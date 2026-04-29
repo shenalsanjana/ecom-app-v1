@@ -44,3 +44,7 @@ next-env.d.ts
 
 # git worktrees
 .worktrees/
+
+# sqlite dev db
+prisma/dev.db
+prisma/dev.db-journal
