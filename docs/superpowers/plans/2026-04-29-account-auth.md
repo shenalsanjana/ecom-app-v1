@@ -2,11 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add real email/password authentication, profile management (name/email + addresses + change password), per-user wishlist with heart-toggle on product cards, and password reset over SMTP. Migrate storefront product/category data from `app/_data/mock.ts` into Postgres so wishlist items have real referential integrity.
+**Goal:** Add real email/password authentication, profile management (name/email + addresses + change password), per-user wishlist with heart-toggle on product cards, and password reset over SMTP. Migrate storefront product/category data from `app/_data/mock.ts` into a local SQLite database so wishlist items have real referential integrity.
 
-**Architecture:** Auth.js v5 with the Credentials provider and JWT session strategy (no Prisma adapter — Credentials does not use one). Prisma + Postgres (via Docker compose). Auth config split into Edge-safe `auth.config.ts` (consumed by `proxy.ts`) and full `auth.ts` (Node-only). All forms use Server Actions; `useActionState` for error/success messaging. Header `ProfileMenu` is a small client component (Radix dropdown); everything else stays as Server Components.
+**Architecture:** Auth.js v5 with the Credentials provider and JWT session strategy (no Prisma adapter — Credentials does not use one). Prisma + SQLite (file-based, `prisma/dev.db`, no external service). Auth config split into Edge-safe `auth.config.ts` (consumed by `proxy.ts`) and full `auth.ts` (Node-only). All forms use Server Actions; `useActionState` for error/success messaging. Header `ProfileMenu` is a small client component (Radix dropdown); everything else stays as Server Components.
 
-**Tech Stack:** Next.js 16.2.4, React 19.2.4, TypeScript strict, Tailwind v4, shadcn/ui, Auth.js v5 (`next-auth@5`), Prisma + Postgres 16-alpine, bcryptjs, zod, nodemailer.
+**Tech Stack:** Next.js 16.2.4, React 19.2.4, TypeScript strict, Tailwind v4, shadcn/ui, Auth.js v5 (`next-auth@5`), Prisma + SQLite, bcryptjs, zod, nodemailer.
+
+> **2026-04-29 amendment:** Originally specified Postgres via Docker compose. Docker isn't available on the dev machine, so the database has been switched to SQLite. The plan has been edited inline to reflect this — Tasks 3, 4, 6, and 47 step 1 changed; everything else (auth config, account routes, wishlist, etc.) is unchanged because it was always DB-agnostic at the Prisma layer.
 
 **Spec:** `docs/superpowers/specs/2026-04-29-account-auth-design.md`
 
@@ -27,7 +29,6 @@
 
 **Created in this plan:**
 
-- `docker-compose.yml` — Postgres 16-alpine + named volume
 - `proxy.ts` — Next 16 proxy (route protection)
 - `prisma/schema.prisma`
 - `prisma/seed.ts`
@@ -161,33 +162,14 @@ git commit -m "chore: add auth, prisma, postgres, nodemailer, zod deps"
 
 ---
 
-## Task 3: Add Docker compose for Postgres
+## Task 3: Add SQLite db scripts to `package.json`
 
 **Files:**
-- Create: `docker-compose.yml`
-- Modify: `package.json` (scripts only)
+- Modify: `package.json` (scripts + prisma config)
 
-- [ ] **Step 1: Create `docker-compose.yml` at project root**
+No external service. SQLite is file-based (lives at `prisma/dev.db`); the file is created automatically by `prisma migrate dev` in Task 7. This task only adds npm script wrappers and the prisma seed config — no `docker-compose.yml`.
 
-```yaml
-services:
-  db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: shoply
-      POSTGRES_PASSWORD: shoply
-      POSTGRES_DB: shoply
-    ports:
-      - "5432:5432"
-    volumes:
-      - shoply-pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-
-volumes:
-  shoply-pgdata:
-```
-
-- [ ] **Step 2: Add `db:*` scripts to `package.json`**
+- [ ] **Step 1: Add `db:*` scripts to `package.json`**
 
 In `package.json`, replace the existing `scripts` object with:
 
@@ -197,13 +179,13 @@ In `package.json`, replace the existing `scripts` object with:
   "build": "next build",
   "start": "next start",
   "lint": "eslint",
-  "db:up": "docker compose up -d db",
-  "db:down": "docker compose down",
-  "db:reset": "docker compose down -v && docker compose up -d db",
   "db:migrate": "prisma migrate dev",
-  "db:seed": "prisma db seed"
+  "db:seed": "prisma db seed",
+  "db:reset": "prisma migrate reset --force"
 }
 ```
+
+`db:reset` uses Prisma's built-in reset (drops all tables, re-runs migrations, then `db seed`). `--force` skips the interactive confirm.
 
 Also add a `prisma` block at the top level of `package.json` (sibling of `scripts`):
 
@@ -213,23 +195,17 @@ Also add a `prisma` block at the top level of `package.json` (sibling of `script
 }
 ```
 
-- [ ] **Step 3: Start the database**
+- [ ] **Step 2: Verify `package.json` is still valid JSON**
 
-Run: `npm run db:up`
+Run: `node -e "JSON.parse(require('fs').readFileSync('package.json'))"`
 
-Expected: `[+] Running 2/2  Container shoply-db-1  Started`. Verify with `docker ps` — image `postgres:16-alpine` should be running.
+Expected: no output, exit 0.
 
-- [ ] **Step 4: Smoke-test connectivity**
-
-Run: `docker exec -it $(docker ps -qf "ancestor=postgres:16-alpine") psql -U shoply -d shoply -c "SELECT 1;"`
-
-Expected: `?column?` row with `1`.
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add docker-compose.yml package.json
-git commit -m "feat: add postgres via docker compose with db scripts"
+git add package.json
+git commit -m "feat: add db:migrate / db:seed / db:reset scripts and prisma seed config"
 ```
 
 ---
@@ -242,7 +218,7 @@ git commit -m "feat: add postgres via docker compose with db scripts"
 
 - [ ] **Step 1: Initialize Prisma scaffolding (without overwriting)**
 
-Run: `npx prisma init --datasource-provider postgresql`
+Run: `npx prisma init --datasource-provider sqlite`
 
 This creates `prisma/schema.prisma` (with a stub) and a top-level `.env`. **Delete the auto-generated `.env`** (we will use `.env.local` instead, see Task 6):
 
@@ -254,7 +230,7 @@ rm .env
 
 ```prisma
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -304,8 +280,8 @@ model Category {
 model Product {
   id            String   @id
   name          String
-  price         Decimal  @db.Decimal(10, 2)
-  originalPrice Decimal? @db.Decimal(10, 2)
+  price         Float
+  originalPrice Float?
   image         String
   rating        Float
   reviewCount   Int
@@ -421,7 +397,7 @@ Copy the output (a 44-char base64 string). You will paste it into `.env.local` i
 - [ ] **Step 2: Create `.env.local`** (replace `<paste-here>` with the secret from Step 1)
 
 ```
-DATABASE_URL="postgresql://shoply:shoply@localhost:5432/shoply"
+DATABASE_URL="file:./dev.db"
 AUTH_SECRET="<paste-here>"
 AUTH_URL="http://localhost:3000"
 APP_URL="http://localhost:3000"
@@ -439,7 +415,7 @@ SMTP_FROM="Shoply <no-reply@example.com>"
 Same content as `.env.local` but with `AUTH_SECRET=""` (no real secret committed):
 
 ```
-DATABASE_URL="postgresql://shoply:shoply@localhost:5432/shoply"
+DATABASE_URL="file:./dev.db"
 AUTH_SECRET=""
 AUTH_URL="http://localhost:3000"
 APP_URL="http://localhost:3000"
@@ -469,35 +445,46 @@ git commit -m "feat: add .env.local.example documenting required env vars"
 
 ## Task 7: First migration
 
-**Files:** `prisma/migrations/<timestamp>_init/migration.sql` (generated)
+**Files:**
+- Generated: `prisma/migrations/<timestamp>_init/migration.sql`
+- Generated: `prisma/dev.db` (gitignored — see Step 1)
+- Modify: `.gitignore` (add `prisma/dev.db*`)
 
-- [ ] **Step 1: Ensure Postgres is running**
+- [ ] **Step 1: Add SQLite db files to `.gitignore`**
 
-Run: `docker ps | grep postgres:16-alpine`
+Append the following to `.gitignore`:
 
-If no result, run `npm run db:up` and wait 3–5s for the container to be ready.
+```
+# sqlite dev db
+prisma/dev.db
+prisma/dev.db-journal
+```
+
+Verify: `git check-ignore -v prisma/dev.db` should print the matching `.gitignore` line.
 
 - [ ] **Step 2: Run the initial migration**
 
 Run: `npm run db:migrate -- --name init`
 
-Expected: Prisma creates the `prisma/migrations/<timestamp>_init/` folder with a `migration.sql` file, then applies it. Output ends with `🚀 Your database is now in sync with your schema.` and generates the Prisma Client.
+Expected: Prisma creates the `prisma/migrations/<timestamp>_init/` folder with a `migration.sql` file, creates `prisma/dev.db`, and applies the schema. Output ends with `Your database is now in sync with your schema.` (or similar) and generates the Prisma Client.
 
 - [ ] **Step 3: Verify tables exist**
 
 Run:
 ```bash
-docker exec -it $(docker ps -qf "ancestor=postgres:16-alpine") psql -U shoply -d shoply -c "\dt"
+node -e "const {PrismaClient}=require('@prisma/client');const p=new PrismaClient();p.\$queryRawUnsafe(\"SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name\").then(r=>console.log(r.map(t=>t.name).join(', '))).finally(()=>p.\$disconnect())"
 ```
 
-Expected: Tables `User`, `Address`, `Category`, `Product`, `WishlistItem`, `PasswordResetToken`, `_prisma_migrations`.
+Expected tables (in some order): `Address, Category, PasswordResetToken, Product, User, WishlistItem, _prisma_migrations`.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add prisma/migrations
-git commit -m "feat: initial prisma migration"
+git add .gitignore prisma/migrations
+git commit -m "feat: initial prisma migration (sqlite)"
 ```
+
+`prisma/dev.db` itself is **not** committed (it's gitignored).
 
 ---
 
@@ -575,16 +562,16 @@ Expected: `Seeded 6 categories and 12 products.` (8 featured + 4 deals = 12 uniq
 
 Run:
 ```bash
-docker exec -it $(docker ps -qf "ancestor=postgres:16-alpine") psql -U shoply -d shoply -c 'SELECT COUNT(*) FROM "Product"; SELECT COUNT(*) FROM "Category";'
+node -e "const {PrismaClient}=require('@prisma/client');const p=new PrismaClient();(async()=>{console.log('products:',await p.product.count(),'categories:',await p.category.count());await p.\$disconnect();})()"
 ```
 
-Expected: Product count = 12, Category count = 6.
+Expected output: `products: 12 categories: 6`.
 
 - [ ] **Step 4: Re-run the seed to confirm idempotency**
 
 Run: `npm run db:seed`
 
-Expected: Same `Seeded 6 categories and 12 products.` line — no errors. Counts in Postgres remain 12 and 6.
+Expected: Same `Seeded 6 categories and 12 products.` line — no errors. Counts in `prisma/dev.db` remain 12 and 6.
 
 - [ ] **Step 5: Commit**
 
@@ -3400,15 +3387,11 @@ This is the verification list from the spec. Walk through every item in a fresh 
 
 - [ ] **Step 1: Reset the database to a clean state**
 
-Run:
-```bash
-npm run db:reset
-sleep 3
-npm run db:migrate
-npm run db:seed
-```
+Run: `npm run db:reset`
 
-Expected: fresh Postgres with seeded products and categories, no users.
+This calls `prisma migrate reset --force`, which drops all tables, re-runs every migration, and runs `prisma db seed` automatically. No separate `db:migrate` / `db:seed` calls needed.
+
+Expected: fresh `prisma/dev.db` with seeded products and categories (12 + 6), no users.
 
 - [ ] **Step 2: Start dev server**
 

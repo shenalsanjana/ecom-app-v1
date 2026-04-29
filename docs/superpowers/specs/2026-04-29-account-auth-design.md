@@ -3,7 +3,9 @@
 **Date:** 2026-04-29
 **Status:** Approved for implementation planning
 **Branch:** `develop`
-**Scope:** Real authentication, profile management, saved addresses, wishlist, and password reset on top of the existing storefront scaffold. Storefront product/category data migrates from `mock.ts` into Postgres.
+**Scope:** Real authentication, profile management, saved addresses, wishlist, and password reset on top of the existing storefront scaffold. Storefront product/category data migrates from `mock.ts` into a local SQLite database.
+
+> **2026-04-29 amendment:** Originally specified Postgres via Docker compose. Docker is not available on the target dev machine, so the database has been switched to **SQLite** (file-based, no server, no install). Affected sections: Stack additions, Data model (Decimal → Float), File layout (no `docker-compose.yml`), Environment variables (`DATABASE_URL` format).
 
 This is **spec #1** of a five-spec sequence. The remaining specs (rate limiting, admin/RBAC, account deletion + data export, real cart/checkout/orders) are listed under [Future specs](#future-specs) and will be brainstormed in their own sessions after this spec is implemented.
 
@@ -16,7 +18,7 @@ Add a real account area to the storefront. Users register and log in with email 
 On top of the existing scaffold (Next.js 16.2.4, React 19.2.4, Tailwind v4, shadcn/ui):
 
 - **Auth.js v5** (`next-auth@5`) with the **Credentials provider** and **JWT session strategy** (`session: { strategy: "jwt" }`). The Auth.js Prisma adapter is *not* installed — Credentials does not use the adapter's session table.
-- **Prisma + Postgres**. Postgres runs in Docker via a `docker-compose.yml` committed to the repo. Local dev URL: `postgresql://shoply:shoply@localhost:5432/shoply`.
+- **Prisma + SQLite**. File-based DB at `prisma/dev.db` (gitignored). Connection: `DATABASE_URL="file:./dev.db"`. No external service, no install. The trade-off is no native `Decimal` column type — prices use `Float` (revisit when real money handling lands).
 - **bcryptjs** for password hashing (pure JS, avoids the Edge-runtime native-binding issue that `bcrypt` hits).
 - **zod** for input validation in server actions.
 - **nodemailer** for password-reset emails over generic SMTP (host/user/pass/port/from in env).
@@ -32,7 +34,6 @@ Next 16 specifics that shape the design:
 
 ```
 ecom-app-v1/
-  docker-compose.yml                    # NEW — Postgres 16-alpine + named volume
   proxy.ts                              # NEW — Next 16 proxy (route protection)
   prisma/
     schema.prisma                       # NEW
@@ -94,7 +95,7 @@ ecom-app-v1/
 ```prisma
 // prisma/schema.prisma
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -144,8 +145,8 @@ model Category {
 model Product {
   id            String   @id          // matches mock.ts ids ("p1", "d1") so seed is idempotent
   name          String
-  price         Decimal  @db.Decimal(10, 2)
-  originalPrice Decimal? @db.Decimal(10, 2)
+  price         Float
+  originalPrice Float?
   image         String
   rating        Float
   reviewCount   Int
@@ -193,39 +194,23 @@ model PasswordResetToken {
 - **`Product.id` keeps mock.ts's string IDs** ("p1", "d1") so the seed `upsert`s by id and re-running it is safe.
 - **`WishlistItem` uniqueness on `(userId, productId)`** — adding the same product twice is a no-op rather than an error.
 - **`onDelete: Cascade`** on user-owned tables: deleting a user removes their addresses, wishlist, and reset tokens cleanly.
-- **`Decimal(10, 2)` for prices.** Real Postgres decimal — no floating-point rounding on money. Server code calls `.toNumber()` (or `.toFixed(2)`) at the render boundary; downstream `ProductCard` props remain plain numbers.
+- **`Float` for prices.** SQLite has no native `Decimal` type and no `@db.Decimal` mapping (`numeric` in SQLite is dynamically typed and Prisma represents it via `Float`/`Decimal` only on Postgres/MySQL). We accept floating-point rounding risk on money in the scaffold and revisit when a real payments backend lands. Downstream `ProductCard` props are plain `number`.
 
-## Postgres + seed
+## SQLite + seed
 
-`docker-compose.yml`:
-
-```yaml
-services:
-  db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: shoply
-      POSTGRES_PASSWORD: shoply
-      POSTGRES_DB: shoply
-    ports: ["5432:5432"]
-    volumes: [shoply-pgdata:/var/lib/postgresql/data]
-    restart: unless-stopped
-
-volumes:
-  shoply-pgdata:
-```
+No external service. The DB lives at `prisma/dev.db` (gitignored). `prisma migrate dev` creates and applies migrations against this file; `prisma db seed` populates rows.
 
 `package.json` scripts added:
 
 ```jsonc
 {
-  "db:up":     "docker compose up -d db",
-  "db:down":   "docker compose down",
-  "db:reset":  "docker compose down -v && docker compose up -d db",
-  "db:migrate":"prisma migrate dev",
-  "db:seed":   "prisma db seed"
+  "db:migrate": "prisma migrate dev",
+  "db:seed":    "prisma db seed",
+  "db:reset":   "prisma migrate reset --force"
 }
 ```
+
+`db:reset` uses Prisma's built-in reset (drops all tables, re-runs migrations, then `db seed`) — no Docker/file deletion needed.
 
 `prisma/seed.ts` imports `categories`, `featuredProducts`, and `dealsProducts` from `app/_data/mock.ts`, then `upsert`s every category by `slug` and every product by `id`. Because the existing `mock.ts` `featuredProducts` and `dealsProducts` use disjoint id prefixes (`p*` and `d*`), the seed simply unions both arrays before upserting products — no dedupe logic needed.
 
@@ -466,7 +451,7 @@ To know whether to render the heart filled, server pages that render a `ProductC
 `.env.local`:
 
 ```
-DATABASE_URL="postgresql://shoply:shoply@localhost:5432/shoply"
+DATABASE_URL="file:./dev.db"
 AUTH_SECRET="<openssl rand -base64 32>"
 AUTH_URL="http://localhost:3000"
 APP_URL="http://localhost:3000"
@@ -491,7 +476,7 @@ This is still a scaffold round; behavior verification is largely manual.
 
 **Manual happy paths:**
 
-4. `npm run db:up && npm run dev`. Home page renders with all sections fed from Postgres (products and categories visible, deals carry discount badges).
+4. `npm run dev`. Home page renders with all sections fed from SQLite (products and categories visible, deals carry discount badges).
 5. Header shows Search → Wishlist → Cart → Profile. As guest: profile dropdown shows Log in / Sign up; clicking the wishlist icon redirects to `/login?callbackUrl=/wishlist`.
 6. Sign up via `/signup` (name + email + password + confirm). Successful signup logs you in and redirects to `/`. Header now shows registered dropdown ("Hi, …" + account links + Log out).
 7. From a product card, click the heart → card re-renders with filled heart. Visit `/wishlist` → product appears. Click "Remove" → product gone, heart empties on the home page.
