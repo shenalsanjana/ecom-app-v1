@@ -1,8 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
-import { categories } from "@/app/_data/mock";
+import { getCategories } from "@/app/_lib/products";
 
-export function CategoryStrip() {
+export async function CategoryStrip() {
+  const categories = await getCategories();
   return (
     <section className="border-b">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
