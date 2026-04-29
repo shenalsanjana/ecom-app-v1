@@ -1,7 +1,8 @@
 import { ProductCard } from "@/app/_components/home/product-card";
-import { featuredProducts } from "@/app/_data/mock";
+import { getFeaturedProducts } from "@/app/_lib/products";
 
-export function ProductGrid() {
+export async function ProductGrid() {
+  const products = await getFeaturedProducts(8);
   return (
     <section className="border-b">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
@@ -12,8 +13,8 @@ export function ProductGrid() {
           </a>
         </div>
         <div className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3 lg:grid-cols-4">
-          {featuredProducts.map((p) => (
-            <ProductCard key={p.id} product={p} />
+          {products.map((p) => (
+            <ProductCard key={p.id} product={{ ...p, originalPrice: p.originalPrice ?? undefined }} />
           ))}
         </div>
       </div>
