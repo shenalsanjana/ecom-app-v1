@@ -1,8 +1,14 @@
+import { auth } from "@/app/_lib/auth";
 import { ProductCard } from "@/app/_components/home/product-card";
 import { getFeaturedProducts } from "@/app/_lib/products";
+import { getWishlistProductIds } from "@/app/_lib/wishlist";
 
 export async function ProductGrid() {
   const products = await getFeaturedProducts(8);
+  const session = await auth();
+  const wishlisted = session?.user?.id
+    ? await getWishlistProductIds(session.user.id)
+    : new Set<string>();
   return (
     <section className="border-b">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
@@ -14,7 +20,18 @@ export async function ProductGrid() {
         </div>
         <div className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3 lg:grid-cols-4">
           {products.map((p) => (
-            <ProductCard key={p.id} product={{ ...p, originalPrice: p.originalPrice ?? undefined }} />
+            <ProductCard
+              key={p.id}
+              id={p.id}
+              name={p.name}
+              price={p.price}
+              originalPrice={p.originalPrice}
+              image={p.image}
+              rating={p.rating}
+              reviewCount={p.reviewCount}
+              wishlisted={wishlisted.has(p.id)}
+              fromPath="/"
+            />
           ))}
         </div>
       </div>
