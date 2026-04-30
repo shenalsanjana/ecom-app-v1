@@ -3,7 +3,78 @@ import { categories, featuredProducts, dealsProducts } from "../app/_data/mock";
 
 const prisma = new PrismaClient();
 
+const REVIEW_AUTHORS = [
+  "Alex M.", "Jordan K.", "Priya R.", "Sam T.", "Mei L.",
+  "Diego A.", "Chris P.", "Hana O.", "Tom W.", "Rosa G.",
+  "Liam B.", "Yuki S.",
+];
+
+const REVIEW_TITLES = [
+  "Loving it so far",
+  "Solid quality",
+  null,
+  "Better than expected",
+  "Would buy again",
+  null,
+  "Great gift",
+  "Not bad for the price",
+];
+
+const REVIEW_BODIES = [
+  "Worked exactly as described. Shipping was quick and packaging was clean.",
+  "Quality feels above the price point. A few small nitpicks but nothing dealbreaking.",
+  "Has held up well after a few weeks of daily use. Recommended.",
+  "Solid build, looks good, does the job. No complaints.",
+  "Bought as a gift — they loved it. Would order again.",
+  "Took a bit to get used to but now I use it constantly.",
+  "Fine. Nothing remarkable but no obvious flaws either.",
+  "Exceeded my expectations honestly. Glad I picked this one.",
+];
+
+const RATING_POOL = [5, 5, 5, 4, 4, 4, 4, 3, 3, 2];
+
+// Stable per-product RNG so reseeds produce the same data.
+function rngFromId(id: string): () => number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return () => {
+    h = (Math.imul(h, 1664525) + 1013904223) >>> 0;
+    return h / 0xffffffff;
+  };
+}
+
+function pick<T>(arr: T[], rng: () => number): T {
+  return arr[Math.floor(rng() * arr.length)];
+}
+
+function buildDescription(name: string, category: string): string {
+  return [
+    `# ${name}`,
+    "",
+    `A standout pick in our ${category} lineup. Designed to feel good in everyday use without compromising on quality.`,
+    "",
+    "## Why you'll like it",
+    "",
+    "- Built to last — chosen materials, careful construction",
+    "- Easy to live with — minimal fuss, comfortable in real-world use",
+    "- Backed by hundreds of happy customers",
+    "",
+    "Whether you're upgrading or trying it for the first time, you're in good hands.",
+  ].join("\n");
+}
+
+function stockFor(productId: string): number {
+  if (productId === "p7") return 0;       // out-of-stock test case
+  if (productId === "d2") return 3;       // low-stock test case
+  const rng = rngFromId(productId + ":stock");
+  return 5 + Math.floor(rng() * 21);      // 5..25
+}
+
 async function main() {
+  // Categories
   for (const c of categories) {
     await prisma.category.upsert({
       where: { slug: c.slug },
@@ -13,16 +84,22 @@ async function main() {
   }
 
   const all = [...featuredProducts, ...dealsProducts];
+
+  // Products (with picsum image, markdown description, stock)
   for (const p of all) {
+    const image = `https://picsum.photos/seed/${p.id}/600/600`;
+    const description = buildDescription(p.name, p.category);
+    const stock = stockFor(p.id);
+
     await prisma.product.upsert({
       where: { id: p.id },
       update: {
         name: p.name,
         price: p.price,
         originalPrice: p.originalPrice ?? null,
-        image: p.image,
-        rating: p.rating,
-        reviewCount: p.reviewCount,
+        image,
+        description,
+        stock,
         categorySlug: p.category,
       },
       create: {
@@ -30,15 +107,47 @@ async function main() {
         name: p.name,
         price: p.price,
         originalPrice: p.originalPrice ?? null,
-        image: p.image,
-        rating: p.rating,
-        reviewCount: p.reviewCount,
+        image,
+        description,
+        stock,
         categorySlug: p.category,
       },
     });
+
+    // ProductImage rows (4 per product). Reset and re-create on each seed run.
+    await prisma.productImage.deleteMany({ where: { productId: p.id } });
+    await prisma.productImage.createMany({
+      data: [1, 2, 3, 4].map((n) => ({
+        productId: p.id,
+        url: `https://picsum.photos/seed/${p.id}-${n}/800/800`,
+        sortOrder: n,
+      })),
+    });
+
+    // Review rows (5..10 per product, deterministic).
+    await prisma.review.deleteMany({ where: { productId: p.id } });
+    const rng = rngFromId(p.id + ":reviews");
+    const count = 5 + Math.floor(rng() * 6); // 5..10
+    const reviews = Array.from({ length: count }).map((_, i) => {
+      const daysAgo = Math.floor(rng() * 90);
+      const createdAt = new Date(Date.now() - daysAgo * 86400_000);
+      return {
+        productId: p.id,
+        authorName: pick(REVIEW_AUTHORS, rng),
+        rating: pick(RATING_POOL, rng),
+        title: pick(REVIEW_TITLES, rng),
+        body: pick(REVIEW_BODIES, rng),
+        createdAt,
+      };
+    });
+    await prisma.review.createMany({ data: reviews });
   }
 
-  console.log(`Seeded ${categories.length} categories and ${all.length} products.`);
+  const totalImages = await prisma.productImage.count();
+  const totalReviews = await prisma.review.count();
+  console.log(
+    `Seeded ${categories.length} categories, ${all.length} products, ${totalImages} images, ${totalReviews} reviews.`,
+  );
 }
 
 main()
