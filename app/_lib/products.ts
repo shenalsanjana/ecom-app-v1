@@ -1,5 +1,6 @@
 // app/_lib/products.ts
 import { prisma } from "@/app/_lib/prisma";
+import type { Category, Product, ProductImage } from "@prisma/client";
 
 export type ProductView = {
   id: string;
@@ -96,4 +97,48 @@ export async function getProductById(id: string): Promise<ProductView | null> {
   if (!row) return null;
   const [view] = await attachAggregates([row]);
   return view;
+}
+
+export type ProductDetail = {
+  product: Product & { category: Category; images: ProductImage[] };
+  ratingAvg: number;
+  ratingCount: number;
+  related: ProductView[];
+};
+
+export async function getProductDetail(id: string): Promise<ProductDetail | null> {
+  const product = await prisma.product.findUnique({
+    where: { id },
+    include: {
+      category: true,
+      images: { orderBy: { sortOrder: "asc" } },
+    },
+  });
+  if (!product) return null;
+
+  const [agg, relatedRows] = await Promise.all([
+    prisma.review.aggregate({
+      where: { productId: id },
+      _avg: { rating: true },
+      _count: { _all: true },
+    }),
+    prisma.product.findMany({
+      where: { categorySlug: product.categorySlug, id: { not: id } },
+      take: 4,
+      orderBy: { id: "asc" },
+      select: {
+        id: true, name: true, price: true, originalPrice: true,
+        image: true, categorySlug: true,
+      },
+    }),
+  ]);
+
+  const related = await attachAggregates(relatedRows);
+
+  return {
+    product,
+    ratingAvg: agg._avg.rating ?? 0,
+    ratingCount: agg._count._all,
+    related,
+  };
 }
