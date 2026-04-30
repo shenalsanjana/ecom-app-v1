@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { Heart, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,23 +39,26 @@ export function ProductCard({
 }: ProductCardProps) {
   const onSale = originalPrice != null && originalPrice > price;
   const pct = onSale ? discountPct(price, originalPrice as number) : 0;
+  const href = `/products/${id}`;
 
   return (
     <Card className="overflow-hidden p-0">
       <div className="relative flex h-48 items-center justify-center bg-gradient-to-br from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-900">
         {onSale && (
-          <Badge className="absolute left-3 top-3" variant="destructive">
+          <Badge className="absolute left-3 top-3 z-10" variant="destructive">
             -{pct}%
           </Badge>
         )}
-        <Image
-          src={image}
-          alt={name}
-          width={96}
-          height={96}
-          className="opacity-90 dark:invert"
-        />
-        <form action={toggleWishlistAction} className="absolute right-2 top-2">
+        <Link href={href} aria-label={name} className="absolute inset-0">
+          <Image
+            src={image}
+            alt={name}
+            fill
+            sizes="(min-width:1024px) 25vw, 50vw"
+            className="object-cover"
+          />
+        </Link>
+        <form action={toggleWishlistAction} className="absolute right-2 top-2 z-10">
           <input type="hidden" name="productId" value={id} />
           <input type="hidden" name="fromPath" value={fromPath} />
           <Button
@@ -70,7 +74,7 @@ export function ProductCard({
       </div>
       <CardContent className="space-y-2 p-4">
         <h3 className="line-clamp-2 min-h-[2.75rem] text-sm font-medium leading-snug">
-          {name}
+          <Link href={href} className="hover:underline underline-offset-4">{name}</Link>
         </h3>
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <Star className="h-3.5 w-3.5 fill-amber-400 stroke-amber-400" />
