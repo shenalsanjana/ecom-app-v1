@@ -18,26 +18,40 @@ export type CategoryView = {
   image: string;
 };
 
-function toView(p: {
+type ProductRow = {
   id: string;
   name: string;
   price: number;
   originalPrice: number | null;
   image: string;
-  rating: number;
-  reviewCount: number;
   categorySlug: string;
-}): ProductView {
-  return {
-    id: p.id,
-    name: p.name,
-    price: p.price,
-    originalPrice: p.originalPrice ?? null,
-    image: p.image,
-    rating: p.rating,
-    reviewCount: p.reviewCount,
-    category: p.categorySlug,
-  };
+};
+
+async function attachAggregates(rows: ProductRow[]): Promise<ProductView[]> {
+  if (rows.length === 0) return [];
+  const ids = rows.map((r) => r.id);
+  const grouped = await prisma.review.groupBy({
+    by: ["productId"],
+    where: { productId: { in: ids } },
+    _avg: { rating: true },
+    _count: { _all: true },
+  });
+  const map = new Map(
+    grouped.map((g) => [g.productId, { avg: g._avg.rating ?? 0, count: g._count._all }]),
+  );
+  return rows.map((p) => {
+    const agg = map.get(p.id) ?? { avg: 0, count: 0 };
+    return {
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      originalPrice: p.originalPrice ?? null,
+      image: p.image,
+      rating: agg.avg,
+      reviewCount: agg.count,
+      category: p.categorySlug,
+    };
+  });
 }
 
 export async function getCategories(): Promise<CategoryView[]> {
@@ -50,8 +64,12 @@ export async function getFeaturedProducts(limit = 8): Promise<ProductView[]> {
     where: { id: { startsWith: "p" } },
     orderBy: { id: "asc" },
     take: limit,
+    select: {
+      id: true, name: true, price: true, originalPrice: true,
+      image: true, categorySlug: true,
+    },
   });
-  return rows.map(toView);
+  return attachAggregates(rows);
 }
 
 export async function getDealsProducts(limit = 4): Promise<ProductView[]> {
@@ -59,11 +77,23 @@ export async function getDealsProducts(limit = 4): Promise<ProductView[]> {
     where: { originalPrice: { not: null } },
     orderBy: { id: "asc" },
     take: limit,
+    select: {
+      id: true, name: true, price: true, originalPrice: true,
+      image: true, categorySlug: true,
+    },
   });
-  return rows.map(toView);
+  return attachAggregates(rows);
 }
 
 export async function getProductById(id: string): Promise<ProductView | null> {
-  const row = await prisma.product.findUnique({ where: { id } });
-  return row ? toView(row) : null;
+  const row = await prisma.product.findUnique({
+    where: { id },
+    select: {
+      id: true, name: true, price: true, originalPrice: true,
+      image: true, categorySlug: true,
+    },
+  });
+  if (!row) return null;
+  const [view] = await attachAggregates([row]);
+  return view;
 }

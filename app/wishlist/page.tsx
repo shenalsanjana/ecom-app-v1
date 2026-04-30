@@ -18,6 +18,21 @@ export default async function WishlistPage() {
     orderBy: { createdAt: "desc" },
   });
 
+  // Compute rating/reviewCount per product via a single groupBy.
+  const productIds = items.map((it) => it.productId);
+  const grouped =
+    productIds.length > 0
+      ? await prisma.review.groupBy({
+          by: ["productId"],
+          where: { productId: { in: productIds } },
+          _avg: { rating: true },
+          _count: { _all: true },
+        })
+      : [];
+  const aggMap = new Map(
+    grouped.map((g) => [g.productId, { avg: g._avg.rating ?? 0, count: g._count._all }]),
+  );
+
   return (
     <>
       <SiteHeader />
@@ -36,20 +51,23 @@ export default async function WishlistPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {items.map((it) => (
-                <ProductCard
-                  key={it.id}
-                  id={it.product.id}
-                  name={it.product.name}
-                  price={it.product.price}
-                  originalPrice={it.product.originalPrice}
-                  image={it.product.image}
-                  rating={it.product.rating}
-                  reviewCount={it.product.reviewCount}
-                  wishlisted={true}
-                  fromPath="/wishlist"
-                />
-              ))}
+              {items.map((it) => {
+                const agg = aggMap.get(it.productId) ?? { avg: 0, count: 0 };
+                return (
+                  <ProductCard
+                    key={it.id}
+                    id={it.product.id}
+                    name={it.product.name}
+                    price={it.product.price}
+                    originalPrice={it.product.originalPrice}
+                    image={it.product.image}
+                    rating={agg.avg}
+                    reviewCount={agg.count}
+                    wishlisted={true}
+                    fromPath="/wishlist"
+                  />
+                );
+              })}
             </div>
           )}
         </section>
