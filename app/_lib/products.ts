@@ -1,6 +1,6 @@
 // app/_lib/products.ts
 import { prisma } from "@/app/_lib/prisma";
-import type { Category, Product, ProductImage } from "@prisma/client";
+import type { Category, Product, ProductImage, Review } from "@prisma/client";
 
 export type ProductView = {
   id: string;
@@ -141,4 +141,32 @@ export async function getProductDetail(id: string): Promise<ProductDetail | null
     ratingCount: agg._count._all,
     related,
   };
+}
+
+export async function getProductReviews(
+  productId: string,
+  take: number,
+): Promise<Review[]> {
+  const safeTake = Number.isFinite(take) && take > 0 ? Math.min(Math.trunc(take), 100) : 5;
+  return prisma.review.findMany({
+    where: { productId },
+    orderBy: { createdAt: "desc" },
+    take: safeTake,
+  });
+}
+
+export type ReviewHistogram = Record<1 | 2 | 3 | 4 | 5, number>;
+
+export async function getReviewHistogram(productId: string): Promise<ReviewHistogram> {
+  const rows = await prisma.review.groupBy({
+    by: ["rating"],
+    where: { productId },
+    _count: { _all: true },
+  });
+  const hist: ReviewHistogram = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  for (const r of rows) {
+    const k = r.rating as 1 | 2 | 3 | 4 | 5;
+    if (k >= 1 && k <= 5) hist[k] = r._count._all;
+  }
+  return hist;
 }
