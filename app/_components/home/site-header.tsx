@@ -1,13 +1,12 @@
 // app/_components/home/site-header.tsx
 import Link from "next/link";
-import { Search, ShoppingCart } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { auth } from "@/app/_lib/auth";
 import { getWishlistCount } from "@/app/_lib/wishlist";
 import { WishlistIcon } from "@/app/_components/header/wishlist-icon";
 import { ProfileMenu } from "@/app/_components/header/profile-menu";
+import { CartIconWrapper } from "@/app/_components/header/cart-icon-wrapper";
 
 const NAV_LINKS = [
   { href: "#", label: "Shop" },
@@ -41,10 +40,7 @@ export async function SiteHeader() {
         </div>
         <div className="ml-auto flex items-center gap-1 md:ml-0">
           <WishlistIcon loggedIn={loggedIn} count={wishlistCount} />
-          <Button variant="ghost" size="icon" className="relative" aria-label="Cart">
-            <ShoppingCart className="h-5 w-5" />
-            <Badge className="absolute -right-1 -top-1 h-5 min-w-[1.25rem] rounded-full px-1 text-[10px]">3</Badge>
-          </Button>
+          <CartIconWrapper />
           <ProfileMenu user={userForMenu} />
         </div>
       </div>

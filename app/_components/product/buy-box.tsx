@@ -1,6 +1,10 @@
+// app/_components/product/buy-box.tsx
+"use client";
+
 import { Heart, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { AddToCartButton } from "@/app/_components/cart/add-to-cart-button";
 import { toggleWishlistAction } from "@/app/wishlist/actions";
 
 type Props = {
@@ -8,6 +12,7 @@ type Props = {
   name: string;
   price: number;
   originalPrice: number | null;
+  image: string;
   ratingAvg: number;
   ratingCount: number;
   stock: number;
@@ -45,7 +50,7 @@ function StockChip({ stock }: { stock: number }) {
 }
 
 export function BuyBox({
-  productId, name, price, originalPrice,
+  productId, name, price, originalPrice, image,
   ratingAvg, ratingCount, stock, wishlisted,
 }: Props) {
   const onSale = originalPrice != null && originalPrice > price;
@@ -99,13 +104,14 @@ export function BuyBox({
       )}
 
       <div className="flex flex-col gap-2 sm:flex-row">
-        <Button
-          className="flex-1"
+        <AddToCartButton
+          productId={productId}
+          name={name}
+          price={price}
+          image={image}
           disabled={!inStock}
-          aria-disabled={!inStock}
-        >
-          Add to cart
-        </Button>
+          className="flex-1"
+        />
         <form action={toggleWishlistAction}>
           <input type="hidden" name="productId" value={productId} />
           <input type="hidden" name="fromPath" value={fromPath} />

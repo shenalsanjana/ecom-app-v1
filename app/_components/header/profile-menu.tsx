@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -34,10 +35,12 @@ export function ProfileMenu({ user }: { user: SessionUser }) {
       <DropdownMenuContent align="end" className="w-56">
         {user ? (
           <>
+            <DropdownMenuGroup>
             <DropdownMenuLabel className="font-normal">
               <div className="text-xs text-muted-foreground">Hi,</div>
               <div className="truncate">{firstName(user.name)}</div>
             </DropdownMenuLabel>
+          </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem render={<Link href="/account" />}>
               My account

@@ -1,10 +1,11 @@
+// app/_components/home/product-card.tsx
 import Image from "next/image";
 import Link from "next/link";
 import { Heart, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { toggleWishlistAction } from "@/app/wishlist/actions";
+import { AddToCartCardButton } from "@/app/_components/cart/add-to-cart-card-button";
 
 export type ProductCardProps = {
   id: string;
@@ -61,15 +62,13 @@ export function ProductCard({
         <form action={toggleWishlistAction} className="absolute right-2 top-2 z-10">
           <input type="hidden" name="productId" value={id} />
           <input type="hidden" name="fromPath" value={fromPath} />
-          <Button
+          <button
             type="submit"
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 rounded-full bg-background/80 backdrop-blur"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-background/80 backdrop-blur text-muted-foreground hover:text-foreground transition-colors"
             aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
           >
             <Heart className={wishlisted ? "h-4 w-4 fill-current" : "h-4 w-4"} />
-          </Button>
+          </button>
         </form>
       </div>
       <CardContent className="space-y-2 p-4">
@@ -91,7 +90,12 @@ export function ProductCard({
         </div>
       </CardContent>
       <CardFooter className="p-4 pt-0">
-        <Button className="w-full" size="sm">Add to cart</Button>
+        <AddToCartCardButton
+          productId={id}
+          name={name}
+          price={price}
+          image={image}
+        />
       </CardFooter>
     </Card>
   );

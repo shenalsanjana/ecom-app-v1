@@ -92,6 +92,7 @@ export default async function ProductPage({
               name={detail.product.name}
               price={detail.product.price}
               originalPrice={detail.product.originalPrice}
+              image={detail.product.image}
               ratingAvg={detail.ratingAvg}
               ratingCount={detail.ratingCount}
               stock={detail.product.stock}
