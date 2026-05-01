@@ -3,8 +3,8 @@ import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy - Shoply",
-  description: "Information about data collection, usage, and protection at Shoply.",
+  title: "Privacy Policy - Dressing Bear",
+  description: "Information about data collection, usage, and protection at Dressing Bear.",
 };
 
 export default function PrivacyPolicyPage() {
@@ -23,7 +23,7 @@ export default function PrivacyPolicyPage() {
             <section aria-labelledby="information-we-collect-heading">
               <h2 id="information-we-collect-heading" className="text-xl font-semibold">Information We Collect</h2>
               <p>
-                Shoply collects information you provide directly to us, such as when you create
+                Dressing Bear collects information you provide directly to us, such as when you create
                 an account, place an order, subscribe to our newsletter, or contact us for support.
                 This information includes your name, email address, phone number, shipping address,
                 and payment information.
@@ -51,7 +51,7 @@ export default function PrivacyPolicyPage() {
             <section aria-labelledby="information-sharing-heading">
               <h2 id="information-sharing-heading" className="text-xl font-semibold">Information Sharing</h2>
               <p>
-                Shoply does not sell or rent your personal information to third parties. We share
+                Dressing Bear does not sell or rent your personal information to third parties. We share
                 your information only in the following circumstances:
               </p>
               <ul className="list-disc pl-6 space-y-1">
@@ -68,7 +68,7 @@ export default function PrivacyPolicyPage() {
             <section aria-labelledby="data-security-heading">
               <h2 id="data-security-heading" className="text-xl font-semibold">Data Security</h2>
               <p>
-                Shoply implements appropriate technical and organizational measures to protect
+                Dressing Bear implements appropriate technical and organizational measures to protect
                 your personal information against unauthorized access, alteration, disclosure, or
                 destruction. This includes SSL encryption for data transmission, secure servers,
                 and regular security assessments.
@@ -83,7 +83,7 @@ export default function PrivacyPolicyPage() {
             <section aria-labelledby="cookies-tracking-heading">
               <h2 id="cookies-tracking-heading" className="text-xl font-semibold">Cookies and Tracking Technologies</h2>
               <p>
-                Shoply uses cookies and similar tracking technologies to enhance your browsing
+                Dressing Bear uses cookies and similar tracking technologies to enhance your browsing
                 experience, analyze site traffic, and personalize content. Cookies are small data
                 files stored on your device that help us remember your preferences and cart items.
               </p>
@@ -101,7 +101,7 @@ export default function PrivacyPolicyPage() {
             <section aria-labelledby="changes-to-privacy-policy-heading">
               <h2 id="changes-to-privacy-policy-heading" className="text-xl font-semibold">Changes to the Privacy Policy</h2>
               <p>
-                Shoply reserves the right to update this Privacy Policy from time to time. Any
+                Dressing Bear reserves the right to update this Privacy Policy from time to time. Any
                 changes will be posted on this page with an updated "Last updated" date. We
                 encourage you to review this Privacy Policy periodically.
               </p>
@@ -118,9 +118,10 @@ export default function PrivacyPolicyPage() {
                 regarding your personal information, please contact us:
               </p>
               <ul className="list-disc pl-6 space-y-1">
-                <li>Email: <a href="mailto:support@shoply.com" className="text-primary hover:underline">support@shoply.com</a></li>
-                <li>Phone: +1 (555) 123-4567</li>
-                <li>Hours: Monday - Friday, 9 AM - 6 PM EST</li>
+                <li>Email: <a href="mailto:dressingbear@gmail.com" className="text-primary hover:underline">dressingbear@gmail.com</a></li>
+                <li>Phone: +94 740545536</li>
+                <li>WhatsApp: <a href="https://wa.me/94740545536" className="text-primary hover:underline">Chat on WhatsApp</a></li>
+                <li>Hours: Monday - Friday, 9 AM - 6 PM Sri Lanka Time</li>
               </ul>
             </section>
           </div>

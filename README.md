@@ -1,36 +1,126 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dressing Bear - E-Commerce Store
+
+A modern e-commerce platform for oversize t-shirts built with Next.js 16.
+
+## Brand Information
+
+- **Brand Name:** Dressing Bear
+- **Contact:** +94 740545536
+- **Email:** dressingbear@gmail.com
+
+## Features
+
+- **Product Catalog:** Oversize t-shirts with size variants (S, M, L, XL)
+- **Shopping Cart:** Client-side cart with localStorage persistence
+- **User Authentication:** Sign up, login, password reset
+- **Wishlist:** Save products for later
+- **Checkout:** Multiple payment options
+- **Order Management:** Orders sent to RoyalExpress delivery service
+
+## Payment Methods
+
+- Cash on Delivery (COD)
+- PayHere
+- Koko
+- MinitPay
 
 ## Getting Started
 
-First, run the development server:
+### 1. Install Dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure Environment
+
+Create `.env.local` with your SMTP settings for email notifications:
+
+```env
+DATABASE_URL="file:./dev.db"
+AUTH_SECRET="your-secret-key"
+AUTH_URL="http://localhost:3000"
+APP_URL="http://localhost:3000"
+
+# SMTP Configuration (for order emails)
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT="587"
+SMTP_USER="your-email@gmail.com"
+SMTP_PASS="your-app-password"
+SMTP_FROM="Dressing Bear <no-reply@example.com>"
+
+# Brand Info
+BRAND_NAME="Dressing Bear"
+BRAND_EMAIL="dressingbear@gmail.com"
+CONTACT_NUMBER="+94 740545536"
+```
+
+### 3. Database Setup
+
+```bash
+# Push schema to database
+$env:DATABASE_URL="file:./dev.db"; npm run db:push
+
+# Seed demo data
+$env:DATABASE_URL="file:./dev.db"; npm run db:seed
+
+# Reset database (full reset)
+$env:DATABASE_URL="file:./dev.db"; npm run db:reset
+```
+
+### 4. Run Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Product Categories
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Oversize T-Shirts
+- Graphic Tees
+- Solid Basics
 
-## Learn More
+## Available Scripts
 
-To learn more about Next.js, take a look at the following resources:
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Build for production |
+| `npm run start` | Start production server |
+| `npm run lint` | Run ESLint |
+| `npm run db:push` | Push schema to database |
+| `npm run db:seed` | Seed demo data |
+| `npm run db:reset` | Reset database |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Demo Data
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The seed creates 12 realistic oversize t-shirt products with:
+- 3 categories
+- 48 product images
+- 93 reviews
+- Size variants (S, M, L, XL)
 
-## Deploy on Vercel
+## Shipping
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Standard Shipping:** 350 LKR flat rate
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Order Flow
+
+1. Customer adds items to cart
+2. Selects size and quantity
+3. Chooses payment method
+4. Enters shipping address
+5. Places order
+6. Order details sent to brand email
+7. Order submitted to RoyalExpress for delivery
+
+## Tech Stack
+
+- **Framework:** Next.js 16 (App Router)
+- **Database:** SQLite with Prisma ORM
+- **Auth:** NextAuth.js v5
+- **Styling:** Tailwind CSS + shadcn/ui
+- **Email:** Nodemailer
+- **Delivery:** RoyalExpress API

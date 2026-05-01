@@ -55,6 +55,7 @@ model Product {
   description   String
   stock         Int      @default(0)
   categorySlug  String
+  sizes         String   @default("S,M,L,XL") // Comma-separated sizes available
 
   category      Category       @relation(fields: [categorySlug], references: [slug])
   wishlistItems WishlistItem[]

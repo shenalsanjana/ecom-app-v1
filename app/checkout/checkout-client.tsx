@@ -1,0 +1,323 @@
+// app/checkout/checkout-client.tsx
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft, ShoppingBag, Truck, CreditCard } from "lucide-react";
+import { useCart } from "@/app/_lib/cart-context";
+import { processOrder } from "./actions";
+import { SiteFooter } from "@/app/_components/home/site-footer";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+
+type PaymentMethod = "COD" | "PAYYHERE" | "KOKO" | "MINITPAY";
+
+function formatPrice(value: number): string {
+  return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
+
+const PAYMENT_OPTIONS: { id: PaymentMethod; name: string; description: string; icon: string }[] = [
+  { id: "PAYYHERE", name: "PayHere", description: "Pay via PayHere gateway", icon: "💳" },
+  { id: "KOKO", name: "Koko", description: "Pay with Koko", icon: "🐘" },
+  { id: "MINITPAY", name: "MinitPay", description: "Pay with MinitPay", icon: "📱" },
+  { id: "COD", name: "Cash on Delivery", description: "Pay when you receive your order", icon: "💵" },
+];
+
+export function CheckoutClient() {
+  const router = useRouter();
+  const { items, clearCart } = useCart();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("COD");
+
+  const [address, setAddress] = useState({
+    line1: "",
+    line2: "",
+    city: "",
+    region: "",
+    postalCode: "",
+    country: "LK",
+  });
+
+  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const shipping = subtotal >= 100 ? 0 : 9.99;
+  const total = subtotal + shipping;
+
+  if (orderId) {
+    return (
+      <>
+        <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur">
+          <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
+            <Link href="/" className="text-lg font-semibold tracking-tight">Dressing Bear</Link>
+          </div>
+        </header>
+        <main className="flex-1 flex items-center justify-center px-4 py-20">
+          <div className="text-center max-w-md">
+            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+              <ShoppingBag className="h-8 w-8 text-green-600" />
+            </div>
+            <h1 className="text-2xl font-bold mb-2">Order Confirmed!</h1>
+            <p className="text-muted-foreground mb-2">Thank you for your order.</p>
+            <p className="text-lg font-semibold mb-6">Order ID: {orderId}</p>
+            <p className="text-sm text-muted-foreground mb-6">
+              {paymentMethod === "COD"
+                ? "You will receive an email confirmation shortly. Your items will be delivered with Cash on Delivery payment option."
+                : `You will receive an email confirmation shortly. Your payment via ${PAYMENT_OPTIONS.find(p => p.id === paymentMethod)?.name} is being processed.`}
+            </p>
+            <Button onClick={() => router.push("/")} className="w-full">
+              Continue Shopping
+            </Button>
+          </div>
+        </main>
+        <SiteFooter />
+      </>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <>
+        <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur">
+          <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
+            <Link href="/" className="text-lg font-semibold tracking-tight">Dressing Bear</Link>
+          </div>
+        </header>
+        <main className="flex-1 flex items-center justify-center px-4 py-20">
+          <div className="text-center max-w-md">
+            <ShoppingBag className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <h1 className="text-xl font-semibold mb-2">Your cart is empty</h1>
+            <p className="text-muted-foreground mb-6">Add some items to checkout.</p>
+            <Link href="/" className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full">
+              Continue Shopping
+            </Link>
+          </div>
+        </main>
+        <SiteFooter />
+      </>
+    );
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      const result = await processOrder(items, address, paymentMethod);
+
+      if (result.success) {
+        clearCart();
+        setOrderId(result.orderId);
+      } else {
+        setError(result.error);
+      }
+    } catch (err) {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <>
+      <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
+          <Link href="/cart" className="flex items-center gap-2 text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" />
+            Back to cart
+          </Link>
+          <Link href="/" className="text-lg font-semibold tracking-tight ml-auto">Dressing Bear</Link>
+        </div>
+      </header>
+
+      <main className="flex-1">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <h1 className="text-2xl font-bold mb-8">Checkout</h1>
+
+          <form onSubmit={handleSubmit}>
+            <div className="grid gap-8 lg:grid-cols-2">
+              {/* Shipping Address */}
+              <div className="space-y-6">
+                <div className="rounded-lg border p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <Truck className="h-5 w-5 text-muted-foreground" />
+                    <h2 className="text-lg font-semibold">Shipping Address</h2>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="line1" className="block text-sm font-medium mb-1">Address Line 1 *</label>
+                      <Input
+                        id="line1"
+                        value={address.line1}
+                        onChange={(e) => setAddress({ ...address, line1: e.target.value })}
+                        required
+                        placeholder="123 Main Street"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="line2" className="block text-sm font-medium mb-1">Address Line 2</label>
+                      <Input
+                        id="line2"
+                        value={address.line2}
+                        onChange={(e) => setAddress({ ...address, line2: e.target.value })}
+                        placeholder="Apt, Suite, etc."
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="city" className="block text-sm font-medium mb-1">City *</label>
+                        <Input
+                          id="city"
+                          value={address.city}
+                          onChange={(e) => setAddress({ ...address, city: e.target.value })}
+                          required
+                          placeholder="Colombo"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="region" className="block text-sm font-medium mb-1">Province *</label>
+                        <Input
+                          id="region"
+                          value={address.region}
+                          onChange={(e) => setAddress({ ...address, region: e.target.value })}
+                          required
+                          placeholder="Western Province"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="postalCode" className="block text-sm font-medium mb-1">Postal Code *</label>
+                        <Input
+                          id="postalCode"
+                          value={address.postalCode}
+                          onChange={(e) => setAddress({ ...address, postalCode: e.target.value })}
+                          required
+                          placeholder="00100"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="country" className="block text-sm font-medium mb-1">Country *</label>
+                        <Input
+                          id="country"
+                          value={address.country}
+                          onChange={(e) => setAddress({ ...address, country: e.target.value })}
+                          required
+                          disabled
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Payment Method */}
+                <div className="rounded-lg border p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <CreditCard className="h-5 w-5 text-muted-foreground" />
+                    <h2 className="text-lg font-semibold">Payment Method</h2>
+                  </div>
+
+                  <div className="space-y-3">
+                    {PAYMENT_OPTIONS.map((option) => (
+                      <label
+                        key={option.id}
+                        className={`flex items-center gap-4 p-4 rounded-lg border cursor-pointer transition-colors ${
+                          paymentMethod === option.id
+                            ? "border-primary bg-primary/5"
+                            : "hover:bg-muted/50"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="payment"
+                          value={option.id}
+                          checked={paymentMethod === option.id}
+                          onChange={() => setPaymentMethod(option.id)}
+                          className="h-4 w-4"
+                        />
+                        <span className="text-2xl">{option.icon}</span>
+                        <div className="flex-1">
+                          <span className="font-medium">{option.name}</span>
+                          <span className="block text-sm text-muted-foreground">{option.description}</span>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Order Summary */}
+              <div>
+                <div className="rounded-lg border p-6 sticky top-24">
+                  <h2 className="text-lg font-semibold mb-4">Order Summary</h2>
+
+                  <div className="space-y-3 text-sm">
+                    {items.map((item) => (
+                      <div key={item.productId} className="flex justify-between">
+                        <span className="text-muted-foreground">{item.name} × {item.quantity}</span>
+                        <span>{formatPrice(item.price * item.quantity)}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Separator className="my-4" />
+
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Subtotal</span>
+                      <span>{formatPrice(subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Shipping</span>
+                      <span>{shipping === 0 ? "Free" : formatPrice(shipping)}</span>
+                    </div>
+                  </div>
+
+                  <Separator className="my-4" />
+
+                  <div className="flex justify-between text-base font-semibold">
+                    <span>Total</span>
+                    <span>{formatPrice(total)}</span>
+                  </div>
+
+                  {subtotal >= 100 && (
+                    <p className="mt-2 text-sm text-green-600 font-medium">
+                      You qualify for free shipping!
+                    </p>
+                  )}
+
+                  {error && (
+                    <p className="mt-4 text-sm text-destructive">{error}</p>
+                  )}
+
+                  <Button
+                    type="submit"
+                    className="w-full mt-6"
+                    size="lg"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting
+                      ? "Processing..."
+                      : paymentMethod === "COD"
+                        ? "Place Order (Cash on Delivery)"
+                        : `Pay with ${PAYMENT_OPTIONS.find(p => p.id === paymentMethod)?.name}`}
+                  </Button>
+
+                  <p className="mt-3 text-center text-xs text-muted-foreground">
+                    By placing this order, you agree to our Terms & Conditions and Privacy Policy.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </main>
+
+      <SiteFooter />
+    </>
+  );
+}

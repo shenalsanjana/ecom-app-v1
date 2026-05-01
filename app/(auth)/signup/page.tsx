@@ -13,6 +13,9 @@ export default function SignupPage() {
   const [state, formAction, pending] = useActionState<ActionState, FormData>(signupAction, null);
   return (
     <main className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center px-4 py-10">
+      <Link href="/" className="mb-6 text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+        ← Back to home
+      </Link>
       <h1 className="mb-6 text-2xl font-semibold tracking-tight">Create your account</h1>
       {state?.error ? (
         <Alert variant="destructive" className="mb-4">

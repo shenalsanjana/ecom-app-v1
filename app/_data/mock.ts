@@ -16,28 +16,25 @@ export type Product = {
 };
 
 export const categories: Category[] = [
-  { slug: "electronics", name: "Electronics", image: "/window.svg" },
-  { slug: "fashion", name: "Fashion", image: "/file.svg" },
-  { slug: "home", name: "Home", image: "/globe.svg" },
-  { slug: "beauty", name: "Beauty", image: "/vercel.svg" },
-  { slug: "sports", name: "Sports", image: "/next.svg" },
-  { slug: "books", name: "Books", image: "/file.svg" },
+  { slug: "oversize-tshirts", name: "Oversize T-Shirts", image: "/window.svg" },
+  { slug: "graphic-tees", name: "Graphic Tees", image: "/file.svg" },
+  { slug: "solid-basics", name: "Solid Basics", image: "/globe.svg" },
 ];
 
 export const featuredProducts: Product[] = [
-  { id: "p1", name: "Wireless Noise-Cancelling Headphones", price: 249.99, image: "/window.svg", rating: 4.6, reviewCount: 1284, category: "electronics" },
-  { id: "p2", name: "Minimalist Leather Wallet", price: 39.0, image: "/file.svg", rating: 4.8, reviewCount: 642, category: "fashion" },
-  { id: "p3", name: "Ceramic Pour-Over Coffee Set", price: 64.5, image: "/globe.svg", rating: 4.4, reviewCount: 318, category: "home" },
-  { id: "p4", name: "Hydrating Vitamin C Serum", price: 28.0, image: "/vercel.svg", rating: 4.7, reviewCount: 2104, category: "beauty" },
-  { id: "p5", name: "Trail Running Shoes", price: 129.99, originalPrice: 159.99, image: "/next.svg", rating: 4.5, reviewCount: 887, category: "sports" },
-  { id: "p6", name: "The Pragmatic Programmer", price: 34.0, image: "/file.svg", rating: 4.9, reviewCount: 5421, category: "books" },
-  { id: "p7", name: "Smart Fitness Watch", price: 199.0, image: "/window.svg", rating: 4.3, reviewCount: 712, category: "electronics" },
-  { id: "p8", name: "Linen Throw Blanket", price: 89.0, image: "/globe.svg", rating: 4.6, reviewCount: 254, category: "home" },
+  { id: "p1", name: "Classic Black Oversize T-Shirt", price: 1850, image: "/window.svg", rating: 4.7, reviewCount: 324, category: "oversize-tshirts" },
+  { id: "p2", name: "Vintage Wash Oversize Tee - Navy", price: 2100, image: "/file.svg", rating: 4.8, reviewCount: 256, category: "oversize-tshirts" },
+  { id: "p3", name: "Striped Oversize T-Shirt - White/Black", price: 1950, image: "/globe.svg", rating: 4.5, reviewCount: 189, category: "oversize-tshirts" },
+  { id: "p4", name: "Drops Shoulder Oversize - Heather Grey", price: 1750, originalPrice: 2200, image: "/vercel.svg", rating: 4.6, reviewCount: 412, category: "oversize-tshirts" },
+  { id: "p5", name: "Urban Street Oversize Tee - Black", price: 2350, originalPrice: 2800, image: "/next.svg", rating: 4.9, reviewCount: 567, category: "graphic-tees" },
+  { id: "p6", name: "Minimal Logo Oversize - White", price: 1650, image: "/file.svg", rating: 4.4, reviewCount: 198, category: "solid-basics" },
+  { id: "p7", name: "Acid Wash Oversize Tee - Slate", price: 2050, image: "/window.svg", rating: 4.7, reviewCount: 145, category: "oversize-tshirts" },
+  { id: "p8", name: "Relaxed Fit Oversize - Charcoal", price: 1850, originalPrice: 2400, image: "/globe.svg", rating: 4.6, reviewCount: 289, category: "oversize-tshirts" },
 ];
 
 export const dealsProducts: Product[] = [
-  { id: "d1", name: "Bluetooth Portable Speaker", price: 69.99, originalPrice: 99.99, image: "/window.svg", rating: 4.4, reviewCount: 1820, category: "electronics" },
-  { id: "d2", name: "Cotton Crewneck Sweatshirt", price: 34.99, originalPrice: 59.99, image: "/file.svg", rating: 4.5, reviewCount: 410, category: "fashion" },
-  { id: "d3", name: "Stainless Steel Cookware Set", price: 179.0, originalPrice: 259.0, image: "/globe.svg", rating: 4.7, reviewCount: 333, category: "home" },
-  { id: "d4", name: "Yoga Mat Premium", price: 29.5, originalPrice: 49.0, image: "/next.svg", rating: 4.6, reviewCount: 1011, category: "sports" },
+  { id: "d1", name: "Washed Finish Oversize Tee - Olive", price: 1650, originalPrice: 2200, image: "/window.svg", rating: 4.5, reviewCount: 178, category: "oversize-tshirts" },
+  { id: "d2", name: "Boxy Fit Oversize - Dusty Pink", price: 1550, originalPrice: 1990, image: "/file.svg", rating: 4.8, reviewCount: 234, category: "oversize-tshirts" },
+  { id: "d3", name: "Heavyweight Cotton Oversize - Stone", price: 2450, originalPrice: 3200, image: "/globe.svg", rating: 4.9, reviewCount: 156, category: "oversize-tshirts" },
+  { id: "d4", name: "Tie-Dye Pattern Oversize - Multi", price: 1950, originalPrice: 2500, image: "/next.svg", rating: 4.4, reviewCount: 312, category: "graphic-tees" },
 ];

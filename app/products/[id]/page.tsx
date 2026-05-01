@@ -14,7 +14,7 @@ import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { Breadcrumb } from "@/app/_components/product/breadcrumb";
 import { ImageGallery } from "@/app/_components/product/image-gallery";
-import { BuyBox } from "@/app/_components/product/buy-box";
+import { BuyBoxClient } from "@/app/_components/product/buy-box-client";
 import { Description } from "@/app/_components/product/description";
 import { ReviewsSection } from "@/app/_components/product/reviews-section";
 import { RelatedStrip } from "@/app/_components/product/related-strip";
@@ -87,7 +87,7 @@ export default async function ProductPage({
               productName={detail.product.name}
               fallbackImage={detail.product.image}
             />
-            <BuyBox
+            <BuyBoxClient
               productId={detail.product.id}
               name={detail.product.name}
               price={detail.product.price}
@@ -97,6 +97,8 @@ export default async function ProductPage({
               ratingCount={detail.ratingCount}
               stock={detail.product.stock}
               wishlisted={wishlistedIds.has(detail.product.id)}
+              isLoggedIn={!!session?.user}
+              sizes={detail.product.sizes}
             />
           </div>
         </section>

@@ -85,7 +85,7 @@ async function main() {
 
   const all = [...featuredProducts, ...dealsProducts];
 
-  // Products (with picsum image, markdown description, stock)
+  // Products (with picsum image, markdown description, stock, sizes)
   for (const p of all) {
     const image = `https://picsum.photos/seed/${p.id}/600/600`;
     const description = buildDescription(p.name, p.category);
@@ -101,6 +101,7 @@ async function main() {
         description,
         stock,
         categorySlug: p.category,
+        sizes: "S,M,L,XL",
       },
       create: {
         id: p.id,
@@ -111,6 +112,7 @@ async function main() {
         description,
         stock,
         categorySlug: p.category,
+        sizes: "S,M,L,XL",
       },
     });
 

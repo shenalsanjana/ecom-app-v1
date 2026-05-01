@@ -5,7 +5,7 @@ import { Heart, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { toggleWishlistAction } from "@/app/wishlist/actions";
-import { AddToCartCardButton } from "@/app/_components/cart/add-to-cart-card-button";
+import { QuickBuyButtons } from "@/app/_components/cart/quick-buy-buttons";
 
 export type ProductCardProps = {
   id: string;
@@ -90,7 +90,7 @@ export function ProductCard({
         </div>
       </CardContent>
       <CardFooter className="p-4 pt-0">
-        <AddToCartCardButton
+        <QuickBuyButtons
           productId={id}
           name={name}
           price={price}

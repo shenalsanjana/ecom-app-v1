@@ -3,8 +3,8 @@ import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 
 export const metadata: Metadata = {
-  title: "Refund Policy - Shoply",
-  description: "Our refund and return policy for Shoply purchases.",
+  title: "Refund Policy - Dressing Bear",
+  description: "Our refund and return policy for Dressing Bear purchases.",
 };
 
 export default function RefundPolicyPage() {
@@ -29,10 +29,10 @@ export default function RefundPolicyPage() {
               </p>
               <p>
                 To initiate a return, please contact our customer support team at{" "}
-                <a href="mailto:support@shoply.com" className="text-primary hover:underline">
-                  support@shoply.com
+                <a href="mailto:dressingbear@gmail.com" className="text-primary hover:underline">
+                  dressingbear@gmail.com
                 </a>{" "}
-                or call us at +1 (555) 123-4567. We will provide you with instructions on how
+                or call us at +94 740545536. We will provide you with instructions on how
                 to return your item.
               </p>
             </section>
@@ -58,8 +58,8 @@ export default function RefundPolicyPage() {
                 We offer exchanges within <strong>14 days</strong> from the date of delivery.
                 If you need to exchange an item for a different size or color, please contact
                 us at{" "}
-                <a href="mailto:support@shoply.com" className="text-primary hover:underline">
-                  support@shoply.com
+                <a href="mailto:dressingbear@gmail.com" className="text-primary hover:underline">
+                  dressingbear@gmail.com
                 </a>{" "}
                 to initiate the exchange process.
               </p>
@@ -88,8 +88,8 @@ export default function RefundPolicyPage() {
               <p>
                 If you receive a damaged or defective item, please contact us immediately
                 at{" "}
-                <a href="mailto:support@shoply.com" className="text-primary hover:underline">
-                  support@shoply.com
+                <a href="mailto:dressingbear@gmail.com" className="text-primary hover:underline">
+                  dressingbear@gmail.com
                 </a>{" "}
                 with photos of the item and packaging. We will work with you to resolve the
                 issue as quickly as possible.
@@ -109,7 +109,7 @@ export default function RefundPolicyPage() {
               </p>
               <p>
                 For your protection, we recommend using a trackable shipping service when
-                returning items. Shoply is not responsible for items lost or damaged during
+                returning items. Dressing Bear is not responsible for items lost or damaged during
                 return shipping.
               </p>
             </section>
@@ -120,9 +120,9 @@ export default function RefundPolicyPage() {
                 If you have any questions about our refund and return policy, please contact us:
               </p>
               <ul className="list-disc pl-6 space-y-1">
-                <li>Email: <a href="mailto:support@shoply.com" className="text-primary hover:underline">support@shoply.com</a></li>
-                <li>Phone: +1 (555) 123-4567</li>
-                <li>Hours: Monday - Friday, 9 AM - 6 PM EST</li>
+                <li>Email: <a href="mailto:dressingbear@gmail.com" className="text-primary hover:underline">dressingbear@gmail.com</a></li>
+                <li>Phone: +94 740545536</li>
+                <li>Hours: Monday - Friday, 9 AM - 6 PM Sri Lanka Time</li>
               </ul>
             </section>
           </div>

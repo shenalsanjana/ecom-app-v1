@@ -16,9 +16,9 @@ const COLUMNS: { heading: string; links: LinkItem[] }[] = [
   {
     heading: "Help",
     links: [
-      { label: "Contact us", href: "#" },
+      { label: "Contact us", href: "/contact" },
       { label: "Shipping", href: "#" },
-      { label: "Returns", href: "#" },
+      { label: "Returns", href: "/refund-policy" },
       { label: "FAQ", href: "#" },
     ],
   },
@@ -70,7 +70,7 @@ export function SiteFooter() {
         </div>
         <Separator className="my-8" />
         <div className="flex flex-col items-start justify-between gap-2 text-xs text-muted-foreground sm:flex-row">
-          <p>&copy; {new Date().getFullYear()} Shoply. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Dressing Bear. All rights reserved.</p>
           <p>Built with Next.js. Prices and stock for demonstration only.</p>
         </div>
       </div>

@@ -60,9 +60,11 @@ export function CartSummary() {
         <Link href="/terms-and-conditions" className="hover:text-foreground underline underline-offset-2">Terms & Conditions</Link>
       </div>
 
-      <Button className="mt-6 w-full" size="lg">
-        Proceed to checkout
-      </Button>
+      <Link href="/checkout" className="block mt-6">
+        <Button className="w-full" size="lg">
+          Proceed to checkout
+        </Button>
+      </Link>
 
       <p className="mt-3 text-center text-xs text-muted-foreground">
         Shipping calculated at checkout
