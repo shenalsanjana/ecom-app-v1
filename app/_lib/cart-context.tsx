@@ -3,7 +3,9 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from "react";
 
 export type CartItem = {
+  key: string; // unique per (productId, size) — used for cart operations
   productId: string;
+  size: string | null;
   name: string;
   price: number;
   image: string;
@@ -15,17 +17,19 @@ type CartState = {
   isLoading: boolean;
 };
 
+type AddItemPayload = Omit<CartItem, "quantity" | "key">;
+
 type CartAction =
-  | { type: "ADD_ITEM"; payload: Omit<CartItem, "quantity"> }
-  | { type: "REMOVE_ITEM"; payload: string }
-  | { type: "UPDATE_QUANTITY"; payload: { productId: string; quantity: number } }
+  | { type: "ADD_ITEM"; payload: AddItemPayload; quantity: number }
+  | { type: "REMOVE_ITEM"; payload: string } // key
+  | { type: "UPDATE_QUANTITY"; payload: { key: string; quantity: number } }
   | { type: "CLEAR_CART" }
   | { type: "LOAD_CART"; payload: CartItem[] };
 
 type CartContextType = CartState & {
-  addItem: (item: Omit<CartItem, "quantity">) => void;
-  removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  addItem: (item: AddItemPayload, quantity?: number) => void;
+  removeItem: (key: string) => void;
+  updateQuantity: (key: string, quantity: number) => void;
   clearCart: () => void;
   totalItems: number;
   subtotal: number;
@@ -33,39 +37,54 @@ type CartContextType = CartState & {
 
 const CartContext = createContext<CartContextType | null>(null);
 
-const STORAGE_KEY = "shoply-cart";
+// Bumped from "shoply-cart" → carts saved before the size/quantity fix are
+// silently discarded. They lacked the size and key fields and would break
+// checkout validation otherwise.
+const STORAGE_KEY = "shoply-cart-v2";
+
+const MAX_PER_LINE = 10;
+
+function deriveKey(productId: string, size: string | null): string {
+  return size ? `${productId}::${size}` : productId;
+}
+
+function clamp(n: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, n));
+}
 
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case "ADD_ITEM": {
-      const existing = state.items.find((i) => i.productId === action.payload.productId);
+      const key = deriveKey(action.payload.productId, action.payload.size);
+      const qty = clamp(action.quantity, 1, MAX_PER_LINE);
+      const existing = state.items.find((i) => i.key === key);
       if (existing) {
         return {
           ...state,
           items: state.items.map((i) =>
-            i.productId === action.payload.productId
-              ? { ...i, quantity: Math.min(i.quantity + 1, 10) }
-              : i
+            i.key === key
+              ? { ...i, quantity: clamp(i.quantity + qty, 1, MAX_PER_LINE) }
+              : i,
           ),
         };
       }
       return {
         ...state,
-        items: [...state.items, { ...action.payload, quantity: 1 }],
+        items: [...state.items, { ...action.payload, key, quantity: qty }],
       };
     }
     case "REMOVE_ITEM":
       return {
         ...state,
-        items: state.items.filter((i) => i.productId !== action.payload),
+        items: state.items.filter((i) => i.key !== action.payload),
       };
     case "UPDATE_QUANTITY":
       return {
         ...state,
         items: state.items.map((i) =>
-          i.productId === action.payload.productId
-            ? { ...i, quantity: Math.max(0, Math.min(action.payload.quantity, 10)) }
-            : i
+          i.key === action.payload.key
+            ? { ...i, quantity: clamp(action.payload.quantity, 0, MAX_PER_LINE) }
+            : i,
         ),
       };
     case "CLEAR_CART":
@@ -77,50 +96,62 @@ function cartReducer(state: CartState, action: CartAction): CartState {
   }
 }
 
+function isValidStoredItem(v: unknown): v is CartItem {
+  if (!v || typeof v !== "object") return false;
+  const o = v as Record<string, unknown>;
+  return (
+    typeof o.key === "string" &&
+    typeof o.productId === "string" &&
+    (o.size === null || typeof o.size === "string") &&
+    typeof o.name === "string" &&
+    typeof o.price === "number" &&
+    typeof o.image === "string" &&
+    typeof o.quantity === "number"
+  );
+}
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { items: [], isLoading: true });
 
-  // Load cart from localStorage on mount
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        const parsed = JSON.parse(stored) as CartItem[];
-        if (Array.isArray(parsed)) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.every(isValidStoredItem)) {
           dispatch({ type: "LOAD_CART", payload: parsed });
           return;
         }
       }
     } catch {
-      // Invalid data, start fresh
+      // Invalid data, start fresh.
     }
     dispatch({ type: "LOAD_CART", payload: [] });
   }, []);
 
-  // Persist cart to localStorage on change
   useEffect(() => {
     if (!state.isLoading) {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state.items));
       } catch {
-        // Storage full or unavailable
+        // Storage full or unavailable.
       }
     }
   }, [state.items, state.isLoading]);
 
-  const addItem = useCallback((item: Omit<CartItem, "quantity">) => {
-    dispatch({ type: "ADD_ITEM", payload: item });
+  const addItem = useCallback((item: AddItemPayload, quantity: number = 1) => {
+    dispatch({ type: "ADD_ITEM", payload: item, quantity });
   }, []);
 
-  const removeItem = useCallback((productId: string) => {
-    dispatch({ type: "REMOVE_ITEM", payload: productId });
+  const removeItem = useCallback((key: string) => {
+    dispatch({ type: "REMOVE_ITEM", payload: key });
   }, []);
 
-  const updateQuantity = useCallback((productId: string, quantity: number) => {
+  const updateQuantity = useCallback((key: string, quantity: number) => {
     if (quantity <= 0) {
-      dispatch({ type: "REMOVE_ITEM", payload: productId });
+      dispatch({ type: "REMOVE_ITEM", payload: key });
     } else {
-      dispatch({ type: "UPDATE_QUANTITY", payload: { productId, quantity } });
+      dispatch({ type: "UPDATE_QUANTITY", payload: { key, quantity } });
     }
   }, []);
 

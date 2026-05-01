@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { AddToCartButton } from "@/app/_components/cart/add-to-cart-button";
 import { toggleWishlistAction } from "@/app/wishlist/actions";
 import { useCart } from "@/app/_lib/cart-context";
+import { formatPrice } from "@/app/_lib/format";
 
 type Props = {
   productId: string;
@@ -23,10 +24,6 @@ type Props = {
   isLoggedIn: boolean;
   sizes?: string;
 };
-
-function formatPrice(value: number): string {
-  return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
-}
 
 function discountPct(price: number, original: number): number {
   return Math.round(((original - price) / original) * 100);
@@ -71,26 +68,25 @@ export function BuyBoxClient({
   const inStock = stock > 0;
   const qtyMax = Math.min(stock, 10);
 
-  // Check if item already in cart (match by productId and size)
-  const cartKey = selectedSize ? `${productId}-${selectedSize}` : productId;
-  const existingItem = items.find(i => i.productId === cartKey);
+  const requiresSize = sizeList.length > 0;
+  const sizeMissing = requiresSize && !selectedSize;
+
+  // Match cart line by composite key (productId + size).
+  const cartKey = selectedSize ? `${productId}::${selectedSize}` : productId;
+  const existingItem = items.find((i) => i.key === cartKey);
   const inCartQty = existingItem ? existingItem.quantity : 0;
 
   function handleBuyNow() {
+    if (sizeMissing) return;
     if (!isLoggedIn) {
-      // Redirect to login with return URL
-      router.push(`/login?callbackUrl=/products/${productId}?buy_now=1&qty=${quantity}&size=${selectedSize}`);
+      const callbackUrl = encodeURIComponent(`/products/${productId}`);
+      router.push(`/login?callbackUrl=${callbackUrl}`);
       return;
     }
 
     setIsBuying(true);
-
-    // Add to cart with selected size in productId
-    const sizeSuffix = selectedSize ? `-${selectedSize}` : "";
-    addItem({ productId: productId + sizeSuffix, name, price, image });
-
-    // Redirect to checkout
-    router.push(`/checkout?buy_now=1&qty=${quantity}&size=${selectedSize}`);
+    addItem({ productId, name, price, image, size: selectedSize || null }, quantity);
+    router.push("/checkout");
   }
 
   return (
@@ -175,18 +171,19 @@ export function BuyBoxClient({
           name={name}
           price={price}
           image={image}
+          size={selectedSize || null}
+          quantity={quantity}
+          requiresSize={requiresSize}
           disabled={!inStock}
           className="flex-1"
         />
         {inStock && (
           <Button
             onClick={handleBuyNow}
-            disabled={isBuying}
+            disabled={isBuying || sizeMissing}
             className="flex-1 bg-black hover:bg-black/90 text-white"
           >
-            {isBuying ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : null}
+            {isBuying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Buy Now
           </Button>
         )}

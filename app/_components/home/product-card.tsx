@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { toggleWishlistAction } from "@/app/wishlist/actions";
 import { QuickBuyButtons } from "@/app/_components/cart/quick-buy-buttons";
+import { formatPrice } from "@/app/_lib/format";
 
 export type ProductCardProps = {
   id: string;
@@ -18,10 +19,6 @@ export type ProductCardProps = {
   wishlisted?: boolean;
   fromPath?: string;
 };
-
-function formatPrice(value: number): string {
-  return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
-}
 
 function discountPct(price: number, original: number): number {
   return Math.round(((original - price) / original) * 100);
@@ -90,12 +87,7 @@ export function ProductCard({
         </div>
       </CardContent>
       <CardFooter className="p-4 pt-0">
-        <QuickBuyButtons
-          productId={id}
-          name={name}
-          price={price}
-          image={image}
-        />
+        <QuickBuyButtons productId={id} />
       </CardFooter>
     </Card>
   );
