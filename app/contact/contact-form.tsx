@@ -96,13 +96,10 @@ export function ContactForm() {
           )}
         </div>
 
-        <div className="flex items-center justify-between pt-2">
+        <div className="pt-2">
           <Button type="submit" disabled={isPending} size="lg">
             {isPending ? "Sending..." : "Send"}
           </Button>
-          <p className="text-xs text-muted-foreground">
-            reCAPTCHA protection (demo)
-          </p>
         </div>
       </form>
     </div>
