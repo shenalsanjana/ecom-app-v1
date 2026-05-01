@@ -131,7 +131,7 @@ export default function TermsAndConditionsPage() {
               <h2 id="amendments-termination-heading" className="text-xl font-semibold">Amendments and Termination</h2>
               <p>
                 Dressing Bear reserves the right to modify these Terms and Conditions at any time. Any changes will be
-                effective immediately upon posting on this page with an updated "Last updated" date. Your continued
+                effective immediately upon posting on this page with an updated &ldquo;Last updated&rdquo; date. Your continued
                 use of the website after any changes constitutes your acceptance of the modified terms.
               </p>
               <p>

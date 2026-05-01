@@ -102,7 +102,7 @@ export default function PrivacyPolicyPage() {
               <h2 id="changes-to-privacy-policy-heading" className="text-xl font-semibold">Changes to the Privacy Policy</h2>
               <p>
                 Dressing Bear reserves the right to update this Privacy Policy from time to time. Any
-                changes will be posted on this page with an updated "Last updated" date. We
+                changes will be posted on this page with an updated &ldquo;Last updated&rdquo; date. We
                 encourage you to review this Privacy Policy periodically.
               </p>
               <p>

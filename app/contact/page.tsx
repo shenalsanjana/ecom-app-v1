@@ -19,7 +19,7 @@ export default function ContactPage() {
             </Link>
             <div className="text-center">
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-                We'd love to hear from you
+                We&apos;d love to hear from you
               </h1>
               <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
                 Our dedicated team is available to assist you with any inquiries.

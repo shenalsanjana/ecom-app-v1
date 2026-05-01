@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState } from "react";
-import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,15 +12,8 @@ const initialState: ContactFormState = {};
 
 export function ContactForm() {
   const [state, formAction, isPending] = useActionState(submitContactForm, initialState);
-  const [showSuccess, setShowSuccess] = useState(false);
 
-  useEffect(() => {
-    if (state.success) {
-      setShowSuccess(true);
-    }
-  }, [state.success]);
-
-  if (showSuccess) {
+  if (state.success) {
     return (
       <div className="rounded-lg border bg-green-50 p-8 text-center dark:bg-green-900/20">
         <CheckCircle className="mx-auto mb-4 h-16 w-16 text-green-600" />
@@ -29,7 +21,7 @@ export function ContactForm() {
           Message Sent Successfully!
         </h3>
         <p className="text-green-700 dark:text-green-300">
-          Thanks for reaching out! We'll get back to you soon.
+          Thanks for reaching out! We&apos;ll get back to you soon.
         </p>
       </div>
     );

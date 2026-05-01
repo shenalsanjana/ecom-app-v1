@@ -1,34 +1,32 @@
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
 
-type LinkItem = { label: string; href?: string };
+type LinkItem = { label: string; href: string };
 
 const COLUMNS: { heading: string; links: LinkItem[] }[] = [
   {
     heading: "Shop",
     links: [
-      { label: "New arrivals", href: "#" },
-      { label: "Best sellers", href: "#" },
-      { label: "Sale", href: "#" },
-      { label: "Gift cards", href: "#" },
+      { label: "All Products", href: "/categories" },
+      { label: "New Arrivals", href: "/categories?sort=newest" },
+      { label: "Best Sellers", href: "/categories?sort=rating" },
+      { label: "Deals", href: "/deals" },
+    ],
+  },
+  {
+    heading: "Categories",
+    links: [
+      { label: "Oversize T-Shirts", href: "/categories/oversize-tshirts" },
+      { label: "Graphic Tees", href: "/categories/graphic-tees" },
+      { label: "Solid Basics", href: "/categories/solid-basics" },
     ],
   },
   {
     heading: "Help",
     links: [
-      { label: "Contact us", href: "/contact" },
-      { label: "Shipping", href: "#" },
+      { label: "About", href: "/about" },
+      { label: "Contact Us", href: "/contact" },
       { label: "Returns", href: "/refund-policy" },
-      { label: "FAQ", href: "#" },
-    ],
-  },
-  {
-    heading: "Company",
-    links: [
-      { label: "About", href: "#" },
-      { label: "Careers", href: "#" },
-      { label: "Press", href: "#" },
-      { label: "Sustainability", href: "#" },
     ],
   },
   {
@@ -37,15 +35,6 @@ const COLUMNS: { heading: string; links: LinkItem[] }[] = [
       { label: "Refund Policy", href: "/refund-policy" },
       { label: "Privacy Policy", href: "/privacy-policy" },
       { label: "Terms & Conditions", href: "/terms-and-conditions" },
-    ],
-  },
-  {
-    heading: "Social",
-    links: [
-      { label: "Instagram", href: "#" },
-      { label: "TikTok", href: "#" },
-      { label: "YouTube", href: "#" },
-      { label: "Newsletter", href: "#" },
     ],
   },
 ];
@@ -61,7 +50,9 @@ export function SiteFooter() {
               <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
                 {col.links.map((link) => (
                   <li key={link.label}>
-                    <Link href={link.href ?? "#"} className="hover:text-foreground">{link.label}</Link>
+                    <Link href={link.href} className="hover:text-foreground">
+                      {link.label}
+                    </Link>
                   </li>
                 ))}
               </ul>

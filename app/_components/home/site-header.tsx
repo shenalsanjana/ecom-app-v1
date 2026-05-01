@@ -9,10 +9,10 @@ import { ProfileMenu } from "@/app/_components/header/profile-menu";
 import { CartIconWrapper } from "@/app/_components/header/cart-icon-wrapper";
 
 const NAV_LINKS = [
-  { href: "#", label: "Shop" },
-  { href: "#", label: "Categories" },
-  { href: "#", label: "Deals" },
-  { href: "/contact", label: "Contact Us" },
+  { href: "/categories", label: "Shop" },
+  { href: "/deals", label: "Deals" },
+  { href: "/about", label: "About" },
+  { href: "/contact", label: "Contact" },
 ];
 
 export async function SiteHeader() {
@@ -34,10 +34,10 @@ export async function SiteHeader() {
             </Link>
           ))}
         </nav>
-        <div className="relative ml-auto hidden flex-1 max-w-sm md:block">
+        <form action="/search" className="relative ml-auto hidden flex-1 max-w-sm md:block">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input type="search" placeholder="Search products" className="pl-9" />
-        </div>
+          <Input type="search" name="q" placeholder="Search products..." className="pl-9" defaultValue="" />
+        </form>
         <div className="ml-auto flex items-center gap-1 md:ml-0">
           <WishlistIcon loggedIn={loggedIn} count={wishlistCount} />
           <CartIconWrapper />

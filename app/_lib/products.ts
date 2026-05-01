@@ -1,6 +1,6 @@
 // app/_lib/products.ts
 import { prisma } from "@/app/_lib/prisma";
-import type { Category, Product, ProductImage, Review } from "@prisma/client";
+import type { Category, Prisma, Product, ProductImage, Review } from "@prisma/client";
 
 export type ProductView = {
   id: string;
@@ -169,4 +169,134 @@ export async function getReviewHistogram(productId: string): Promise<ReviewHisto
     if (k >= 1 && k <= 5) hist[k] = r._count._all;
   }
   return hist;
+}
+
+export type SortBy = "name" | "price_asc" | "price_desc" | "rating" | "newest";
+
+const SORT_VALUES: readonly SortBy[] = [
+  "name",
+  "price_asc",
+  "price_desc",
+  "rating",
+  "newest",
+];
+
+export function parseSortBy(value: string | undefined, fallback: SortBy = "newest"): SortBy {
+  return value && (SORT_VALUES as readonly string[]).includes(value)
+    ? (value as SortBy)
+    : fallback;
+}
+
+export type GetProductsOptions = {
+  categorySlug?: string;
+  searchQuery?: string;
+  categorySlugs?: string[];
+  sortBy?: SortBy;
+  minPrice?: number;
+  maxPrice?: number;
+  inStockOnly?: boolean;
+};
+
+export async function getProducts(opts: GetProductsOptions = {}): Promise<ProductView[]> {
+  const {
+    categorySlug,
+    searchQuery,
+    categorySlugs,
+    sortBy = "newest",
+    minPrice,
+    maxPrice,
+    inStockOnly = false,
+  } = opts;
+
+  const where: Prisma.ProductWhereInput = {};
+
+  // Category filter
+  if (categorySlug) {
+    where.categorySlug = categorySlug;
+  }
+  if (categorySlugs && categorySlugs.length > 0) {
+    where.categorySlug = { in: categorySlugs };
+  }
+
+  // Search query filter (name or description)
+  if (searchQuery && searchQuery.trim()) {
+    const searchTerm = searchQuery.trim();
+    where.OR = [
+      { name: { contains: searchTerm } },
+      { description: { contains: searchTerm } },
+    ];
+  }
+
+  // Price range filter
+  if (minPrice !== undefined || maxPrice !== undefined) {
+    const priceFilter: Prisma.FloatFilter = {};
+    if (minPrice !== undefined) priceFilter.gte = minPrice;
+    if (maxPrice !== undefined) priceFilter.lte = maxPrice;
+    where.price = priceFilter;
+  }
+
+  // In stock only filter
+  if (inStockOnly) {
+    where.stock = { gt: 0 };
+  }
+
+  // Sort order
+  let orderBy: Prisma.ProductOrderByWithRelationInput;
+  switch (sortBy) {
+    case "name":
+      orderBy = { name: "asc" };
+      break;
+    case "price_asc":
+      orderBy = { price: "asc" };
+      break;
+    case "price_desc":
+      orderBy = { price: "desc" };
+      break;
+    case "rating":
+      // Can't sort by rating directly, will sort post-query
+      orderBy = { id: "asc" };
+      break;
+    case "newest":
+    default:
+      orderBy = { id: "asc" };
+      break;
+  }
+
+  const rows = await prisma.product.findMany({
+    where,
+    orderBy,
+    select: {
+      id: true, name: true, price: true, originalPrice: true,
+      image: true, categorySlug: true,
+    },
+  });
+
+  const views = await attachAggregates(rows);
+
+  // If sorting by rating, do it client-side
+  if (sortBy === "rating") {
+    views.sort((a, b) => b.rating - a.rating || b.reviewCount - a.reviewCount);
+  }
+
+  return views;
+}
+
+export async function searchProducts(query: string, limit = 20): Promise<ProductView[]> {
+  if (!query || !query.trim()) return [];
+  const searchTerm = query.trim();
+  const rows = await prisma.product.findMany({
+    where: {
+      OR: [
+        { name: { contains: searchTerm } },
+        { description: { contains: searchTerm } },
+      ],
+    },
+    take: limit,
+    orderBy: { id: "asc" },
+    select: {
+      id: true, name: true, price: true, originalPrice: true,
+      image: true, categorySlug: true,
+    },
+  });
+  return attachAggregates(rows);
 }
