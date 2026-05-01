@@ -1,5 +1,6 @@
 // app/contact/page.tsx
-import { Phone, Mail, Clock } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Phone, Mail, Clock } from "lucide-react";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { ContactForm } from "./contact-form";
@@ -10,15 +11,21 @@ export default function ContactPage() {
       <SiteHeader />
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="bg-gradient-to-b from-muted/50 to-background py-16 sm:py-24">
-          <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-              We'd love to hear from you
-            </h1>
-            <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-              Our dedicated team is available to assist you with any inquiries.
-              Reach out to us through any of the channels below.
-            </p>
+        <section className="bg-gradient-to-b from-muted/50 to-background py-12 sm:py-16">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <Link href="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6">
+              <ArrowLeft className="h-4 w-4" />
+              Back to home
+            </Link>
+            <div className="text-center">
+              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+                We'd love to hear from you
+              </h1>
+              <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
+                Our dedicated team is available to assist you with any inquiries.
+                Reach out to us through any of the channels below.
+              </p>
+            </div>
           </div>
         </section>
 
