@@ -15,13 +15,13 @@ export default function RefundPolicyPage() {
         <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
           <h1 className="mb-8 text-3xl font-bold tracking-tight">Refund Policy</h1>
 
-          <div className="prose prose-slate max-w-none space-y-6">
+          <div className="prose prose-zinc dark:prose-invert max-w-none space-y-6">
             <p className="text-muted-foreground">
               Last updated: May 1, 2026
             </p>
 
-            <section>
-              <h2 className="text-xl font-semibold">Returns</h2>
+            <section aria-labelledby="returns-heading">
+              <h2 id="returns-heading" className="text-xl font-semibold">Returns</h2>
               <p>
                 We accept returns within <strong>14 days</strong> from the date of delivery.
                 To be eligible for a return, your item must be unused and in the same condition
@@ -37,8 +37,8 @@ export default function RefundPolicyPage() {
               </p>
             </section>
 
-            <section>
-              <h2 className="text-xl font-semibold">Refunds</h2>
+            <section aria-labelledby="refunds-heading">
+              <h2 id="refunds-heading" className="text-xl font-semibold">Refunds</h2>
               <p>
                 Once we receive your returned item, we will notify you of the receipt and
                 inspect the item. Upon approval, your refund will be processed, and a credit
@@ -52,8 +52,8 @@ export default function RefundPolicyPage() {
               </p>
             </section>
 
-            <section>
-              <h2 className="text-xl font-semibold">Exchanges</h2>
+            <section aria-labelledby="exchanges-heading">
+              <h2 id="exchanges-heading" className="text-xl font-semibold">Exchanges</h2>
               <p>
                 We offer exchanges within <strong>14 days</strong> from the date of delivery.
                 If you need to exchange an item for a different size or color, please contact
@@ -69,8 +69,8 @@ export default function RefundPolicyPage() {
               </p>
             </section>
 
-            <section>
-              <h2 className="text-xl font-semibold">Non-Returnable Items</h2>
+            <section aria-labelledby="non-returnable-heading">
+              <h2 id="non-returnable-heading" className="text-xl font-semibold">Non-Returnable Items</h2>
               <p>The following items cannot be returned:</p>
               <ul className="list-disc pl-6 space-y-1">
                 <li>Gift cards</li>
@@ -83,8 +83,8 @@ export default function RefundPolicyPage() {
               </ul>
             </section>
 
-            <section>
-              <h2 className="text-xl font-semibold">Damaged or Defective Items</h2>
+            <section aria-labelledby="damaged-items-heading">
+              <h2 id="damaged-items-heading" className="text-xl font-semibold">Damaged or Defective Items</h2>
               <p>
                 If you receive a damaged or defective item, please contact us immediately
                 at{" "}
@@ -100,8 +100,8 @@ export default function RefundPolicyPage() {
               </p>
             </section>
 
-            <section>
-              <h2 className="text-xl font-semibold">Return Shipping</h2>
+            <section aria-labelledby="return-shipping-heading">
+              <h2 id="return-shipping-heading" className="text-xl font-semibold">Return Shipping</h2>
               <p>
                 The cost of return shipping will be deducted from your refund unless the
                 return is due to our error (damaged, defective, or incorrect item) or you
@@ -114,8 +114,8 @@ export default function RefundPolicyPage() {
               </p>
             </section>
 
-            <section>
-              <h2 className="text-xl font-semibold">Contact Us</h2>
+            <section aria-labelledby="contact-us-heading">
+              <h2 id="contact-us-heading" className="text-xl font-semibold">Contact Us</h2>
               <p>
                 If you have any questions about our refund and return policy, please contact us:
               </p>
