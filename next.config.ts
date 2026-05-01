@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
         hostname: "picsum.photos",
       },
     ],
+    // Demo product images are SVG. Safe here because they are local files in
+    // /public/products that we author ourselves.
+    dangerouslyAllowSVG: true,
+    contentDispositionType: "attachment",
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
 };
 

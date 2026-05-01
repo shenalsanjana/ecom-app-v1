@@ -5,18 +5,15 @@ import Link from "next/link";
 import { useCart } from "@/app/_lib/cart-context";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-
-function formatPrice(value: number): string {
-  return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
-}
+import { formatPrice } from "@/app/_lib/format";
+import { calculateShipping, FREE_SHIPPING_THRESHOLD } from "@/app/_lib/checkout-config";
 
 export function CartSummary() {
   const { subtotal, totalItems } = useCart();
 
-  const shipping = subtotal > 100 ? 0 : 9.99;
+  const shipping = calculateShipping(subtotal);
   const total = subtotal + shipping;
-  const freeShippingThreshold = 100;
-  const remainingForFreeShipping = Math.max(0, freeShippingThreshold - subtotal);
+  const remainingForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
 
   return (
     <div className="rounded-lg border p-4 sm:p-6">
@@ -30,7 +27,7 @@ export function CartSummary() {
         </p>
       )}
 
-      {subtotal >= freeShippingThreshold && (
+      {subtotal >= FREE_SHIPPING_THRESHOLD && (
         <p className="mb-4 text-sm font-medium text-emerald-600 dark:text-emerald-400">
           You qualify for free shipping!
         </p>

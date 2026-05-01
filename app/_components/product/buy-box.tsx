@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AddToCartButton } from "@/app/_components/cart/add-to-cart-button";
 import { toggleWishlistAction } from "@/app/wishlist/actions";
+import { formatPrice } from "@/app/_lib/format";
 
 type Props = {
   productId: string;
@@ -18,10 +19,6 @@ type Props = {
   stock: number;
   wishlisted: boolean;
 };
-
-function formatPrice(value: number): string {
-  return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
-}
 
 function discountPct(price: number, original: number): number {
   return Math.round(((original - price) / original) * 100);

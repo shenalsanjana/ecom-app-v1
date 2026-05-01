@@ -18,6 +18,7 @@ model User {
   addresses     Address[]
   wishlist      WishlistItem[]
   resetTokens   PasswordResetToken[]
+  orders        Order[]
 }
 
 model Address {
@@ -61,6 +62,7 @@ model Product {
   wishlistItems WishlistItem[]
   images        ProductImage[]
   reviews       Review[]
+  orderItems    OrderItem[]
 
   @@index([categorySlug])
 }
@@ -101,6 +103,54 @@ model WishlistItem {
 
   @@unique([userId, productId])
   @@index([userId])
+}
+
+model Order {
+  id                    String   @id
+  userId                String?
+  guestName             String?
+  guestEmail            String?
+  customerPhone         String
+  shippingLine1         String
+  shippingLine2         String?
+  shippingCity          String
+  shippingRegion        String
+  shippingPostalCode    String
+  shippingCountry       String
+  subtotal              Float
+  shippingCost          Float
+  total                 Float
+  paymentMethod         String
+  paymentMethodDisplay  String
+  status                String   @default("PENDING")
+  trackingCode          String?
+  royalExpressSubmitted Boolean  @default(false)
+  emailSent             Boolean  @default(false)
+  idempotencyKey        String?  @unique
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user                  User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items                 OrderItem[]
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  name      String
+  size      String?
+  price     Float
+  quantity  Int
+
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
 }
 
 model PasswordResetToken {

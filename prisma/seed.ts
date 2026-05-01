@@ -1,7 +1,37 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { categories, featuredProducts, dealsProducts } from "../app/_data/mock";
 
 const prisma = new PrismaClient();
+
+// Resolve a product image path. Prefers real photos at
+// public/products/<id>/main.jpg + 1.jpg..4.jpg when present and falls back to
+// the demo SVG (main.svg) otherwise. Generate demos with:
+//   npx tsx scripts/generate-demo-images.ts
+function publicPath(...parts: string[]): string {
+  return join(process.cwd(), "public", ...parts);
+}
+
+function pickProductMain(productId: string): string {
+  const candidates = ["main.jpg", "main.jpeg", "main.png", "main.webp", "main.svg"];
+  for (const file of candidates) {
+    if (existsSync(publicPath("products", productId, file))) {
+      return `/products/${productId}/${file}`;
+    }
+  }
+  return `/products/${productId}/main.svg`;
+}
+
+function pickGalleryImage(productId: string, index: number): string {
+  const candidates = [`${index}.jpg`, `${index}.jpeg`, `${index}.png`, `${index}.webp`];
+  for (const file of candidates) {
+    if (existsSync(publicPath("products", productId, file))) {
+      return `/products/${productId}/${file}`;
+    }
+  }
+  return pickProductMain(productId);
+}
 
 const REVIEW_AUTHORS = [
   "Alex M.", "Jordan K.", "Priya R.", "Sam T.", "Mei L.",
@@ -85,9 +115,9 @@ async function main() {
 
   const all = [...featuredProducts, ...dealsProducts];
 
-  // Products (with picsum image, markdown description, stock, sizes)
+  // Products (image resolved from public/products/<id>/, description, stock, sizes)
   for (const p of all) {
-    const image = `https://picsum.photos/seed/${p.id}/600/600`;
+    const image = pickProductMain(p.id);
     const description = buildDescription(p.name, p.category);
     const stock = stockFor(p.id);
 
@@ -121,7 +151,7 @@ async function main() {
     await prisma.productImage.createMany({
       data: [1, 2, 3, 4].map((n) => ({
         productId: p.id,
-        url: `https://picsum.photos/seed/${p.id}-${n}/800/800`,
+        url: pickGalleryImage(p.id, n),
         sortOrder: n,
       })),
     });

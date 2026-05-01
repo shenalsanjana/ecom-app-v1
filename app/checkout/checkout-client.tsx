@@ -1,37 +1,63 @@
 // app/checkout/checkout-client.tsx
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ShoppingBag, Truck, CreditCard } from "lucide-react";
+import { ArrowLeft, ShoppingBag, Truck, CreditCard, User } from "lucide-react";
 import { useCart } from "@/app/_lib/cart-context";
 import { processOrder } from "./actions";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { formatPrice } from "@/app/_lib/format";
+import { calculateShipping, FREE_SHIPPING_THRESHOLD } from "@/app/_lib/checkout-config";
 
-type PaymentMethod = "COD" | "PAYYHERE" | "KOKO" | "MINITPAY";
+type PaymentMethod = "COD" | "PAYHERE" | "KOKO" | "MINITPAY";
 
-function formatPrice(value: number): string {
-  return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
-}
+type CheckoutUser = { name: string; email: string } | null;
 
-const PAYMENT_OPTIONS: { id: PaymentMethod; name: string; description: string; icon: string }[] = [
-  { id: "PAYYHERE", name: "PayHere", description: "Pay via PayHere gateway", icon: "💳" },
+type Props = {
+  user: CheckoutUser;
+};
+
+const PAYMENT_OPTIONS: {
+  id: PaymentMethod;
+  name: string;
+  description: string;
+  icon: string;
+}[] = [
+  { id: "COD", name: "Cash on Delivery", description: "Pay when you receive your order", icon: "💵" },
+  { id: "PAYHERE", name: "PayHere", description: "Pay via PayHere gateway", icon: "💳" },
   { id: "KOKO", name: "Koko", description: "Pay with Koko", icon: "🐘" },
   { id: "MINITPAY", name: "MinitPay", description: "Pay with MinitPay", icon: "📱" },
-  { id: "COD", name: "Cash on Delivery", description: "Pay when you receive your order", icon: "💵" },
 ];
 
-export function CheckoutClient() {
+function generateIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+export function CheckoutClient({ user }: Props) {
   const router = useRouter();
   const { items, clearCart } = useCart();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("COD");
+  const idempotencyKey = useMemo(() => generateIdempotencyKey(), []);
+
+  const isGuest = !user;
+
+  const [guest, setGuest] = useState({
+    name: "",
+    email: "",
+  });
+
+  const [phone, setPhone] = useState("");
 
   const [address, setAddress] = useState({
     line1: "",
@@ -39,11 +65,11 @@ export function CheckoutClient() {
     city: "",
     region: "",
     postalCode: "",
-    country: "LK",
+    country: "Sri Lanka",
   });
 
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const shipping = subtotal >= 100 ? 0 : 9.99;
+  const shipping = calculateShipping(subtotal);
   const total = subtotal + shipping;
 
   if (orderId) {
@@ -64,8 +90,8 @@ export function CheckoutClient() {
             <p className="text-lg font-semibold mb-6">Order ID: {orderId}</p>
             <p className="text-sm text-muted-foreground mb-6">
               {paymentMethod === "COD"
-                ? "You will receive an email confirmation shortly. Your items will be delivered with Cash on Delivery payment option."
-                : `You will receive an email confirmation shortly. Your payment via ${PAYMENT_OPTIONS.find(p => p.id === paymentMethod)?.name} is being processed.`}
+                ? "We&rsquo;ve emailed your confirmation. Your items will be delivered with Cash on Delivery."
+                : `We&rsquo;ve emailed your confirmation. Your payment via ${PAYMENT_OPTIONS.find(p => p.id === paymentMethod)?.name} is being processed.`}
             </p>
             <Button onClick={() => router.push("/")} className="w-full">
               Continue Shopping
@@ -90,7 +116,10 @@ export function CheckoutClient() {
             <ShoppingBag className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
             <h1 className="text-xl font-semibold mb-2">Your cart is empty</h1>
             <p className="text-muted-foreground mb-6">Add some items to checkout.</p>
-            <Link href="/" className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full">
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full"
+            >
               Continue Shopping
             </Link>
           </div>
@@ -106,7 +135,20 @@ export function CheckoutClient() {
     setIsSubmitting(true);
 
     try {
-      const result = await processOrder(items, address, paymentMethod);
+      const result = await processOrder({
+        items: items.map((it) => ({
+          productId: it.productId,
+          name: it.name,
+          price: it.price,
+          quantity: it.quantity,
+          size: it.size,
+        })),
+        shippingAddress: address,
+        paymentMethod,
+        contactPhone: phone,
+        guestInfo: isGuest ? { name: guest.name, email: guest.email, phone } : undefined,
+        idempotencyKey,
+      });
 
       if (result.success) {
         clearCart();
@@ -114,7 +156,7 @@ export function CheckoutClient() {
       } else {
         setError(result.error);
       }
-    } catch (err) {
+    } catch {
       setError("Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);
@@ -125,11 +167,16 @@ export function CheckoutClient() {
     <>
       <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
-          <Link href="/cart" className="flex items-center gap-2 text-muted-foreground hover:text-foreground">
+          <Link
+            href="/cart"
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+          >
             <ArrowLeft className="h-4 w-4" />
             Back to cart
           </Link>
-          <Link href="/" className="text-lg font-semibold tracking-tight ml-auto">Dressing Bear</Link>
+          <Link href="/" className="text-lg font-semibold tracking-tight ml-auto">
+            Dressing Bear
+          </Link>
         </div>
       </header>
 
@@ -139,8 +186,53 @@ export function CheckoutClient() {
 
           <form onSubmit={handleSubmit}>
             <div className="grid gap-8 lg:grid-cols-2">
-              {/* Shipping Address */}
               <div className="space-y-6">
+                {isGuest && (
+                  <div className="rounded-lg border p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <User className="h-5 w-5 text-muted-foreground" />
+                      <h2 className="text-lg font-semibold">Your Details</h2>
+                    </div>
+                    <p className="mb-4 text-sm text-muted-foreground">
+                      Checking out as a guest.{" "}
+                      <Link
+                        href="/login?callbackUrl=/checkout"
+                        className="text-primary hover:underline"
+                      >
+                        Sign in
+                      </Link>{" "}
+                      to use your saved details.
+                    </p>
+                    <div className="space-y-4">
+                      <div>
+                        <label htmlFor="guestName" className="block text-sm font-medium mb-1">
+                          Full Name *
+                        </label>
+                        <Input
+                          id="guestName"
+                          value={guest.name}
+                          onChange={(e) => setGuest({ ...guest, name: e.target.value })}
+                          required
+                          placeholder="Your name"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="guestEmail" className="block text-sm font-medium mb-1">
+                          Email *
+                        </label>
+                        <Input
+                          id="guestEmail"
+                          type="email"
+                          value={guest.email}
+                          onChange={(e) => setGuest({ ...guest, email: e.target.value })}
+                          required
+                          placeholder="you@example.com"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="rounded-lg border p-6">
                   <div className="flex items-center gap-3 mb-4">
                     <Truck className="h-5 w-5 text-muted-foreground" />
@@ -149,7 +241,25 @@ export function CheckoutClient() {
 
                   <div className="space-y-4">
                     <div>
-                      <label htmlFor="line1" className="block text-sm font-medium mb-1">Address Line 1 *</label>
+                      <label htmlFor="phone" className="block text-sm font-medium mb-1">
+                        Phone Number *
+                      </label>
+                      <Input
+                        id="phone"
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        required
+                        placeholder="+94 7X XXX XXXX"
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        For delivery contact.
+                      </p>
+                    </div>
+                    <div>
+                      <label htmlFor="line1" className="block text-sm font-medium mb-1">
+                        Address Line 1 *
+                      </label>
                       <Input
                         id="line1"
                         value={address.line1}
@@ -159,7 +269,9 @@ export function CheckoutClient() {
                       />
                     </div>
                     <div>
-                      <label htmlFor="line2" className="block text-sm font-medium mb-1">Address Line 2</label>
+                      <label htmlFor="line2" className="block text-sm font-medium mb-1">
+                        Address Line 2
+                      </label>
                       <Input
                         id="line2"
                         value={address.line2}
@@ -169,7 +281,9 @@ export function CheckoutClient() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label htmlFor="city" className="block text-sm font-medium mb-1">City *</label>
+                        <label htmlFor="city" className="block text-sm font-medium mb-1">
+                          City *
+                        </label>
                         <Input
                           id="city"
                           value={address.city}
@@ -179,7 +293,9 @@ export function CheckoutClient() {
                         />
                       </div>
                       <div>
-                        <label htmlFor="region" className="block text-sm font-medium mb-1">Province *</label>
+                        <label htmlFor="region" className="block text-sm font-medium mb-1">
+                          Province *
+                        </label>
                         <Input
                           id="region"
                           value={address.region}
@@ -191,7 +307,9 @@ export function CheckoutClient() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label htmlFor="postalCode" className="block text-sm font-medium mb-1">Postal Code *</label>
+                        <label htmlFor="postalCode" className="block text-sm font-medium mb-1">
+                          Postal Code *
+                        </label>
                         <Input
                           id="postalCode"
                           value={address.postalCode}
@@ -201,7 +319,9 @@ export function CheckoutClient() {
                         />
                       </div>
                       <div>
-                        <label htmlFor="country" className="block text-sm font-medium mb-1">Country *</label>
+                        <label htmlFor="country" className="block text-sm font-medium mb-1">
+                          Country *
+                        </label>
                         <Input
                           id="country"
                           value={address.country}
@@ -214,7 +334,6 @@ export function CheckoutClient() {
                   </div>
                 </div>
 
-                {/* Payment Method */}
                 <div className="rounded-lg border p-6">
                   <div className="flex items-center gap-3 mb-4">
                     <CreditCard className="h-5 w-5 text-muted-foreground" />
@@ -242,7 +361,9 @@ export function CheckoutClient() {
                         <span className="text-2xl">{option.icon}</span>
                         <div className="flex-1">
                           <span className="font-medium">{option.name}</span>
-                          <span className="block text-sm text-muted-foreground">{option.description}</span>
+                          <span className="block text-sm text-muted-foreground">
+                            {option.description}
+                          </span>
                         </div>
                       </label>
                     ))}
@@ -250,15 +371,17 @@ export function CheckoutClient() {
                 </div>
               </div>
 
-              {/* Order Summary */}
               <div>
                 <div className="rounded-lg border p-6 sticky top-24">
                   <h2 className="text-lg font-semibold mb-4">Order Summary</h2>
 
                   <div className="space-y-3 text-sm">
                     {items.map((item) => (
-                      <div key={item.productId} className="flex justify-between">
-                        <span className="text-muted-foreground">{item.name} × {item.quantity}</span>
+                      <div key={item.key} className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          {item.name}
+                          {item.size ? ` (${item.size})` : ""} × {item.quantity}
+                        </span>
                         <span>{formatPrice(item.price * item.quantity)}</span>
                       </div>
                     ))}
@@ -284,31 +407,24 @@ export function CheckoutClient() {
                     <span>{formatPrice(total)}</span>
                   </div>
 
-                  {subtotal >= 100 && (
+                  {subtotal >= FREE_SHIPPING_THRESHOLD && (
                     <p className="mt-2 text-sm text-green-600 font-medium">
                       You qualify for free shipping!
                     </p>
                   )}
 
-                  {error && (
-                    <p className="mt-4 text-sm text-destructive">{error}</p>
-                  )}
+                  {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-                  <Button
-                    type="submit"
-                    className="w-full mt-6"
-                    size="lg"
-                    disabled={isSubmitting}
-                  >
+                  <Button type="submit" className="w-full mt-6" size="lg" disabled={isSubmitting}>
                     {isSubmitting
                       ? "Processing..."
                       : paymentMethod === "COD"
-                        ? "Place Order (Cash on Delivery)"
-                        : `Pay with ${PAYMENT_OPTIONS.find(p => p.id === paymentMethod)?.name}`}
+                      ? "Place Order (Cash on Delivery)"
+                      : `Pay with ${PAYMENT_OPTIONS.find((p) => p.id === paymentMethod)?.name}`}
                   </Button>
 
                   <p className="mt-3 text-center text-xs text-muted-foreground">
-                    By placing this order, you agree to our Terms & Conditions and Privacy Policy.
+                    By placing this order, you agree to our Terms &amp; Conditions and Privacy Policy.
                   </p>
                 </div>
               </div>
