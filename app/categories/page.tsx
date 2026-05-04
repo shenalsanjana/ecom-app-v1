@@ -4,6 +4,12 @@ import { ProductCard } from "@/app/_components/home/product-card";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { SortSelect } from "@/app/_components/shared/sort-select";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Shop all categories",
+  description: "Browse every category: oversize t-shirts, graphic tees, solid basics.",
+};
 
 type CategoriesPageProps = {
   searchParams: Promise<{

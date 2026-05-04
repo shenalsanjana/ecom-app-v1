@@ -5,6 +5,21 @@ import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { SortSelect } from "@/app/_components/shared/sort-select";
 import { getCategories, getProducts, parseSortBy } from "@/app/_lib/products";
+import type { Metadata } from "next";
+
+export async function generateMetadata(
+  { searchParams }: { searchParams: Promise<{ q?: string }> },
+): Promise<Metadata> {
+  const sp = await searchParams;
+  const q = sp.q?.trim();
+  return {
+    title: q ? `"${q}" — search` : "Search",
+    description: q
+      ? `Search results for "${q}" at Dressing Bear.`
+      : "Search products at Dressing Bear.",
+    robots: { index: false, follow: true },
+  };
+}
 
 const ITEMS_PER_PAGE = 12;
 

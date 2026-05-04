@@ -14,9 +14,30 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
+
 export const metadata: Metadata = {
-  title: "Dressing Bear - Oversize T-Shirts",
-  description: "Shop premium oversize t-shirts with size variants. Cash on Delivery available.",
+  metadataBase: new URL(APP_URL),
+  title: {
+    default: "Dressing Bear — Oversize T-Shirts",
+    template: "%s | Dressing Bear",
+  },
+  description:
+    "Shop premium oversize t-shirts with size variants. Cash on Delivery available.",
+  openGraph: {
+    type: "website",
+    siteName: "Dressing Bear",
+    locale: "en_LK",
+    url: APP_URL,
+    title: "Dressing Bear — Oversize T-Shirts",
+    description:
+      "Shop premium oversize t-shirts with size variants. Cash on Delivery available.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Dressing Bear — Oversize T-Shirts",
+    description: "Shop premium oversize t-shirts with size variants.",
+  },
 };
 
 export default function RootLayout({

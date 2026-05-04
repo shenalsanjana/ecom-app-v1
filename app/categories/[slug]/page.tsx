@@ -5,6 +5,23 @@ import { ProductCard } from "@/app/_components/home/product-card";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { SortSelect } from "@/app/_components/shared/sort-select";
+import type { Metadata } from "next";
+
+export async function generateMetadata(
+  { params }: { params: Promise<{ slug: string }> },
+): Promise<Metadata> {
+  const { slug } = await params;
+  const categories = await getCategories();
+  const category = categories.find((c) => c.slug === slug);
+  if (!category) {
+    return { title: "Category not found" };
+  }
+  return {
+    title: category.name,
+    description: `Shop ${category.name.toLowerCase()} at Dressing Bear.`,
+    alternates: { canonical: `/categories/${slug}` },
+  };
+}
 
 type CategoryPageProps = {
   params: Promise<{ slug: string }>;

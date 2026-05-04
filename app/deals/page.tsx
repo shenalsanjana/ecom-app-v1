@@ -4,6 +4,13 @@ import { ProductCard } from "@/app/_components/home/product-card";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { SortSelect } from "@/app/_components/shared/sort-select";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Deals",
+  description: "Limited-time deals on premium oversize t-shirts.",
+  alternates: { canonical: "/deals" },
+};
 
 type DealsSort = "price_asc" | "price_desc" | "discount" | "rating";
 
