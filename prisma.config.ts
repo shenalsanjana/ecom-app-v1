@@ -8,6 +8,12 @@ import { PrismaLibSQL } from "@prisma/adapter-libsql";
 // the file URL from prisma/schema.prisma's datasource block.
 const tursoUrl = process.env.TURSO_DATABASE_URL;
 
+if (tursoUrl && !process.env.DATABASE_URL) {
+  // Prisma validates schema.prisma's `url = env("DATABASE_URL")` before the
+  // adapter takes over, even though the adapter handles the real connection.
+  process.env.DATABASE_URL = "file:./placeholder.db";
+}
+
 export default defineConfig(
   tursoUrl
     ? {
