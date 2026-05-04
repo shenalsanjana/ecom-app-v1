@@ -63,6 +63,7 @@ export function CartItemRow({ item }: Props) {
               size="icon"
               className="h-7 w-7"
               onClick={() => updateQuantity(item.key, item.quantity - 1)}
+              disabled={item.quantity <= 1}
               aria-label="Decrease quantity"
             >
               <Minus className="h-3 w-3" />
