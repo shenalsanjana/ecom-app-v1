@@ -1,9 +1,26 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
+import { PrismaLibSQL } from "@prisma/adapter-libsql";
 import { categories, featuredProducts, dealsProducts } from "../app/_data/mock";
 
-const prisma = new PrismaClient();
+// Mirrors app/_lib/prisma.ts: when running against Turso, use the libSQL
+// driver adapter and satisfy schema.prisma's DATABASE_URL validation with a
+// placeholder. Without this, seeding from a build env that has only
+// TURSO_DATABASE_URL would either fail validation or silently write to a
+// local SQLite file instead of the remote DB.
+if (process.env.TURSO_DATABASE_URL && !process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = "file:./placeholder.db";
+}
+
+const prisma = process.env.TURSO_DATABASE_URL
+  ? new PrismaClient({
+      adapter: new PrismaLibSQL({
+        url: process.env.TURSO_DATABASE_URL,
+        authToken: process.env.TURSO_AUTH_TOKEN,
+      }),
+    })
+  : new PrismaClient();
 
 // Resolve a product image path. Prefers real photos at
 // public/products/<id>/main.jpg + 1.jpg..4.jpg when present and falls back to
