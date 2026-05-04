@@ -33,7 +33,7 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const { id } = await params;
   const detail = await getProductDetail(id);
-  if (!detail) return { title: "Not found" };
+  if (!detail) return { title: "Product not found — Dressing Bear" };
   return {
     title: detail.product.name,
     description: stripMarkdown(detail.product.description),
