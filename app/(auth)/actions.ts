@@ -24,6 +24,9 @@ function flatten(errs: unknown): string {
   return "Invalid input";
 }
 
+const NEUTRAL_SIGNUP_MESSAGE =
+  "If this email isn't already registered, your account is ready. Sign in to continue.";
+
 export async function signupAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = SignupSchema.safeParse({
     name: formData.get("name"),
@@ -34,7 +37,11 @@ export async function signupAction(_prev: ActionState, formData: FormData): Prom
   if (!parsed.success) return { error: flatten(parsed.error) };
 
   const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } });
-  if (existing) return { error: "Email already in use" };
+  if (existing) {
+    // Do not create, do not sign in, do not reveal that this email is already
+    // registered. Same response shape as the genuinely-new-user success path.
+    return { success: NEUTRAL_SIGNUP_MESSAGE };
+  }
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 10);
   await prisma.user.create({
