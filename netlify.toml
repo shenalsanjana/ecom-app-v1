@@ -6,6 +6,10 @@
   NODE_VERSION = "20"
   # We run `prisma generate` explicitly in the build command above; skip the duplicate from postinstall.
   PRISMA_SKIP_POSTINSTALL_GENERATE = "1"
+  # SQLite file URL used during build for `prisma migrate deploy` and seeding.
+  # Override in Netlify UI (Site settings > Environment variables) with a
+  # production Postgres/MySQL connection string when moving off SQLite.
+  DATABASE_URL = "file:./prisma/dev.db"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
