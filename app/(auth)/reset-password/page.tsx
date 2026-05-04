@@ -18,7 +18,7 @@ export default function ResetPasswordPage({ searchParams }: Props) {
     searchParams.then((p) => setToken(p.token));
   }, [searchParams]);
 
-  if (token === "") {
+  if (token !== undefined && !token) {
     return (
       <main className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center px-4 py-10">
         <Alert variant="destructive">
