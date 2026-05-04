@@ -66,6 +66,27 @@ export const AddressSchema = z.object({
   isDefault: z.boolean().optional().default(false),
 });
 
+// Sri Lankan mobile/landline normalized to digits-only after stripping spaces,
+// hyphens, and parens. Accepts:
+//   - 0771234567       (national, leading 0)
+//   - +94771234567     (international with +)
+//   - 94771234567      (international without +)
+//   - 771234567        (9 digits, no prefix)
+// Rejects empty, all-zeroes, leading-zero-zero, and obviously short/long inputs.
+export const LkPhoneSchema = z
+  .string()
+  .trim()
+  .min(1, "Phone is required")
+  .transform((v) => v.replace(/[\s()-]/g, ""))
+  .pipe(
+    z
+      .string()
+      .regex(
+        /^(?:\+?94|0)?[1-9]\d{8}$/,
+        "Enter a valid Sri Lankan phone number (e.g. 0771234567)",
+      ),
+  );
+
 export type SignupInput = z.infer<typeof SignupSchema>;
 export type LoginInput = z.infer<typeof LoginSchema>;
 export type ProfileInput = z.infer<typeof ProfileSchema>;
@@ -73,3 +94,4 @@ export type ChangePasswordInput = z.infer<typeof ChangePasswordSchema>;
 export type RequestResetInput = z.infer<typeof RequestResetSchema>;
 export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
 export type AddressInput = z.infer<typeof AddressSchema>;
+export type LkPhoneInput = z.infer<typeof LkPhoneSchema>;
