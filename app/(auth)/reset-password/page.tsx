@@ -14,11 +14,15 @@ type Props = { searchParams: Promise<{ token?: string }> };
 export default function ResetPasswordPage({ searchParams }: Props) {
   const [state, formAction, pending] = useActionState<ActionState, FormData>(resetPasswordAction, null);
   const [token, setToken] = useState<string | undefined>();
+  const [loaded, setLoaded] = useState(false);
   useEffect(() => {
-    searchParams.then((p) => setToken(p.token));
+    searchParams.then((p) => {
+      setToken(p.token);
+      setLoaded(true);
+    });
   }, [searchParams]);
 
-  if (token !== undefined && !token) {
+  if (loaded && !token) {
     return (
       <main className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center px-4 py-10">
         <Alert variant="destructive">
