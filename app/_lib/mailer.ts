@@ -24,6 +24,26 @@ function getTransport(): nodemailer.Transporter {
 const BRAND_NAME = process.env.BRAND_NAME ?? "Dressing Bear";
 const CONTACT_NUMBER = process.env.CONTACT_NUMBER ?? "+94 740545536";
 
+function requireFrom(): string {
+  const from = process.env.SMTP_FROM;
+  if (!from) {
+    throw new Error(
+      "SMTP_FROM is not configured. Set SMTP_FROM in .env.local (e.g. \"Dressing Bear <no-reply@dressingbear.com>\").",
+    );
+  }
+  return from;
+}
+
+function requireBrandEmail(): string {
+  const email = process.env.BRAND_EMAIL;
+  if (!email) {
+    throw new Error(
+      "BRAND_EMAIL is not configured. Set BRAND_EMAIL in .env.local.",
+    );
+  }
+  return email;
+}
+
 // Replies go to the brand inbox even when the From: address is a relay-aligned
 // technical address (needed to pass DMARC on strict providers like Gmail).
 function brandReplyTo(): string | undefined {
@@ -32,7 +52,7 @@ function brandReplyTo(): string | undefined {
 
 export async function sendPasswordResetEmail(to: string, resetUrl: string): Promise<void> {
   const transport = getTransport();
-  const from = process.env.SMTP_FROM ?? `${BRAND_NAME} <no-reply@example.com>`;
+  const from = requireFrom();
   await transport.sendMail({
     from,
     to,
@@ -76,8 +96,8 @@ export type OrderDetails = {
 
 export async function sendOrderConfirmationEmail(order: OrderDetails): Promise<void> {
   const transport = getTransport();
-  const brandEmail = process.env.BRAND_EMAIL ?? "dressingbear@gmail.com";
-  const from = process.env.SMTP_FROM ?? `${BRAND_NAME} <no-reply@example.com>`;
+  const brandEmail = requireBrandEmail();
+  const from = requireFrom();
   const paymentDisplay = order.paymentMethodDisplay ?? "Cash on Delivery";
 
   const itemsListText = order.items
@@ -202,8 +222,8 @@ export type ContactSubmission = {
 
 export async function sendContactEmail(submission: ContactSubmission): Promise<void> {
   const transport = getTransport();
-  const brandEmail = process.env.BRAND_EMAIL ?? "dressingbear@gmail.com";
-  const from = process.env.SMTP_FROM ?? `${BRAND_NAME} <no-reply@example.com>`;
+  const brandEmail = requireBrandEmail();
+  const from = requireFrom();
 
   const { name, email, phone, message } = submission;
 
