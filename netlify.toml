@@ -4,6 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # We run `prisma generate` explicitly in the build command above; skip the duplicate from postinstall.
   PRISMA_SKIP_POSTINSTALL_GENERATE = "1"
 
 [[plugins]]

@@ -110,7 +110,6 @@ async function main() {
       `[seed] Skipping: ${existingCategoryCount} categories already present. ` +
       `Set FORCE_SEED=true to override.`,
     );
-    await prisma.$disconnect();
     return;
   }
 
