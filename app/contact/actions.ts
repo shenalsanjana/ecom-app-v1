@@ -1,12 +1,18 @@
 "use server";
 
 import { sendContactEmail, type ContactSubmission } from "@/app/_lib/mailer";
+import { LkPhoneSchema } from "@/app/_lib/validation";
 import { z } from "zod";
 
 const contactSchema = z.object({
   name: z.string().optional(),
   email: z.string().email("Please enter a valid email address"),
-  phone: z.string().optional(),
+  phone: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v ? v : undefined))
+    .pipe(LkPhoneSchema.optional()),
   message: z.string().min(10, "Message must be at least 10 characters"),
 });
 
