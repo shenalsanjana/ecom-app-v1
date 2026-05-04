@@ -104,6 +104,22 @@ function stockFor(productId: string): number {
 }
 
 async function main() {
+  const existingCategoryCount = await prisma.category.count();
+  if (existingCategoryCount > 0 && process.env.FORCE_SEED !== "true") {
+    console.log(
+      `[seed] Skipping: ${existingCategoryCount} categories already present. ` +
+      `Set FORCE_SEED=true to override.`,
+    );
+    await prisma.$disconnect();
+    return;
+  }
+
+  if (existingCategoryCount > 0) {
+    console.log(
+      `[seed] FORCE_SEED=true detected; reseeding over ${existingCategoryCount} existing categories.`,
+    );
+  }
+
   // Categories
   for (const c of categories) {
     await prisma.category.upsert({
