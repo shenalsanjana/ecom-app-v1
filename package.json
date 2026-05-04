@@ -18,7 +18,9 @@
   "dependencies": {
     "@auth/core": "^0.41.2",
     "@base-ui/react": "^1.4.1",
+    "@libsql/client": "^0.17.3",
     "@netlify/plugin-nextjs": "^5.15.10",
+    "@prisma/adapter-libsql": "^6.19.3",
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
