@@ -2,6 +2,7 @@
 "use server";
 
 import { z } from "zod";
+import { LkPhoneSchema } from "@/app/_lib/validation";
 import { auth } from "@/app/_lib/auth";
 import { sendOrderConfirmationEmail, type OrderItem } from "@/app/_lib/mailer";
 import { prisma } from "@/app/_lib/prisma";
@@ -43,14 +44,14 @@ const AddressSchema = z.object({
 const GuestInfoSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
   email: z.string().trim().email("Valid email is required"),
-  phone: z.string().trim().min(7, "Phone is required"),
+  phone: LkPhoneSchema,
 });
 
 const ProcessOrderSchema = z.object({
   items: z.array(ItemInputSchema).min(1, "Cart is empty"),
   shippingAddress: AddressSchema,
   paymentMethod: z.enum(["COD", "PAYHERE", "KOKO", "MINITPAY"]),
-  contactPhone: z.string().trim().min(7, "Phone is required"),
+  contactPhone: LkPhoneSchema,
   guestInfo: GuestInfoSchema.optional(),
   idempotencyKey: z.string().min(8).max(128).optional(),
 });
