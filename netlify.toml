@@ -1,0 +1,10 @@
+[build]
+  command = "prisma generate && prisma migrate deploy && tsx prisma/seed.ts && next build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+  PRISMA_SKIP_POSTINSTALL_GENERATE = "1"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
