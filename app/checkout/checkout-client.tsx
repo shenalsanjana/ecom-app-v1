@@ -135,6 +135,10 @@ export function CheckoutClient({ user }: Props) {
     setIsSubmitting(true);
 
     try {
+      const normalizedAddress = {
+        ...address,
+        line2: address.line2.trim() || undefined,
+      };
       const result = await processOrder({
         items: items.map((it) => ({
           productId: it.productId,
@@ -143,7 +147,7 @@ export function CheckoutClient({ user }: Props) {
           quantity: it.quantity,
           size: it.size,
         })),
-        shippingAddress: address,
+        shippingAddress: normalizedAddress,
         paymentMethod,
         contactPhone: phone,
         guestInfo: isGuest ? { name: guest.name, email: guest.email, phone } : undefined,
@@ -213,6 +217,7 @@ export function CheckoutClient({ user }: Props) {
                           value={guest.name}
                           onChange={(e) => setGuest({ ...guest, name: e.target.value })}
                           required
+                          autoComplete="name"
                           placeholder="Your name"
                         />
                       </div>
@@ -223,6 +228,8 @@ export function CheckoutClient({ user }: Props) {
                         <Input
                           id="guestEmail"
                           type="email"
+                          inputMode="email"
+                          autoComplete="email"
                           value={guest.email}
                           onChange={(e) => setGuest({ ...guest, email: e.target.value })}
                           required
@@ -247,6 +254,9 @@ export function CheckoutClient({ user }: Props) {
                       <Input
                         id="phone"
                         type="tel"
+                        inputMode="tel"
+                        autoComplete="tel"
+                        pattern="^(?:\+?94|0)?[1-9]\d{8}$"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         required
