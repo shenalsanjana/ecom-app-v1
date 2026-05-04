@@ -160,7 +160,7 @@ async function main() {
     await prisma.review.deleteMany({ where: { productId: p.id } });
     const rng = rngFromId(p.id + ":reviews");
     const count = 5 + Math.floor(rng() * 6); // 5..10
-    const reviews = Array.from({ length: count }).map((_, i) => {
+    const reviews = Array.from({ length: count }, () => {
       const daysAgo = Math.floor(rng() * 90);
       const createdAt = new Date(Date.now() - daysAgo * 86400_000);
       return {
