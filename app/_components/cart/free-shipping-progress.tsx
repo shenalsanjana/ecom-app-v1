@@ -28,15 +28,17 @@ export function FreeShippingProgress({ subtotal }: Props) {
         <Truck className="h-4 w-4 shrink-0" aria-hidden />
         Add <span className="font-semibold text-foreground">{formatPrice(remaining)}</span> more for free shipping
       </p>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+      <div
+        className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+        role="progressbar"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Progress to free shipping"
+      >
         <div
           className="h-full rounded-full bg-primary transition-[width] duration-300"
           style={{ width: `${pct}%` }}
-          role="progressbar"
-          aria-valuenow={pct}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label={`Free-shipping progress: ${pct}%`}
         />
       </div>
     </div>

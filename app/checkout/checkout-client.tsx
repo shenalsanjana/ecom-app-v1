@@ -11,6 +11,7 @@ import { SiteFooter } from "@/app/_components/home/site-footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { formatPrice } from "@/app/_lib/format";
 import { calculateShipping, FREE_SHIPPING_THRESHOLD } from "@/app/_lib/checkout-config";
@@ -350,18 +351,22 @@ export function CheckoutClient({ user }: Props) {
 
                 <div className="rounded-lg border p-6">
                   <div className="flex items-center gap-3 mb-4">
-                    <FileText className="h-5 w-5 text-muted-foreground" />
-                    <h2 className="text-lg font-semibold">Delivery notes</h2>
+                    <FileText className="h-5 w-5 text-muted-foreground" aria-hidden />
+                    <Label htmlFor="notes" className="text-lg font-semibold">
+                      Delivery notes
+                    </Label>
                     <span className="text-xs text-muted-foreground">Optional</span>
                   </div>
                   <Textarea
+                    id="notes"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value.slice(0, 500))}
                     rows={3}
                     maxLength={500}
                     placeholder="e.g. Leave at front desk; call before delivery"
+                    aria-describedby="notes-counter"
                   />
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p id="notes-counter" className="mt-1 text-xs text-muted-foreground">
                     {notes.length}/500
                   </p>
                 </div>
