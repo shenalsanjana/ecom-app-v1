@@ -12,10 +12,16 @@ export async function CategoryStrip() {
           {categories.map((c) => (
             <li key={c.slug} className="flex flex-col items-center gap-3">
               <Link
-                href="#"
-                className="flex h-20 w-20 items-center justify-center rounded-full bg-zinc-100 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700"
+                href={`/categories/${c.slug}`}
+                className="relative h-20 w-20 overflow-hidden rounded-full bg-zinc-100 ring-1 ring-zinc-200 transition-shadow hover:ring-2 hover:ring-zinc-300 dark:bg-zinc-800 dark:ring-zinc-700"
               >
-                <Image src={c.image} alt={c.name} width={36} height={36} className="dark:invert" />
+                <Image
+                  src={c.image}
+                  alt={c.name}
+                  fill
+                  sizes="80px"
+                  className="object-cover"
+                />
               </Link>
               <span className="text-sm font-medium">{c.name}</span>
             </li>
