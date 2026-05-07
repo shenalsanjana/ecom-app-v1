@@ -26,14 +26,14 @@ export function Hero() {
             </Button>
           </div>
         </div>
-        <div className="relative flex h-72 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-100 via-rose-100 to-fuchsia-100 dark:from-amber-950 dark:via-rose-950 dark:to-fuchsia-950 md:h-96">
+        <div className="relative h-72 overflow-hidden rounded-2xl bg-zinc-100 dark:bg-zinc-900 md:h-96">
           <Image
-            src="/window.svg"
-            alt="Featured product"
-            width={200}
-            height={200}
+            src="/banners/spring-collection.jpg"
+            alt="Dressing Bear — unleash your inner bear"
+            fill
             priority
-            className="dark:invert"
+            sizes="(min-width: 768px) 50vw, 100vw"
+            className="object-cover"
           />
         </div>
       </div>
