@@ -208,6 +208,26 @@ async function main() {
     await prisma.review.createMany({ data: reviews });
   }
 
+  // FORCE_SEED runs replace the catalog wholesale, so prune any products and
+  // categories left over from a previous catalog. Product cascades to its
+  // images, reviews, and wishlist items; Category needs its products gone
+  // first (no onDelete on the Product->Category relation, so RESTRICT).
+  if (process.env.FORCE_SEED === "true") {
+    const newProductIds = all.map((p) => p.id);
+    const newCategorySlugs = categories.map((c) => c.slug);
+    const stalePrd = await prisma.product.deleteMany({
+      where: { id: { notIn: newProductIds } },
+    });
+    const staleCat = await prisma.category.deleteMany({
+      where: { slug: { notIn: newCategorySlugs } },
+    });
+    if (stalePrd.count > 0 || staleCat.count > 0) {
+      console.log(
+        `[seed] Removed stale catalog rows: ${stalePrd.count} products, ${staleCat.count} categories.`,
+      );
+    }
+  }
+
   const totalImages = await prisma.productImage.count();
   const totalReviews = await prisma.review.count();
   console.log(
