@@ -1,8 +1,7 @@
 // app/(auth)/signup/page.tsx
 "use client";
 
-import { useActionState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,10 +9,31 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { signupAction, type ActionState } from "@/app/(auth)/actions";
 
-export default function SignupPage() {
+type Props = { searchParams: Promise<{ callbackUrl?: string }> };
+
+export default function SignupPage({ searchParams }: Props) {
   const [state, formAction, pending] = useActionState<ActionState, FormData>(signupAction, null);
-  const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/";
+  return (
+    <SignupInner state={state} formAction={formAction} pending={pending} searchParams={searchParams} />
+  );
+}
+
+function SignupInner({
+  state,
+  formAction,
+  pending,
+  searchParams,
+}: {
+  state: ActionState;
+  formAction: (fd: FormData) => void;
+  pending: boolean;
+  searchParams: Promise<{ callbackUrl?: string }>;
+}) {
+  const [params, setParams] = useState<{ callbackUrl?: string }>({});
+  useEffect(() => {
+    searchParams.then(setParams);
+  }, [searchParams]);
+
   return (
     <main className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center px-4 py-10">
       <Link href="/" className="mb-6 text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
@@ -43,7 +63,7 @@ export default function SignupPage() {
         </>
       ) : (
         <form action={formAction} className="space-y-4">
-          <input type="hidden" name="callbackUrl" value={callbackUrl} />
+          <input type="hidden" name="callbackUrl" value={params.callbackUrl ?? "/"} />
           <div className="space-y-2">
             <Label htmlFor="name">Full name</Label>
             <Input id="name" name="name" required autoComplete="name" />
