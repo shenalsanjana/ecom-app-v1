@@ -120,10 +120,10 @@ export async function sendOrderConfirmationEmail(order: OrderDetails): Promise<v
   const itemsListHtml = order.items
     .map(
       (item) => {
-        const sizeStr = item.size ? ` <span style="color:#666;font-size:0.9em;">(Size ${item.size})</span>` : "";
+        const sizeStr = item.size ? ` <span style="color:#666;font-size:0.9em;">(Size ${escapeHtml(item.size)})</span>` : "";
         return `
         <div class="item">
-          <span>${item.name}${sizeStr} × ${item.quantity}</span>
+          <span>${escapeHtml(item.name)}${sizeStr} × ${item.quantity}</span>
           <span>${formatPrice(item.price * item.quantity)}</span>
         </div>`;
       },
@@ -174,17 +174,17 @@ ${BRAND_NAME}
 <body>
   <div class="container">
     <div class="header">
-      <h1 style="margin: 0; color: #2c3e50;">${BRAND_NAME}</h1>
+      <h1 style="margin: 0; color: #2c3e50;">${escapeHtml(BRAND_NAME)}</h1>
       <h2 style="margin: 10px 0 0 0; color: #27ae60;">Order Confirmation</h2>
     </div>
 
-    <p>Hi ${order.customerName}, thank you for your order. Here are the details:</p>
+    <p>Hi ${escapeHtml(order.customerName)}, thank you for your order. Here are the details:</p>
 
-    <p><strong>Order ID:</strong> ${order.orderId}</p>
-    <p><strong>Email:</strong> ${order.customerEmail}</p>
-    ${order.customerPhone ? `<p><strong>Phone:</strong> ${order.customerPhone}</p>` : ""}
-    <p><strong>Payment Method:</strong> ${paymentDisplay}</p>
-    ${order.trackingCode ? `<p><strong>Tracking Code:</strong> ${order.trackingCode}</p>` : ""}
+    <p><strong>Order ID:</strong> ${escapeHtml(order.orderId)}</p>
+    <p><strong>Email:</strong> ${escapeHtml(order.customerEmail)}</p>
+    ${order.customerPhone ? `<p><strong>Phone:</strong> ${escapeHtml(order.customerPhone)}</p>` : ""}
+    <p><strong>Payment Method:</strong> ${escapeHtml(paymentDisplay)}</p>
+    ${order.trackingCode ? `<p><strong>Tracking Code:</strong> ${escapeHtml(order.trackingCode)}</p>` : ""}
 
     <div class="items">
       <h3 style="margin-top: 0;">Items</h3>
@@ -198,13 +198,13 @@ ${BRAND_NAME}
     <div class="footer">
       <h3>Shipping Address</h3>
       <p>
-        ${order.shippingAddress.line1}<br>
-        ${order.shippingAddress.line2 ? order.shippingAddress.line2 + "<br>" : ""}
-        ${order.shippingAddress.city}, ${order.shippingAddress.region} ${order.shippingAddress.postalCode}<br>
-        ${order.shippingAddress.country}
+        ${escapeHtml(order.shippingAddress.line1)}<br>
+        ${order.shippingAddress.line2 ? escapeHtml(order.shippingAddress.line2) + "<br>" : ""}
+        ${escapeHtml(order.shippingAddress.city)}, ${escapeHtml(order.shippingAddress.region)} ${escapeHtml(order.shippingAddress.postalCode)}<br>
+        ${escapeHtml(order.shippingAddress.country)}
       </p>
       ${order.notes && order.notes.trim() ? `<h3>Delivery Notes</h3><p>${escapeHtml(order.notes).replace(/\n/g, "<br>")}</p>` : ""}
-      <p>Need help? Contact us at <strong>${CONTACT_NUMBER}</strong> or <a href="mailto:${brandEmail}">${brandEmail}</a>.</p>
+      <p>Need help? Contact us at <strong>${escapeHtml(CONTACT_NUMBER)}</strong> or <a href="mailto:${encodeURIComponent(brandEmail)}">${escapeHtml(brandEmail)}</a>.</p>
     </div>
   </div>
 </body>
@@ -268,28 +268,28 @@ Submitted from ${BRAND_NAME} website
 <body>
   <div class="container">
     <div class="header">
-      <h1 style="margin: 0; color: #2c3e50;">${BRAND_NAME}</h1>
+      <h1 style="margin: 0; color: #2c3e50;">${escapeHtml(BRAND_NAME)}</h1>
       <h2 style="margin: 10px 0 0 0; color: #007bff;">New Contact Form Submission</h2>
     </div>
 
     <div class="field">
       <div class="label">Name:</div>
-      <div>${name || "Not provided"}</div>
+      <div>${name ? escapeHtml(name) : "Not provided"}</div>
     </div>
 
     <div class="field">
       <div class="label">Email:</div>
-      <div><a href="mailto:${email}">${email}</a></div>
+      <div><a href="mailto:${encodeURIComponent(email)}">${escapeHtml(email)}</a></div>
     </div>
 
     <div class="field">
       <div class="label">Phone:</div>
-      <div>${phone || "Not provided"}</div>
+      <div>${phone ? escapeHtml(phone) : "Not provided"}</div>
     </div>
 
     <div class="field">
       <div class="label">Message:</div>
-      <div class="message-box">${message.replace(/\n/g, "<br>")}</div>
+      <div class="message-box">${escapeHtml(message).replace(/\n/g, "<br>")}</div>
     </div>
   </div>
 </body>
