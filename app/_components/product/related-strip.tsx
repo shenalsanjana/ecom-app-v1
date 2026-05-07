@@ -25,6 +25,7 @@ export function RelatedStrip({ products, wishlistedIds, fromPath }: Props) {
             image={p.image}
             rating={p.rating}
             reviewCount={p.reviewCount}
+            sizes={p.sizes}
             wishlisted={wishlistedIds.has(p.id)}
             fromPath={fromPath}
           />

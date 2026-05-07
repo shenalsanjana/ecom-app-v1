@@ -32,6 +32,7 @@ export async function DealsSection() {
               image={p.image}
               rating={p.rating}
               reviewCount={p.reviewCount}
+              sizes={p.sizes}
               wishlisted={wishlisted.has(p.id)}
               fromPath="/"
             />

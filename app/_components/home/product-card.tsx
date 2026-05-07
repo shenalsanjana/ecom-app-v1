@@ -16,6 +16,7 @@ export type ProductCardProps = {
   image: string;
   rating: number;
   reviewCount: number;
+  sizes: string;
   wishlisted?: boolean;
   fromPath?: string;
 };
@@ -32,6 +33,7 @@ export function ProductCard({
   image,
   rating,
   reviewCount,
+  sizes,
   wishlisted = false,
   fromPath = "/",
 }: ProductCardProps) {
@@ -87,7 +89,13 @@ export function ProductCard({
         </div>
       </CardContent>
       <CardFooter className="p-4 pt-0">
-        <QuickBuyButtons productId={id} />
+        <QuickBuyButtons
+          productId={id}
+          name={name}
+          price={price}
+          image={image}
+          sizes={sizes}
+        />
       </CardFooter>
     </Card>
   );

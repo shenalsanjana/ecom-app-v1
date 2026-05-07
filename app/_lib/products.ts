@@ -11,6 +11,7 @@ export type ProductView = {
   rating: number;
   reviewCount: number;
   category: string;
+  sizes: string;
 };
 
 export type CategoryView = {
@@ -26,6 +27,7 @@ type ProductRow = {
   originalPrice: number | null;
   image: string;
   categorySlug: string;
+  sizes: string;
 };
 
 async function attachAggregates(rows: ProductRow[]): Promise<ProductView[]> {
@@ -51,6 +53,7 @@ async function attachAggregates(rows: ProductRow[]): Promise<ProductView[]> {
       rating: agg.avg,
       reviewCount: agg.count,
       category: p.categorySlug,
+      sizes: p.sizes,
     };
   });
 }
@@ -67,7 +70,7 @@ export async function getFeaturedProducts(limit = 8): Promise<ProductView[]> {
     take: limit,
     select: {
       id: true, name: true, price: true, originalPrice: true,
-      image: true, categorySlug: true,
+      image: true, categorySlug: true, sizes: true,
     },
   });
   return attachAggregates(rows);
@@ -80,7 +83,7 @@ export async function getDealsProducts(limit = 4): Promise<ProductView[]> {
     take: limit,
     select: {
       id: true, name: true, price: true, originalPrice: true,
-      image: true, categorySlug: true,
+      image: true, categorySlug: true, sizes: true,
     },
   });
   return attachAggregates(rows);
@@ -91,7 +94,7 @@ export async function getProductById(id: string): Promise<ProductView | null> {
     where: { id },
     select: {
       id: true, name: true, price: true, originalPrice: true,
-      image: true, categorySlug: true,
+      image: true, categorySlug: true, sizes: true,
     },
   });
   if (!row) return null;
@@ -128,7 +131,7 @@ export async function getProductDetail(id: string): Promise<ProductDetail | null
       orderBy: { id: "asc" },
       select: {
         id: true, name: true, price: true, originalPrice: true,
-        image: true, categorySlug: true,
+        image: true, categorySlug: true, sizes: true,
       },
     }),
   ]);
@@ -267,7 +270,7 @@ export async function getProducts(opts: GetProductsOptions = {}): Promise<Produc
     orderBy,
     select: {
       id: true, name: true, price: true, originalPrice: true,
-      image: true, categorySlug: true,
+      image: true, categorySlug: true, sizes: true,
     },
   });
 
@@ -295,7 +298,7 @@ export async function searchProducts(query: string, limit = 20): Promise<Product
     orderBy: { id: "asc" },
     select: {
       id: true, name: true, price: true, originalPrice: true,
-      image: true, categorySlug: true,
+      image: true, categorySlug: true, sizes: true,
     },
   });
   return attachAggregates(rows);

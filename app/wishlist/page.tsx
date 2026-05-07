@@ -63,6 +63,7 @@ export default async function WishlistPage() {
                     image={it.product.image}
                     rating={agg.avg}
                     reviewCount={agg.count}
+                    sizes={it.product.sizes}
                     wishlisted={true}
                     fromPath="/wishlist"
                   />
