@@ -1,8 +1,8 @@
 // app/_components/product/buy-box-client.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Heart, Star, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,9 +62,13 @@ export function BuyBoxClient({
   const [isBuying, setIsBuying] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string>("");
 
-  const sizeList = sizes ? sizes.split(",").map(s => s.trim()) : [];
+  const sizeList = useMemo(
+    () => (sizes ? sizes.split(",").map((s) => s.trim()) : []),
+    [sizes],
+  );
 
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const buyNowIntent = searchParams.get("action") === "buy-now";
 
   useEffect(() => {
@@ -76,8 +80,19 @@ export function BuyBoxClient({
     el.scrollIntoView({ behavior: "smooth", block: "center" });
     el.setAttribute("data-attention", "true");
     const t = setTimeout(() => el.removeAttribute("data-attention"), 2000);
-    return () => clearTimeout(t);
-  }, [buyNowIntent, sizeList.length, selectedSize]);
+
+    // Strip ?action=buy-now from the URL so refresh / back-nav doesn't re-fire
+    // the nudge. Preserve any other query params.
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("action");
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+
+    return () => {
+      clearTimeout(t);
+      el.removeAttribute("data-attention");
+    };
+  }, [buyNowIntent, sizeList.length, selectedSize, searchParams, pathname, router]);
 
   const onSale = originalPrice != null && originalPrice > price;
   const pct = onSale ? discountPct(price, originalPrice as number) : 0;
