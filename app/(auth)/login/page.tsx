@@ -68,7 +68,10 @@ function LoginInner({
         <Link href="/forgot-password" className="text-muted-foreground hover:text-foreground">
           Forgot password?
         </Link>
-        <Link href="/signup" className="text-muted-foreground hover:text-foreground">
+        <Link
+          href={params.callbackUrl ? `/signup?callbackUrl=${encodeURIComponent(params.callbackUrl)}` : "/signup"}
+          className="text-muted-foreground hover:text-foreground"
+        >
           Create account
         </Link>
       </div>

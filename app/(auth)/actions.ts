@@ -16,6 +16,12 @@ import {
 
 export type ActionState = { error?: string; success?: string } | null;
 
+function safeCallbackUrl(raw: string | null | undefined): string {
+  if (!raw) return "/";
+  // Same-origin only — reject "//evil.com/foo" and absolute URLs.
+  return raw.startsWith("/") && !raw.startsWith("//") ? raw : "/";
+}
+
 function flatten(errs: unknown): string {
   if (typeof errs === "object" && errs && "issues" in errs) {
     const issues = (errs as { issues: { message: string }[] }).issues;
@@ -54,11 +60,7 @@ export async function signupAction(_prev: ActionState, formData: FormData): Prom
     redirect: false,
   });
 
-  const rawCallback = (formData.get("callbackUrl") as string | null) ?? "/";
-  // Same-origin only — reject "//evil.com/foo" and absolute URLs.
-  const safeCallback =
-    rawCallback.startsWith("/") && !rawCallback.startsWith("//") ? rawCallback : "/";
-  redirect(safeCallback);
+  redirect(safeCallbackUrl(formData.get("callbackUrl") as string | null));
 }
 
 export async function loginAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -68,7 +70,7 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   });
   if (!parsed.success) return { error: "Invalid email or password" };
 
-  const callbackUrl = (formData.get("callbackUrl") as string) || "/";
+  const callbackUrl = safeCallbackUrl(formData.get("callbackUrl") as string | null);
 
   try {
     await signIn("credentials", {

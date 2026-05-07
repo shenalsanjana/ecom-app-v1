@@ -51,7 +51,7 @@ function SignupInner({
             <AlertDescription>{state.success}</AlertDescription>
           </Alert>
           <Link
-            href="/login"
+            href={params.callbackUrl ? `/login?callbackUrl=${encodeURIComponent(params.callbackUrl)}` : "/login"}
             className="inline-flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
             Sign in
@@ -87,7 +87,12 @@ function SignupInner({
       )}
       <p className="mt-4 text-sm text-muted-foreground">
         Already have an account?{" "}
-        <Link href="/login" className="hover:text-foreground">Sign in</Link>
+        <Link
+          href={params.callbackUrl ? `/login?callbackUrl=${encodeURIComponent(params.callbackUrl)}` : "/login"}
+          className="hover:text-foreground"
+        >
+          Sign in
+        </Link>
       </p>
     </main>
   );
