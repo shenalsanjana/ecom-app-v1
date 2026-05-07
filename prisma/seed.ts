@@ -168,15 +168,26 @@ async function main() {
       },
     });
 
-    // ProductImage rows (4 per product). Reset and re-create on each seed run.
+    // ProductImage rows: one per real gallery file (1.jpg, 2.jpg, ...) under
+    // public/products/<id>/. Stops at the first missing index so we don't
+    // create duplicate rows pointing at main.jpg.
     await prisma.productImage.deleteMany({ where: { productId: p.id } });
-    await prisma.productImage.createMany({
-      data: [1, 2, 3, 4].map((n) => ({
+    const galleryRows: { productId: string; url: string; sortOrder: number }[] = [];
+    for (let n = 1; n <= 8; n++) {
+      const candidates = [`${n}.jpg`, `${n}.jpeg`, `${n}.png`, `${n}.webp`];
+      const found = candidates.find((file) =>
+        existsSync(publicPath("products", p.id, file)),
+      );
+      if (!found) break;
+      galleryRows.push({
         productId: p.id,
-        url: pickGalleryImage(p.id, n),
+        url: `/products/${p.id}/${found}`,
         sortOrder: n,
-      })),
-    });
+      });
+    }
+    if (galleryRows.length > 0) {
+      await prisma.productImage.createMany({ data: galleryRows });
+    }
 
     // Review rows (5..10 per product, deterministic).
     await prisma.review.deleteMany({ where: { productId: p.id } });
