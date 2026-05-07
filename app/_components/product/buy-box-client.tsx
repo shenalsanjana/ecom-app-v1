@@ -7,6 +7,7 @@ import { Heart, Star, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AddToCartButton } from "@/app/_components/cart/add-to-cart-button";
+import { SizeChartDialog } from "@/app/_components/product/size-chart-dialog";
 import { toggleWishlistAction } from "@/app/wishlist/actions";
 import { useCart } from "@/app/_lib/cart-context";
 import { formatPrice } from "@/app/_lib/format";
@@ -123,6 +124,7 @@ export function BuyBoxClient({
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">Size:</span>
             <span className="text-sm text-muted-foreground">{selectedSize || "Select a size"}</span>
+            <SizeChartDialog />
           </div>
           <div className="flex flex-wrap gap-2">
             {sizeList.map((size) => (
