@@ -2,6 +2,15 @@
 import nodemailer from "nodemailer";
 import { formatPrice } from "@/app/_lib/format";
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 let cached: nodemailer.Transporter | null = null;
 
 function getTransport(): nodemailer.Transporter {
@@ -92,6 +101,7 @@ export type OrderDetails = {
   paymentMethod: "COD" | "PAYHERE" | "KOKO" | "MINITPAY";
   paymentMethodDisplay?: string;
   trackingCode?: string;
+  notes?: string;
 };
 
 export async function sendOrderConfirmationEmail(order: OrderDetails): Promise<void> {
@@ -139,7 +149,7 @@ Shipping Address:
 ${order.shippingAddress.line1}
 ${order.shippingAddress.line2 ? order.shippingAddress.line2 + "\n" : ""}${order.shippingAddress.city}, ${order.shippingAddress.region} ${order.shippingAddress.postalCode}
 ${order.shippingAddress.country}
-
+${order.notes && order.notes.trim() ? `\nDelivery Notes:\n${order.notes}\n` : ""}
 Need help? Contact us at ${CONTACT_NUMBER} or ${brandEmail}.
 
 ---
@@ -193,6 +203,7 @@ ${BRAND_NAME}
         ${order.shippingAddress.city}, ${order.shippingAddress.region} ${order.shippingAddress.postalCode}<br>
         ${order.shippingAddress.country}
       </p>
+      ${order.notes && order.notes.trim() ? `<h3>Delivery Notes</h3><p>${escapeHtml(order.notes).replace(/\n/g, "<br>")}</p>` : ""}
       <p>Need help? Contact us at <strong>${CONTACT_NUMBER}</strong> or <a href="mailto:${brandEmail}">${brandEmail}</a>.</p>
     </div>
   </div>

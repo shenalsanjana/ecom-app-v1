@@ -54,6 +54,7 @@ const ProcessOrderSchema = z.object({
   contactPhone: LkPhoneSchema,
   guestInfo: GuestInfoSchema.optional(),
   idempotencyKey: z.string().min(8).max(128).optional(),
+  notes: z.string().trim().max(500).optional(),
 });
 
 export type ProcessOrderInput = z.infer<typeof ProcessOrderSchema>;
@@ -64,7 +65,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
     const first = parsed.error.issues[0];
     return { success: false, error: first?.message ?? "Invalid order data" };
   }
-  const { items, shippingAddress, paymentMethod, contactPhone, guestInfo, idempotencyKey } =
+  const { items, shippingAddress, paymentMethod, contactPhone, guestInfo, idempotencyKey, notes } =
     parsed.data;
 
   const session = await auth();
@@ -175,6 +176,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
           paymentMethodDisplay: PAYMENT_METHOD_DISPLAY[paymentMethod],
           status: "PENDING",
           idempotencyKey: idempotencyKey ?? null,
+          notes: notes && notes.length > 0 ? notes : null,
           items: {
             create: items.map((item) => ({
               productId: item.productId,
@@ -271,6 +273,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
       paymentMethod,
       paymentMethodDisplay: PAYMENT_METHOD_DISPLAY[paymentMethod],
       trackingCode,
+      notes: notes && notes.length > 0 ? notes : undefined,
     });
     await prisma.order.update({
       where: { id: orderId },
