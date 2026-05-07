@@ -54,7 +54,11 @@ export async function signupAction(_prev: ActionState, formData: FormData): Prom
     redirect: false,
   });
 
-  redirect("/");
+  const rawCallback = (formData.get("callbackUrl") as string | null) ?? "/";
+  // Same-origin only — reject "//evil.com/foo" and absolute URLs.
+  const safeCallback =
+    rawCallback.startsWith("/") && !rawCallback.startsWith("//") ? rawCallback : "/";
+  redirect(safeCallback);
 }
 
 export async function loginAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
