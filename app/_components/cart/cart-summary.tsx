@@ -6,14 +6,14 @@ import { useCart } from "@/app/_lib/cart-context";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { formatPrice } from "@/app/_lib/format";
-import { calculateShipping, FREE_SHIPPING_THRESHOLD } from "@/app/_lib/checkout-config";
+import { calculateShipping } from "@/app/_lib/checkout-config";
+import { FreeShippingProgress } from "@/app/_components/cart/free-shipping-progress";
 
 export function CartSummary() {
   const { subtotal, totalItems } = useCart();
 
   const shipping = calculateShipping(subtotal);
   const total = subtotal + shipping;
-  const remainingForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
 
   return (
     <div className="rounded-lg border p-4 sm:p-6">
@@ -21,17 +21,7 @@ export function CartSummary() {
 
       <Separator className="my-4" />
 
-      {remainingForFreeShipping > 0 && (
-        <p className="mb-4 text-sm text-muted-foreground">
-          Add {formatPrice(remainingForFreeShipping)} more for free shipping
-        </p>
-      )}
-
-      {subtotal >= FREE_SHIPPING_THRESHOLD && (
-        <p className="mb-4 text-sm font-medium text-emerald-600 dark:text-emerald-400">
-          You qualify for free shipping!
-        </p>
-      )}
+      <FreeShippingProgress subtotal={subtotal} />
 
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
