@@ -4,12 +4,13 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ShoppingBag, Truck, CreditCard, User } from "lucide-react";
+import { ArrowLeft, ShoppingBag, Truck, CreditCard, User, FileText } from "lucide-react";
 import { useCart } from "@/app/_lib/cart-context";
 import { processOrder } from "./actions";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { formatPrice } from "@/app/_lib/format";
 import { calculateShipping, FREE_SHIPPING_THRESHOLD } from "@/app/_lib/checkout-config";
@@ -67,6 +68,8 @@ export function CheckoutClient({ user }: Props) {
     postalCode: "",
     country: "Sri Lanka",
   });
+
+  const [notes, setNotes] = useState("");
 
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shipping = calculateShipping(subtotal);
@@ -152,6 +155,7 @@ export function CheckoutClient({ user }: Props) {
         contactPhone: phone,
         guestInfo: isGuest ? { name: guest.name, email: guest.email, phone } : undefined,
         idempotencyKey,
+        notes: notes.trim() || undefined,
       });
 
       if (result.success) {
@@ -342,6 +346,24 @@ export function CheckoutClient({ user }: Props) {
                       </div>
                     </div>
                   </div>
+                </div>
+
+                <div className="rounded-lg border p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <FileText className="h-5 w-5 text-muted-foreground" />
+                    <h2 className="text-lg font-semibold">Delivery notes</h2>
+                    <span className="text-xs text-muted-foreground">Optional</span>
+                  </div>
+                  <Textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value.slice(0, 500))}
+                    rows={3}
+                    maxLength={500}
+                    placeholder="e.g. Leave at front desk; call before delivery"
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {notes.length}/500
+                  </p>
                 </div>
 
                 <div className="rounded-lg border p-6">
