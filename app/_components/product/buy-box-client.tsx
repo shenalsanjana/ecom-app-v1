@@ -1,8 +1,8 @@
 // app/_components/product/buy-box-client.tsx
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Heart, Star, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,6 +63,22 @@ export function BuyBoxClient({
   const [selectedSize, setSelectedSize] = useState<string>("");
 
   const sizeList = sizes ? sizes.split(",").map(s => s.trim()) : [];
+
+  const searchParams = useSearchParams();
+  const buyNowIntent = searchParams.get("action") === "buy-now";
+
+  useEffect(() => {
+    if (!buyNowIntent) return;
+    if (!sizeList.length) return;
+    if (selectedSize) return;
+    const el = document.getElementById("size-picker");
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.setAttribute("data-attention", "true");
+    const t = setTimeout(() => el.removeAttribute("data-attention"), 2000);
+    return () => clearTimeout(t);
+  }, [buyNowIntent, sizeList.length, selectedSize]);
+
   const onSale = originalPrice != null && originalPrice > price;
   const pct = onSale ? discountPct(price, originalPrice as number) : 0;
   const fromPath = `/products/${productId}`;
@@ -120,7 +136,10 @@ export function BuyBoxClient({
 
       {/* Size Selection */}
       {sizeList.length > 0 && (
-        <div className="space-y-2">
+        <div
+          id="size-picker"
+          className="space-y-2 rounded-md transition-shadow data-[attention=true]:ring-2 data-[attention=true]:ring-primary data-[attention=true]:ring-offset-2 data-[attention=true]:ring-offset-background"
+        >
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">Size:</span>
             <span className="text-sm text-muted-foreground">{selectedSize || "Select a size"}</span>
