@@ -127,6 +127,7 @@ model Order {
   royalExpressSubmitted Boolean  @default(false)
   emailSent             Boolean  @default(false)
   idempotencyKey        String?  @unique
+  notes                 String?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
