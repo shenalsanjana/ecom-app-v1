@@ -21,23 +21,23 @@ export function QuickBuyButtons({ productId }: Props) {
         className={buttonVariants({
           size: "sm",
           variant: "outline",
-          className: "flex-1",
+          className: "flex-1 min-w-0 whitespace-nowrap",
         })}
         aria-label="Add to cart"
       >
-        <ShoppingCart className="mr-2 h-4 w-4" />
-        Add to cart
+        <ShoppingCart className="mr-1.5 h-4 w-4 shrink-0" />
+        <span className="truncate">Add to cart</span>
       </Link>
       <Link
         href={`${href}?action=buy-now`}
         className={buttonVariants({
           size: "sm",
-          className: "flex-1 bg-black hover:bg-black/90 text-white",
+          className: "flex-1 min-w-0 whitespace-nowrap bg-black hover:bg-black/90 text-white",
         })}
         aria-label="Buy now"
       >
-        <Zap className="mr-2 h-4 w-4" />
-        Buy now
+        <Zap className="mr-1.5 h-4 w-4 shrink-0" />
+        <span className="truncate">Buy now</span>
       </Link>
     </div>
   );
