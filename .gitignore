@@ -45,6 +45,9 @@ next-env.d.ts
 # git worktrees
 .worktrees/
 
+# bug-report screenshots (local debugging artefacts)
+bugs/
+
 # sqlite dev db
 prisma/dev.db
 prisma/dev.db-journal

@@ -104,8 +104,6 @@ function buildDescription(name: string, category: string): string {
 }
 
 function stockFor(productId: string): number {
-  if (productId === "p7") return 0;       // out-of-stock test case
-  if (productId === "d2") return 3;       // low-stock test case
   const rng = rngFromId(productId + ":stock");
   return 5 + Math.floor(rng() * 21);      // 5..25
 }
