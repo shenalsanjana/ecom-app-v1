@@ -72,9 +72,10 @@ export function ProductCard({
             aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
           >
             <Heart
+              key={wishlisted ? "filled" : "empty"}
               className={
                 wishlisted
-                  ? "h-4 w-4 fill-brand text-brand"
+                  ? "h-4 w-4 fill-brand text-brand motion-safe:animate-wishlist-fill"
                   : "h-4 w-4"
               }
             />

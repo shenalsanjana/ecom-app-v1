@@ -128,5 +128,6 @@ Sale badges MUST include both olive bg AND a percentage or "SALE" text label. Fr
 #### Scenario: Error boundary follows pattern
 
 - **WHEN** an error boundary on a customer surface renders due to a thrown error or 404
-- **THEN** the visible content consists of: one heading in `font-heading`, one explanatory paragraph in `font-sans`, one button using the `accent` variant linking back to a useful surface
+- **THEN** the visible content consists of: one heading in `font-heading`, one explanatory paragraph in `font-sans`, and a primary CTA using the `brand` variant linking back to a useful surface
+- **AND** recoverable error boundaries (e.g., `account/error.tsx`, `checkout/error.tsx`, `search/error.tsx`) MAY add a secondary CTA using the `outline` variant for a fallback action (e.g., a "Try again" + "Back to cart" pairing); 404 surfaces have a single primary CTA only
 - **AND** the page background uses `--background` and the heading uses `--foreground`
