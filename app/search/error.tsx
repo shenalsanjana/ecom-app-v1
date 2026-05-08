@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 
 export default function SearchError({
   error,
@@ -17,18 +17,15 @@ export default function SearchError({
 
   return (
     <main className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-4 py-20 text-center">
-      <h1 className="text-2xl font-semibold">Search hit a snag</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
+      <h1 className="font-heading text-3xl font-medium">Search hit a snag</h1>
+      <p className="mt-3 text-sm text-muted-foreground">
         Try the search again, or browse the catalog instead.
       </p>
       <div className="mt-6 flex gap-3">
-        <Button onClick={reset} variant="default">
+        <Button onClick={reset} variant="brand" size="lg">
           Try again
         </Button>
-        <Link
-          href="/categories"
-          className="inline-flex h-10 items-center justify-center rounded-md border bg-background px-4 text-sm font-medium hover:bg-accent"
-        >
+        <Link href="/categories" className={buttonVariants({ variant: "outline", size: "lg" })}>
           Browse categories
         </Link>
       </div>

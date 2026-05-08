@@ -12,10 +12,13 @@ export function CartIcon() {
 
   return (
     <Link href="/cart" aria-label="View cart">
-      <Button variant="ghost" size="icon" className="relative" aria-label="Cart">
+      <Button variant="ghost" size="icon-lg" className="relative" aria-label="Cart">
         <ShoppingCart className="h-5 w-5" />
         {totalItems > 0 ? (
-          <Badge className="absolute -right-1 -top-1 h-5 min-w-[1.25rem] rounded-full px-1 text-[10px]">
+          <Badge
+            variant="brand"
+            className="absolute -right-1 -top-1 h-5 min-w-[1.25rem] rounded-full px-1 text-[10px]"
+          >
             {totalItems}
           </Badge>
         ) : null}

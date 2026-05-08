@@ -2,12 +2,12 @@
 
 ### Requirement: Color tokens define a single warm palette with WCAG AA contrast across published pairs
 
-The system SHALL expose a single set of color tokens defined in `app/globals.css` `:root` (no `.dark` override, no `prefers-color-scheme: dark` override) using the OKLCH color space. Every committed pair drawn from the published list (foreground-on-background, primary-foreground-on-primary, accent-foreground-on-accent, muted-foreground-on-background, destructive-foreground-on-destructive, ring-on-background) MUST meet WCAG AA contrast (≥ 4.5:1 for body text, ≥ 3:1 for large text and non-text UI). The published pairs are validated automatically by `scripts/check-contrast.ts`, which exits with a non-zero status on any failing pair.
+The system SHALL expose a single set of color tokens defined in `app/globals.css` `:root` (no `.dark` override, no `prefers-color-scheme: dark` override) using the OKLCH color space. The token set MUST distinguish *brand* color (`--brand`, `--brand-foreground`) from *subtle-hover* color (`--accent`, `--accent-foreground`) — see design.md "Brand vs hover token" decision. Every committed pair drawn from the published list (foreground-on-background, primary-foreground-on-primary, brand-foreground-on-brand, accent-foreground-on-accent, muted-foreground-on-background, destructive-foreground-on-destructive, ring-on-background) MUST meet WCAG AA contrast (≥ 4.5:1 for body text, ≥ 3:1 for large text and non-text UI). The published pairs are validated automatically by `scripts/check-contrast.ts`, which exits with a non-zero status on any failing pair.
 
 #### Scenario: Token contract loaded for every page
 
 - **WHEN** any customer-facing page is rendered
-- **THEN** the document inherits exactly one set of CSS custom properties for `--background`, `--foreground`, `--card`, `--card-foreground`, `--muted`, `--muted-foreground`, `--border`, `--primary`, `--primary-foreground`, `--accent`, `--accent-foreground`, `--destructive`, `--destructive-foreground`, and `--ring` from `:root`
+- **THEN** the document inherits exactly one set of CSS custom properties for `--background`, `--foreground`, `--card`, `--card-foreground`, `--muted`, `--muted-foreground`, `--border`, `--primary`, `--primary-foreground`, `--brand`, `--brand-foreground`, `--accent`, `--accent-foreground`, `--destructive`, `--destructive-foreground`, and `--ring` from `:root`
 - **AND** no `.dark` block, no `prefers-color-scheme: dark` block, and no inline-style override redefines those tokens
 
 #### Scenario: Contrast audit blocks merge
@@ -56,9 +56,9 @@ The system SHALL expose four motion tokens in `app/globals.css`: `--ease-out: cu
 - **AND** the state-color transitions via cross-fade between the two state colors over the same duration
 - **AND** under reduced motion, the width snaps to its new value instantly while colors still cross-fade by opacity only
 
-### Requirement: UI primitive variants preserve their public API and add an `accent` variant on Button and Badge
+### Requirement: UI primitive variants preserve their public API and add a `brand` variant on Button and Badge
 
-Refactors to `components/ui/button.tsx`, `components/ui/card.tsx`, `components/ui/input.tsx`, `components/ui/badge.tsx`, `components/ui/dialog.tsx`, `components/ui/dropdown-menu.tsx`, `components/ui/alert.tsx`, `components/ui/separator.tsx`, `components/ui/label.tsx`, and `components/ui/textarea.tsx` SHALL NOT remove or rename existing variants or props. New `accent` variants MUST be added to `Button` (olive background + cream text + cocoa-on-olive focus ring) and to `Badge` (pill, olive background, cream text), suitable for olive-led promotional surfaces (sale badges, secondary CTAs).
+Refactors to `components/ui/button.tsx`, `components/ui/card.tsx`, `components/ui/input.tsx`, `components/ui/badge.tsx`, `components/ui/dialog.tsx`, `components/ui/dropdown-menu.tsx`, `components/ui/alert.tsx`, `components/ui/separator.tsx`, `components/ui/label.tsx`, and `components/ui/textarea.tsx` SHALL NOT remove or rename existing variants or props. New `brand` variants MUST be added to `Button` (olive `--brand` background + cream `--brand-foreground` text + olive focus ring) and to `Badge` (pill, olive `--brand` background, cream `--brand-foreground` text), suitable for olive-led promotional surfaces (sale badges, secondary CTAs). The pre-existing `accent` variant on dropdown-menu items and shadcn-derived hover/focus states uses the *subtle hover* `--accent` token (warm muted-darker), NOT the brand olive — see design.md "Brand vs hover token" decision.
 
 #### Scenario: Existing variant usages still compile and render
 
@@ -66,11 +66,17 @@ Refactors to `components/ui/button.tsx`, `components/ui/card.tsx`, `components/u
 - **THEN** the component compiles and renders without changes to its prop signature
 - **AND** uses the new boutique tokens for its visual treatment
 
-#### Scenario: New accent variant available
+#### Scenario: New brand variant available
 
-- **WHEN** a consumer renders `<Button variant="accent">` or `<Badge variant="accent">`
-- **THEN** the rendered element uses the olive `--accent` background and cream `--accent-foreground` text
+- **WHEN** a consumer renders `<Button variant="brand">` or `<Badge variant="brand">`
+- **THEN** the rendered element uses the olive `--brand` background and cream `--brand-foreground` text
 - **AND** the focus-visible ring uses `--ring` (olive)
+
+#### Scenario: Existing `bg-accent` / `hover:bg-accent` consumers stay subtle
+
+- **WHEN** any pre-existing consumer (dropdown-menu item, error-page CTA, category pagination, search filter) renders with `bg-accent` or `hover:bg-accent` after the token swap
+- **THEN** the rendered element uses warm muted-darker `--accent` (NOT olive) and cocoa `--accent-foreground` text
+- **AND** does not produce a saturated olive flash on hover or focus
 
 ### Requirement: Every interactive element has a visible focus ring using the `--ring` token
 
@@ -122,5 +128,6 @@ Sale badges MUST include both olive bg AND a percentage or "SALE" text label. Fr
 #### Scenario: Error boundary follows pattern
 
 - **WHEN** an error boundary on a customer surface renders due to a thrown error or 404
-- **THEN** the visible content consists of: one heading in `font-heading`, one explanatory paragraph in `font-sans`, one button using the `accent` variant linking back to a useful surface
+- **THEN** the visible content consists of: one heading in `font-heading`, one explanatory paragraph in `font-sans`, and a primary CTA using the `brand` variant linking back to a useful surface
+- **AND** recoverable error boundaries (e.g., `account/error.tsx`, `checkout/error.tsx`, `search/error.tsx`) MAY add a secondary CTA using the `outline` variant for a fallback action (e.g., a "Try again" + "Back to cart" pairing); 404 surfaces have a single primary CTA only
 - **AND** the page background uses `--background` and the heading uses `--foreground`

@@ -11,10 +11,13 @@ export function WishlistIcon({ loggedIn, count }: Props) {
   const label = loggedIn ? "Wishlist" : "Sign in to view wishlist";
   return (
     <Link href={href} aria-label={label}>
-      <Button variant="ghost" size="icon" className="relative" aria-label={label}>
+      <Button variant="ghost" size="icon-lg" className="relative" aria-label={label}>
         <Heart className="h-5 w-5" />
         {loggedIn && count > 0 ? (
-          <Badge className="absolute -right-1 -top-1 h-5 min-w-[1.25rem] rounded-full px-1 text-[10px]">
+          <Badge
+            variant="brand"
+            className="absolute -right-1 -top-1 h-5 min-w-[1.25rem] rounded-full px-1 text-[10px]"
+          >
             {count}
           </Badge>
         ) : null}

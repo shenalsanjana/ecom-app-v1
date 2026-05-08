@@ -26,19 +26,21 @@ export function CartSummary() {
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
           <span className="text-muted-foreground">Subtotal ({totalItems} items)</span>
-          <span>{formatPrice(subtotal)}</span>
+          <span className="font-heading">{formatPrice(subtotal)}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Shipping</span>
-          <span>{shipping === 0 ? "Free" : formatPrice(shipping)}</span>
+          <span className={`font-heading ${shipping === 0 ? "text-brand" : ""}`}>
+            {shipping === 0 ? "Free" : formatPrice(shipping)}
+          </span>
         </div>
       </div>
 
       <Separator className="my-4" />
 
       <div className="flex justify-between text-base font-semibold">
-        <span>Total</span>
-        <span>{formatPrice(total)}</span>
+        <span className="font-heading">Total</span>
+        <span className="font-heading">{formatPrice(total)}</span>
       </div>
 
       <div className="mt-4 flex gap-4 text-xs text-muted-foreground justify-center">

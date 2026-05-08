@@ -29,7 +29,11 @@ export async function SiteHeader() {
         <Link href="/" className="text-lg font-semibold tracking-tight">Dressing Bear</Link>
         <nav className="hidden items-center gap-5 text-sm md:flex">
           {NAV_LINKS.map((l) => (
-            <Link key={l.label} href={l.href} className="text-muted-foreground hover:text-foreground">
+            <Link
+              key={l.label}
+              href={l.href}
+              className="text-muted-foreground transition-colors duration-(--duration-fast) hover:text-brand"
+            >
               {l.label}
             </Link>
           ))}

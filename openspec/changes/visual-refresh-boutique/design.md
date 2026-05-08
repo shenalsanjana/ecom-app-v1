@@ -37,7 +37,8 @@ Constraint baked in by the user: **no major page changes** — no restructure, n
 
 - **Background:** warm cream `oklch(0.972 0.013 80)` (~#FAF7F2). All page surfaces, including header/footer.
 - **Foreground (text + CTAs):** cocoa ink `oklch(0.235 0.018 60)` (~#3A2E22). Primary buttons are cocoa-on-cream, NOT olive — olive is an accent, not a CTA color.
-- **Accent:** olive `oklch(0.55 0.075 125)` (~#7A8456). Used for: sale prices, sale badges, link hover underlines, focus rings, free-shipping qualified state, badge `accent` variant, button `accent` variant. ~5.1:1 contrast on cream for badge text, ~4.7:1 for sale prices — both AA.
+- **Brand accent:** olive `oklch(0.55 0.075 125)` (~#7A8456) — exposed as `--brand` and `--brand-foreground` (NOT `--accent` — see "Brand vs hover token" decision). Used for: sale prices, sale badges, link hover underlines, focus rings, free-shipping qualified state, badge `brand` variant, button `brand` variant. ~5.1:1 contrast on cream for badge text, ~4.7:1 for sale prices — both AA.
+- **Subtle hover (`--accent`):** warm muted-darker `oklch(0.90 0.014 75)` with cocoa `--accent-foreground`. Drives shadcn-derived hover/focus states (dropdown items, error-page CTA hovers, category pagination, search filters). NOT olive — see "Brand vs hover token" decision.
 - **Muted / borders:** warm hairlines `oklch(0.89 0.014 75)` (~#E8E1D6) and warm subtle fills `oklch(0.93 0.012 75)`. Skeletons live here.
 - **Destructive:** warmed red `oklch(0.52 0.18 28)` so it doesn't read as a foreign cool color in the warm palette.
 - **Radius:** `--radius: 1rem` (was 0.625rem). Cards/dialogs read `radius-2xl` (~1.8rem). Buttons keep `radius-md` (~0.8rem). Add-to-cart and back-to CTAs use `rounded-full` explicitly — pills, by intent, not by token.
@@ -45,6 +46,16 @@ Constraint baked in by the user: **no major page changes** — no restructure, n
 - **Typography:** Fraunces (variable, `opsz` axis used) for product names, page headings, and prices via `--font-heading`. Inter for body and UI via `--font-sans`. Geist Mono kept for tabular numerals on cart totals.
 
 ## Decisions
+
+### Brand vs hover token (`--brand` distinct from `--accent`)
+
+The original brainstorm assigned olive to `--accent`, treating it as the brand color. Implementation surfaced a real conflict: `--accent` is shadcn's *subtle-hover* semantic, used by `dropdown-menu` item focus, error-page CTA hovers (`account/error.tsx`, `checkout/error.tsx`, `search/error.tsx`), category pagination buttons (`categories/page.tsx`, `deals/page.tsx`), and search-filter selected states (`search/page.tsx`). Setting `--accent` to olive turned every one of those interactions into a saturated olive flash — visually loud and inconsistent with "subtle micro-interactions".
+**Decision:** split the two semantics.
+- `--brand: oklch(0.55 0.075 125)` (olive) and `--brand-foreground: oklch(0.985 0.008 80)` (cream). New tokens, new utilities (`bg-brand`, `text-brand`, `text-brand-foreground`, `bg-brand/10`).
+- `--accent: oklch(0.90 0.014 75)` (warm muted-darker) and `--accent-foreground: oklch(0.235 0.018 60)` (cocoa). Consumed by every existing `bg-accent` / `hover:bg-accent` / `focus:bg-accent` site (dropdown items, error CTAs, pagination, filters).
+- `--ring: var(--brand)` — focus rings remain olive (intentional brand moment).
+The `accent` variant on Button and Badge announced in the original spec is renamed to `brand`. Spec, tasks, and this design doc all reflect the renamed variant.
+**Alternatives considered:** (a) keep `--accent` = olive and tone it down via `bg-accent/20` everywhere — rejected, brittle and obscures the brand at full saturation in the few places it should be loud (sale badges, filled wishlist heart). (b) Keep `--accent` = olive and re-class every `bg-accent`/`hover:bg-accent` site to `bg-muted`/`hover:bg-muted` — rejected, fights the convention without need.
 
 ### Single change, not split
 Splitting tokens / primitives / surfaces / states into multiple changes would create stretches where tokens are new but consumers haven't picked them up — the site would look broken in mid-refactor. Token-first design only works as an atomic flip. **Decision:** one change, four commit groups (tokens, primitives, surfaces, states+a11y), ~15 tasks, ≤1.5k LOC of diff.
@@ -76,7 +87,7 @@ Tailwind v4's `@theme inline { }` block in `globals.css` only exposes tokens to 
 **Alternatives:** apply Fraunces only via inline `style={{ fontFamily: 'var(--font-fraunces)' }}` (rejected: hostile to authoring, doesn't compose with responsive variants).
 
 ### Bundle real a11y bugs into the visual change, deliberately
-Three known accessibility bugs (h2→h4 jump in `home/category-strip.tsx`, missing star aria-label in `product/reviews-section.tsx`, ungrouped quantity-stepper buttons in `cart/cart-item.tsx`) live in files this change is already touching for typographic restyle. Splitting them into a separate "fixes" change would: (a) require a second visual-regression QA pass, (b) leave them invisible after the boutique flip ships.
+Two confirmed accessibility bugs (missing star aria-label in `product/reviews-section.tsx`, ungrouped quantity-stepper buttons in `cart/cart-item.tsx`) live in files this change is already touching for typographic restyle. (A third claimed bug — `h2 → h4` jump in `home/category-strip.tsx` — was disproved during implementation: the file has no inner heading. Documented as N/A in tasks.md §3.5.) Splitting these into a separate "fixes" change would: (a) require a second visual-regression QA pass, (b) leave them invisible after the boutique flip ships.
 **Decision:** include them, surface them in `proposal.md` as intentional, log them as their own line items in `tasks.md` so they're auditable rather than buried.
 **Alternatives:** ship boutique first, file separate a11y change (rejected: doubles QA, leaks visible bugs).
 
