@@ -10,9 +10,9 @@ async function subscribe(formData: FormData) {
 
 export function Newsletter() {
   return (
-    <section className="border-b bg-zinc-900 text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900">
+    <section className="border-b bg-primary text-primary-foreground">
       <div className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 lg:px-8">
-        <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">
+        <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
           Get 10% off your first order
         </h2>
         <p className="mt-3 text-base opacity-80">
@@ -24,7 +24,7 @@ export function Newsletter() {
             name="email"
             required
             placeholder="you@example.com"
-            className="bg-white text-zinc-900 placeholder:text-zinc-500 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder:text-zinc-400"
+            className="bg-background text-foreground placeholder:text-muted-foreground"
           />
           <Button type="submit" variant="secondary">Subscribe</Button>
         </form>

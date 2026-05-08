@@ -43,9 +43,9 @@ export function ProductCard({
 
   return (
     <Card className="overflow-hidden p-0">
-      <div className="relative flex h-48 items-center justify-center bg-gradient-to-br from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-900">
+      <div className="relative flex h-48 items-center justify-center bg-muted">
         {onSale && (
-          <Badge className="absolute left-3 top-3 z-10" variant="destructive">
+          <Badge className="absolute left-3 top-3 z-10" variant="brand">
             -{pct}%
           </Badge>
         )}
@@ -63,15 +63,26 @@ export function ProductCard({
           <input type="hidden" name="fromPath" value={fromPath} />
           <button
             type="submit"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-background/80 backdrop-blur text-muted-foreground hover:text-foreground transition-colors"
+            className={
+              "flex h-8 w-8 items-center justify-center rounded-full bg-background/80 backdrop-blur transition-transform duration-(--duration-fast) motion-safe:hover:scale-110 " +
+              (wishlisted
+                ? "text-brand"
+                : "text-muted-foreground hover:text-foreground")
+            }
             aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
           >
-            <Heart className={wishlisted ? "h-4 w-4 fill-current" : "h-4 w-4"} />
+            <Heart
+              className={
+                wishlisted
+                  ? "h-4 w-4 fill-brand text-brand"
+                  : "h-4 w-4"
+              }
+            />
           </button>
         </form>
       </div>
       <CardContent className="space-y-2 p-4">
-        <h3 className="line-clamp-2 min-h-[2.75rem] text-sm font-medium leading-snug">
+        <h3 className="font-heading line-clamp-2 min-h-[2.75rem] text-base font-medium leading-snug">
           <Link href={href} className="hover:underline underline-offset-4">{name}</Link>
         </h3>
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -80,7 +91,14 @@ export function ProductCard({
           <span>({reviewCount.toLocaleString()})</span>
         </div>
         <div className="flex items-baseline gap-2">
-          <span className="text-base font-semibold">{formatPrice(price)}</span>
+          <span
+            className={
+              "font-heading text-base font-semibold " +
+              (onSale ? "text-brand" : "")
+            }
+          >
+            {formatPrice(price)}
+          </span>
           {onSale && (
             <span className="text-sm text-muted-foreground line-through">
               {formatPrice(originalPrice as number)}

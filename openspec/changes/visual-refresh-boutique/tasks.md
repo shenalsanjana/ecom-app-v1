@@ -15,12 +15,12 @@
 
 ## 3. Surface components — home, header, footer
 
-- [ ] 3.1 Refactor `app/_components/home/product-card.tsx`: image backdrop → `bg-muted` (replace `from-zinc-100 to-zinc-200`); product name → `font-heading`; on-sale price → `font-heading text-brand`; wishlist heart fills with olive (`fill-brand text-brand`) when active; hover lift inherits from `Card`.
-- [ ] 3.2 Refactor `app/_components/home/hero.tsx`: heading → `font-heading`; both CTAs → cocoa pill (`Button` `default` variant with `rounded-full`).
-- [ ] 3.3 Refactor `app/_components/home/site-header.tsx`: cream bg, cocoa ink, olive `underline-offset-4 hover:underline` on nav links, olive pill cart-count badge.
-- [ ] 3.4 Refactor `app/_components/home/site-footer.tsx`: warm-neutral fills, structure unchanged.
-- [ ] 3.5 Refactor `app/_components/home/category-strip.tsx`: section heading → `font-heading`; FIX heading hierarchy (currently `h2 → h4`; correct to `h2 → h3` or restructure semantically). Document the heading-level decision inline.
-- [ ] 3.6 Refactor `app/_components/home/deals-section.tsx` and `app/_components/home/newsletter.tsx`: typographic restyle only — section headings → `font-heading`, body `font-sans`, CTAs use new button variants.
+- [x] 3.1 `app/_components/home/product-card.tsx`: image backdrop `from-zinc-100/200` → `bg-muted`; name `text-sm` → `font-heading text-base font-medium`; live price `font-heading`, on-sale price gets `text-brand`; wishlist button gets hover scale (`motion-safe:hover:scale-110`, 150ms); when filled, heart icon `fill-brand text-brand`. Sale badge `variant="destructive"` → `variant="brand"` (still includes `−{pct}%` text). The fill-bounce on toggle is a separate keyframe addition deferred to 5.0.
+- [x] 3.2 `app/_components/home/hero.tsx`: heading gets `font-heading font-medium` (was `font-semibold`). CTAs already use `buttonVariants({ size: "lg" })` which is now h-10 cocoa from Group 2. Hero gradient overlay and image untouched.
+- [x] 3.3 `app/_components/home/site-header.tsx`: nav links `transition-colors duration-(--duration-fast) hover:text-brand`. Background already `bg-background/80` (cream via token). Cart-count badge lives in `header/cart-icon.tsx` — handled in Group 4 §4.9.
+- [x] 3.4 `app/_components/home/site-footer.tsx`: column headings `font-heading`. No hardcoded zinc/gray classes to convert; structure unchanged.
+- [x] 3.5 `app/_components/home/category-strip.tsx`: section heading → `font-heading`. Avatar ring swapped from hardcoded zinc to `bg-muted ring-1 ring-border hover:ring-2 hover:ring-ring/50`. **Heading-hierarchy fix N/A**: file has no inner heading (uses `<span>` per category), so the `h2 → h4` jump documented during exploration doesn't exist in current source. Likely fixed in a prior commit or misread. No code change needed for the a11y fix on this file.
+- [x] 3.6 `app/_components/home/deals-section.tsx`: bg `bg-zinc-50 dark:bg-zinc-950` → `bg-muted`, h2 `font-heading`, "See all" link gets `hover:text-brand` with motion token. `app/_components/home/newsletter.tsx`: inverted band switched to `bg-primary text-primary-foreground` (cocoa-on-cream); h2 `font-heading`; Input override hardcoded zinc → token-based (`bg-background text-foreground placeholder:text-muted-foreground`).
 
 ## 4. Surface components — cart, product, header icons
 
@@ -38,6 +38,7 @@
 
 ## 5. States, a11y audit, verification
 
+- [ ] 5.0 Wishlist heart fill-bounce (motion item 3 from spec): wraps Spec Requirement "Motion tokens drive a fixed set of subtle micro-interactions". Add a `wishlist-fill` keyframe in `globals.css` (`from { transform: scale(1); } 50% { transform: scale(1.15); } to { transform: scale(1); }`), 150ms `--ease-out`, gated on `motion-safe:`. In `product-card.tsx`, apply it to the heart icon when `wishlisted=true` so the toggle from unfilled→filled scales briefly. Skipped during Group 3 because it requires a small keyframe addition rather than a pure className tweak.
 - [ ] 5.1 Tune `app/_components/shared/product-grid-skeleton.tsx`: tile color → `bg-muted` (warm); shimmer `opacity: 0.6`, cycle `2s`. Verify it complies with `prefers-reduced-motion: reduce` (shimmer becomes static).
 - [ ] 5.2 Audit every `loading.tsx` (`app/cart/`, `app/categories/[slug]/`, `app/account/orders/`, `app/deals/`, `app/search/`, `app/wishlist/`) — confirm each renders `ProductGridSkeleton` or a domain-equivalent skeleton. No naked spinners.
 - [ ] 5.3 Restyle every error boundary on customer surfaces (`app/account/error.tsx`, `app/checkout/error.tsx`, `app/search/error.tsx`, `app/not-found.tsx`, `app/products/[id]/not-found.tsx`) to the consistent typographic pattern: `font-heading` headline + one-line plain-language explanation + single olive-pill CTA returning to a useful surface. No new illustrations.

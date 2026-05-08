@@ -87,7 +87,7 @@ Tailwind v4's `@theme inline { }` block in `globals.css` only exposes tokens to 
 **Alternatives:** apply Fraunces only via inline `style={{ fontFamily: 'var(--font-fraunces)' }}` (rejected: hostile to authoring, doesn't compose with responsive variants).
 
 ### Bundle real a11y bugs into the visual change, deliberately
-Three known accessibility bugs (h2→h4 jump in `home/category-strip.tsx`, missing star aria-label in `product/reviews-section.tsx`, ungrouped quantity-stepper buttons in `cart/cart-item.tsx`) live in files this change is already touching for typographic restyle. Splitting them into a separate "fixes" change would: (a) require a second visual-regression QA pass, (b) leave them invisible after the boutique flip ships.
+Two confirmed accessibility bugs (missing star aria-label in `product/reviews-section.tsx`, ungrouped quantity-stepper buttons in `cart/cart-item.tsx`) live in files this change is already touching for typographic restyle. (A third claimed bug — `h2 → h4` jump in `home/category-strip.tsx` — was disproved during implementation: the file has no inner heading. Documented as N/A in tasks.md §3.5.) Splitting these into a separate "fixes" change would: (a) require a second visual-regression QA pass, (b) leave them invisible after the boutique flip ships.
 **Decision:** include them, surface them in `proposal.md` as intentional, log them as their own line items in `tasks.md` so they're auditable rather than buried.
 **Alternatives:** ship boutique first, file separate a11y change (rejected: doubles QA, leaks visible bugs).
 
