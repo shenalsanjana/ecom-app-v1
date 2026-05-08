@@ -1,9 +1,9 @@
 ## 1. Tokens & font loading
 
-- [ ] 1.1 Update `app/globals.css` `:root` block with the boutique color tokens (`--background`, `--foreground`, `--card`, `--card-foreground`, `--muted`, `--muted-foreground`, `--border`, `--input`, `--primary`, `--primary-foreground`, `--secondary`, `--secondary-foreground`, `--accent`, `--accent-foreground`, `--destructive`, `--destructive-foreground`, `--ring`, `--popover`, `--popover-foreground`, `--sidebar*`), `--radius: 1rem`, `--shadow-card`, and motion tokens (`--ease-out`, `--duration-fast`, `--duration-base`, `--duration-slow`).
-- [ ] 1.2 Delete the `.dark { }` block AND the `@media (prefers-color-scheme: dark) { :root:not(.light) { ... } }` block in `app/globals.css`.
-- [ ] 1.3 Add Inter and Fraunces to `app/layout.tsx` via `next/font/google`: Inter with `variable: '--font-inter'`, `subsets: ['latin']`, `display: 'swap'`; Fraunces with `variable: '--font-fraunces'`, `subsets: ['latin']`, `display: 'swap'`, `axes: ['opsz']`. Apply both `.variable` class names to `<html>`. Replace the current Geist Sans usage; keep Geist Mono.
-- [ ] 1.4 In `app/globals.css` `@theme inline { }` block: set `--font-sans: var(--font-inter)`, `--font-heading: var(--font-fraunces)` (keep `--font-mono: var(--font-geist-mono)`). Verify Tailwind `font-heading` utility resolves at build time.
+- [x] 1.1 Update `app/globals.css` `:root` block with the boutique color tokens, `--radius: 1rem`, `--shadow-card-token`. Motion tokens added in `@theme inline` per 1.4.
+- [x] 1.2 Removed `.dark { }` and the `@media (prefers-color-scheme: dark) { :root:not(.light) { ... } }` block. Kept `@custom-variant dark (&:is(.dark *));` so leftover `dark:*` utility classes stay inert (no `.dark` ancestor) instead of activating on system preference.
+- [x] 1.3 Inter + Fraunces (variable, `axes: ['opsz']`, `display: 'swap'`, `latin` subset) wired in `app/layout.tsx` via `next/font/google`. Geist Mono retained for tabular numerals. All three `.variable` classes applied to `<html>`.
+- [x] 1.4 `@theme inline { }` exposes `--font-sans: var(--font-inter)`, `--font-heading: var(--font-fraunces)`, plus motion tokens and `--shadow-card`. (Build verification of `font-heading` utility deferred to 5.7 typecheck/lint pass; Tailwind v4 compiles theme tokens at build.)
 
 ## 2. UI primitives
 
