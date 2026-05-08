@@ -33,6 +33,7 @@
 
 #### Critical fix surfaced by advisor checkpoint #2 (post-cache)
 - [x] 5.0a Removed cache-busting `revalidatePath(fromPath)` and `revalidatePath("/")` from `app/wishlist/actions.ts`. After Phase A, hearts hydrate client-side via `useWishlist()`, so home/PDP/categories/deals SSR no longer encodes per-user wishlist state. The pre-existing `revalidatePath("/")` would have nuked the home-page ISR cache on every wishlist toggle from any user — actively destructive once `/` became `○ Static`. Kept `revalidatePath("/wishlist")` since the listing page (still `ƒ Dynamic`) reads the user's wishlist directly.
+- [x] 5.0b Same-defect-class scrub via grep `revalidatePath|revalidateTag` across `app/`. Found and fixed `app/account/actions.ts` line 51: `updateProfileAction` was calling `revalidatePath("/")` to refresh the SSR'd user name in `SiteHeader`. Post Phase A, header reads `useSession()` client-side; the home cache bust was unnecessary and now actively defeats home-page ISR. Dropped. Kept `revalidatePath("/account")` since `/account` is dynamic and the bust just busts the router cache. Other matches (auth actions, checkout actions) don't call revalidatePath/Tag — clean. Other matches in account/actions.ts (4 × `revalidatePath("/account/addresses")`) target a dynamic route and are fine.
 
 ## 5. Cache adds + Prisma wrapping + verification
 
