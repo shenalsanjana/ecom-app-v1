@@ -17,7 +17,7 @@ export function ImageGallery({ images, productName, fallbackImage }: Props) {
 
   return (
     <div className="space-y-3">
-      <div className="relative aspect-square overflow-hidden rounded-lg border bg-zinc-50 dark:bg-zinc-900">
+      <div className="relative aspect-square overflow-hidden rounded-lg border bg-muted">
         <Image
           src={sources[selected]}
           alt={productName}
@@ -39,9 +39,9 @@ export function ImageGallery({ images, productName, fallbackImage }: Props) {
                 aria-label={`Show image ${i + 1}`}
                 aria-current={active ? "true" : "false"}
                 className={
-                  "relative aspect-square overflow-hidden rounded-md border bg-zinc-50 dark:bg-zinc-900 " +
+                  "relative aspect-square overflow-hidden rounded-md border bg-muted transition-opacity duration-(--duration-fast) " +
                   (active
-                    ? "ring-2 ring-foreground ring-offset-2 ring-offset-background"
+                    ? "ring-2 ring-ring ring-offset-2 ring-offset-background"
                     : "hover:opacity-90")
                 }
               >

@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { User } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -16,16 +17,20 @@ import {
 import { firstName } from "@/app/_lib/format";
 import { logoutAction } from "@/app/(auth)/actions";
 
-type SessionUser = { name: string; email: string } | null;
+export function ProfileMenu() {
+  const { data: session, status } = useSession();
+  const user =
+    status === "authenticated" && session?.user
+      ? { name: session.user.name ?? "", email: session.user.email ?? "" }
+      : null;
 
-export function ProfileMenu({ user }: { user: SessionUser }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
           <Button
             variant="ghost"
-            size="icon"
+            size="icon-lg"
             aria-label={user ? `Signed in as ${user.name}` : "Account"}
           />
         }
@@ -36,11 +41,11 @@ export function ProfileMenu({ user }: { user: SessionUser }) {
         {user ? (
           <>
             <DropdownMenuGroup>
-            <DropdownMenuLabel className="font-normal">
-              <div className="text-xs text-muted-foreground">Hi,</div>
-              <div className="truncate">{firstName(user.name)}</div>
-            </DropdownMenuLabel>
-          </DropdownMenuGroup>
+              <DropdownMenuLabel className="font-normal">
+                <div className="text-xs text-muted-foreground">Hi,</div>
+                <div className="truncate">{firstName(user.name)}</div>
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem render={<Link href="/account" />}>
               My account

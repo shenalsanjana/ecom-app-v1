@@ -1,4 +1,6 @@
 // app/_lib/products.ts
+import { unstable_cache } from "next/cache";
+
 import { prisma } from "@/app/_lib/prisma";
 import type { Category, Prisma, Product, ProductImage, Review } from "@prisma/client";
 
@@ -58,49 +60,70 @@ async function attachAggregates(rows: ProductRow[]): Promise<ProductView[]> {
   });
 }
 
-export async function getCategories(): Promise<CategoryView[]> {
-  const rows = await prisma.category.findMany({ orderBy: { name: "asc" } });
-  return rows.map((c) => ({ slug: c.slug, name: c.name, image: c.image }));
-}
+// Cached readers — wrapped via unstable_cache with explicit tags so future
+// admin write paths can drop in revalidateTag(...) without touching this file.
+// IMPORTANT: callbacks below must remain pure (no auth(), cookies(), headers());
+// unstable_cache throws at runtime if those slip in.
 
-export async function getFeaturedProducts(limit = 8): Promise<ProductView[]> {
-  const rows = await prisma.product.findMany({
-    where: { id: { startsWith: "p" } },
-    orderBy: { id: "asc" },
-    take: limit,
-    select: {
-      id: true, name: true, price: true, originalPrice: true,
-      image: true, categorySlug: true, sizes: true,
-    },
-  });
-  return attachAggregates(rows);
-}
+export const getCategories = unstable_cache(
+  async (): Promise<CategoryView[]> => {
+    const rows = await prisma.category.findMany({ orderBy: { name: "asc" } });
+    return rows.map((c) => ({ slug: c.slug, name: c.name, image: c.image }));
+  },
+  ["categories-list"],
+  { tags: ["catalog", "categories"], revalidate: 3600 }
+);
 
-export async function getDealsProducts(limit = 4): Promise<ProductView[]> {
-  const rows = await prisma.product.findMany({
-    where: { originalPrice: { not: null } },
-    orderBy: { id: "asc" },
-    take: limit,
-    select: {
-      id: true, name: true, price: true, originalPrice: true,
-      image: true, categorySlug: true, sizes: true,
-    },
-  });
-  return attachAggregates(rows);
-}
+export const getFeaturedProducts = unstable_cache(
+  async (limit = 8): Promise<ProductView[]> => {
+    const rows = await prisma.product.findMany({
+      where: { id: { startsWith: "p" } },
+      orderBy: { id: "asc" },
+      take: limit,
+      select: {
+        id: true, name: true, price: true, originalPrice: true,
+        image: true, categorySlug: true, sizes: true,
+      },
+    });
+    return attachAggregates(rows);
+  },
+  ["featured-products"],
+  { tags: ["catalog", "featured"], revalidate: 300 }
+);
 
-export async function getProductById(id: string): Promise<ProductView | null> {
-  const row = await prisma.product.findUnique({
-    where: { id },
-    select: {
-      id: true, name: true, price: true, originalPrice: true,
-      image: true, categorySlug: true, sizes: true,
-    },
-  });
-  if (!row) return null;
-  const [view] = await attachAggregates([row]);
-  return view;
-}
+export const getDealsProducts = unstable_cache(
+  async (limit = 4): Promise<ProductView[]> => {
+    const rows = await prisma.product.findMany({
+      where: { originalPrice: { not: null } },
+      orderBy: { id: "asc" },
+      take: limit,
+      select: {
+        id: true, name: true, price: true, originalPrice: true,
+        image: true, categorySlug: true, sizes: true,
+      },
+    });
+    return attachAggregates(rows);
+  },
+  ["deals-products"],
+  { tags: ["catalog", "deals"], revalidate: 120 }
+);
+
+export const getProductById = unstable_cache(
+  async (id: string): Promise<ProductView | null> => {
+    const row = await prisma.product.findUnique({
+      where: { id },
+      select: {
+        id: true, name: true, price: true, originalPrice: true,
+        image: true, categorySlug: true, sizes: true,
+      },
+    });
+    if (!row) return null;
+    const [view] = await attachAggregates([row]);
+    return view;
+  },
+  ["product-by-id"],
+  { tags: ["catalog", "product"], revalidate: 300 }
+);
 
 export type ProductDetail = {
   product: Product & { category: Category; images: ProductImage[] };
@@ -109,70 +132,79 @@ export type ProductDetail = {
   related: ProductView[];
 };
 
-export async function getProductDetail(id: string): Promise<ProductDetail | null> {
-  const product = await prisma.product.findUnique({
-    where: { id },
-    include: {
-      category: true,
-      images: { orderBy: { sortOrder: "asc" } },
-    },
-  });
-  if (!product) return null;
-
-  const [agg, relatedRows] = await Promise.all([
-    prisma.review.aggregate({
-      where: { productId: id },
-      _avg: { rating: true },
-      _count: { _all: true },
-    }),
-    prisma.product.findMany({
-      where: { categorySlug: product.categorySlug, id: { not: id } },
-      take: 4,
-      orderBy: { id: "asc" },
-      select: {
-        id: true, name: true, price: true, originalPrice: true,
-        image: true, categorySlug: true, sizes: true,
+export const getProductDetail = unstable_cache(
+  async (id: string): Promise<ProductDetail | null> => {
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        category: true,
+        images: { orderBy: { sortOrder: "asc" } },
       },
-    }),
-  ]);
+    });
+    if (!product) return null;
 
-  const related = await attachAggregates(relatedRows);
+    const [agg, relatedRows] = await Promise.all([
+      prisma.review.aggregate({
+        where: { productId: id },
+        _avg: { rating: true },
+        _count: { _all: true },
+      }),
+      prisma.product.findMany({
+        where: { categorySlug: product.categorySlug, id: { not: id } },
+        take: 4,
+        orderBy: { id: "asc" },
+        select: {
+          id: true, name: true, price: true, originalPrice: true,
+          image: true, categorySlug: true, sizes: true,
+        },
+      }),
+    ]);
 
-  return {
-    product,
-    ratingAvg: agg._avg.rating ?? 0,
-    ratingCount: agg._count._all,
-    related,
-  };
-}
+    const related = await attachAggregates(relatedRows);
 
-export async function getProductReviews(
-  productId: string,
-  take: number,
-): Promise<Review[]> {
-  const safeTake = Number.isFinite(take) && take > 0 ? Math.min(Math.trunc(take), 100) : 5;
-  return prisma.review.findMany({
-    where: { productId },
-    orderBy: { createdAt: "desc" },
-    take: safeTake,
-  });
-}
+    return {
+      product,
+      ratingAvg: agg._avg.rating ?? 0,
+      ratingCount: agg._count._all,
+      related,
+    };
+  },
+  ["product-detail"],
+  { tags: ["catalog", "product"], revalidate: 300 }
+);
+
+export const getProductReviews = unstable_cache(
+  async (productId: string, take: number): Promise<Review[]> => {
+    const safeTake = Number.isFinite(take) && take > 0 ? Math.min(Math.trunc(take), 100) : 5;
+    return prisma.review.findMany({
+      where: { productId },
+      orderBy: { createdAt: "desc" },
+      take: safeTake,
+    });
+  },
+  ["product-reviews"],
+  { tags: ["catalog", "product"], revalidate: 300 }
+);
 
 export type ReviewHistogram = Record<1 | 2 | 3 | 4 | 5, number>;
 
-export async function getReviewHistogram(productId: string): Promise<ReviewHistogram> {
-  const rows = await prisma.review.groupBy({
-    by: ["rating"],
-    where: { productId },
-    _count: { _all: true },
-  });
-  const hist: ReviewHistogram = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-  for (const r of rows) {
-    const k = r.rating as 1 | 2 | 3 | 4 | 5;
-    if (k >= 1 && k <= 5) hist[k] = r._count._all;
-  }
-  return hist;
-}
+export const getReviewHistogram = unstable_cache(
+  async (productId: string): Promise<ReviewHistogram> => {
+    const rows = await prisma.review.groupBy({
+      by: ["rating"],
+      where: { productId },
+      _count: { _all: true },
+    });
+    const hist: ReviewHistogram = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    for (const r of rows) {
+      const k = r.rating as 1 | 2 | 3 | 4 | 5;
+      if (k >= 1 && k <= 5) hist[k] = r._count._all;
+    }
+    return hist;
+  },
+  ["review-histogram"],
+  { tags: ["catalog", "product"], revalidate: 300 }
+);
 
 export type SortBy = "name" | "price_asc" | "price_desc" | "rating" | "newest";
 

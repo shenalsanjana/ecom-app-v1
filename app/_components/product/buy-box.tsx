@@ -58,11 +58,11 @@ export function BuyBox({
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{name}</h1>
+      <h1 className="font-heading text-2xl font-medium tracking-tight sm:text-3xl">{name}</h1>
 
       <a
         href="#reviews"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors duration-(--duration-fast) hover:text-foreground"
         aria-label={`${ratingAvg.toFixed(1)} out of 5 stars, ${ratingCount} reviews`}
       >
         <Star className="h-4 w-4 fill-amber-400 stroke-amber-400" aria-hidden />
@@ -71,13 +71,19 @@ export function BuyBox({
       </a>
 
       <div className="flex items-baseline gap-3">
-        <span className="text-2xl font-semibold">{formatPrice(price)}</span>
+        <span
+          className={
+            "font-heading text-2xl font-semibold " + (onSale ? "text-brand" : "")
+          }
+        >
+          {formatPrice(price)}
+        </span>
         {onSale && (
           <>
             <span className="text-base text-muted-foreground line-through">
               {formatPrice(originalPrice as number)}
             </span>
-            <Badge variant="destructive">-{pct}%</Badge>
+            <Badge variant="brand">-{pct}%</Badge>
           </>
         )}
       </div>

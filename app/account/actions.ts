@@ -47,8 +47,12 @@ export async function updateProfileAction(_prev: ActionState, formData: FormData
     data: { name: parsed.data.name, email: parsed.data.email },
   });
 
+  // Busts the /account router cache. We deliberately do NOT
+  // revalidatePath("/") here — post Phase A of perf-isr-public-catalog,
+  // SiteHeader is client-hydrated via useSession(), so the home-page
+  // SSR HTML doesn't encode profile data. Busting "/" would nuke the
+  // home-page ISR cache on every profile edit.
   revalidatePath("/account");
-  revalidatePath("/");
   return { success: "Profile updated" };
 }
 

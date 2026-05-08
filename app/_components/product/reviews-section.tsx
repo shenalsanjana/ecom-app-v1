@@ -14,7 +14,11 @@ type Props = {
 
 function StarRow({ value, max = 5 }: { value: number; max?: number }) {
   return (
-    <span aria-label={`${value} out of ${max} stars`} className="inline-flex">
+    <span
+      role="img"
+      aria-label={`Rating: ${value} out of ${max}`}
+      className="inline-flex"
+    >
       {Array.from({ length: max }).map((_, i) => (
         <Star
           key={i}
@@ -45,7 +49,7 @@ export function ReviewsSection({
 
   return (
     <section id="reviews" aria-labelledby="reviews-heading" className="space-y-6">
-      <h2 id="reviews-heading" className="text-xl font-semibold tracking-tight">
+      <h2 id="reviews-heading" className="font-heading text-xl font-medium tracking-tight">
         Customer reviews
       </h2>
 
@@ -55,7 +59,7 @@ export function ReviewsSection({
         <>
           <div className="grid gap-6 sm:grid-cols-[auto_1fr] sm:items-start">
             <div className="space-y-1">
-              <div className="text-4xl font-semibold tabular-nums">{ratingAvg.toFixed(1)}</div>
+              <div className="font-heading text-4xl font-semibold tabular-nums">{ratingAvg.toFixed(1)}</div>
               <StarRow value={Math.round(ratingAvg)} />
               <div className="text-xs text-muted-foreground">
                 {ratingCount.toLocaleString()} reviews

@@ -27,7 +27,11 @@ export async function toggleWishlistAction(formData: FormData): Promise<void> {
     await prisma.wishlistItem.create({ data: { userId, productId } });
   }
 
-  revalidatePath(fromPath);
-  if (fromPath !== "/wishlist") revalidatePath("/wishlist");
-  if (fromPath !== "/") revalidatePath("/");
+  // Only bust /wishlist's router cache — that's the one page whose SSR'd
+  // content depends on the user's wishlist set. Heart fill on every other
+  // surface (home, PDP, categories, deals, search) hydrates client-side
+  // from useWishlist(), so busting those routes' caches would be wrong:
+  // it would nuke the home-page ISR cache on every toggle from any user.
+  // See openspec/changes/perf-isr-public-catalog/design.md.
+  revalidatePath("/wishlist");
 }

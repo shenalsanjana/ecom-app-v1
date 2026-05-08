@@ -172,7 +172,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                     type="checkbox"
                     name="inStockOnly"
                     defaultChecked={inStockOnly}
-                    className="rounded border-gray-300 text-primary focus:ring-primary"
+                    className="rounded border-input text-primary focus:ring-ring"
                   />
                   <span>In stock only</span>
                 </label>
@@ -223,7 +223,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                     rating={product.rating}
                     reviewCount={product.reviewCount}
                     sizes={product.sizes}
-                    wishlisted={false}
                     fromPath="/search"
                   />
                 ))}

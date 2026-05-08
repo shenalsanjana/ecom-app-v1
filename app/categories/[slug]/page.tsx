@@ -7,6 +7,8 @@ import { SiteFooter } from "@/app/_components/home/site-footer";
 import { SortSelect } from "@/app/_components/shared/sort-select";
 import type { Metadata } from "next";
 
+export const revalidate = 300;
+
 export async function generateMetadata(
   { params }: { params: Promise<{ slug: string }> },
 ): Promise<Metadata> {
@@ -119,7 +121,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
                   {paginatedProducts.map((product) => (
                     <ProductCard key={product.id} id={product.id} name={product.name} price={product.price} originalPrice={product.originalPrice}
-                      image={product.image} rating={product.rating} reviewCount={product.reviewCount} sizes={product.sizes} wishlisted={false} fromPath={`/categories/${slug}`} />
+                      image={product.image} rating={product.rating} reviewCount={product.reviewCount} sizes={product.sizes} fromPath={`/categories/${slug}`} />
                   ))}
                 </div>
               )}

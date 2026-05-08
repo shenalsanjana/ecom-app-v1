@@ -1,14 +1,14 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
-import { auth } from "@/app/_lib/auth";
 import {
   getProductDetail,
   getProductReviews,
   getReviewHistogram,
 } from "@/app/_lib/products";
-import { getWishlistProductIds } from "@/app/_lib/wishlist";
 import { stripMarkdown } from "@/app/_lib/strip-markdown";
+
+export const revalidate = 300;
 
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
@@ -57,13 +57,10 @@ export default async function ProductPage({
   if (!detail) notFound();
 
   const shown = clampReviews(sp.reviews);
-  const session = await auth();
-  const userId = session?.user?.id;
 
-  const [reviews, histogram, wishlistedIds] = await Promise.all([
+  const [reviews, histogram] = await Promise.all([
     getProductReviews(id, shown),
     getReviewHistogram(id),
-    userId ? getWishlistProductIds(userId) : Promise.resolve(new Set<string>()),
   ]);
 
   const fromPath = `/products/${id}`;
@@ -96,8 +93,6 @@ export default async function ProductPage({
               ratingAvg={detail.ratingAvg}
               ratingCount={detail.ratingCount}
               stock={detail.product.stock}
-              wishlisted={wishlistedIds.has(detail.product.id)}
-              isLoggedIn={!!session?.user}
               sizes={detail.product.sizes}
             />
           </div>
@@ -115,7 +110,6 @@ export default async function ProductPage({
           />
           <RelatedStrip
             products={detail.related}
-            wishlistedIds={wishlistedIds}
             fromPath={fromPath}
           />
         </div>

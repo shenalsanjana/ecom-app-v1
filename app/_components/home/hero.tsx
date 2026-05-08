@@ -21,7 +21,7 @@ export function Hero() {
             <p className="text-sm font-medium uppercase tracking-wider text-white/85">
               Spring collection
             </p>
-            <h1 className="text-4xl font-semibold leading-tight tracking-tight md:text-5xl lg:text-6xl">
+            <h1 className="font-heading text-4xl font-medium leading-tight tracking-tight md:text-5xl lg:text-6xl">
               Everyday essentials, curated for you.
             </h1>
             <p className="text-lg text-white/90">
