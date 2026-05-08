@@ -1,6 +1,7 @@
 import Image from "next/image";
+import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 
 export function Hero() {
   return (
@@ -28,16 +29,20 @@ export function Hero() {
               shipped fast, returned freely.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Button size="lg">
+              <Link href="/products" className={buttonVariants({ size: "lg" })}>
                 Shop now <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="border-white/70 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+              </Link>
+              <Link
+                href="/categories"
+                className={buttonVariants({
+                  size: "lg",
+                  variant: "outline",
+                  className:
+                    "border-white/70 bg-white/10 text-white hover:bg-white/20 hover:text-white",
+                })}
               >
                 Browse categories
-              </Button>
+              </Link>
             </div>
           </div>
         </div>
