@@ -6,9 +6,9 @@
 
 ## 2. SiteHeader + header-icon decoupling
 
-- [ ] 2.1 Refactor `app/_components/home/site-header.tsx`: drop the `async` keyword, remove the `await auth()` and `await getWishlistCount(...)` calls, remove the `loggedIn` and `userForMenu` derivations. Render NAV_LINKS, the search input form, and the three child icons WITHOUT passing `loggedIn` / `count` / `user` props. The header HTML is now identical for every visitor at SSR.
-- [ ] 2.2 Refactor `app/_components/header/profile-menu.tsx` to a `"use client"` component. Read user info via `useSession()` from `next-auth/react`. Render the "Login" link when `status === "unauthenticated"`, render the user-menu trigger + dropdown when authenticated. Remove the `user` prop from the type signature (and from the parent's prop pass).
-- [ ] 2.3 Refactor `app/_components/header/wishlist-icon.tsx` to a `"use client"` component. Read count from `useWishlist()` (size of the `ids` Set). Drop `loggedIn` and `count` props from the type signature. The link still navigates to `/wishlist`.
+- [x] 2.1 `app/_components/home/site-header.tsx`: dropped `async` + `auth()` + `getWishlistCount()`. Render NAV_LINKS + search form + child icons with no user-specific props. The header HTML is now identical for every visitor at SSR.
+- [x] 2.2 `app/_components/header/profile-menu.tsx`: was already `"use client"`; now reads via `useSession()` from `next-auth/react` instead of receiving a `user` prop. `status === "authenticated"` shows the user menu; otherwise shows the Login/Sign-up items. Cached HTML renders the unauthenticated treatment until hydration (~50-100ms flicker for logged-in users — acceptable per design.md R6).
+- [x] 2.3 `app/_components/header/wishlist-icon.tsx`: now `"use client"`, reads `ids` from `useWishlist()` and shows the count badge from `ids.size`. Drops `loggedIn`/`count` props. Link always navigates to `/wishlist` (the wishlist page handles auth-redirect itself). Exposed `ids: ReadonlySet<string>` on `WishlistContext` so consumers can read `.size` and `.has(id)` without separate accessors.
 
 ## 3. WishlistHeart + ProductCard refactor
 

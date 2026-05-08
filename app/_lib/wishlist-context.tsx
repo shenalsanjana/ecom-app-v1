@@ -15,6 +15,7 @@ import { useSession } from "next-auth/react";
 import { toggleWishlistAction } from "@/app/wishlist/actions";
 
 type WishlistContextType = {
+  ids: ReadonlySet<string>;
   has: (productId: string) => boolean;
   toggle: (productId: string, fromPath?: string) => void;
 };
@@ -91,7 +92,7 @@ export function WishlistProvider({
   );
 
   return (
-    <WishlistContext.Provider value={{ has, toggle }}>
+    <WishlistContext.Provider value={{ ids: optimisticIds, has, toggle }}>
       {children}
     </WishlistContext.Provider>
   );
