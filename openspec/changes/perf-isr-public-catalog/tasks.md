@@ -1,8 +1,8 @@
 ## 1. Wishlist context + API
 
-- [ ] 1.1 Add `app/api/wishlist/ids/route.ts`: Next.js route handler exporting `GET`. Imports `auth` from `@/app/_lib/auth` and `getWishlistProductIds` from `@/app/_lib/wishlist`. Returns `Response.json({ ids: [...] })` for authenticated requests, `{ ids: [] }` for unauthenticated. Set `Cache-Control: private, no-store` so this endpoint is never edge-cached. No mutations.
-- [ ] 1.2 Add `app/_lib/wishlist-context.tsx` (`"use client"`): exports `WishlistProvider` and `useWishlist()`. Provider holds `Set<string>` state, runs a one-shot `fetch('/api/wishlist/ids')` on mount, and exposes `{ ids, has(id), toggle(id) }`. `toggle` does `useOptimistic`-style local flip + calls `toggleWishlistAction`; success commits, failure reverts and surfaces a console error (toast wiring deferred to a later UX change).
-- [ ] 1.3 Add `<SessionProvider>` (from `next-auth/react`) and `<WishlistProvider>` to `app/layout.tsx`, wrapping the existing `<CartProvider>`. Wrap order: `SessionProvider` → `WishlistProvider` → `CartProvider` → `{children}`. This makes `useSession()` and `useWishlist()` available everywhere downstream. No other layout edits.
+- [x] 1.1 `app/api/wishlist/ids/route.ts` exports `GET` that returns `{ ids: string[] }` from the current session's wishlist (empty array unauthenticated). Sets `Cache-Control: private, no-store` so the response is never edge-cached. Pure read, no mutations. Uses existing `auth()` + `getWishlistProductIds()`.
+- [x] 1.2 `app/_lib/wishlist-context.tsx` exports `WishlistProvider` + `useWishlist()`. Provider hydrates from `/api/wishlist/ids` only when `useSession().status === "authenticated"`. Holds `realIds: Set<string>` and exposes optimistic state via `useOptimistic` with a flip reducer. `toggle(productId, fromPath)` redirects unauthenticated users to `/login?callbackUrl=...`; authenticated users get an immediate optimistic flip + the existing `toggleWishlistAction` server action runs in `startTransition`. Failure auto-reverts via useOptimistic's transition contract.
+- [x] 1.3 `app/layout.tsx` now wraps in order `<SessionProvider>` → `<WishlistProvider>` → `<CartProvider>` → `{children}`. SessionProvider is from `next-auth/react`. No other layout edits.
 
 ## 2. SiteHeader + header-icon decoupling
 

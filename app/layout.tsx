@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Inter, Fraunces } from "next/font/google";
+import { SessionProvider } from "next-auth/react";
 import { CartProvider } from "@/app/_lib/cart-context";
+import { WishlistProvider } from "@/app/_lib/wishlist-context";
 import { WhatsAppFloatButton } from "@/app/_components/whatsapp-float-button";
 import "./globals.css";
 
@@ -59,7 +61,11 @@ export default function RootLayout({
       className={`${inter.variable} ${fraunces.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <CartProvider>{children}</CartProvider>
+        <SessionProvider>
+          <WishlistProvider>
+            <CartProvider>{children}</CartProvider>
+          </WishlistProvider>
+        </SessionProvider>
         <WhatsAppFloatButton />
       </body>
     </html>
