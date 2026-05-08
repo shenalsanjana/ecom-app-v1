@@ -6,6 +6,8 @@ import { ProductGrid } from "@/app/_components/home/product-grid";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { SiteHeader } from "@/app/_components/home/site-header";
 
+export const revalidate = 300;
+
 export default function Home() {
   return (
     <>

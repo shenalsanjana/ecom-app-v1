@@ -5,6 +5,8 @@ import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { ContactForm } from "./contact-form";
 
+export const dynamic = "force-static";
+
 export default function ContactPage() {
   return (
     <>

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 
+export const dynamic = "force-static";
+
 export const metadata: Metadata = {
   title: "Privacy Policy - Dressing Bear",
   description: "Information about data collection, usage, and protection at Dressing Bear.",

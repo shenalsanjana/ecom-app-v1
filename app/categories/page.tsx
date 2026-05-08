@@ -6,6 +6,8 @@ import { SiteFooter } from "@/app/_components/home/site-footer";
 import { SortSelect } from "@/app/_components/shared/sort-select";
 import type { Metadata } from "next";
 
+export const revalidate = 3600;
+
 export const metadata: Metadata = {
   title: "Shop all categories",
   description: "Browse every category: oversize t-shirts, graphic tees, solid basics.",

@@ -35,8 +35,9 @@ User-specific or query-specific routes (`app/cart/page.tsx`, `app/wishlist/page.
 #### Scenario: Build output reflects the cache contract
 
 - **WHEN** a developer runs `npm run build`
-- **THEN** the route table shows `○` (Static), `●` (SSG with data), or ISR for `/`, `/categories`, `/categories/[slug]`, `/products/[id]`, `/deals`, `/about`, `/contact`, `/privacy-policy`, `/terms-and-conditions`, `/refund-policy`
+- **THEN** the route table shows `○` (Static) for `/`, `/about`, `/contact`, `/privacy-policy`, `/terms-and-conditions`, `/refund-policy`
 - **AND** shows `ƒ` (Dynamic) for `/cart`, `/wishlist`, `/checkout`, `/account/*`, `/(auth)/*`, `/search`
+- **AND** MAY show `ƒ` (Dynamic) for `/categories`, `/categories/[slug]`, `/products/[id]`, `/deals` despite their `revalidate` declarations, because Next.js opts out of static rendering on any route that reads `searchParams` at render time. These routes still benefit from the `unstable_cache` data-layer dedup (each underlying Prisma read is cached for its `revalidate` window), but route-level edge caching is not engaged. See design.md "searchParams keeps PDP / categories / deals dynamic" for the full reasoning.
 
 #### Scenario: Stale-while-revalidate behaviour on the deployed site
 

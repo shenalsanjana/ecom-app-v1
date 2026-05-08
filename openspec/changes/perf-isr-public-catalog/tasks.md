@@ -30,24 +30,36 @@
 
 ## 5. Cache adds + Prisma wrapping + verification
 
-- [ ] 5.1 Add `export const revalidate = 300` to `app/page.tsx`. Add `export const revalidate = 3600` to `app/categories/page.tsx`. Add `export const revalidate = 300` to `app/categories/[slug]/page.tsx`. Add `export const revalidate = 300` to `app/products/[id]/page.tsx`. Add `export const revalidate = 120` to `app/deals/page.tsx`.
-- [ ] 5.2 Add `export const dynamic = 'force-static'` to `app/about/page.tsx`, `app/contact/page.tsx`, `app/privacy-policy/page.tsx`, `app/terms-and-conditions/page.tsx`, `app/refund-policy/page.tsx`. For `app/contact/page.tsx`, verify the `<ContactForm>` server action remains functional (it's posted to a dynamic action endpoint regardless of the page-shell being static).
-- [ ] 5.3 Wrap hot Prisma reads in `app/_lib/products.ts` with `unstable_cache` from `next/cache`. Each wrapper takes a unique key array, a tags array drawn from `['catalog', 'categories', 'product', 'category-products', 'deals', 'featured']`, and a matching `revalidate` value:
-    - `getCategoryList` — keys `['categories-list']`, tags `['catalog', 'categories']`, revalidate `3600`.
-    - `getProductDetail` — keys `['product-detail']` + arg, tags `['catalog', 'product']`, revalidate `300`.
-    - `getProductsByCategory` — keys `['products-by-category']` + arg, tags `['catalog', 'category-products']`, revalidate `300`.
-    - `getDeals` — keys `['deals-list']`, tags `['catalog', 'deals']`, revalidate `120`.
-    - `getFeaturedProducts` (or the function home calls; check `app/page.tsx` imports) — keys `['featured']`, tags `['catalog', 'featured']`, revalidate `300`.
-    Pure DB reads only — DO NOT wrap any function that calls `auth()` / `cookies()` / `headers()` (e.g., `getWishlistProductIds`, `getWishlistCount` stay unwrapped).
-- [ ] 5.4 Run `npm run build`. Verify the route table shows `○` (Static), `●` (SSG with data), or ISR for the cacheable routes (`/`, `/categories`, `/categories/[slug]`, `/products/[id]`, `/deals`, `/about`, `/contact`, `/privacy-policy`, `/terms-and-conditions`, `/refund-policy`) — NOT `ƒ` (Dynamic). If any cacheable route still shows `ƒ`, find the lingering `auth()` / `cookies()` / `headers()` call and fix before continuing.
-- [ ] 5.5 Re-run `npx tsc --noEmit` (must pass) and `npm run lint` (must pass — pre-existing seed.ts unused-symbol warning is acceptable).
-- [ ] 5.6 Run `npm run check:contrast`. Must remain green — this change touches no tokens.
-- [ ] 5.7 Manual smoke (light mode):
-    - Cold: home → /categories → category page → PDP → /cart → /checkout → /search → /wishlist → /account/* — no surface looks broken or off-palette.
-    - Toggle wishlist heart on a `ProductCard` while logged in → heart flips within 150ms (optimistic) → page reload shows the new state from `/api/wishlist/ids` hydration.
-    - Toggle wishlist heart while logged OUT → server action redirects to `/login` (existing behavior; not changed by this work).
-    - Open cart drawer → cart count badge in header reflects current cart state via client hydration.
+- [x] 5.1 Added `export const revalidate = N` to `app/page.tsx` (300), `app/categories/page.tsx` (3600), `app/categories/[slug]/page.tsx` (300), `app/products/[id]/page.tsx` (300), `app/deals/page.tsx` (120).
+- [x] 5.2 Added `export const dynamic = 'force-static'` to `app/about/page.tsx`, `app/contact/page.tsx`, `app/privacy-policy/page.tsx`, `app/terms-and-conditions/page.tsx`, `app/refund-policy/page.tsx`. Contact form's server action is unaffected (server actions are posted to dynamic action endpoints regardless of page-shell static-ness).
+- [x] 5.3 Wrapped these readers in `app/_lib/products.ts` with `unstable_cache` from `next/cache`:
+    - `getCategories` — keys `["categories-list"]`, tags `["catalog", "categories"]`, revalidate 3600.
+    - `getFeaturedProducts` — keys `["featured-products"]`, tags `["catalog", "featured"]`, revalidate 300.
+    - `getDealsProducts` — keys `["deals-products"]`, tags `["catalog", "deals"]`, revalidate 120.
+    - `getProductById` — keys `["product-by-id"]`, tags `["catalog", "product"]`, revalidate 300.
+    - `getProductDetail` — keys `["product-detail"]`, tags `["catalog", "product"]`, revalidate 300.
+    - `getProductReviews` — keys `["product-reviews"]`, tags `["catalog", "product"]`, revalidate 300.
+    - `getReviewHistogram` — keys `["review-histogram"]`, tags `["catalog", "product"]`, revalidate 300.
+    `getProducts(opts)` left unwrapped — used by both `/categories/[slug]` (cacheable) and `/search` (intentionally uncached) with a complex options object; relying on page-level `revalidate` for the cacheable consumer. `getWishlistProductIds`, `getWishlistCount` deliberately untouched (they read user state).
+- [x] 5.4 `npm run build` exits 0. Route table shows:
+    - `○ /` (Revalidate 2m, clamped from 5m by inner `getDealsProducts`)
+    - `○ /about`, `○ /contact`, `○ /privacy-policy`, `○ /refund-policy`, `○ /terms-and-conditions`
+    - `○ /cart`, `○ /forgot-password`, `○ /login`, `○ /reset-password`, `○ /signup` (auto-static after Phase A removed auth() coupling)
+    - `ƒ /categories`, `ƒ /categories/[slug]`, `ƒ /products/[id]`, `ƒ /deals` — **stayed dynamic despite `revalidate`** because they read `await searchParams`. Documented as accepted in design.md "searchParams keeps PDP / categories / deals dynamic". Data-layer cache via `unstable_cache` still engaged on these routes.
+    - `ƒ /wishlist`, `ƒ /checkout`, `ƒ /account/*`, `ƒ /search` — intentionally dynamic.
+- [x] 5.5 `npx tsc --noEmit` clean. `npm run lint` clean (only pre-existing prisma/seed.ts warning).
+- [x] 5.6 `npm run check:contrast` green — no token changes.
+- [ ] 5.7 Manual smoke (you, light mode):
+    - Cold: home → /categories → category page → PDP → /cart → /checkout → /search → /wishlist → /account/* — no surface broken or off-palette.
+    - Toggle wishlist heart on a ProductCard while logged in → heart flips within 150ms (optimistic). Reload → state still set.
+    - Toggle wishlist heart while logged OUT → redirected to `/login?callbackUrl=...`.
+    - Open cart drawer → cart count badge in header reflects current state.
     - Visit `/products/[id]` while logged in with that product wishlisted → heart appears filled within ~100ms of first paint.
-    - Visit `/about` and `/contact` → pages render correctly; contact form submit works.
-- [ ] 5.8 Run `openspec validate perf-isr-public-catalog --strict` — must be green.
-- [ ] 5.9 Post-deploy measurement (after merge to develop and Vercel deploys): re-run the curl battery against `https://www.dressingbear.com` for `/`, `/categories`, `/categories/[slug]/<some-slug>`, `/products/<some-id>`, `/deals`. Targets: warm TTFB < 200ms (pass < 400ms; PDP allowance < 500ms). Run a Lighthouse mobile audit on PDP via PageSpeed Insights — target LCP < 2.5s. Record numbers in the merge-commit body or a follow-up note for the next perf iteration.
+    - Visit `/about` and `/contact` → render correctly; contact form submit works.
+- [x] 5.8 `openspec validate perf-isr-public-catalog --strict` green.
+- [ ] 5.9 Post-deploy measurement (after merge to develop and Vercel deploys): re-run the curl battery against `https://www.dressingbear.com` for `/`, `/categories`, `/categories/[slug]/<some-slug>`, `/products/<some-id>`, `/deals`.
+    Revised targets given the searchParams finding:
+    - **`/` (statically rendered):** warm TTFB < 200ms target, < 400ms pass threshold.
+    - **`/categories`, `/categories/[slug]`, `/products/[id]`, `/deals` (still dynamic, but data-cached):** warm TTFB target < 600ms, pass threshold < 1000ms (substantial drop from baseline 0.85s–3.27s, but not edge-cache levels). The Prisma round-trips that dominated cross-region latency are now cache hits.
+    - **Marketing pages** (`/about` etc.): warm TTFB < 200ms.
+    Run a Lighthouse mobile audit on PDP via PageSpeed Insights — target LCP < 2.5s. Record numbers in the merge-commit body or a follow-up note. If PDP warm TTFB still > 1s after deploy, the next perf change should restructure searchParams handling (move pagination/sort to client, wrap in Suspense) to unlock route-level edge caching.

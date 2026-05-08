@@ -8,6 +8,8 @@ import {
 } from "@/app/_lib/products";
 import { stripMarkdown } from "@/app/_lib/strip-markdown";
 
+export const revalidate = 300;
+
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { Breadcrumb } from "@/app/_components/product/breadcrumb";

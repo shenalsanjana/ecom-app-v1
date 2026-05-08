@@ -6,6 +6,8 @@ import { SiteFooter } from "@/app/_components/home/site-footer";
 import { SortSelect } from "@/app/_components/shared/sort-select";
 import type { Metadata } from "next";
 
+export const revalidate = 120;
+
 export const metadata: Metadata = {
   title: "Deals",
   description: "Limited-time deals on premium oversize t-shirts.",
