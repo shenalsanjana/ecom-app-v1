@@ -7,15 +7,15 @@
 
 ## 2. UI primitives
 
-- [ ] 2.1 Refactor `components/ui/button.tsx`: `default` variant → cocoa-cream (`bg-primary text-primary-foreground`); bump `default` and `lg` sizes to `h-9` minimum; add new `accent` variant (`bg-accent text-accent-foreground` with olive focus ring). Variant names and prop API preserved.
-- [ ] 2.2 Refactor `components/ui/card.tsx`: default radius → `rounded-2xl`, hover-only `--shadow-card` lift (no shadow at rest), `--border` for hairlines.
-- [ ] 2.3 Refactor `components/ui/dialog.tsx`: panel `rounded-2xl`; overlay color → `oklch(0.235 0.018 60 / 0.5)` (warm cocoa wash, replacing `black/80`); override `data-[state=open]` and `data-[state=closed]` keyframes locally so `--duration-slow` and the warm overlay take precedence over `tw-animate-css` defaults.
-- [ ] 2.4 Refactor `components/ui/input.tsx` and `components/ui/textarea.tsx`: `h-10` (was `h-9`), `--ring` at 50% opacity on `:focus-visible`, `font-sans`. Refactor `components/ui/label.tsx` to inherit tokens.
-- [ ] 2.5 Refactor `components/ui/badge.tsx`: pill (`rounded-full`), new `accent` variant (olive bg + cream text), warmed `destructive`. Refactor `components/ui/dropdown-menu.tsx`, `components/ui/alert.tsx`, `components/ui/separator.tsx` to inherit tokens (no per-component code change beyond removing hardcoded class strings if any).
+- [x] 2.1 `components/ui/button.tsx`: `default` size bumped `h-8 → h-9`, `lg` size `h-9 → h-10`, `sm` size `h-7 → h-8`, icon sizes scaled to match. New `brand` variant (`bg-brand text-brand-foreground hover:bg-brand/90`) added without removing or renaming any existing variant. `default` (cocoa) hover went from `/80 → /85` (subtler).
+- [x] 2.2 `components/ui/card.tsx`: radius `rounded-xl → rounded-2xl` (and the corner `rounded-t-2xl/rounded-b-2xl` selectors). Added `transition` + `motion-safe:hover:-translate-y-0.5` + `motion-safe:hover:shadow-card` gated on `has-[a]` (only cards containing a link lift). Ring softened from `/10 → /5` (less prominent at rest).
+- [x] 2.3 `components/ui/dialog.tsx`: overlay `bg-black/10 → bg-foreground/50` (warm cocoa wash, since `--foreground` is cocoa), duration `100ms → var(--duration-slow)` with `ease-(--ease-out)`. Popup `rounded-xl → rounded-2xl`, same duration/ease swap. Footer `rounded-b-xl → rounded-b-2xl`.
+- [x] 2.4 `components/ui/input.tsx`: `h-8 → h-10`, `px-2.5 → px-3`, added `transition-colors duration-(--duration-fast)`. Focus ring already `--ring/50` (now olive). `components/ui/textarea.tsx`: switched from offset-ring pattern to flat ring matching Input (`focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50`), `rounded-md → rounded-lg`, added aria-invalid styling. `components/ui/label.tsx` unchanged — inherits tokens.
+- [x] 2.5 `components/ui/badge.tsx`: new `brand` variant (`bg-brand text-brand-foreground`), `destructive` bg `/10 → /12` for slightly stronger warmed-red read on cream, outline/ghost `text-muted-foreground → text-foreground` for AA. Existing `rounded-4xl` already gives the pill shape. `components/ui/dropdown-menu.tsx`, `components/ui/alert.tsx`, `components/ui/separator.tsx`: no edits — they consume `bg-accent/text-accent-foreground` / `border` / `text-destructive` semantically and inherit the new tokens (warm muted-darker hover for menu items, NOT olive).
 
 ## 3. Surface components — home, header, footer
 
-- [ ] 3.1 Refactor `app/_components/home/product-card.tsx`: image backdrop → `bg-muted` (replace `from-zinc-100 to-zinc-200`); product name → `font-heading`; on-sale price → `font-heading text-accent`; wishlist heart fills with olive when active; hover lift inherits from `Card`.
+- [ ] 3.1 Refactor `app/_components/home/product-card.tsx`: image backdrop → `bg-muted` (replace `from-zinc-100 to-zinc-200`); product name → `font-heading`; on-sale price → `font-heading text-brand`; wishlist heart fills with olive (`fill-brand text-brand`) when active; hover lift inherits from `Card`.
 - [ ] 3.2 Refactor `app/_components/home/hero.tsx`: heading → `font-heading`; both CTAs → cocoa pill (`Button` `default` variant with `rounded-full`).
 - [ ] 3.3 Refactor `app/_components/home/site-header.tsx`: cream bg, cocoa ink, olive `underline-offset-4 hover:underline` on nav links, olive pill cart-count badge.
 - [ ] 3.4 Refactor `app/_components/home/site-footer.tsx`: warm-neutral fills, structure unchanged.
@@ -24,9 +24,9 @@
 
 ## 4. Surface components — cart, product, header icons
 
-- [ ] 4.1 Refactor `app/_components/cart/free-shipping-progress.tsx`: track `bg-muted`, fill `bg-accent`; under threshold → muted-foreground copy; near threshold (within 20%) → olive copy; qualified → olive bg pill with cream text. Width transitions `--duration-slow var(--ease-out)`. Cross-fade between state colors.
+- [ ] 4.1 Refactor `app/_components/cart/free-shipping-progress.tsx`: track `bg-muted`, fill `bg-brand`; under threshold → muted-foreground copy; near threshold (within 20%) → brand copy (`text-brand`); qualified → `bg-brand` pill with cream text. Width transitions `--duration-slow var(--ease-out)`. Cross-fade between state colors.
 - [ ] 4.2 Refactor `app/_components/cart/cart-item.tsx`: hairline borders (`--border`); totals → `font-heading`; FIX quantity-stepper buttons by wrapping them in a `role="group"` wrapper with `aria-label="Quantity"`.
-- [ ] 4.3 Refactor `app/_components/cart/cart-summary.tsx`: totals → `font-heading`; free-shipping callout → olive (`text-accent`).
+- [ ] 4.3 Refactor `app/_components/cart/cart-summary.tsx`: totals → `font-heading`; free-shipping callout → olive (`text-brand`).
 - [ ] 4.4 Refactor `app/_components/cart/add-to-cart-dialog.tsx` and `app/_components/cart/quick-buy-buttons.tsx`: pick up new dialog overlay/radius; size-picker buttons get `--ring` (olive) when selected.
 - [ ] 4.5 Refactor `app/_components/product/buy-box.tsx` and `app/_components/product/buy-box-client.tsx`: price → `font-heading`; size-picker selected state → olive ring + cream fill (with copy showing the selected size — color is not the only signifier).
 - [ ] 4.6 Refactor `app/_components/product/breadcrumb.tsx`: olive `underline-offset-4 hover:underline` on links; current item uses `font-sans` (no underline).
@@ -41,7 +41,7 @@
 - [ ] 5.1 Tune `app/_components/shared/product-grid-skeleton.tsx`: tile color → `bg-muted` (warm); shimmer `opacity: 0.6`, cycle `2s`. Verify it complies with `prefers-reduced-motion: reduce` (shimmer becomes static).
 - [ ] 5.2 Audit every `loading.tsx` (`app/cart/`, `app/categories/[slug]/`, `app/account/orders/`, `app/deals/`, `app/search/`, `app/wishlist/`) — confirm each renders `ProductGridSkeleton` or a domain-equivalent skeleton. No naked spinners.
 - [ ] 5.3 Restyle every error boundary on customer surfaces (`app/account/error.tsx`, `app/checkout/error.tsx`, `app/search/error.tsx`, `app/not-found.tsx`, `app/products/[id]/not-found.tsx`) to the consistent typographic pattern: `font-heading` headline + one-line plain-language explanation + single olive-pill CTA returning to a useful surface. No new illustrations.
-- [ ] 5.4 Author `scripts/check-contrast.ts`: takes the tokens from `globals.css`, parses the OKLCH values, converts to sRGB, computes WCAG relative-luminance ratios for the published pairs (foreground-on-background, primary-foreground-on-primary, accent-foreground-on-accent, muted-foreground-on-background, destructive-foreground-on-destructive, ring-on-background), prints PASS/FAIL per pair with the ratio, exits 1 on any failure. Add an `npm run check:contrast` script in `package.json`.
+- [ ] 5.4 Author `scripts/check-contrast.ts`: takes the tokens from `globals.css`, parses the OKLCH values, converts to sRGB, computes WCAG relative-luminance ratios for the published pairs (foreground-on-background, primary-foreground-on-primary, brand-foreground-on-brand, accent-foreground-on-accent, muted-foreground-on-background, destructive-foreground-on-destructive, ring-on-background), prints PASS/FAIL per pair with the ratio, exits 1 on any failure. Add an `npm run check:contrast` script in `package.json`.
 - [ ] 5.5 Run `npm run check:contrast` — every published pair must PASS. Adjust tokens (within the boutique palette) until green.
 - [ ] 5.6 Manual a11y pass (record findings in commit body):
     - Verify focus rings on wishlist heart, free-shipping bar (if interactive), and size-picker buttons.

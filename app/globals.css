@@ -34,6 +34,8 @@
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -72,8 +74,14 @@
   --secondary-foreground: oklch(0.235 0.018 60);
   --muted: oklch(0.93 0.012 75);
   --muted-foreground: oklch(0.54 0.018 60);
-  --accent: oklch(0.55 0.075 125);
-  --accent-foreground: oklch(0.985 0.008 80);
+  /* `--accent` is shadcn's *subtle hover* semantic — used by dropdown items,
+     error CTAs, pagination, search filters. NOT the brand color. */
+  --accent: oklch(0.90 0.014 75);
+  --accent-foreground: oklch(0.235 0.018 60);
+  /* `--brand` is the boutique olive — used by sale prices, sale badges,
+     wishlist heart fill, free-shipping qualified state, brand variants. */
+  --brand: oklch(0.55 0.075 125);
+  --brand-foreground: oklch(0.985 0.008 80);
   --destructive: oklch(0.52 0.18 28);
   --destructive-foreground: oklch(0.985 0.008 80);
   --border: oklch(0.89 0.014 75);
