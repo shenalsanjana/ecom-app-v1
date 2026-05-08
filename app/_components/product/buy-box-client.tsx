@@ -123,11 +123,11 @@ export function BuyBoxClient({
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{name}</h1>
+      <h1 className="font-heading text-2xl font-medium tracking-tight sm:text-3xl">{name}</h1>
 
       <a
         href="#reviews"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors duration-(--duration-fast) hover:text-foreground"
         aria-label={`${ratingAvg.toFixed(1)} out of 5 stars, ${ratingCount} reviews`}
       >
         <Star className="h-4 w-4 fill-amber-400 stroke-amber-400" aria-hidden />
@@ -136,13 +136,19 @@ export function BuyBoxClient({
       </a>
 
       <div className="flex items-baseline gap-3">
-        <span className="text-2xl font-semibold">{formatPrice(price)}</span>
+        <span
+          className={
+            "font-heading text-2xl font-semibold " + (onSale ? "text-brand" : "")
+          }
+        >
+          {formatPrice(price)}
+        </span>
         {onSale && (
           <>
             <span className="text-base text-muted-foreground line-through">
               {formatPrice(originalPrice as number)}
             </span>
-            <Badge variant="destructive">-{pct}%</Badge>
+            <Badge variant="brand">-{pct}%</Badge>
           </>
         )}
       </div>
@@ -153,7 +159,7 @@ export function BuyBoxClient({
       {sizeList.length > 0 && (
         <div
           id="size-picker"
-          className="space-y-2 rounded-md transition-shadow data-[attention=true]:ring-2 data-[attention=true]:ring-primary data-[attention=true]:ring-offset-2 data-[attention=true]:ring-offset-background"
+          className="space-y-2 rounded-md transition-shadow data-[attention=true]:ring-2 data-[attention=true]:ring-ring data-[attention=true]:ring-offset-2 data-[attention=true]:ring-offset-background"
         >
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">Size:</span>
@@ -161,20 +167,25 @@ export function BuyBoxClient({
             <SizeChartDialog />
           </div>
           <div className="flex flex-wrap gap-2">
-            {sizeList.map((size) => (
-              <button
-                key={size}
-                type="button"
-                onClick={() => setSelectedSize(size)}
-                className={`min-w-[48px] rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                  selectedSize === size
-                    ? "border-black bg-black text-white"
-                    : "border-gray-300 hover:border-gray-400"
-                }`}
-              >
-                {size}
-              </button>
-            ))}
+            {sizeList.map((size) => {
+              const isSelected = selectedSize === size;
+              return (
+                <button
+                  key={size}
+                  type="button"
+                  onClick={() => setSelectedSize(size)}
+                  aria-pressed={isSelected}
+                  className={
+                    "min-w-[48px] rounded-md border bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors duration-(--duration-fast) " +
+                    (isSelected
+                      ? "border-ring bg-muted ring-2 ring-ring"
+                      : "border-border hover:border-foreground/40")
+                  }
+                >
+                  {size}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -217,7 +228,8 @@ export function BuyBoxClient({
           <Button
             onClick={handleBuyNow}
             disabled={isBuying || sizeMissing}
-            className="flex-1 bg-black hover:bg-black/90 text-white"
+            variant="outline"
+            className="flex-1"
           >
             {isBuying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Buy Now

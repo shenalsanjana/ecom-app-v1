@@ -25,7 +25,7 @@ export function ProfileMenu({ user }: { user: SessionUser }) {
         render={
           <Button
             variant="ghost"
-            size="icon"
+            size="icon-lg"
             aria-label={user ? `Signed in as ${user.name}` : "Account"}
           />
         }

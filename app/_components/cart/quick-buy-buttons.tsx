@@ -33,7 +33,8 @@ export function QuickBuyButtons({ productId, name, price, image, sizes }: Props)
         href={`${href}?action=buy-now`}
         className={buttonVariants({
           size: "sm",
-          className: "flex-1 min-w-0 whitespace-nowrap bg-black hover:bg-black/90 text-white",
+          variant: "default",
+          className: "flex-1 min-w-0 whitespace-nowrap",
         })}
         aria-label="Buy now"
       >

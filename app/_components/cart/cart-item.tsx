@@ -18,10 +18,10 @@ export function CartItemRow({ item }: Props) {
   const subtotal = item.price * item.quantity;
 
   return (
-    <div className="flex gap-4 py-4 border-b">
+    <div className="flex gap-4 py-4 border-b border-border">
       <Link
         href={`/products/${item.productId}`}
-        className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-md bg-zinc-100 dark:bg-zinc-800"
+        className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-md bg-muted"
       >
         <Image
           src={item.image}
@@ -57,7 +57,7 @@ export function CartItemRow({ item }: Props) {
         </div>
 
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1">
+          <div role="group" aria-label="Quantity" className="flex items-center gap-1">
             <Button
               variant="outline"
               size="icon"
@@ -80,7 +80,7 @@ export function CartItemRow({ item }: Props) {
               <Plus className="h-3 w-3" />
             </Button>
           </div>
-          <div className="text-sm font-medium">
+          <div className="font-heading text-sm font-medium">
             {formatPrice(subtotal)}
           </div>
         </div>

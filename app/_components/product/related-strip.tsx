@@ -11,7 +11,7 @@ export function RelatedStrip({ products, wishlistedIds, fromPath }: Props) {
   if (products.length === 0) return null;
   return (
     <section aria-labelledby="related-heading" className="space-y-6">
-      <h2 id="related-heading" className="text-xl font-semibold tracking-tight">
+      <h2 id="related-heading" className="font-heading text-xl font-medium tracking-tight">
         You might also like
       </h2>
       <div className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3 lg:grid-cols-4">

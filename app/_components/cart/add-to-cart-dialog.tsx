@@ -83,20 +83,25 @@ export function AddToCartDialog({ productId, name, price, image, sizes }: Props)
         </DialogHeader>
         {requiresSize && (
           <div className="flex flex-wrap gap-2">
-            {sizeList.map((size) => (
-              <button
-                key={size}
-                type="button"
-                onClick={() => setSelectedSize(size)}
-                className={`min-w-[48px] rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                  selectedSize === size
-                    ? "border-black bg-black text-white"
-                    : "border-gray-300 hover:border-gray-400"
-                }`}
-              >
-                {size}
-              </button>
-            ))}
+            {sizeList.map((size) => {
+              const selected = selectedSize === size;
+              return (
+                <button
+                  key={size}
+                  type="button"
+                  onClick={() => setSelectedSize(size)}
+                  data-state={selected ? "selected" : "unselected"}
+                  aria-pressed={selected}
+                  className={`min-w-[48px] rounded-md border px-3 py-2 text-sm font-medium transition-colors duration-(--duration-fast) ease-(--ease-out) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                    selected
+                      ? "border-foreground bg-foreground text-background ring-2 ring-ring ring-offset-2"
+                      : "border-border hover:border-foreground/40"
+                  }`}
+                >
+                  {size}
+                </button>
+              );
+            })}
           </div>
         )}
         <DialogFooter className="mt-2">

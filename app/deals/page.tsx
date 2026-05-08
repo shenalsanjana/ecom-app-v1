@@ -71,13 +71,13 @@ export default async function DealsPage({ searchParams }: DealsPageProps) {
       <SiteHeader />
       <main className="flex-1">
       {/* Hero Section */}
-      <section className="border-b bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20">
+      <section className="border-b bg-muted">
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="text-center">
-            <span className="inline-block rounded-full bg-red-500 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">
+            <span className="inline-block rounded-full bg-brand px-3 py-1 text-xs font-bold uppercase tracking-wider text-brand-foreground">
               Limited Time
             </span>
-            <h1 className="mt-4 text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
+            <h1 className="mt-4 font-heading text-4xl font-medium tracking-tight text-foreground sm:text-5xl">
               Deals of the Day
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
@@ -174,7 +174,7 @@ export default async function DealsPage({ searchParams }: DealsPageProps) {
                 <div key={product.id} className="group relative">
                   {/* Discount Badge */}
                   {discount > 0 && (
-                    <div className="absolute left-2 top-2 z-10 rounded-md bg-red-500 px-2 py-0.5 text-xs font-bold text-white shadow-lg">
+                    <div className="absolute left-2 top-2 z-10 rounded-full bg-brand px-2 py-0.5 text-xs font-bold text-brand-foreground shadow-lg">
                       -{discount}%
                     </div>
                   )}
