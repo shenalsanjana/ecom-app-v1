@@ -29,7 +29,7 @@ export function Hero() {
               shipped fast, returned freely.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Link href="/products" className={buttonVariants({ size: "lg" })}>
+              <Link href="/categories" className={buttonVariants({ size: "lg" })}>
                 Shop now <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
               <Link
