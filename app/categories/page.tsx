@@ -174,7 +174,6 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
                     rating={product.rating}
                     reviewCount={product.reviewCount}
                     sizes={product.sizes}
-                    wishlisted={false}
                     fromPath="/categories"
                   />
                 ))}

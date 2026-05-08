@@ -1,14 +1,8 @@
-import { auth } from "@/app/_lib/auth";
 import { ProductCard } from "@/app/_components/home/product-card";
 import { getDealsProducts } from "@/app/_lib/products";
-import { getWishlistProductIds } from "@/app/_lib/wishlist";
 
 export async function DealsSection() {
   const products = await getDealsProducts(4);
-  const session = await auth();
-  const wishlisted = session?.user?.id
-    ? await getWishlistProductIds(session.user.id)
-    : new Set<string>();
   return (
     <section className="border-b bg-muted">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
@@ -33,7 +27,6 @@ export async function DealsSection() {
               rating={p.rating}
               reviewCount={p.reviewCount}
               sizes={p.sizes}
-              wishlisted={wishlisted.has(p.id)}
               fromPath="/"
             />
           ))}

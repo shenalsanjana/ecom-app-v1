@@ -3,11 +3,10 @@ import type { ProductView } from "@/app/_lib/products";
 
 type Props = {
   products: ProductView[];
-  wishlistedIds: Set<string>;
   fromPath: string;
 };
 
-export function RelatedStrip({ products, wishlistedIds, fromPath }: Props) {
+export function RelatedStrip({ products, fromPath }: Props) {
   if (products.length === 0) return null;
   return (
     <section aria-labelledby="related-heading" className="space-y-6">
@@ -26,7 +25,6 @@ export function RelatedStrip({ products, wishlistedIds, fromPath }: Props) {
             rating={p.rating}
             reviewCount={p.reviewCount}
             sizes={p.sizes}
-            wishlisted={wishlistedIds.has(p.id)}
             fromPath={fromPath}
           />
         ))}

@@ -187,7 +187,6 @@ export default async function DealsPage({ searchParams }: DealsPageProps) {
                     rating={product.rating}
                     reviewCount={product.reviewCount}
                     sizes={product.sizes}
-                    wishlisted={false}
                     fromPath="/deals"
                   />
                 </div>

@@ -21,6 +21,7 @@ type WishlistContextType = {
 };
 
 const WishlistContext = createContext<WishlistContextType | null>(null);
+const EMPTY_IDS: ReadonlySet<string> = new Set();
 
 function flip(prev: ReadonlySet<string>, productId: string): Set<string> {
   const next = new Set(prev);
@@ -36,27 +37,29 @@ export function WishlistProvider({
 }) {
   const { status } = useSession();
   const router = useRouter();
-  const [realIds, setRealIds] = useState<Set<string>>(new Set());
+  const [fetchedIds, setFetchedIds] = useState<Set<string>>(new Set());
+  // Logout transitions back to EMPTY_IDS via this derivation, so we never
+  // need to call setFetchedIds(new Set()) directly inside the effect.
+  const baseIds: ReadonlySet<string> =
+    status === "authenticated" ? fetchedIds : EMPTY_IDS;
   const [optimisticIds, applyOptimistic] = useOptimistic(
-    realIds,
+    baseIds,
     (state: ReadonlySet<string>, productId: string) => flip(state, productId)
   );
   const [, startTransition] = useTransition();
 
-  // Hydrate once when authenticated.
+  // Hydrate once when authenticated. fetchedIds stays whatever it was
+  // when status drops to unauthenticated; baseIds masks it via EMPTY_IDS.
   useEffect(() => {
-    if (status !== "authenticated") {
-      setRealIds(new Set());
-      return;
-    }
+    if (status !== "authenticated") return;
     let cancelled = false;
     fetch("/api/wishlist/ids", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { ids: [] as string[] }))
       .then((data: { ids: string[] }) => {
-        if (!cancelled) setRealIds(new Set(data.ids));
+        if (!cancelled) setFetchedIds(new Set(data.ids));
       })
       .catch(() => {
-        // Network/parse failure: keep an empty set; UI shows empty hearts.
+        // Network/parse failure: keep the previous set; UI is unaffected.
       });
     return () => {
       cancelled = true;
@@ -81,7 +84,7 @@ export function WishlistProvider({
           fd.set("productId", productId);
           fd.set("fromPath", fromPath);
           await toggleWishlistAction(fd);
-          setRealIds((prev) => flip(prev, productId));
+          setFetchedIds((prev) => flip(prev, productId));
         } catch {
           // Action threw (network, server error, expired session) — useOptimistic
           // auto-reverts when the transition ends without realIds advancing.
