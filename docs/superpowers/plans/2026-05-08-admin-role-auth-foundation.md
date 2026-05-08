@@ -1,0 +1,915 @@
+# Admin Role + Auth Foundation Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Add a single `ADMIN` role to the existing user system and stand up a gated `/admin/*` namespace with placeholder pages for every future admin section.
+
+**Architecture:** One enum + one column on `User`. Role flows through next-auth's JWT/session so server components read `session.user.role` without DB hits. The Next 16 proxy gates `/admin/*` for "must be authenticated"; the admin layout then enforces the role check via `notFound()` so non-admins see a real 404, not a redirect chain.
+
+**Tech Stack:** Next.js 16.2.4, React 19.2.4, next-auth v5 (JWT strategy), Prisma + Postgres, TypeScript, Tailwind v4. **No test framework** — verification is the manual smoke matrix in Task 12.
+
+**Spec:** `docs/superpowers/specs/2026-05-08-admin-role-auth-foundation-design.md`
+
+---
+
+## File map
+
+**Modified:**
+- `prisma/schema.prisma` — add `UserRole` enum, `role` field on `User`
+- `app/_lib/auth.ts` — return `role` from `authorize()`
+- `app/_lib/auth.config.ts` — JWT + session + `authorized` callbacks
+- `proxy.ts` — extend matcher to include `/admin/:path*`
+- `app/(auth)/actions.ts` — admin-aware redirect after login
+- `package.json` — add `admin:promote` script
+
+**Modified (continued):**
+- `app/_lib/auth-types.d.ts` — extend module augmentation with `role` on `User`, `Session.user`, `JWT`
+
+**Created:**
+- `scripts/promote-admin.ts` — bootstrap script
+- `app/_components/admin/admin-sidebar.tsx` — left nav (client)
+- `app/_components/admin/admin-topbar.tsx` — top bar (server, with sign-out form)
+- `app/admin/layout.tsx` — admin shell, role check
+- `app/admin/page.tsx` — dashboard stub
+- `app/admin/categories/page.tsx` — stub
+- `app/admin/products/page.tsx` — stub
+- `app/admin/inventory/page.tsx` — stub
+- `app/admin/deals/page.tsx` — stub
+- `app/admin/hero/page.tsx` — stub
+- `app/admin/orders/page.tsx` — stub
+
+---
+
+## Task 1: Schema delta — add UserRole enum and role field
+
+**Files:**
+- Modify: `prisma/schema.prisma`
+
+- [ ] **Step 1: Add the enum and field**
+
+In `prisma/schema.prisma`, add the enum near the top of the model section and the field on `User`:
+
+```prisma
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  passwordHash  String
+  role          UserRole  @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  addresses     Address[]
+  wishlist      WishlistItem[]
+  resetTokens   PasswordResetToken[]
+  orders        Order[]
+}
+```
+
+Place the `enum UserRole { ... }` block immediately above `model User`. Leave the rest of the file untouched.
+
+- [ ] **Step 2: Generate the migration**
+
+Run:
+
+```
+npx prisma migrate dev --name add_user_role
+```
+
+Expected: prints `Applying migration` and `Generated Prisma Client`. A new folder appears under `prisma/migrations/` with timestamp + `_add_user_role`.
+
+- [ ] **Step 3: Verify the migration SQL is sane**
+
+Read the generated `prisma/migrations/<timestamp>_add_user_role/migration.sql`. It should contain:
+- `CREATE TYPE "public"."UserRole" AS ENUM ('USER', 'ADMIN');`
+- `ALTER TABLE "public"."User" ADD COLUMN "role" "public"."UserRole" NOT NULL DEFAULT 'USER';`
+
+If anything else changed (e.g., other tables), back out and check whether someone else's uncommitted schema edits leaked in.
+
+- [ ] **Step 4: Commit**
+
+```
+git add prisma/schema.prisma prisma/migrations
+git commit -m "feat(schema): add UserRole enum and role column on User"
+```
+
+---
+
+## Task 2: Extend module augmentation with role
+
+**Files:**
+- Modify: `app/_lib/auth-types.d.ts`
+
+The repo already has a next-auth module augmentation at `app/_lib/auth-types.d.ts`. We extend it — do not create a new `next-auth.d.ts`.
+
+- [ ] **Step 1: Replace the file with the extended version**
+
+Overwrite `app/_lib/auth-types.d.ts` with:
+
+```ts
+// app/_lib/auth-types.d.ts
+import type { DefaultSession } from "next-auth";
+import type {} from "next-auth/jwt";
+import type { UserRole } from "@prisma/client";
+
+declare module "next-auth" {
+  interface User {
+    role?: UserRole;
+  }
+  interface Session {
+    user: {
+      id: string;
+      role?: UserRole;
+    } & DefaultSession["user"];
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    uid?: string;
+    role?: UserRole;
+  }
+}
+```
+
+The diff vs. the original: a new `import type { UserRole }`, a new `User` interface declaration with `role?`, a new `role?` field on `Session.user`, a new `role?` on `JWT`.
+
+- [ ] **Step 2: Type-check**
+
+Run:
+
+```
+npx tsc --noEmit
+```
+
+Expected: no errors. If `UserRole` import errors, the Prisma client wasn't regenerated by Task 1 — run `npx prisma generate` and retry.
+
+- [ ] **Step 3: Commit**
+
+```
+git add app/_lib/auth-types.d.ts
+git commit -m "feat(types): extend next-auth augmentation with role"
+```
+
+---
+
+## Task 3: Return role from authorize()
+
+**Files:**
+- Modify: `app/_lib/auth.ts`
+
+- [ ] **Step 1: Edit the return statement of `authorize()`**
+
+In `app/_lib/auth.ts`, change the final `return` of the `authorize` callback to include `role`:
+
+```ts
+return {
+  id: user.id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+};
+```
+
+The whole `authorize` block after edit looks like:
+
+```ts
+async authorize(creds) {
+  const parsed = LoginSchema.safeParse(creds);
+  if (!parsed.success) return null;
+  const user = await prisma.user.findUnique({
+    where: { email: parsed.data.email },
+  });
+  if (!user) return null;
+  const ok = await bcrypt.compare(parsed.data.password, user.passwordHash);
+  if (!ok) return null;
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+  };
+},
+```
+
+- [ ] **Step 2: Type-check**
+
+Run:
+
+```
+npx tsc --noEmit
+```
+
+Expected: no errors.
+
+- [ ] **Step 3: Commit**
+
+```
+git add app/_lib/auth.ts
+git commit -m "feat(auth): return role from credentials authorize"
+```
+
+---
+
+## Task 4: Propagate role through JWT/session callbacks
+
+**Files:**
+- Modify: `app/_lib/auth.config.ts`
+
+- [ ] **Step 1: Add role to jwt and session callbacks**
+
+In `app/_lib/auth.config.ts`, replace the existing `jwt` and `session` callbacks with these versions (the existing `authorized` callback stays untouched in this task — we'll edit it in Task 5):
+
+```ts
+jwt({ token, user }) {
+  if (user && "id" in user && typeof user.id === "string") {
+    token.uid = user.id;
+  }
+  if (user && "role" in user && user.role) {
+    token.role = user.role;
+  }
+  return token;
+},
+session({ session, token }) {
+  if (token.uid && session.user) {
+    session.user.id = token.uid;
+  }
+  if (token.role && session.user) {
+    session.user.role = token.role;
+  }
+  return session;
+},
+```
+
+- [ ] **Step 2: Type-check**
+
+Run:
+
+```
+npx tsc --noEmit
+```
+
+Expected: no errors. If TS complains about `token.role` on `JWT` or `session.user.role`, the augmentation in Task 2 didn't take — verify `app/_lib/auth-types.d.ts` has the extended declarations.
+
+- [ ] **Step 3: Commit**
+
+```
+git add app/_lib/auth.config.ts
+git commit -m "feat(auth): propagate role through jwt and session callbacks"
+```
+
+---
+
+## Task 5: Extend authorized() and proxy matcher to gate /admin
+
+**Files:**
+- Modify: `app/_lib/auth.config.ts`
+- Modify: `proxy.ts`
+
+- [ ] **Step 1: Update the `authorized` callback**
+
+In `app/_lib/auth.config.ts`, replace the existing `authorized` callback with:
+
+```ts
+authorized({ auth, request }) {
+  const path = request.nextUrl.pathname;
+
+  if (path === "/admin" || path.startsWith("/admin/")) {
+    if (auth) return true;
+    const url = new URL("/login", request.url);
+    url.searchParams.set("callbackUrl", path);
+    return Response.redirect(url);
+  }
+
+  const protectedPaths = ["/account", "/wishlist"];
+  const isProtected = protectedPaths.some(
+    (p) => path === p || path.startsWith(p + "/"),
+  );
+  if (!isProtected) return true;
+  if (auth) return true;
+  const url = new URL("/login", request.url);
+  url.searchParams.set("callbackUrl", path);
+  return Response.redirect(url);
+},
+```
+
+The `/admin` branch comes first; the existing `/account`/`/wishlist` logic is preserved verbatim below it. The role check is intentionally *not* here — it lives in the admin layout (Task 8).
+
+- [ ] **Step 2: Extend the proxy matcher**
+
+In `proxy.ts`, change the `matcher` array so the proxy fires on `/admin/*` too:
+
+```ts
+export const config = {
+  matcher: ["/account/:path*", "/wishlist/:path*", "/admin/:path*"],
+};
+```
+
+The full file after edit:
+
+```ts
+// proxy.ts
+import NextAuth from "next-auth";
+import { authConfig } from "@/app/_lib/auth.config";
+
+export default NextAuth(authConfig).auth;
+
+export const config = {
+  matcher: ["/account/:path*", "/wishlist/:path*", "/admin/:path*"],
+};
+```
+
+- [ ] **Step 3: Type-check**
+
+Run:
+
+```
+npx tsc --noEmit
+```
+
+Expected: no errors.
+
+- [ ] **Step 4: Smoke check the unauthenticated redirect**
+
+Start the dev server in another shell (`npm run dev`), then from this shell:
+
+```
+curl -s -o /dev/null -w "%{http_code} %{redirect_url}\n" http://localhost:3000/admin
+```
+
+Expected output: `307 http://localhost:3000/login?callbackUrl=%2Fadmin` (next-auth uses 307; some versions emit 302 — either is acceptable as long as the location matches).
+
+If you get `404` instead, the matcher edit didn't take effect — restart the dev server.
+
+- [ ] **Step 5: Commit**
+
+```
+git add app/_lib/auth.config.ts proxy.ts
+git commit -m "feat(auth): gate /admin/* in proxy and require auth"
+```
+
+---
+
+## Task 6: Promote-admin bootstrap script
+
+**Files:**
+- Create: `scripts/promote-admin.ts`
+- Modify: `package.json`
+
+- [ ] **Step 1: Create the script**
+
+Create `scripts/promote-admin.ts`:
+
+```ts
+import { prisma } from "../app/_lib/prisma";
+
+async function main() {
+  const email = process.env.ADMIN_EMAIL;
+  if (!email) {
+    console.error("Set ADMIN_EMAIL in the environment.");
+    process.exit(1);
+  }
+  try {
+    const user = await prisma.user.update({
+      where: { email },
+      data: { role: "ADMIN" },
+      select: { id: true, email: true, role: true },
+    });
+    console.log("Promoted:", user);
+  } catch (err) {
+    if ((err as { code?: string }).code === "P2025") {
+      console.error(`No user with email ${email}. Sign up first, then re-run.`);
+      process.exit(1);
+    }
+    throw err;
+  }
+}
+
+main().finally(() => prisma.$disconnect());
+```
+
+- [ ] **Step 2: Add the npm script**
+
+In `package.json`, inside `"scripts"`, add the entry (preserve existing ordering — insert it next to the other `db:*` entries to keep ops scripts grouped):
+
+```json
+"admin:promote": "tsx scripts/promote-admin.ts",
+```
+
+After edit, the scripts block looks like:
+
+```json
+"scripts": {
+  "dev": "next dev",
+  "build": "next build",
+  "start": "next start",
+  "lint": "eslint",
+  "db:push": "prisma db push",
+  "db:migrate": "prisma migrate dev",
+  "db:seed": "prisma db seed",
+  "db:reset": "prisma migrate reset --force",
+  "admin:promote": "tsx scripts/promote-admin.ts"
+},
+```
+
+- [ ] **Step 3: Smoke check the missing-email branch**
+
+Run:
+
+```
+npm run admin:promote
+```
+
+Expected: exits with code 1, prints `Set ADMIN_EMAIL in the environment.`
+
+- [ ] **Step 4: Smoke check the missing-user branch**
+
+```
+ADMIN_EMAIL=does-not-exist@example.com npm run admin:promote
+```
+
+Expected: exits with code 1, prints `No user with email does-not-exist@example.com. Sign up first, then re-run.`
+
+(On Windows PowerShell, set the env var via `$env:ADMIN_EMAIL = "..."; npm run admin:promote`.)
+
+- [ ] **Step 5: Commit**
+
+```
+git add scripts/promote-admin.ts package.json
+git commit -m "feat(scripts): add admin:promote bootstrap"
+```
+
+---
+
+## Task 7: Admin sidebar and topbar components
+
+**Files:**
+- Create: `app/_components/admin/admin-sidebar.tsx`
+- Create: `app/_components/admin/admin-topbar.tsx`
+
+- [ ] **Step 1: Create the sidebar (client component)**
+
+Create `app/_components/admin/admin-sidebar.tsx`:
+
+```tsx
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+const ITEMS = [
+  { href: "/admin", label: "Dashboard" },
+  { href: "/admin/categories", label: "Categories" },
+  { href: "/admin/products", label: "Products" },
+  { href: "/admin/inventory", label: "Inventory" },
+  { href: "/admin/deals", label: "Deals" },
+  { href: "/admin/hero", label: "Hero panel" },
+  { href: "/admin/orders", label: "Orders" },
+];
+
+export function AdminSidebar() {
+  const path = usePathname();
+  return (
+    <aside className="w-56 shrink-0 border-r bg-background">
+      <nav className="flex flex-col gap-1 p-4 text-sm">
+        {ITEMS.map((it) => {
+          const active = it.href === "/admin"
+            ? path === "/admin"
+            : path === it.href || path.startsWith(it.href + "/");
+          return (
+            <Link
+              key={it.href}
+              href={it.href}
+              className={
+                active
+                  ? "rounded px-2 py-1.5 bg-secondary font-medium"
+                  : "rounded px-2 py-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+              }
+            >
+              {it.label}
+            </Link>
+          );
+        })}
+      </nav>
+    </aside>
+  );
+}
+```
+
+The active-state logic for `/admin` exact-matches (so `/admin/orders` doesn't also light up Dashboard).
+
+- [ ] **Step 2: Create the topbar (server component)**
+
+Create `app/_components/admin/admin-topbar.tsx`:
+
+```tsx
+import Link from "next/link";
+import { logoutAction } from "@/app/(auth)/actions";
+
+export function AdminTopbar({ userName }: { userName: string }) {
+  return (
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-6">
+      <Link href="/admin" className="font-semibold tracking-tight">
+        Dressing Bear · Admin
+      </Link>
+      <div className="ml-auto flex items-center gap-4 text-sm">
+        <span className="text-muted-foreground">{userName}</span>
+        <Link
+          href="/"
+          target="_blank"
+          rel="noopener"
+          className="text-muted-foreground hover:text-foreground"
+        >
+          View store
+        </Link>
+        <form action={logoutAction}>
+          <button
+            type="submit"
+            className="rounded px-2 py-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+          >
+            Sign out
+          </button>
+        </form>
+      </div>
+    </header>
+  );
+}
+```
+
+The sign-out reuses the existing `logoutAction` from `app/(auth)/actions.ts` — same primitive used by the customer account sidebar.
+
+- [ ] **Step 3: Type-check**
+
+```
+npx tsc --noEmit
+```
+
+Expected: no errors.
+
+- [ ] **Step 4: Commit**
+
+```
+git add app/_components/admin
+git commit -m "feat(admin): add admin sidebar and topbar"
+```
+
+---
+
+## Task 8: Admin layout with role gate, plus dashboard page
+
+**Files:**
+- Create: `app/admin/layout.tsx`
+- Create: `app/admin/page.tsx`
+
+- [ ] **Step 1: Create the admin layout**
+
+Create `app/admin/layout.tsx`:
+
+```tsx
+import { notFound, redirect } from "next/navigation";
+import { auth } from "@/app/_lib/auth";
+import { AdminSidebar } from "@/app/_components/admin/admin-sidebar";
+import { AdminTopbar } from "@/app/_components/admin/admin-topbar";
+
+export default async function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const session = await auth();
+  if (!session?.user) redirect("/login?callbackUrl=/admin");
+  if (session.user.role !== "ADMIN") notFound();
+
+  const userName = session.user.name ?? session.user.email ?? "Admin";
+
+  return (
+    <div className="flex min-h-dvh flex-col">
+      <AdminTopbar userName={userName} />
+      <div className="flex flex-1">
+        <AdminSidebar />
+        <main className="flex-1 p-8">{children}</main>
+      </div>
+    </div>
+  );
+}
+```
+
+Notes:
+- No `SiteHeader` / `SiteFooter` — admin is a separate visual space.
+- The unauthenticated branch redirects (matches proxy behavior); the wrong-role branch calls `notFound()` so the namespace returns a real 404.
+
+- [ ] **Step 2: Create the dashboard page**
+
+Create `app/admin/page.tsx`:
+
+```tsx
+import { auth } from "@/app/_lib/auth";
+
+export const metadata = { title: "Admin · Dressing Bear" };
+
+export default async function AdminDashboardPage() {
+  const session = await auth();
+  const name = session?.user?.name ?? "there";
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Welcome, {name}
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Pick a section from the sidebar. Each one is a placeholder for now —
+          they'll be wired up in their own sub-projects.
+        </p>
+      </div>
+    </div>
+  );
+}
+```
+
+(`auth()` here is fine — Next will dedupe with the layout's call within the same request.)
+
+- [ ] **Step 3: Type-check**
+
+```
+npx tsc --noEmit
+```
+
+Expected: no errors.
+
+- [ ] **Step 4: Commit**
+
+```
+git add app/admin/layout.tsx app/admin/page.tsx
+git commit -m "feat(admin): add admin shell layout and dashboard stub"
+```
+
+---
+
+## Task 9: Admin sub-page stubs
+
+**Files:**
+- Create: `app/admin/categories/page.tsx`
+- Create: `app/admin/products/page.tsx`
+- Create: `app/admin/inventory/page.tsx`
+- Create: `app/admin/deals/page.tsx`
+- Create: `app/admin/hero/page.tsx`
+- Create: `app/admin/orders/page.tsx`
+
+- [ ] **Step 1: Create six identical-shape stubs**
+
+Each page is a single function component with a heading and a "coming soon" line. Keep them deliberately trivial — they exist so the sidebar links resolve and the IA is locked in. Future sub-projects replace these one at a time.
+
+`app/admin/categories/page.tsx`:
+
+```tsx
+export const metadata = { title: "Categories · Admin" };
+
+export default function AdminCategoriesPage() {
+  return (
+    <div className="space-y-2">
+      <h1 className="text-2xl font-semibold tracking-tight">Categories</h1>
+      <p className="text-sm text-muted-foreground">Coming soon.</p>
+    </div>
+  );
+}
+```
+
+`app/admin/products/page.tsx`:
+
+```tsx
+export const metadata = { title: "Products · Admin" };
+
+export default function AdminProductsPage() {
+  return (
+    <div className="space-y-2">
+      <h1 className="text-2xl font-semibold tracking-tight">Products</h1>
+      <p className="text-sm text-muted-foreground">Coming soon.</p>
+    </div>
+  );
+}
+```
+
+`app/admin/inventory/page.tsx`:
+
+```tsx
+export const metadata = { title: "Inventory · Admin" };
+
+export default function AdminInventoryPage() {
+  return (
+    <div className="space-y-2">
+      <h1 className="text-2xl font-semibold tracking-tight">Inventory</h1>
+      <p className="text-sm text-muted-foreground">Coming soon.</p>
+    </div>
+  );
+}
+```
+
+`app/admin/deals/page.tsx`:
+
+```tsx
+export const metadata = { title: "Deals · Admin" };
+
+export default function AdminDealsPage() {
+  return (
+    <div className="space-y-2">
+      <h1 className="text-2xl font-semibold tracking-tight">Deals</h1>
+      <p className="text-sm text-muted-foreground">Coming soon.</p>
+    </div>
+  );
+}
+```
+
+`app/admin/hero/page.tsx`:
+
+```tsx
+export const metadata = { title: "Hero panel · Admin" };
+
+export default function AdminHeroPage() {
+  return (
+    <div className="space-y-2">
+      <h1 className="text-2xl font-semibold tracking-tight">Hero panel</h1>
+      <p className="text-sm text-muted-foreground">Coming soon.</p>
+    </div>
+  );
+}
+```
+
+`app/admin/orders/page.tsx`:
+
+```tsx
+export const metadata = { title: "Orders · Admin" };
+
+export default function AdminOrdersPage() {
+  return (
+    <div className="space-y-2">
+      <h1 className="text-2xl font-semibold tracking-tight">Orders</h1>
+      <p className="text-sm text-muted-foreground">Coming soon.</p>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 2: Type-check**
+
+```
+npx tsc --noEmit
+```
+
+Expected: no errors.
+
+- [ ] **Step 3: Commit**
+
+```
+git add app/admin/categories app/admin/products app/admin/inventory app/admin/deals app/admin/hero app/admin/orders
+git commit -m "feat(admin): add placeholder pages for future admin sections"
+```
+
+---
+
+## Task 10: Admin-aware redirect after login
+
+**Files:**
+- Modify: `app/(auth)/actions.ts`
+
+- [ ] **Step 1: Update `loginAction` to redirect admins to /admin when no callbackUrl**
+
+In `app/(auth)/actions.ts`, replace the existing `loginAction` with:
+
+```ts
+export async function loginAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = LoginSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
+  if (!parsed.success) return { error: "Invalid email or password" };
+
+  const rawCallback = formData.get("callbackUrl") as string | null;
+
+  try {
+    await signIn("credentials", {
+      email: parsed.data.email,
+      password: parsed.data.password,
+      redirect: false,
+    });
+  } catch {
+    return { error: "Invalid email or password" };
+  }
+
+  if (rawCallback) {
+    redirect(safeCallbackUrl(rawCallback));
+  }
+
+  const u = await prisma.user.findUnique({
+    where: { email: parsed.data.email },
+    select: { role: true },
+  });
+  redirect(u?.role === "ADMIN" ? "/admin" : "/");
+}
+```
+
+The rest of `actions.ts` (signupAction, logoutAction, requestResetAction, resetPasswordAction, helpers) stays untouched.
+
+Note: `redirect()` throws — it never returns — so the lookup only runs when there's no callbackUrl. The Prisma read is cheap, runs once per login event, and is the simplest correct way to know the freshly-authenticated user's role since `signIn(..., { redirect: false })` doesn't synchronously expose a session inside the same server action.
+
+- [ ] **Step 2: Type-check**
+
+```
+npx tsc --noEmit
+```
+
+Expected: no errors.
+
+- [ ] **Step 3: Commit**
+
+```
+git add app/(auth)/actions.ts
+git commit -m "feat(auth): redirect admins to /admin after login when no callbackUrl"
+```
+
+---
+
+## Task 11: Smoke verification matrix
+
+This task runs the full smoke matrix from the spec, end-to-end. No code changes — only verification. The implementer must report results in the PR description.
+
+**Setup once before starting:**
+
+- [ ] **Step 1: Make sure the dev server is running**
+
+```
+npm run dev
+```
+
+Wait for `Ready in <ms>`. Leave this terminal open and run subsequent curl/browser steps from another shell.
+
+- [ ] **Step 2: Confirm or create a USER fixture**
+
+In a separate terminal, sign up at http://localhost:3000/signup with a non-admin test email (e.g. `user@test.local`) if you don't already have one. Note the password.
+
+- [ ] **Step 3: Confirm or create an ADMIN fixture**
+
+Sign up at /signup with an admin test email (e.g. `admin@test.local`), then promote:
+
+```
+ADMIN_EMAIL=admin@test.local npm run admin:promote
+```
+
+Expected: `Promoted: { id: '...', email: 'admin@test.local', role: 'ADMIN' }`
+
+- [ ] **Step 4: Run the matrix**
+
+Walk through each row in a browser (you need a real session cookie — curl can do rows 1–2 unauthenticated, but 3–11 are easier in a browser). Record observed result vs expected.
+
+| # | Scenario | Expected |
+|---|---|---|
+| 1 | Logged-out, visit /admin | 307/302 → /login?callbackUrl=%2Fadmin |
+| 2 | Logged-out, visit /admin/orders | 307/302 → /login?callbackUrl=%2Fadmin%2Forders |
+| 3 | Logged in as USER, visit /admin | 404 page (renders app/not-found.tsx), URL stays /admin |
+| 4 | Logged in as USER, visit /admin/orders | 404 page, URL stays /admin/orders |
+| 5 | Logged in as ADMIN, visit /admin | 200, dashboard shows "Welcome, …" + sidebar |
+| 6 | Logged in as ADMIN, visit /admin/orders | 200, "Orders" heading + "Coming soon." |
+| 7 | Logged-in user visits /account | unchanged from today (loads profile) |
+| 8 | Logged-in user visits /wishlist | unchanged from today |
+| 9 | Sign in as ADMIN at /login with no callbackUrl | lands on /admin |
+| 10 | Sign in as USER at /login with no callbackUrl | lands on / |
+| 11 | From admin topbar, click "Sign out" | redirected to /, session dropped |
+| 12 | `npm run admin:promote` for nonexistent email | exit code 1, "Sign up first" message |
+
+For row 1 and 2, you can use:
+
+```
+curl -s -o /dev/null -w "%{http_code} %{redirect_url}\n" http://localhost:3000/admin
+curl -s -o /dev/null -w "%{http_code} %{redirect_url}\n" http://localhost:3000/admin/orders
+```
+
+- [ ] **Step 5: Spot-check the sidebar links**
+
+While logged in as admin on /admin, click each sidebar item: Dashboard, Categories, Products, Inventory, Deals, Hero panel, Orders. Each should land on its respective `/admin/<section>` URL with a "Coming soon." stub. The active link in the sidebar should highlight.
+
+- [ ] **Step 6: Verify "View store" link**
+
+From the admin topbar, click "View store". Expected: opens / in a new tab.
+
+- [ ] **Step 7: Record results and ship**
+
+If any row fails, **stop and fix before merging.** Update this checklist with the actual observed behavior. Once all rows pass, no commit is needed for this task — push the branch and open a PR with the matrix results pasted into the PR body.
+
+---
+
+## Open questions
+
+None.
+
+## Out of scope (explicitly punted)
+
+- Categories/products/deals/hero/orders content — each is its own future sub-project.
+- Image upload primitive (cross-cutting infra decision for later).
+- Promoting/demoting users from the UI; users-list page.
+- Audit logs, MFA, IP allowlists.
+- Playwright tests — to be introduced alongside the first interactive admin sub-project.
