@@ -28,6 +28,12 @@
 #### Bonus a11y/correctness fix surfaced during refactor
 - [x] 4.8 `BuyBoxClient`: heart Button gets `type="button"` (was implicitly `submit` inside the dropped `<form>`) + `aria-pressed={wishlisted}` for SR state. Filled heart now uses `text-brand` to match the brand-color contract.
 
+#### Out-of-scope follow-ups surfaced
+- StockChip in `buy-box-client.tsx` still uses hardcoded `bg-red-100 text-red-800`, `bg-amber-100 text-amber-800`, `bg-emerald-100 text-emerald-800` (with `dark:` variants). Pre-existing — visual-refresh-boutique missed them. Token-ize in a follow-up.
+
+#### Critical fix surfaced by advisor checkpoint #2 (post-cache)
+- [x] 5.0a Removed cache-busting `revalidatePath(fromPath)` and `revalidatePath("/")` from `app/wishlist/actions.ts`. After Phase A, hearts hydrate client-side via `useWishlist()`, so home/PDP/categories/deals SSR no longer encodes per-user wishlist state. The pre-existing `revalidatePath("/")` would have nuked the home-page ISR cache on every wishlist toggle from any user — actively destructive once `/` became `○ Static`. Kept `revalidatePath("/wishlist")` since the listing page (still `ƒ Dynamic`) reads the user's wishlist directly.
+
 ## 5. Cache adds + Prisma wrapping + verification
 
 - [x] 5.1 Added `export const revalidate = N` to `app/page.tsx` (300), `app/categories/page.tsx` (3600), `app/categories/[slug]/page.tsx` (300), `app/products/[id]/page.tsx` (300), `app/deals/page.tsx` (120).
