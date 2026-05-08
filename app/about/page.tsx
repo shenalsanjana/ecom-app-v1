@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 
+export const dynamic = "force-static";
+
 export const metadata: Metadata = {
   title: "About - Dressing Bear",
   description: "Learn about Dressing Bear and our oversize t-shirt collection.",

@@ -4,12 +4,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Heart, Star, Loader2 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AddToCartButton } from "@/app/_components/cart/add-to-cart-button";
 import { SizeChartDialog } from "@/app/_components/product/size-chart-dialog";
-import { toggleWishlistAction } from "@/app/wishlist/actions";
 import { useCart } from "@/app/_lib/cart-context";
+import { useWishlist } from "@/app/_lib/wishlist-context";
 import { formatPrice } from "@/app/_lib/format";
 
 type Props = {
@@ -21,8 +22,6 @@ type Props = {
   ratingAvg: number;
   ratingCount: number;
   stock: number;
-  wishlisted: boolean;
-  isLoggedIn: boolean;
   sizes?: string;
 };
 
@@ -54,10 +53,14 @@ function StockChip({ stock }: { stock: number }) {
 
 export function BuyBoxClient({
   productId, name, price, originalPrice, image,
-  ratingAvg, ratingCount, stock, wishlisted, isLoggedIn, sizes,
+  ratingAvg, ratingCount, stock, sizes,
 }: Props) {
   const router = useRouter();
   const { addItem, items } = useCart();
+  const { has: isWishlisted, toggle: toggleWishlist } = useWishlist();
+  const { status: authStatus } = useSession();
+  const isLoggedIn = authStatus === "authenticated";
+  const wishlisted = isWishlisted(productId);
   const [quantity, setQuantity] = useState(1);
   const [isBuying, setIsBuying] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string>("");
@@ -235,19 +238,17 @@ export function BuyBoxClient({
             Buy Now
           </Button>
         )}
-        <form action={toggleWishlistAction}>
-          <input type="hidden" name="productId" value={productId} />
-          <input type="hidden" name="fromPath" value={fromPath} />
-          <Button
-            type="submit"
-            variant="outline"
-            className="w-full sm:w-auto"
-            aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
-          >
-            <Heart className={"mr-2 h-4 w-4 " + (wishlisted ? "fill-current" : "")} />
-            {wishlisted ? "Wishlisted" : "Wishlist"}
-          </Button>
-        </form>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full sm:w-auto"
+          aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
+          aria-pressed={wishlisted}
+          onClick={() => toggleWishlist(productId, fromPath)}
+        >
+          <Heart className={"mr-2 h-4 w-4 " + (wishlisted ? "fill-current text-brand" : "")} />
+          {wishlisted ? "Wishlisted" : "Wishlist"}
+        </Button>
       </div>
     </div>
   );

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 
+export const dynamic = "force-static";
+
 export const metadata: Metadata = {
   title: "Terms and Conditions - Dressing Bear",
   description: "Terms and conditions for using the Dressing Bear website and services.",

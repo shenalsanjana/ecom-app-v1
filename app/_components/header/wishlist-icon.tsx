@@ -1,19 +1,20 @@
 // app/_components/header/wishlist-icon.tsx
+"use client";
+
 import Link from "next/link";
 import { Heart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useWishlist } from "@/app/_lib/wishlist-context";
 
-type Props = { loggedIn: boolean; count: number };
-
-export function WishlistIcon({ loggedIn, count }: Props) {
-  const href = loggedIn ? "/wishlist" : "/login?callbackUrl=/wishlist";
-  const label = loggedIn ? "Wishlist" : "Sign in to view wishlist";
+export function WishlistIcon() {
+  const { ids } = useWishlist();
+  const count = ids.size;
   return (
-    <Link href={href} aria-label={label}>
-      <Button variant="ghost" size="icon-lg" className="relative" aria-label={label}>
+    <Link href="/wishlist" aria-label="Wishlist">
+      <Button variant="ghost" size="icon-lg" className="relative" aria-label="Wishlist">
         <Heart className="h-5 w-5" />
-        {loggedIn && count > 0 ? (
+        {count > 0 ? (
           <Badge
             variant="brand"
             className="absolute -right-1 -top-1 h-5 min-w-[1.25rem] rounded-full px-1 text-[10px]"

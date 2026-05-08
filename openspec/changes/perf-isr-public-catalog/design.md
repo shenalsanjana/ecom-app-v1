@@ -61,6 +61,17 @@ Without removing these, `revalidate` is a no-op; with them removed, `revalidate`
 **Alternatives:** `react.cache` (doesn't help across requests; rejected for v1), `'use cache'` directive (experimental; rejected).
 **Foot-gun documented:** `unstable_cache` callbacks MUST NOT call `auth()` / `cookies()` / `headers()`. Anyone wrapping a "personalized" reader (e.g., `getProductsForUser(userId)`) will get a runtime throw. The five wrappers in scope are pure DB reads; safe.
 
+### `searchParams` keeps PDP / categories / deals dynamic — accepted; data-cache wins remain
+
+Implementation surfaced a Next.js 15/16 behavior the original design didn't account for: accessing `await searchParams` inside a page render opts the route out of static rendering, regardless of an `export const revalidate = N` declaration. PDP (`?reviews=N`), `/categories` (`?sort=&page=`), `/categories/[slug]` (same), and `/deals` (same) all read `searchParams`, so they remain `ƒ Dynamic` in the build output despite the cache adds. Home (`/`) doesn't read `searchParams` and DOES flip to `○ Static` (with `Revalidate 2m`, clamped down from the page-level 5m by the inner `getDealsProducts` cache window — Next uses the tightest revalidate from the page's data fetches).
+
+**Decision:** accept the dynamic mark on those four routes. The page render function still runs per-request, BUT the underlying Prisma reads (`getProductDetail`, `getProductReviews`, `getReviewHistogram`, `getCategories`, `getDealsProducts`, `getFeaturedProducts`) are now wrapped in `unstable_cache` and hit the data cache within the configured revalidate windows. Net effect: PDP's warm TTFB still drops substantially (cache-hit Prisma calls are ~10ms vs cross-region ~300ms+), just not down to "edge cache" levels.
+
+**Alternatives considered:**
+- (a) Move `searchParams` access into a client component wrapped in `<Suspense>` so the static shell can prerender — this is essentially Partial Prerendering by hand; we explicitly excluded PPR for this change.
+- (b) Eliminate `searchParams` entirely by rebuilding sort/filter/pagination as client-only state — feature change, out of scope.
+- (c) Accept the dynamic mark + rely on `unstable_cache` data-layer dedup — picked. Lowest risk, partial-but-real win, and the remaining route-level caching can be unlocked in a follow-up that does the Suspense restructure.
+
 ### `revalidate` per-route values
 
 | Route | `revalidate` (s) | Reasoning |

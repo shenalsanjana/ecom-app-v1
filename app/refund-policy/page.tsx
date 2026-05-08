@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 
+export const dynamic = "force-static";
+
 export const metadata: Metadata = {
   title: "Refund Policy - Dressing Bear",
   description: "Our refund and return policy for Dressing Bear purchases.",

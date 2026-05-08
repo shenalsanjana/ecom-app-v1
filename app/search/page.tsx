@@ -223,7 +223,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                     rating={product.rating}
                     reviewCount={product.reviewCount}
                     sizes={product.sizes}
-                    wishlisted={false}
                     fromPath="/search"
                   />
                 ))}
