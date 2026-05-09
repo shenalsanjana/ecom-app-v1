@@ -1,7 +1,7 @@
 // app/(auth)/signup/page.tsx
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, use } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,10 +29,7 @@ function SignupInner({
   pending: boolean;
   searchParams: Promise<{ callbackUrl?: string }>;
 }) {
-  const [params, setParams] = useState<{ callbackUrl?: string }>({});
-  useEffect(() => {
-    searchParams.then(setParams);
-  }, [searchParams]);
+  const params = use(searchParams);
 
   return (
     <main className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center px-4 py-10">

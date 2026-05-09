@@ -4,7 +4,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Heart, Star, Loader2 } from "lucide-react";
-import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AddToCartButton } from "@/app/_components/cart/add-to-cart-button";
@@ -58,8 +57,6 @@ export function BuyBoxClient({
   const router = useRouter();
   const { addItem, items } = useCart();
   const { has: isWishlisted, toggle: toggleWishlist } = useWishlist();
-  const { status: authStatus } = useSession();
-  const isLoggedIn = authStatus === "authenticated";
   const wishlisted = isWishlisted(productId);
   const [quantity, setQuantity] = useState(1);
   const [isBuying, setIsBuying] = useState(false);
@@ -113,11 +110,6 @@ export function BuyBoxClient({
 
   function handleBuyNow() {
     if (sizeMissing) return;
-    if (!isLoggedIn) {
-      const callbackUrl = encodeURIComponent(`/products/${productId}`);
-      router.push(`/login?callbackUrl=${callbackUrl}`);
-      return;
-    }
 
     setIsBuying(true);
     addItem({ productId, name, price, image, size: selectedSize || null }, quantity);
