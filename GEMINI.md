@@ -25,5 +25,6 @@ This file defines the foundational architecture and workflows for the Dressing B
 ## 4. Documentation
 - **GEMINI.md:** This file. Foundational repo guidance.
 - **README.md:** Project overview and setup instructions.
+- **docs/commands/:** Quick reference for OpenSpec and Superpower workflows.
 - **openspec/changes/:** Active implementation plans currently in progress.
 - **openspec/archive/:** History of major implementations and brainstormed ideas.
