@@ -4,28 +4,28 @@ import type { NextAuthConfig } from "next-auth";
 export const authConfig = {
   trustHost: true,
   secret: process.env.AUTH_SECRET,
-  session: {
-    strategy: "jwt",
-    maxAge: 60 * 60 * 24 * 30
-  },
+  session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 30 },
   pages: { signIn: "/login" },
   providers: [],
   callbacks: {
     authorized({ auth, request }) {
-      const protectedPaths = ["/account", "/wishlist"];
-      const path = request.nextUrl.pathname;
-      const isProtected = protectedPaths.some(
-        (p) => path === p || path.startsWith(p + "/"),
+      const { pathname } = request.nextUrl;
+      const isProtected = ["/account", "/wishlist"].some(
+        (p) => pathname === p || pathname.startsWith(p + "/"),
       );
+
+      console.log(`[Auth Config]: Authorized check for ${pathname}, protected: ${isProtected}, hasAuth: ${!!auth}`);
+
       if (!isProtected) return true;
       if (auth) return true;
-      const url = new URL("/login", request.url);
-      url.searchParams.set("callbackUrl", path);
-      return Response.redirect(url);
+
+      // Returning false will redirect to the signIn page defined in 'pages'.
+      return false;
     },
     jwt({ token, user }) {
-      if (user && "id" in user && typeof user.id === "string") {
-        token.uid = user.id;
+      if (user && "id" in user) {
+        console.log(`[Auth Config]: JWT callback - user id ${user.id}`);
+        token.uid = user.id as string;
       }
       return token;
     },
@@ -37,3 +37,8 @@ export const authConfig = {
     },
   },
 } satisfies NextAuthConfig;
+
+console.log("[Auth Config]: Shared config loaded. Secret set:", !!process.env.AUTH_SECRET);
+if (process.env.AUTH_SECRET?.startsWith('"')) {
+  console.warn("[Auth Config]: WARNING: AUTH_SECRET starts with a quote. Check environment variables.");
+}
