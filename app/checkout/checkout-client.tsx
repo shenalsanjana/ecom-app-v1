@@ -7,7 +7,7 @@ import Link from "next/link";
 import { ArrowLeft, ShoppingBag, Truck, CreditCard, User, FileText } from "lucide-react";
 import { useCart } from "@/app/_lib/cart-context";
 import { processOrder } from "./actions";
-import { SiteFooter } from "@/app/_components/home/site-footer";
+import { ProfileMenu } from "@/app/_components/header/profile-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -82,6 +82,9 @@ export function CheckoutClient({ user }: Props) {
         <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur">
           <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
             <Link href="/" className="text-lg font-semibold tracking-tight">Dressing Bear</Link>
+            <div className="ml-auto">
+              <ProfileMenu />
+            </div>
           </div>
         </header>
         <main className="flex-1 flex items-center justify-center px-4 py-20">
@@ -102,7 +105,7 @@ export function CheckoutClient({ user }: Props) {
             </Button>
           </div>
         </main>
-        <SiteFooter />
+        
       </>
     );
   }
@@ -113,6 +116,9 @@ export function CheckoutClient({ user }: Props) {
         <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur">
           <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
             <Link href="/" className="text-lg font-semibold tracking-tight">Dressing Bear</Link>
+            <div className="ml-auto">
+              <ProfileMenu />
+            </div>
           </div>
         </header>
         <main className="flex-1 flex items-center justify-center px-4 py-20">
@@ -128,7 +134,7 @@ export function CheckoutClient({ user }: Props) {
             </Link>
           </div>
         </main>
-        <SiteFooter />
+        
       </>
     );
   }
@@ -186,6 +192,7 @@ export function CheckoutClient({ user }: Props) {
           <Link href="/" className="text-lg font-semibold tracking-tight ml-auto">
             Dressing Bear
           </Link>
+          <ProfileMenu />
         </div>
       </header>
 
@@ -470,7 +477,7 @@ export function CheckoutClient({ user }: Props) {
         </div>
       </main>
 
-      <SiteFooter />
+      
     </>
   );
 }
