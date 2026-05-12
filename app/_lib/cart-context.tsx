@@ -110,8 +110,26 @@ function isValidStoredItem(v: unknown): v is CartItem {
   );
 }
 
+const DEBUG_SEED_ITEMS: CartItem[] =
+  process.env.NEXT_PUBLIC_DEBUG_CART === "1"
+    ? [
+        {
+          key: "debug::M",
+          productId: "debug-product",
+          size: "M",
+          name: "Debug Tee",
+          price: 1990,
+          image: "/products/placeholder.svg",
+          quantity: 2,
+        },
+      ]
+    : [];
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(cartReducer, { items: [], isLoading: true });
+  const [state, dispatch] = useReducer(cartReducer, {
+    items: DEBUG_SEED_ITEMS,
+    isLoading: DEBUG_SEED_ITEMS.length === 0,
+  });
 
   useEffect(() => {
     try {
