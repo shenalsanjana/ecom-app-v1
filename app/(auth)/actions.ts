@@ -34,49 +34,33 @@ const NEUTRAL_SIGNUP_MESSAGE =
   "If this email isn't already registered, your account is ready. Sign in to continue.";
 
 export async function signupAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  console.log("[Signup Action]: Starting...");
   const parsed = SignupSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password"),
     confirmPassword: formData.get("confirmPassword"),
   });
-  if (!parsed.success) return { error: flatten(parsed.error) };
+  if (!parsed.success) {
+    console.warn("[Signup Action]: Validation failed", parsed.error.format());
+    return { error: flatten(parsed.error) };
+  }
 
+  console.log(`[Signup Action]: Checking for existing user: ${parsed.data.email}`);
   const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } });
   if (existing) {
-    // Do not create, do not sign in, do not reveal that this email is already
-    // registered. Same response shape as the genuinely-new-user success path.
+    console.log("[Signup Action]: User already exists, returning neutral message.");
     return { success: NEUTRAL_SIGNUP_MESSAGE };
   }
 
+  console.log(`[Signup Action]: Creating new user: ${parsed.data.email}`);
   const passwordHash = await bcrypt.hash(parsed.data.password, 10);
   await prisma.user.create({
     data: { name: parsed.data.name, email: parsed.data.email, passwordHash },
   });
 
-  try {
-    await signIn("credentials", {
-      email: parsed.data.email,
-      password: parsed.data.password,
-      redirectTo: safeCallbackUrl(formData.get("callbackUrl") as string | null),
-    });
-    return null;
-  } catch (error) {
-    if (error instanceof Error && (error as any).digest?.startsWith("NEXT_REDIRECT")) throw error;
-    // Do not create, do not sign in, do not reveal that this email is already
-    // registered. Same response shape as the genuinely-new-user success path.
-    return { success: NEUTRAL_SIGNUP_MESSAGE };
-  }
-}
-
-export async function loginAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const parsed = LoginSchema.safeParse({
-    email: formData.get("email"),
-    password: formData.get("password"),
-  });
-  if (!parsed.success) return { error: "Invalid email or password" };
-
   const callbackUrl = safeCallbackUrl(formData.get("callbackUrl") as string | null);
+  console.log(`[Signup Action]: User created, calling signIn with callbackUrl: ${callbackUrl}`);
 
   try {
     await signIn("credentials", {
@@ -84,9 +68,46 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
       password: parsed.data.password,
       redirectTo: callbackUrl,
     });
+    console.log("[Signup Action]: signIn call finished (redirect expected)");
     return null;
   } catch (error) {
-    if (error instanceof Error && (error as any).digest?.startsWith("NEXT_REDIRECT")) throw error;
+    if (error instanceof Error && (error as any).digest?.startsWith("NEXT_REDIRECT")) {
+      console.log("[Signup Action]: Caught expected redirect error");
+      throw error;
+    }
+    console.error("[Signup Action]: Unexpected error during signIn", error);
+    return { success: NEUTRAL_SIGNUP_MESSAGE };
+  }
+}
+
+export async function loginAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  console.log("[Login Action]: Starting...");
+  const parsed = LoginSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
+  if (!parsed.success) {
+    console.warn("[Login Action]: Validation failed");
+    return { error: "Invalid email or password" };
+  }
+
+  const callbackUrl = safeCallbackUrl(formData.get("callbackUrl") as string | null);
+  console.log(`[Login Action]: Attempting signIn for ${parsed.data.email} with callbackUrl: ${callbackUrl}`);
+
+  try {
+    await signIn("credentials", {
+      email: parsed.data.email,
+      password: parsed.data.password,
+      redirectTo: callbackUrl,
+    });
+    console.log("[Login Action]: signIn call finished (redirect expected)");
+    return null;
+  } catch (error) {
+    if (error instanceof Error && (error as any).digest?.startsWith("NEXT_REDIRECT")) {
+      console.log("[Login Action]: Caught expected redirect error");
+      throw error;
+    }
+    console.error("[Login Action]: Unexpected error during signIn", error);
     return { error: "Invalid email or password" };
   }
 }
