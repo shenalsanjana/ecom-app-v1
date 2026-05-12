@@ -2,15 +2,16 @@
 
 This file defines the foundational architecture and workflows for the Dressing Bear project.
 
-## 1. Specification Workflow
-- **Spec First:** All new features or major architectural changes must have a specification written before implementation.
-- **Location:** Specs are stored in `docs/spec/` as `.md` files.
-- **Content:** Specs should define the goal, user impact, technical approach, and a checklist of requirements.
+## 1. Lifecycle: Spec -> Plan -> Implement
+- **Phase 1: Brainstorming & Specification:** When a new feature, bug, or change is conceived, write a specification in `docs/spec/<change-name>.md`. This defines "what" we are building and "why".
+- **Phase 2: Implementation Planning:** Once the spec is ready, use the `openspec` process to create a detailed implementation plan. Create a folder in `openspec/changes/<change-name>/` containing a `plan.md` (the "how").
+- **Phase 3: Execution:** Implement the plan on a feature branch from `develop`.
+- **Phase 4: Archiving:** Once merged, move the implementation details to `openspec/archive/` and remove the active plan folder from `openspec/changes/`.
 
 ## 2. Development Workflow
 - **Branching:** Work exclusively from the `develop` branch. Never commit directly to `main`.
 - **Commit Process:** Follow the rules in `openspec/COMMIT_PROCESS.md`.
-- **Archiving:** After a significant set of changes is completed and merged, document the implementation in `openspec/archive/`.
+- **Validation:** Every change must be verified with `npm run build` before merge.
 
 ## 3. Architecture Guidelines
 - **Framework:** Next.js 16 (App Router).
@@ -24,4 +25,5 @@ This file defines the foundational architecture and workflows for the Dressing B
 ## 4. Documentation
 - **GEMINI.md:** This file. Foundational repo guidance.
 - **README.md:** Project overview and setup instructions.
+- **openspec/changes/:** Active implementation plans currently in progress.
 - **openspec/archive/:** History of major implementations and brainstormed ideas.
