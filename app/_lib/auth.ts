@@ -6,9 +6,15 @@ import { prisma } from "@/app/_lib/prisma";
 import { LoginSchema } from "@/app/_lib/validation";
 import { authConfig } from "@/app/_lib/auth.config";
 
+const authSecret = process.env.AUTH_SECRET;
+if (!authSecret && process.env.NODE_ENV === "production") {
+  console.warn("AUTH_SECRET is not set in production. Login will fail.");
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
-  secret: process.env.AUTH_SECRET,
+  secret: authSecret,
+  trustHost: true,
   debug: process.env.NODE_ENV === "development",
   providers: [
     Credentials({
