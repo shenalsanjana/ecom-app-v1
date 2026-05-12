@@ -7,7 +7,6 @@ import Link from "next/link";
 import { ArrowLeft, ShoppingBag, Truck, CreditCard, User, FileText } from "lucide-react";
 import { useCart } from "@/app/_lib/cart-context";
 import { processOrder } from "./actions";
-import { SiteFooter } from "@/app/_components/home/site-footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -102,7 +101,7 @@ export function CheckoutClient({ user }: Props) {
             </Button>
           </div>
         </main>
-        <SiteFooter />
+        
       </>
     );
   }
@@ -128,7 +127,7 @@ export function CheckoutClient({ user }: Props) {
             </Link>
           </div>
         </main>
-        <SiteFooter />
+        
       </>
     );
   }
@@ -470,7 +469,7 @@ export function CheckoutClient({ user }: Props) {
         </div>
       </main>
 
-      <SiteFooter />
+      
     </>
   );
 }

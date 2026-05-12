@@ -1,6 +1,7 @@
 // app/checkout/page.tsx
 import { auth } from "@/app/_lib/auth";
 import { CheckoutClient } from "./checkout-client";
+import { SiteFooter } from "@/app/_components/home/site-footer";
 
 export default async function CheckoutPage() {
   const session = await auth();
@@ -10,5 +11,11 @@ export default async function CheckoutPage() {
         email: session.user.email ?? "",
       }
     : null;
-  return <CheckoutClient user={user} />;
+
+  return (
+    <>
+      <CheckoutClient user={user} />
+      <SiteFooter />
+    </>
+  );
 }
