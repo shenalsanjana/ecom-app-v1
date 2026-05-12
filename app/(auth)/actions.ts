@@ -54,13 +54,19 @@ export async function signupAction(_prev: ActionState, formData: FormData): Prom
     data: { name: parsed.data.name, email: parsed.data.email, passwordHash },
   });
 
-  await signIn("credentials", {
-    email: parsed.data.email,
-    password: parsed.data.password,
-    redirect: false,
-  });
-
-  redirect(safeCallbackUrl(formData.get("callbackUrl") as string | null));
+  try {
+    await signIn("credentials", {
+      email: parsed.data.email,
+      password: parsed.data.password,
+      redirectTo: safeCallbackUrl(formData.get("callbackUrl") as string | null),
+    });
+    return null;
+  } catch (error) {
+    if (error instanceof Error && (error as any).digest?.startsWith("NEXT_REDIRECT")) throw error;
+    // Do not create, do not sign in, do not reveal that this email is already
+    // registered. Same response shape as the genuinely-new-user success path.
+    return { success: NEUTRAL_SIGNUP_MESSAGE };
+  }
 }
 
 export async function loginAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -76,12 +82,13 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
     await signIn("credentials", {
       email: parsed.data.email,
       password: parsed.data.password,
-      redirect: false,
+      redirectTo: callbackUrl,
     });
-  } catch {
+    return null;
+  } catch (error) {
+    if (error instanceof Error && (error as any).digest?.startsWith("NEXT_REDIRECT")) throw error;
     return { error: "Invalid email or password" };
   }
-  redirect(callbackUrl);
 }
 
 export async function logoutAction(): Promise<void> {
