@@ -3,7 +3,6 @@ import {
   createCurfoxOrder,
   fetchCurfoxWaybillPdf,
   listCurfoxCities,
-  CurfoxError,
   __test_only_resetTokenCache,
 } from "../curfox-client";
 import type { CurfoxCreateOrderInput } from "../curfox-types";
