@@ -1,5 +1,11 @@
 // app/_lib/courier/curfox-client.ts
-import { CurfoxLoginResponseSchema } from "./curfox-types";
+import {
+  CurfoxLoginResponseSchema,
+  CurfoxCreateOrderInputSchema,
+  CurfoxOrderResponseSchema,
+  CurfoxCityListResponseSchema,
+} from "./curfox-types";
+import type { CurfoxCreateOrderInput, CurfoxCreatedOrder, CurfoxCity } from "./curfox-types";
 
 export class CurfoxError extends Error {
   readonly step: "login" | "create-order" | "fetch-pdf" | "list-cities";
@@ -120,3 +126,143 @@ export const __test_only_authedFetch = authedFetch;
 
 // Internal exports used by sibling functions in later tasks
 export { getToken as _getToken, authedFetch as _authedFetch, baseUrl as _baseUrl };
+
+function orderCreatePath(): string {
+  return process.env.CURFOX_ORDER_CREATE_PATH ?? "/api/merchant/order";
+}
+function waybillPdfPathTemplate(): string {
+  return process.env.CURFOX_WAYBILL_PDF_PATH_TEMPLATE ?? "/api/merchant/order/{id}/waybill";
+}
+function citiesPath(): string {
+  return process.env.CURFOX_CITIES_PATH ?? "/api/merchant/city";
+}
+
+function redactPhone(phone: string): string {
+  if (phone.length <= 4) return "****";
+  return phone.slice(0, -4) + "****";
+}
+
+export async function createCurfoxOrder(input: CurfoxCreateOrderInput): Promise<CurfoxCreatedOrder> {
+  const payload = CurfoxCreateOrderInputSchema.parse(input);
+  const url = `${baseUrl()}${orderCreatePath()}`;
+  let res: Response;
+  try {
+    res = await authedFetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    throw new CurfoxError(
+      `Curfox create-order network error: ${err instanceof Error ? err.message : String(err)}`,
+      "create-order",
+    );
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error("[curfox] create-order failed", {
+      status: res.status,
+      body,
+      payload: { ...payload, customer_phone: redactPhone(payload.customer_phone) },
+    });
+    throw new CurfoxError(
+      `Curfox create-order failed: HTTP ${res.status}`,
+      "create-order",
+      res.status,
+      body,
+    );
+  }
+  const json = await res.json();
+  const parsed = CurfoxOrderResponseSchema.parse(json);
+  return parsed.data;
+}
+
+export async function fetchCurfoxWaybillPdf(
+  orderId: number,
+  waybillNumber: string,
+): Promise<Buffer> {
+  const template = waybillPdfPathTemplate();
+  const path = template
+    .replace("{id}", String(orderId))
+    .replace("{waybill_number}", waybillNumber);
+  const url = `${baseUrl()}${path}`;
+
+  let res: Response;
+  try {
+    res = await authedFetch(url, { method: "GET" });
+  } catch (err) {
+    throw new CurfoxError(
+      `Curfox waybill PDF network error: ${err instanceof Error ? err.message : String(err)}`,
+      "fetch-pdf",
+    );
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new CurfoxError(
+      `Curfox waybill PDF failed: HTTP ${res.status}`,
+      "fetch-pdf",
+      res.status,
+      body,
+    );
+  }
+
+  const ct = res.headers.get("content-type") ?? "";
+  if (ct.includes("application/pdf")) {
+    const ab = await res.arrayBuffer();
+    return Buffer.from(ab);
+  }
+  if (ct.includes("application/json")) {
+    const j = await res.json();
+    const downloadUrl =
+      (j as { url?: string }).url ??
+      (j as { data?: { url?: string } }).data?.url ??
+      (j as { pdf_url?: string }).pdf_url;
+    if (!downloadUrl) {
+      throw new CurfoxError(
+        "Waybill PDF: no url in JSON response",
+        "fetch-pdf",
+        res.status,
+      );
+    }
+    const pdfRes = await fetch(downloadUrl);
+    if (!pdfRes.ok) {
+      throw new CurfoxError(
+        `Waybill PDF download failed: HTTP ${pdfRes.status}`,
+        "fetch-pdf",
+        pdfRes.status,
+      );
+    }
+    const ab = await pdfRes.arrayBuffer();
+    return Buffer.from(ab);
+  }
+  throw new CurfoxError(
+    `Waybill PDF: unexpected content-type ${ct}`,
+    "fetch-pdf",
+    res.status,
+  );
+}
+
+export async function listCurfoxCities(): Promise<CurfoxCity[]> {
+  const url = `${baseUrl()}${citiesPath()}`;
+  let res: Response;
+  try {
+    res = await authedFetch(url, { method: "GET" });
+  } catch (err) {
+    throw new CurfoxError(
+      `Curfox list-cities network error: ${err instanceof Error ? err.message : String(err)}`,
+      "list-cities",
+    );
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new CurfoxError(
+      `Curfox list-cities failed: HTTP ${res.status}`,
+      "list-cities",
+      res.status,
+      body,
+    );
+  }
+  const json = await res.json();
+  const parsed = CurfoxCityListResponseSchema.parse(json);
+  return parsed.data;
+}
