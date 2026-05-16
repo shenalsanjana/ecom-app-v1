@@ -246,14 +246,20 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
     // here on payment success.
   }
 
-  // Reload waybill if COD booking persisted it
+  // Reload waybill if COD booking persisted it. Failure here must NOT surface
+  // to the customer — the order is already saved and the customer-facing
+  // success path runs regardless of whether we know the tracking code yet.
   let trackingCode: string | undefined;
   if (paymentMethod === "COD") {
-    const updated = await prisma.order.findUnique({
-      where: { id: orderId },
-      select: { courierWaybillNumber: true },
-    });
-    trackingCode = updated?.courierWaybillNumber ?? undefined;
+    try {
+      const updated = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: { courierWaybillNumber: true },
+      });
+      trackingCode = updated?.courierWaybillNumber ?? undefined;
+    } catch (err) {
+      console.error("[checkout] trackingCode lookup failed (suppressed):", err);
+    }
   }
 
   // Send confirmation email to both customer and brand.
