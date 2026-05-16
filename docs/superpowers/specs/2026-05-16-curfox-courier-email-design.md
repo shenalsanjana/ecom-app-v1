@@ -556,6 +556,86 @@ npm run build  # MUST pass before merge (per CLAUDE.md §2)
 - [ ] Staging validation checklist (§11.4) completed; results pasted here as "Validation log: <date>"
 - [ ] PR description references this spec doc
 
+## Validation log: 2026-05-16
+
+Live probe of `https://v1.api.curfox.com` (login) and `https://v2-operations.api.curfox.com` (operations) with the real `ROYAL_EXPRESS_*` credentials. **Surfaced a major wire-format mismatch — the implementation as designed will not successfully book orders. Code changes required before production rollout.**
+
+### ✅ Confirmed working
+
+- **Login flow** — `POST https://v1.api.curfox.com/api/public/merchant/login` with `X-Tenant: royalexpress` header and `{email, password}` body returns a Sanctum-style token (`{token: "..."}` ~984 chars). Implementation matches.
+- **Token reuse against v2** — Bearer token from v1 login authenticates against `v2-operations.api.curfox.com` operations endpoints.
+- **AUTH_SECRET-guarded admin route** — `POST /api/admin/curfox/refresh-cities` correctly returns 401 without bearer, 200 with the right bearer, 500 if the downstream Curfox call fails. Auth layer is sound.
+
+### ❌ Findings that block production rollout
+
+1. **Wrong create-order endpoint path.** Defaults to `/api/merchant/order` (which is the GET list endpoint). The real create endpoint is `POST /api/merchant/order/single` (and `/bulk` for batches). Setting `CURFOX_ORDER_CREATE_PATH=/api/merchant/order/single` is the env-only fix — no code change needed.
+
+2. **Payload structure is wrong (significant code change required).** Our `CurfoxCreateOrderInputSchema` is flat; Curfox expects a two-key envelope with an array of orders:
+
+    ```json
+    {
+      "general_data": {
+        "merchant_business_id": 7290,
+        "origin_city_id": 1500,
+        "origin_warehouse_id": 78
+      },
+      "order_data": [
+        {
+          "destination_city_id": 419,
+          "customer_name": "...",
+          "customer_address": "...",
+          "customer_phone": "...",
+          "weight": 1,
+          "cod": 0,
+          "description": "...",
+          "order_no": "..."
+        }
+      ]
+    }
+    ```
+
+    Required new env: `CURFOX_MERCHANT_BUSINESS_ID=7290` for Dressing Bear. `merchant_business_id` is a separate ID from `merchant_id` (7200) — it lives on the `MerchantBusiness` entity surfaced at `/api/merchant/business`.
+
+3. **Successful response is a flat array of waybill strings.** `{"message": "Orders Created Successfully", "data": ["RA03872055"]}`. Our `CurfoxOrderResponseSchema` expects `{data: {id, waybill_number, ...}}` — it will fail Zod-parsing every real response. We don't get the numeric `id` back from create (only the waybill string), which breaks the `{id}` substitution in `CURFOX_WAYBILL_PDF_PATH_TEMPLATE`.
+
+4. **No cities endpoint exists at any standard path.** Probed: `/api/merchant/city`, `/api/merchant/cities`, `/api/cities`, `/api/v1/cities`, `/api/operations/cities`, `/api/merchant/city-list`, `/api/merchant/destination-cities`, plus 10 more variants on both v1 and v2 hosts. All 404. Curfox does NOT publish a city directory through this API surface. **The `/api/admin/curfox/refresh-cities` admin route cannot work as designed.**
+
+    However, the API accepts `destination_city_name` as an alternative to `destination_city_id`. Names that validated (so are in Curfox's dataset): `Kotte`, `Ettampitiya`, `Kandy`, `Galle`, `Colombo 01`, `Colombo 03`. Names that did NOT validate: `Colombo` (must be a numbered zone), `Western`/`Western Province`/etc. (so `destination_state_name` is also required but its valid value set is unknown — every state name tried returned "invalid").
+
+5. **PDF retrieval untested but the path template uses `{id}` which we never receive.** `CURFOX_WAYBILL_PDF_PATH_TEMPLATE=/api/merchant/order/{id}/waybill` needs to be reworked to use `{waybill_number}` only, and the path itself is unverified (likely `/api/merchant/order/print/{waybill_number}` or similar — needs probing in a future smoke pass).
+
+### ⚠ Real test order created in Curfox during probing
+
+**Waybill `RA03872055`** was created against the live Royal Express system during the wire-format discovery (the only payload combination that returned `200`). It needs to be cancelled manually in the merchant portal before any pickup attempt:
+
+- Portal: `https://royalexpress.merchant.curfox.com/`
+- Order data: customer name `Probe`, address `a`, phone `0777000000`, cod `0`, description `X`
+- Order no: `P-A-<timestamp>` (visible by sorting orders by created_at desc)
+- API cancellation was attempted at `/api/merchant/order/{id}/cancel`, `/cancel/{id}`, `/cancel-order`, `DELETE /api/merchant/order/{id}`, and a `/status` endpoint — all returned 404 or "Cannot Delete this Order". **Manual cancellation in the portal UI is required.**
+
+### Recommended next steps (separate change set)
+
+1. **Add `CURFOX_MERCHANT_BUSINESS_ID` env var.** Set to `7290` for Dressing Bear.
+2. **Rewrite `CurfoxCreateOrderInputSchema`** to be `{general_data: GeneralDataSchema, order_data: OrderItemSchema[]}` and update `bookCourierAndNotify` to build the nested payload.
+3. **Rewrite `CurfoxOrderResponseSchema`** to `{message: string, data: string[]}` (waybill array). The first element is the waybill for our single order.
+4. **Drop the city dropdown / `CurfoxCity` DB table / refresh-cities admin route**, OR keep them as a future enhancement. The simpler interim path: send `destination_city_name` (free text from checkout) and let Curfox reject names it doesn't know via a 422 — our existing failure-cascade already emails admin with the full response body, which makes "bad city" issues self-documenting.
+5. **Discover valid `destination_state_name` values** — open Curfox merchant portal, place a test order in the UI, capture the `destination_state_name` value sent via the Network tab. Or contact Curfox support.
+6. **Probe the real PDF endpoint** under v2-operations using the waybill_number — `/api/merchant/order/print/{waybill}` and `/api/merchant/order/waybill/{waybill}` are likely candidates. Confirm the response content-type.
+7. **Re-flip `ROYAL_EXPRESS_ENABLED=false`** until the above are fixed, so real customer checkouts don't book orders that subsequently fail the wrong-payload path.
+
+### What still passes from the original 6.4 checklist
+
+| # | Check | Result |
+|---|---|---|
+| 1 | City seeding via admin route | ❌ Curfox has no cities endpoint at probed paths. Refresh returned `Curfox list-cities failed: HTTP 404`. Auth + handler shape verified working. |
+| 2 | COD happy path | Not attempted via UI — wire-format mismatch would have failed at create-order. |
+| 3 | COD unknown city | Not attempted. |
+| 4 | Prepaid path | Not attempted. |
+| 5 | Simulated Curfox outage | Not attempted (was about to do this last). |
+| 6 | SMTP outage | Not attempted. |
+
+The end-to-end checkout flows (items 2–6) require the wire-format fixes from "Recommended next steps" above before they can produce meaningful results.
+
 ## 14. Out of scope
 
 - Curfox webhook ingestion (order-status updates back to our DB)

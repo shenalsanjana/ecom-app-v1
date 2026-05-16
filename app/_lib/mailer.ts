@@ -12,8 +12,15 @@ function escapeHtml(s: string): string {
 }
 
 let cached: nodemailer.Transporter | null = null;
+let testTransport: nodemailer.Transporter | null = null;
+
+export function __setTestTransport(t: nodemailer.Transporter | null): void {
+  testTransport = t;
+  cached = null;
+}
 
 function getTransport(): nodemailer.Transporter {
+  if (testTransport) return testTransport;
   if (cached) return cached;
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
@@ -303,5 +310,187 @@ Submitted from ${BRAND_NAME} website
     subject: `New Contact: ${name || "Anonymous"} - ${email}`,
     text,
     html,
+  });
+}
+
+// ── Dispatch / admin emails ─────────────────────────────────────────────
+
+function formatItemsList(items: OrderItem[]): string {
+  return items
+    .map((it) => `  • ${it.name}${it.size ? ` (${it.size})` : ""} × ${it.quantity}`)
+    .join("\n");
+}
+
+function formatAddress(addr: OrderDetails["shippingAddress"]): string {
+  const lines = [
+    addr.line1,
+    addr.line2,
+    `${addr.city}, ${addr.region} ${addr.postalCode}`,
+    addr.country,
+  ].filter(Boolean);
+  return lines.join("\n  ");
+}
+
+export async function sendDispatchNotificationEmail(params: {
+  order: OrderDetails;
+  waybillNumber: string;
+  pdfBuffer?: Buffer;
+}): Promise<void> {
+  const { order, waybillNumber, pdfBuffer } = params;
+  const transport = getTransport();
+  const brandEmail = requireBrandEmail();
+  const from = requireFrom();
+
+  const pdfNote = pdfBuffer
+    ? "The printable airwaybill is attached as delivery-note.pdf."
+    : "⚠ The PDF could not be fetched from Curfox — download it from the merchant portal at https://royalexpress.merchant.curfox.com/";
+
+  const text = `A new COD order has been booked with Royal Express via Curfox.
+${pdfNote}
+
+ORDER:        ${order.orderId}
+WAYBILL:      ${waybillNumber}
+CUSTOMER:     ${order.customerName}
+PHONE:        ${order.customerPhone ?? "n/a"}
+COD AMOUNT:   LKR ${order.total.toFixed(2)}
+DESTINATION:  ${order.shippingAddress.city}
+
+ITEMS:
+${formatItemsList(order.items)}
+
+ADDRESS:
+  ${formatAddress(order.shippingAddress)}
+
+Print ${pdfBuffer ? "the attached delivery-note.pdf" : "the waybill from the Curfox portal"} and hand the parcel + label to the Royal Express pickup rider.
+
+─────────────
+Dressing Bear · automated dispatch
+`.trim();
+
+  await transport.sendMail({
+    from,
+    to: brandEmail,
+    replyTo: brandReplyTo(),
+    subject: `[Dispatch] Order ${order.orderId} — Waybill ${waybillNumber}`,
+    text,
+    attachments: pdfBuffer
+      ? [{ filename: "delivery-note.pdf", content: pdfBuffer }]
+      : undefined,
+  });
+}
+
+export async function sendPendingPrepaidNotificationEmail(params: {
+  order: OrderDetails;
+}): Promise<void> {
+  const { order } = params;
+  const transport = getTransport();
+  const brandEmail = requireBrandEmail();
+  const from = requireFrom();
+  const gateway = order.paymentMethodDisplay ?? order.paymentMethod;
+
+  const text = `A new prepaid order has been placed. Courier booking is
+DEFERRED until the payment gateway confirms the transaction.
+Do NOT ship this order yet.
+
+ORDER:        ${order.orderId}
+CUSTOMER:     ${order.customerName}
+PAYMENT:      ${gateway} (pending)
+TOTAL:        LKR ${order.total.toFixed(2)}
+
+ITEMS:
+${formatItemsList(order.items)}
+
+ADDRESS:
+  ${formatAddress(order.shippingAddress)}
+
+When the gateway confirms (or you confirm manually in the dashboard),
+the courier booking will need to be triggered.
+
+─────────────
+Dressing Bear · automated dispatch
+`.trim();
+
+  await transport.sendMail({
+    from,
+    to: brandEmail,
+    replyTo: brandReplyTo(),
+    subject: `[PENDING PAYMENT] Order ${order.orderId} — LKR ${order.total.toFixed(2)} via ${gateway}`,
+    text,
+  });
+}
+
+const NEXT_ACTION_BY_STEP: Record<
+  "city-lookup" | "curfox-login" | "curfox-create" | "curfox-persist" | "curfox-pdf",
+  (orderId: string, ctx: { city?: string; waybillNumber?: string }) => string
+> = {
+  "city-lookup": (_o, c) =>
+    `The city "${c.city ?? "<unknown>"}" is not in our Curfox city map. Either add it via the admin city-refresh route, or book this order manually in the Curfox portal.`,
+  "curfox-login": () =>
+    `Curfox login is failing. Verify ROYAL_EXPRESS_USER / ROYAL_EXPRESS_PASS in production env. Until fixed, all COD orders will need manual booking.`,
+  "curfox-create": () =>
+    `Curfox rejected the order payload. Review the response body above — likely an address-format or city-id mismatch. Book manually at https://royalexpress.merchant.curfox.com/`,
+  "curfox-persist": (_o, c) =>
+    `⚠ URGENT — Order was booked at Curfox (waybill ${c.waybillNumber ?? "<unknown>"}) but the local DB write failed. The order will not appear as "booked" in our system. Reconcile manually.`,
+  "curfox-pdf": (_o, c) =>
+    `The order was booked at Curfox (waybill ${c.waybillNumber ?? "<unknown>"}) but we could not fetch the printable PDF. Download it from https://royalexpress.merchant.curfox.com/`,
+};
+
+export async function sendAdminFailureAlertEmail(params: {
+  orderId: string;
+  step: "city-lookup" | "curfox-login" | "curfox-create" | "curfox-persist" | "curfox-pdf";
+  reason: string;
+  errorDetail?: string;
+  order: OrderDetails;
+  context?: { city?: string; waybillNumber?: string };
+}): Promise<void> {
+  const { orderId, step, reason, errorDetail, order, context } = params;
+  const transport = getTransport();
+  const brandEmail = requireBrandEmail();
+  const from = requireFrom();
+
+  const urgentPrefix = step === "curfox-persist" ? "[URGENT] " : "";
+  const nextAction = NEXT_ACTION_BY_STEP[step](orderId, context ?? {});
+
+  const text = `A Dressing Bear order saved successfully but the downstream
+courier/dispatch step failed. The customer was NOT shown an
+error. Manual action may be required.
+
+ORDER DETAILS
+─────────────
+Order ID:      ${orderId}
+Placed:        ${new Date().toISOString()}
+Customer:      ${order.customerName}
+Email:         ${order.customerEmail}
+Phone:         ${order.customerPhone ?? "n/a"}
+Payment:       ${order.paymentMethodDisplay ?? order.paymentMethod}
+Total:         LKR ${order.total.toFixed(2)}
+
+ITEMS:
+${formatItemsList(order.items)}
+
+SHIPPING ADDRESS
+────────────────
+  ${formatAddress(order.shippingAddress)}
+
+FAILURE
+───────
+Step:          ${step}
+Reason:        ${reason}
+Server time:   ${new Date().toISOString()}
+
+${errorDetail ? `DETAIL\n──────\n    ${errorDetail.split("\n").join("\n    ")}\n\n` : ""}NEXT ACTION
+───────────
+${nextAction}
+
+─────────────
+Dressing Bear · automated alert
+`.trim();
+
+  await transport.sendMail({
+    from,
+    to: brandEmail,
+    replyTo: brandReplyTo(),
+    subject: `${urgentPrefix}[Dressing Bear] Order ${orderId} — Curfox ${step} failed`,
+    text,
   });
 }
