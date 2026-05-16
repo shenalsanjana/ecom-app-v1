@@ -14,9 +14,6 @@ export type CheckoutResult =
   | { success: true; orderId: string; trackingCode?: string; isGuest?: boolean }
   | { success: false; error: string };
 
-const ROYAL_EXPRESS_API =
-  process.env.ROYAL_EXPRESS_API ?? "https://royalexpress.merchant.curfox.com/add-new-order";
-
 const PAYMENT_METHOD_DISPLAY: Record<PaymentMethod, string> = {
   COD: "Cash on Delivery",
   PAYHERE: "PayHere",
@@ -194,64 +191,9 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
     return { success: false, error: message };
   }
 
-  // Submit to RoyalExpress (best-effort — failures here don't roll back the order).
-  // Disabled by default until ROYAL_EXPRESS_API is configured to a working
-  // endpoint and ROYAL_EXPRESS_ENABLED is explicitly set to "true".
-  let trackingCode: string | undefined;
+  // ── Branch on payment method (Option B2) ────────────────────────────
   const royalEnabled = process.env.ROYAL_EXPRESS_ENABLED === "true";
-  const royalUser = process.env.ROYAL_EXPRESS_USER;
-  const royalPass = process.env.ROYAL_EXPRESS_PASS;
-  if (royalEnabled && royalUser && royalPass) {
-    try {
-      const royalResponse = await fetch(ROYAL_EXPRESS_API, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Basic ${Buffer.from(`${royalUser}:${royalPass}`).toString("base64")}`,
-        },
-        body: JSON.stringify({
-          order_id: orderId,
-          customer_name: customerName,
-          customer_phone: contactPhone,
-          customer_email: customerEmail,
-          delivery_address: shippingAddress.line2
-            ? `${shippingAddress.line1}, ${shippingAddress.line2}`
-            : shippingAddress.line1,
-          city: shippingAddress.city,
-          province: shippingAddress.region,
-          postal_code: shippingAddress.postalCode,
-          country: shippingAddress.country,
-          items: items.map((item) => ({ name: item.name, qty: item.quantity, price: item.price })),
-          total_amount: total,
-          payment_method: PAYMENT_METHOD_DISPLAY[paymentMethod],
-          cod_amount: paymentMethod === "COD" ? total : 0,
-        }),
-      });
 
-      if (royalResponse.ok) {
-        const royalData = await royalResponse.json();
-        trackingCode = royalData.tracking_code || royalData.id || royalData.order_id;
-        await prisma.order.update({
-          where: { id: orderId },
-          data: { royalExpressSubmitted: true, trackingCode: trackingCode ?? null },
-        });
-      } else {
-        console.error(
-          "RoyalExpress API error:",
-          royalResponse.status,
-          await royalResponse.text(),
-        );
-      }
-    } catch (error) {
-      console.error("RoyalExpress submission failed:", error);
-    }
-  } else if (!royalEnabled) {
-    // Intentionally silent — disabled via env flag until endpoint is verified.
-  } else {
-    console.warn("ROYAL_EXPRESS_USER / ROYAL_EXPRESS_PASS not set; skipping RoyalExpress submission");
-  }
-
-  // Send confirmation email to both customer and brand.
   const orderItems: OrderItem[] = items.map((item) => ({
     name: item.name,
     size: item.size ?? null,
@@ -259,6 +201,68 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
     quantity: item.quantity,
   }));
 
+  const orderDetailsForEmail: import("@/app/_lib/mailer").OrderDetails = {
+    orderId,
+    customerName,
+    customerEmail,
+    customerPhone: contactPhone,
+    items: orderItems,
+    subtotal,
+    shipping: shippingCost,
+    total,
+    shippingAddress,
+    paymentMethod,
+    paymentMethodDisplay: PAYMENT_METHOD_DISPLAY[paymentMethod],
+    notes: notes && notes.length > 0 ? notes : undefined,
+  };
+
+  if (paymentMethod === "COD") {
+    if (royalEnabled) {
+      try {
+        const { bookCourierAndNotify } = await import("./book-courier");
+        await bookCourierAndNotify({ order: orderDetailsForEmail });
+      } catch (err) {
+        console.error("[checkout] bookCourierAndNotify threw (contract violated):", err);
+      }
+    } else {
+      console.log(
+        "[checkout] ROYAL_EXPRESS_ENABLED=false — skipping Curfox booking",
+        { orderId },
+      );
+    }
+  } else {
+    console.log(
+      "[checkout] Skipped courier automation: awaiting payment confirmation",
+      { orderId, paymentMethod },
+    );
+    try {
+      const { sendPendingPrepaidNotificationEmail } = await import("@/app/_lib/mailer");
+      await sendPendingPrepaidNotificationEmail({ order: orderDetailsForEmail });
+    } catch (err) {
+      console.error("[mailer] pending-prepaid send failed:", err);
+    }
+    // TODO(curfox-hook): when PayHere/Koko/MinitPay webhook handlers are added,
+    // they should call bookCourierAndNotify({ order: <reconstructed OrderDetails> })
+    // here on payment success.
+  }
+
+  // Reload waybill if COD booking persisted it. Failure here must NOT surface
+  // to the customer — the order is already saved and the customer-facing
+  // success path runs regardless of whether we know the tracking code yet.
+  let trackingCode: string | undefined;
+  if (paymentMethod === "COD") {
+    try {
+      const updated = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: { courierWaybillNumber: true },
+      });
+      trackingCode = updated?.courierWaybillNumber ?? undefined;
+    } catch (err) {
+      console.error("[checkout] trackingCode lookup failed (suppressed):", err);
+    }
+  }
+
+  // Send confirmation email to both customer and brand.
   try {
     await sendOrderConfirmationEmail({
       orderId,

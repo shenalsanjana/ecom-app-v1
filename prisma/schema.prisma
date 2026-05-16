@@ -126,6 +126,14 @@ model Order {
   trackingCode          String?
   royalExpressSubmitted Boolean  @default(false)
   emailSent             Boolean  @default(false)
+  // Curfox booking lifecycle
+  courierWaybillNumber  String?
+  courierBookedAt       DateTime?
+  courierLastError      String?
+  courierLastErrorAt    DateTime?
+  dispatchPdfFetchedAt  DateTime?
+  dispatchEmailSentAt   DateTime?
+  adminAlertSentAt      DateTime?
   idempotencyKey        String?  @unique
   notes                 String?
   createdAt             DateTime @default(now())
@@ -166,4 +174,13 @@ model PasswordResetToken {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+model CurfoxCity {
+  id                  Int      @id
+  name                String
+  defaultWarehouseId  Int?
+  updatedAt           DateTime @updatedAt
+
+  @@index([name])
 }
