@@ -22,6 +22,7 @@ type CheckoutUser = { name: string; email: string } | null;
 
 type Props = {
   user: CheckoutUser;
+  cities: Array<{ id: number; name: string }>;
 };
 
 const PAYMENT_OPTIONS: {
@@ -43,7 +44,7 @@ function generateIdempotencyKey(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export function CheckoutClient({ user }: Props) {
+export function CheckoutClient({ user, cities }: Props) {
   const router = useRouter();
   const { items, clearCart } = useCart();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -306,13 +307,32 @@ export function CheckoutClient({ user }: Props) {
                         <label htmlFor="city" className="block text-sm font-medium mb-1">
                           City *
                         </label>
-                        <Input
-                          id="city"
-                          value={address.city}
-                          onChange={(e) => setAddress({ ...address, city: e.target.value })}
-                          required
-                          placeholder="Colombo"
-                        />
+                        {cities.length > 0 ? (
+                          <select
+                            id="city"
+                            value={address.city}
+                            onChange={(e) => setAddress({ ...address, city: e.target.value })}
+                            required
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <option value="" disabled>
+                              Select city
+                            </option>
+                            {cities.map((c) => (
+                              <option key={c.id} value={c.name}>
+                                {c.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <Input
+                            id="city"
+                            value={address.city}
+                            onChange={(e) => setAddress({ ...address, city: e.target.value })}
+                            required
+                            placeholder="Colombo"
+                          />
+                        )}
                       </div>
                       <div>
                         <label htmlFor="region" className="block text-sm font-medium mb-1">
