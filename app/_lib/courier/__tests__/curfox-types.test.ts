@@ -4,6 +4,8 @@ import {
   CurfoxOrderResponseSchema,
   CurfoxCityListResponseSchema,
   CurfoxCreateOrderInputSchema,
+  CurfoxOrderDataItemSchema,
+  CurfoxGeneralDataSchema,
 } from "../curfox-types";
 
 describe("CurfoxLoginResponseSchema", () => {
@@ -22,27 +24,30 @@ describe("CurfoxLoginResponseSchema", () => {
 });
 
 describe("CurfoxOrderResponseSchema", () => {
-  it("parses the sample order create response", () => {
+  it("parses the staging-probe success response", () => {
     const sample = {
-      data: {
-        id: 9249611,
-        waybill_number: "RA03870247",
-        order_no: "116",
-        customer_name: "Oshini Yapa",
-        cod: 2440,
-        delivery_charge: 450,
-      },
+      message: "Orders Created Successfully",
+      data: ["RA03872055"],
     };
     const parsed = CurfoxOrderResponseSchema.parse(sample);
-    expect(parsed.data.waybill_number).toBe("RA03870247");
-    expect(parsed.data.id).toBe(9249611);
+    expect(parsed.message).toBe("Orders Created Successfully");
+    expect(parsed.data[0]).toBe("RA03872055");
   });
-  it("rejects missing waybill_number", () => {
-    expect(() =>
-      CurfoxOrderResponseSchema.parse({
-        data: { id: 1, order_no: "1", customer_name: "X", cod: 0 },
-      }),
-    ).toThrow();
+
+  it("parses multi-waybill responses (bulk endpoint shape)", () => {
+    const parsed = CurfoxOrderResponseSchema.parse({
+      message: "Orders Created Successfully",
+      data: ["RA1", "RA2", "RA3"],
+    });
+    expect(parsed.data).toHaveLength(3);
+  });
+
+  it("rejects empty data array", () => {
+    expect(() => CurfoxOrderResponseSchema.parse({ message: "OK", data: [] })).toThrow();
+  });
+
+  it("rejects missing message", () => {
+    expect(() => CurfoxOrderResponseSchema.parse({ data: ["RA1"] })).toThrow();
   });
 });
 
@@ -55,35 +60,122 @@ describe("CurfoxCityListResponseSchema", () => {
   });
 });
 
-describe("CurfoxCreateOrderInputSchema", () => {
-  it("accepts a valid minimal payload", () => {
-    const ok = CurfoxCreateOrderInputSchema.parse({
-      order_no: "ORD-1",
-      customer_name: "Jane Doe",
-      customer_address: "1 Walls Lane, Colombo 15",
-      customer_phone: "+94778207539",
-      weight: 1,
-      origin_city_id: 1500,
-      origin_warehouse_id: 78,
-      destination_city_id: 419,
-      cod: 2440,
-      description: "Clothes",
-    });
-    expect(ok.cod).toBe(2440);
-  });
-  it("rejects negative cod", () => {
-    expect(() =>
-      CurfoxCreateOrderInputSchema.parse({
-        order_no: "ORD-1",
-        customer_name: "Jane",
-        customer_address: "addr",
-        customer_phone: "+94770000000",
-        weight: 1,
+describe("CurfoxGeneralDataSchema", () => {
+  it("requires merchant_business_id, origin_city_id, origin_warehouse_id", () => {
+    expect(
+      CurfoxGeneralDataSchema.parse({
+        merchant_business_id: 7290,
         origin_city_id: 1500,
         origin_warehouse_id: 78,
-        destination_city_id: 419,
-        cod: -1,
-        description: "X",
+      }),
+    ).toEqual({ merchant_business_id: 7290, origin_city_id: 1500, origin_warehouse_id: 78 });
+  });
+  it("rejects missing merchant_business_id", () => {
+    expect(() =>
+      CurfoxGeneralDataSchema.parse({ origin_city_id: 1500, origin_warehouse_id: 78 }),
+    ).toThrow();
+  });
+});
+
+describe("CurfoxOrderDataItemSchema", () => {
+  const base = {
+    order_no: "ORD-1",
+    customer_name: "Jane Doe",
+    customer_address: "1 Walls Lane, Colombo 15",
+    customer_phone: "+94778207539",
+    weight: 1,
+    cod: 0,
+    description: "Clothes",
+  } as const;
+
+  it("accepts destination_city_id alone", () => {
+    expect(() =>
+      CurfoxOrderDataItemSchema.parse({ ...base, destination_city_id: 419 }),
+    ).not.toThrow();
+  });
+
+  it("accepts destination_city_name + destination_state_name", () => {
+    expect(() =>
+      CurfoxOrderDataItemSchema.parse({
+        ...base,
+        destination_city_name: "Kotte",
+        destination_state_name: "Western",
+      }),
+    ).not.toThrow();
+  });
+
+  it("rejects when neither destination_city_id nor destination_city_name is given", () => {
+    expect(() => CurfoxOrderDataItemSchema.parse(base)).toThrow();
+  });
+
+  it("rejects negative cod", () => {
+    expect(() =>
+      CurfoxOrderDataItemSchema.parse({ ...base, destination_city_id: 419, cod: -1 }),
+    ).toThrow();
+  });
+});
+
+describe("CurfoxCreateOrderInputSchema (full envelope)", () => {
+  it("accepts the verified single-order envelope shape", () => {
+    const envelope = {
+      general_data: {
+        merchant_business_id: 7290,
+        origin_city_id: 1500,
+        origin_warehouse_id: 78,
+      },
+      order_data: [
+        {
+          order_no: "ORD-1",
+          customer_name: "Jane Doe",
+          customer_address: "1 Walls Lane, Colombo 15",
+          customer_phone: "+94778207539",
+          weight: 1,
+          destination_city_id: 419,
+          cod: 2440,
+          description: "Clothes",
+        },
+      ],
+    };
+    const parsed = CurfoxCreateOrderInputSchema.parse(envelope);
+    expect(parsed.order_data).toHaveLength(1);
+    expect(parsed.general_data.merchant_business_id).toBe(7290);
+  });
+
+  it("accepts a multi-order array (bulk endpoint shape)", () => {
+    const envelope = {
+      general_data: { merchant_business_id: 7290, origin_city_id: 1500, origin_warehouse_id: 78 },
+      order_data: [
+        {
+          order_no: "ORD-1",
+          customer_name: "A",
+          customer_address: "addr",
+          customer_phone: "+94770000000",
+          weight: 1,
+          destination_city_name: "Kotte",
+          destination_state_name: "Western",
+          cod: 100,
+          description: "X",
+        },
+        {
+          order_no: "ORD-2",
+          customer_name: "B",
+          customer_address: "addr",
+          customer_phone: "+94770000001",
+          weight: 1,
+          destination_city_id: 419,
+          cod: 200,
+          description: "Y",
+        },
+      ],
+    };
+    expect(() => CurfoxCreateOrderInputSchema.parse(envelope)).not.toThrow();
+  });
+
+  it("rejects empty order_data array", () => {
+    expect(() =>
+      CurfoxCreateOrderInputSchema.parse({
+        general_data: { merchant_business_id: 7290, origin_city_id: 1500, origin_warehouse_id: 78 },
+        order_data: [],
       }),
     ).toThrow();
   });

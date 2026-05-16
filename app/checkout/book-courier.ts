@@ -5,13 +5,20 @@ import {
   fetchCurfoxWaybillPdf,
   CurfoxError,
 } from "@/app/_lib/courier/curfox-client";
-import { resolveCurfoxCity } from "@/app/_lib/courier/city-map";
+import {
+  resolveCurfoxCity,
+  isKnownCurfoxCityName,
+  canonicalizeCurfoxCityName,
+} from "@/app/_lib/courier/city-map";
 import {
   sendDispatchNotificationEmail,
   sendAdminFailureAlertEmail,
 } from "@/app/_lib/mailer";
 import type { OrderDetails } from "@/app/_lib/mailer";
+import type { CurfoxOrderDataItem } from "@/app/_lib/courier/curfox-types";
 
+const MERCHANT_BUSINESS_ID = (): number =>
+  Number(process.env.CURFOX_MERCHANT_BUSINESS_ID ?? "7290");
 const ORIGIN_CITY_ID = (): number =>
   Number(process.env.CURFOX_ORIGIN_CITY_ID ?? "1500");
 const ORIGIN_WAREHOUSE_ID = (): number =>
@@ -61,6 +68,34 @@ async function tryDispatchEmail(
 }
 
 /**
+ * Resolve destination fields for the order envelope. Two tiers:
+ *   1. DB lookup → use destination_city_id (best — Curfox doesn't need state)
+ *   2. Known-name fallback → use destination_city_name + caller-supplied region
+ *      (Curfox accepts the name but requires destination_state_name too)
+ * Returns null when the city is neither in the DB nor in the known list,
+ * which signals the orchestrator to fail with a city-lookup admin alert.
+ */
+async function resolveDestination(
+  shipping: OrderDetails["shippingAddress"],
+): Promise<Pick<
+  CurfoxOrderDataItem,
+  "destination_city_id" | "destination_city_name" | "destination_state_name"
+> | null> {
+  const rawCity = shipping.city;
+  const dbHit = await resolveCurfoxCity(rawCity);
+  if (dbHit && dbHit.destinationCityId > 0) {
+    return { destination_city_id: dbHit.destinationCityId };
+  }
+  if (isKnownCurfoxCityName(rawCity)) {
+    return {
+      destination_city_name: canonicalizeCurfoxCityName(rawCity),
+      destination_state_name: shipping.region,
+    };
+  }
+  return null;
+}
+
+/**
  * Books a courier shipment for the order and emails the dispatch notification
  * with the airwaybill PDF attached. Never throws — every failure is contained
  * and emits an admin alert via sendAdminFailureAlertEmail.
@@ -69,9 +104,12 @@ export async function bookCourierAndNotify(params: { order: OrderDetails }): Pro
   const { order } = params;
 
   // ⑤ Resolve city ─────────────────────────────────────────────────────
-  let cityIds: { destinationCityId: number; destinationWarehouseId: number | null };
+  let destination: Pick<
+    CurfoxOrderDataItem,
+    "destination_city_id" | "destination_city_name" | "destination_state_name"
+  >;
   try {
-    const resolved = await resolveCurfoxCity(order.shippingAddress.city);
+    const resolved = await resolveDestination(order.shippingAddress);
     if (!resolved) {
       console.warn("[curfox] city-lookup failed", {
         orderId: order.orderId,
@@ -95,7 +133,7 @@ export async function bookCourierAndNotify(params: { order: OrderDetails }): Pro
       });
       return;
     }
-    cityIds = resolved;
+    destination = resolved;
   } catch (err) {
     console.error("[curfox] city-lookup error", err);
     await tryAlert({
@@ -109,23 +147,29 @@ export async function bookCourierAndNotify(params: { order: OrderDetails }): Pro
   }
 
   // ⑥–⑧ Create order at Curfox ────────────────────────────────────────
-  let curfoxOrder: { id: number; waybill_number: string };
+  let curfoxOrder: { waybill_number: string };
   try {
     const created = await createCurfoxOrder({
-      order_no: order.orderId,
-      customer_name: order.customerName,
-      customer_address: buildAddressLine(order.shippingAddress),
-      customer_phone: order.customerPhone ?? "",
-      customer_email: order.customerEmail ?? null,
-      weight: DEFAULT_WEIGHT(),
-      origin_city_id: ORIGIN_CITY_ID(),
-      origin_warehouse_id: ORIGIN_WAREHOUSE_ID(),
-      destination_city_id: cityIds.destinationCityId,
-      destination_warehouse_id: cityIds.destinationWarehouseId ?? undefined,
-      cod: order.paymentMethod === "COD" ? order.total : 0,
-      description: buildDescription(order.items),
+      general_data: {
+        merchant_business_id: MERCHANT_BUSINESS_ID(),
+        origin_city_id: ORIGIN_CITY_ID(),
+        origin_warehouse_id: ORIGIN_WAREHOUSE_ID(),
+      },
+      order_data: [
+        {
+          order_no: order.orderId,
+          customer_name: order.customerName,
+          customer_address: buildAddressLine(order.shippingAddress),
+          customer_phone: order.customerPhone ?? "",
+          customer_email: order.customerEmail ?? null,
+          weight: DEFAULT_WEIGHT(),
+          cod: order.paymentMethod === "COD" ? order.total : 0,
+          description: buildDescription(order.items),
+          ...destination,
+        },
+      ],
     });
-    curfoxOrder = { id: created.id, waybill_number: created.waybill_number };
+    curfoxOrder = { waybill_number: created.waybill_number };
   } catch (err) {
     const isCurfoxErr = err instanceof CurfoxError;
     const reason =
@@ -181,7 +225,7 @@ export async function bookCourierAndNotify(params: { order: OrderDetails }): Pro
   // ⑩ Fetch PDF ───────────────────────────────────────────────────────
   let pdfBuffer: Buffer | undefined;
   try {
-    pdfBuffer = await fetchCurfoxWaybillPdf(curfoxOrder.id, curfoxOrder.waybill_number);
+    pdfBuffer = await fetchCurfoxWaybillPdf(curfoxOrder.waybill_number);
     await prisma.order
       .update({
         where: { id: order.orderId },

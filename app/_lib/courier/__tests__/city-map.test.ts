@@ -3,6 +3,10 @@ import {
   resolveCurfoxCity,
   refreshCurfoxCityMap,
   listAvailableCities,
+  isKnownCurfoxCityName,
+  canonicalizeCurfoxCityName,
+  seedKnownCurfoxCities,
+  KNOWN_CURFOX_CITIES,
   __test_only_setPrisma,
   __test_only_setCurfoxClient,
 } from "../city-map";
@@ -36,6 +40,7 @@ function makePrismaMock(rows: Array<{ id: number; name: string; defaultWarehouse
         },
       },
     })),
+    __store: () => store.slice(),
   };
 }
 
@@ -64,6 +69,37 @@ describe("resolveCurfoxCity", () => {
   });
 });
 
+describe("isKnownCurfoxCityName", () => {
+  it("matches the 2026-05-16 staging-probe validated names exactly", () => {
+    for (const c of KNOWN_CURFOX_CITIES) {
+      expect(isKnownCurfoxCityName(c.name)).toBe(true);
+    }
+  });
+
+  it("is case-insensitive and whitespace-tolerant", () => {
+    expect(isKnownCurfoxCityName("kotte")).toBe(true);
+    expect(isKnownCurfoxCityName("  COLOMBO 01  ")).toBe(true);
+    expect(isKnownCurfoxCityName("colombo 03")).toBe(true);
+  });
+
+  it("rejects unknown names", () => {
+    expect(isKnownCurfoxCityName("Atlantis")).toBe(false);
+    // Plain "Colombo" is NOT accepted by Curfox — must be a numbered zone.
+    expect(isKnownCurfoxCityName("Colombo")).toBe(false);
+  });
+});
+
+describe("canonicalizeCurfoxCityName", () => {
+  it("returns the canonical casing for known names", () => {
+    expect(canonicalizeCurfoxCityName("kotte")).toBe("Kotte");
+    expect(canonicalizeCurfoxCityName("  COLOMBO 01 ")).toBe("Colombo 01");
+  });
+
+  it("returns the trimmed input when the name is not known", () => {
+    expect(canonicalizeCurfoxCityName("  Atlantis  ")).toBe("Atlantis");
+  });
+});
+
 describe("refreshCurfoxCityMap", () => {
   it("wipes + repopulates from listCurfoxCities", async () => {
     const mock = makePrismaMock([{ id: 9999, name: "Stale", defaultWarehouseId: null }]);
@@ -80,15 +116,50 @@ describe("refreshCurfoxCityMap", () => {
   });
 });
 
+describe("seedKnownCurfoxCities", () => {
+  it("seeds only the entries with confirmed Curfox ids", async () => {
+    const mock = makePrismaMock([]);
+    __test_only_setPrisma(mock as unknown as never);
+    const out = await seedKnownCurfoxCities();
+    const idBackedCount = KNOWN_CURFOX_CITIES.filter((c) => c.id !== null).length;
+    expect(out.count).toBe(idBackedCount);
+    expect(idBackedCount).toBeGreaterThan(0);
+    const store = mock.__store();
+    expect(store.map((r) => r.name).sort()).toEqual(
+      KNOWN_CURFOX_CITIES.filter((c) => c.id !== null).map((c) => c.name).sort(),
+    );
+  });
+});
+
 describe("listAvailableCities", () => {
-  it("returns id+name sorted by name", async () => {
+  it("returns DB rows + name-only known cities sorted alphabetically", async () => {
     __test_only_setPrisma(
       makePrismaMock([
-        { id: 419, name: "Ettampitiya", defaultWarehouseId: 7 },
         { id: 1500, name: "Kotte", defaultWarehouseId: 78 },
+        { id: 419, name: "Ettampitiya", defaultWarehouseId: 7 },
       ]) as unknown as never,
     );
     const out = await listAvailableCities();
-    expect(out.map((c) => c.name)).toEqual(["Ettampitiya", "Kotte"]);
+    const names = out.map((c) => c.name);
+    // Must include both DB and name-only entries
+    expect(names).toContain("Kotte");
+    expect(names).toContain("Ettampitiya");
+    expect(names).toContain("Colombo 01");
+    expect(names).toContain("Colombo 03");
+    // Sorted alphabetically
+    expect([...names].sort()).toEqual(names);
+  });
+
+  it("falls back to the known-only list if the DB read throws", async () => {
+    __test_only_setPrisma({
+      curfoxCity: {
+        findMany: vi.fn(async () => {
+          throw new Error("DB down");
+        }),
+      },
+    } as unknown as never);
+    const out = await listAvailableCities();
+    expect(out.length).toBeGreaterThan(0);
+    expect(out.map((c) => c.name)).toContain("Colombo 01");
   });
 });

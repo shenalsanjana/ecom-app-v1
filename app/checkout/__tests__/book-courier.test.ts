@@ -19,6 +19,8 @@ vi.mock("@/app/_lib/courier/curfox-client", () => ({
 }));
 vi.mock("@/app/_lib/courier/city-map", () => ({
   resolveCurfoxCity: vi.fn(),
+  isKnownCurfoxCityName: vi.fn(),
+  canonicalizeCurfoxCityName: vi.fn((s: string) => s.trim()),
 }));
 vi.mock("@/app/_lib/mailer", () => ({
   sendDispatchNotificationEmail: vi.fn(),
@@ -37,7 +39,10 @@ import {
   fetchCurfoxWaybillPdf,
   CurfoxError as MockedCurfoxError,
 } from "@/app/_lib/courier/curfox-client";
-import { resolveCurfoxCity } from "@/app/_lib/courier/city-map";
+import {
+  resolveCurfoxCity,
+  isKnownCurfoxCityName,
+} from "@/app/_lib/courier/city-map";
 import {
   sendDispatchNotificationEmail,
   sendAdminFailureAlertEmail,
@@ -56,8 +61,8 @@ const ORDER: OrderDetails = {
   total: 2440,
   shippingAddress: {
     line1: "1 Walls Lane",
-    city: "Colombo",
-    region: "Western Province",
+    city: "Kotte",
+    region: "Western",
     postalCode: "00100",
     country: "Sri Lanka",
   },
@@ -69,36 +74,60 @@ beforeEach(() => {
   vi.mocked(createCurfoxOrder).mockReset();
   vi.mocked(fetchCurfoxWaybillPdf).mockReset();
   vi.mocked(resolveCurfoxCity).mockReset();
+  vi.mocked(isKnownCurfoxCityName).mockReset();
   vi.mocked(sendDispatchNotificationEmail).mockReset();
   vi.mocked(sendAdminFailureAlertEmail).mockReset();
   vi.mocked(prisma.order.update).mockReset();
   vi.mocked(prisma.order.update).mockResolvedValue({} as never);
 });
 
-describe("bookCourierAndNotify — happy path", () => {
-  it("books, captures PDF, sends dispatch email, updates DB", async () => {
+describe("bookCourierAndNotify — happy path (DB id resolved)", () => {
+  it("sends destination_city_id in the envelope, captures waybill + PDF, sends dispatch email", async () => {
     vi.mocked(resolveCurfoxCity).mockResolvedValueOnce({
       destinationCityId: 1500,
       destinationWarehouseId: 78,
     });
-    vi.mocked(createCurfoxOrder).mockResolvedValueOnce({
-      id: 9249611,
-      waybill_number: "RA03870247",
-      order_no: "ORD-TEST-1",
-      customer_name: "Jane Doe",
-      cod: 2440,
-    } as never);
+    vi.mocked(createCurfoxOrder).mockResolvedValueOnce({ waybill_number: "RA03870247" });
     vi.mocked(fetchCurfoxWaybillPdf).mockResolvedValueOnce(Buffer.from("%PDF-x"));
     vi.mocked(sendDispatchNotificationEmail).mockResolvedValueOnce(undefined);
 
     await bookCourierAndNotify({ order: ORDER });
+
+    expect(createCurfoxOrder).toHaveBeenCalledOnce();
+    const envelope = vi.mocked(createCurfoxOrder).mock.calls[0][0];
+    expect(envelope.general_data.merchant_business_id).toBe(7290);
+    expect(envelope.general_data.origin_city_id).toBe(1500);
+    expect(envelope.general_data.origin_warehouse_id).toBe(78);
+    expect(envelope.order_data).toHaveLength(1);
+    expect(envelope.order_data[0].destination_city_id).toBe(1500);
+    expect(envelope.order_data[0].destination_city_name).toBeUndefined();
+    expect(envelope.order_data[0].cod).toBe(2440);
 
     expect(sendDispatchNotificationEmail).toHaveBeenCalledOnce();
     const dispatchCall = vi.mocked(sendDispatchNotificationEmail).mock.calls[0][0];
     expect(dispatchCall.waybillNumber).toBe("RA03870247");
     expect(dispatchCall.pdfBuffer).toBeInstanceOf(Buffer);
 
+    expect(fetchCurfoxWaybillPdf).toHaveBeenCalledWith("RA03870247");
     expect(prisma.order.update).toHaveBeenCalled();
+    expect(sendAdminFailureAlertEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe("bookCourierAndNotify — happy path (name fallback)", () => {
+  it("falls back to destination_city_name + region as state_name when DB has no id", async () => {
+    vi.mocked(resolveCurfoxCity).mockResolvedValueOnce(null);
+    vi.mocked(isKnownCurfoxCityName).mockReturnValueOnce(true);
+    vi.mocked(createCurfoxOrder).mockResolvedValueOnce({ waybill_number: "RA03870248" });
+    vi.mocked(fetchCurfoxWaybillPdf).mockResolvedValueOnce(Buffer.from("%PDF-x"));
+
+    await bookCourierAndNotify({ order: ORDER });
+
+    expect(createCurfoxOrder).toHaveBeenCalledOnce();
+    const envelope = vi.mocked(createCurfoxOrder).mock.calls[0][0];
+    expect(envelope.order_data[0].destination_city_id).toBeUndefined();
+    expect(envelope.order_data[0].destination_city_name).toBe("Kotte");
+    expect(envelope.order_data[0].destination_state_name).toBe("Western");
     expect(sendAdminFailureAlertEmail).not.toHaveBeenCalled();
   });
 });
@@ -106,6 +135,7 @@ describe("bookCourierAndNotify — happy path", () => {
 describe("bookCourierAndNotify — failure cascade", () => {
   it("city miss → admin alert(city-lookup), no Curfox call, no throw", async () => {
     vi.mocked(resolveCurfoxCity).mockResolvedValueOnce(null);
+    vi.mocked(isKnownCurfoxCityName).mockReturnValueOnce(false);
 
     await bookCourierAndNotify({ order: ORDER });
 
@@ -137,13 +167,7 @@ describe("bookCourierAndNotify — failure cascade", () => {
       destinationCityId: 1500,
       destinationWarehouseId: 78,
     });
-    vi.mocked(createCurfoxOrder).mockResolvedValueOnce({
-      id: 9249611,
-      waybill_number: "RA03870247",
-      order_no: "ORD-TEST-1",
-      customer_name: "Jane Doe",
-      cod: 2440,
-    } as never);
+    vi.mocked(createCurfoxOrder).mockResolvedValueOnce({ waybill_number: "RA03870247" });
     vi.mocked(fetchCurfoxWaybillPdf).mockRejectedValueOnce(
       new MockedCurfoxError("HTTP 404", "fetch-pdf", 404),
     );
@@ -161,13 +185,7 @@ describe("bookCourierAndNotify — failure cascade", () => {
       destinationCityId: 1500,
       destinationWarehouseId: 78,
     });
-    vi.mocked(createCurfoxOrder).mockResolvedValueOnce({
-      id: 9249611,
-      waybill_number: "RA03870247",
-      order_no: "ORD-TEST-1",
-      customer_name: "Jane Doe",
-      cod: 2440,
-    } as never);
+    vi.mocked(createCurfoxOrder).mockResolvedValueOnce({ waybill_number: "RA03870247" });
     vi.mocked(prisma.order.update).mockRejectedValueOnce(new Error("DB write failed"));
 
     await bookCourierAndNotify({ order: ORDER });
