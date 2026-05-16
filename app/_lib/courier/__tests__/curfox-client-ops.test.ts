@@ -53,7 +53,7 @@ function mockFetch(responses: Array<{ status: number; body: unknown | Uint8Array
         : typeof r.body === "string"
           ? r.body
           : JSON.stringify(r.body);
-    return new Response(body, { status: r.status, headers: { "content-type": ct } });
+    return new Response(body as BodyInit, { status: r.status, headers: { "content-type": ct } });
   }) as typeof fetch;
 }
 

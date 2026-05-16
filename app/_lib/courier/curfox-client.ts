@@ -40,9 +40,12 @@ function tenant(): string {
 
 function parseTokenFromLoginResponse(body: unknown): string {
   const parsed = CurfoxLoginResponseSchema.parse(body);
-  if ("token" in parsed) return parsed.token;
-  if ("access_token" in parsed) return parsed.access_token;
-  return parsed.data.token;
+  if ("token" in parsed && typeof parsed.token === "string") return parsed.token;
+  if ("access_token" in parsed && typeof parsed.access_token === "string") return parsed.access_token;
+  if ("data" in parsed && parsed.data && typeof parsed.data === "object" && "token" in parsed.data && typeof parsed.data.token === "string") {
+    return parsed.data.token;
+  }
+  throw new CurfoxError("Curfox login: token missing from response", "login");
 }
 
 async function login(): Promise<string> {
