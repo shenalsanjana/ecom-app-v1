@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   createCurfoxOrder,
   fetchCurfoxWaybillPdf,
-  listCurfoxCities,
   __test_only_resetTokenCache,
 } from "../curfox-client";
 import type { CurfoxCreateOrderInput } from "../curfox-types";
@@ -39,7 +38,6 @@ beforeEach(() => {
   process.env.CURFOX_BASE_URL = "https://api.example.com";
   process.env.CURFOX_ORDER_CREATE_PATH = "/api/merchant/order/single";
   process.env.CURFOX_WAYBILL_PDF_PATH_TEMPLATE = "/api/merchant/order/print/{waybill_number}";
-  process.env.CURFOX_CITIES_PATH = "/api/merchant/city";
 });
 
 afterEach(() => {
@@ -64,7 +62,7 @@ function mockFetch(responses: Array<{ status: number; body: unknown | Uint8Array
 }
 
 describe("createCurfoxOrder", () => {
-  it("posts the verified nested envelope and returns the first waybill", async () => {
+  it("posts the verified nested envelope and returns the waybill string", async () => {
     mockFetch([
       { status: 200, body: { token: "abc" } },
       {
@@ -72,8 +70,8 @@ describe("createCurfoxOrder", () => {
         body: { message: "Orders Created Successfully", data: ["RA03872055"] },
       },
     ]);
-    const out = await createCurfoxOrder(VALID_ENVELOPE);
-    expect(out.waybill_number).toBe("RA03872055");
+    const waybill = await createCurfoxOrder(VALID_ENVELOPE);
+    expect(waybill).toBe("RA03872055");
 
     const orderCall = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[1];
     expect(orderCall[0]).toBe("https://api.example.com/api/merchant/order/single");
@@ -100,11 +98,12 @@ describe("createCurfoxOrder", () => {
   });
 
   it("rejects envelope with neither destination_city_id nor destination_city_name", async () => {
-    const bad: CurfoxCreateOrderInput = {
+    const bad = {
       ...VALID_ENVELOPE,
       order_data: [{ ...VALID_ENVELOPE.order_data[0], destination_city_id: undefined }],
-    } as unknown as CurfoxCreateOrderInput;
-    await expect(createCurfoxOrder(bad)).rejects.toThrow();
+    };
+    // Zod throws on .parse()
+    await expect(createCurfoxOrder(bad as any)).rejects.toThrow();
   });
 });
 
@@ -155,33 +154,3 @@ describe("fetchCurfoxWaybillPdf", () => {
   });
 });
 
-describe("listCurfoxCities", () => {
-  it("returns the parsed array", async () => {
-    mockFetch([
-      { status: 200, body: { token: "abc" } },
-      {
-        status: 200,
-        body: {
-          data: [
-            { id: 1500, name: "Kotte", default_warehouse_id: 78 },
-            { id: 419, name: "Ettampitiya", default_warehouse_id: 7 },
-          ],
-        },
-      },
-    ]);
-    const cities = await listCurfoxCities();
-    expect(cities).toHaveLength(2);
-    expect(cities[0].id).toBe(1500);
-  });
-
-  it("throws CurfoxError(step=list-cities) on 500", async () => {
-    mockFetch([
-      { status: 200, body: { token: "abc" } },
-      { status: 500, body: { message: "boom" } },
-    ]);
-    await expect(listCurfoxCities()).rejects.toMatchObject({
-      name: "CurfoxError",
-      step: "list-cities",
-    });
-  });
-});

@@ -15,12 +15,8 @@ Content should include:
 - Requirements Checklist
 
 ## 2. Implementation Planning (openspec/changes)
-Once the spec is approved, create an implementation folder and plan:
-```bash
-# Example
-mkdir openspec/changes/new-feature
-touch openspec/changes/new-feature/plan.md
-```
+Once the spec is approved, execute a plan writing with superpowers:
+
 The `plan.md` should contain:
 - Step-by-step implementation tasks
 - Testing strategy for each step

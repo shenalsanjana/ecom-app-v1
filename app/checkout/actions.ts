@@ -4,9 +4,16 @@
 import { z } from "zod";
 import { LkPhoneSchema } from "@/app/_lib/validation";
 import { auth } from "@/app/_lib/auth";
-import { sendOrderConfirmationEmail, type OrderItem } from "@/app/_lib/mailer";
+import {
+  sendOrderConfirmationEmail,
+  sendPendingPrepaidNotificationEmail,
+  sendAdminFailureAlertEmail,
+  type OrderItem,
+  type OrderDetails,
+} from "@/app/_lib/mailer";
 import { prisma } from "@/app/_lib/prisma";
 import { calculateShipping } from "@/app/_lib/checkout-config";
+import { bookCourierAndNotify } from "./book-courier";
 
 export type PaymentMethod = "COD" | "PAYHERE" | "KOKO" | "MINITPAY";
 
@@ -55,6 +62,55 @@ const ProcessOrderSchema = z.object({
 });
 
 export type ProcessOrderInput = z.infer<typeof ProcessOrderSchema>;
+
+/**
+ * Internal helper to book courier and notify the brand/customer.
+ * Handles both COD (Curfox booking) and Prepaid (deferred) flows.
+ * Never throws — failures are logged and alerts sent to admin.
+ * Returns the waybillNumber if booked.
+ */
+async function orchestrateCourierBooking(orderId: string, details: OrderDetails): Promise<string | undefined> {
+  try {
+    const royalEnabled = process.env.ROYAL_EXPRESS_ENABLED === "true";
+
+    if (details.paymentMethod === "COD") {
+      if (royalEnabled) {
+        // Synchronous booking with non-blocking failure
+        return await bookCourierAndNotify({ order: details });
+      } else {
+        console.log("[checkout] ROYAL_EXPRESS_ENABLED=false — skipping Curfox booking", {
+          orderId,
+        });
+      }
+    } else {
+      // Prepaid flow: send pending notification to brand
+      console.log("[checkout] Skipped courier automation: awaiting payment confirmation", {
+        orderId,
+        paymentMethod: details.paymentMethod,
+      });
+      try {
+        await sendPendingPrepaidNotificationEmail({ order: details });
+      } catch (err) {
+        console.error("[mailer] pending-prepaid send failed:", err);
+      }
+    }
+  } catch (err) {
+    // Top-level catch to ensure no failure ever bubbles up to the customer.
+    console.error("[checkout] orchestrateCourierBooking top-level failure:", err);
+    try {
+      await sendAdminFailureAlertEmail({
+        orderId,
+        step: "orchestrate-courier",
+        reason: err instanceof Error ? err.message : String(err),
+        order: details,
+        errorDetail: err instanceof Error ? err.stack : undefined,
+      });
+    } catch (alertErr) {
+      console.error("[checkout] admin alert failed in orchestrateCourierBooking:", alertErr);
+    }
+  }
+  return undefined;
+}
 
 export async function processOrder(input: ProcessOrderInput): Promise<CheckoutResult> {
   const parsed = ProcessOrderSchema.safeParse(input);
@@ -192,8 +248,6 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
   }
 
   // ── Branch on payment method (Option B2) ────────────────────────────
-  const royalEnabled = process.env.ROYAL_EXPRESS_ENABLED === "true";
-
   const orderItems: OrderItem[] = items.map((item) => ({
     name: item.name,
     size: item.size ?? null,
@@ -201,7 +255,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
     quantity: item.quantity,
   }));
 
-  const orderDetailsForEmail: import("@/app/_lib/mailer").OrderDetails = {
+  const orderDetailsForEmail: OrderDetails = {
     orderId,
     customerName,
     customerEmail,
@@ -216,68 +270,14 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
     notes: notes && notes.length > 0 ? notes : undefined,
   };
 
-  if (paymentMethod === "COD") {
-    if (royalEnabled) {
-      try {
-        const { bookCourierAndNotify } = await import("./book-courier");
-        await bookCourierAndNotify({ order: orderDetailsForEmail });
-      } catch (err) {
-        console.error("[checkout] bookCourierAndNotify threw (contract violated):", err);
-      }
-    } else {
-      console.log(
-        "[checkout] ROYAL_EXPRESS_ENABLED=false — skipping Curfox booking",
-        { orderId },
-      );
-    }
-  } else {
-    console.log(
-      "[checkout] Skipped courier automation: awaiting payment confirmation",
-      { orderId, paymentMethod },
-    );
-    try {
-      const { sendPendingPrepaidNotificationEmail } = await import("@/app/_lib/mailer");
-      await sendPendingPrepaidNotificationEmail({ order: orderDetailsForEmail });
-    } catch (err) {
-      console.error("[mailer] pending-prepaid send failed:", err);
-    }
-    // TODO(curfox-hook): when PayHere/Koko/MinitPay webhook handlers are added,
-    // they should call bookCourierAndNotify({ order: <reconstructed OrderDetails> })
-    // here on payment success.
-  }
-
-  // Reload waybill if COD booking persisted it. Failure here must NOT surface
-  // to the customer — the order is already saved and the customer-facing
-  // success path runs regardless of whether we know the tracking code yet.
-  let trackingCode: string | undefined;
-  if (paymentMethod === "COD") {
-    try {
-      const updated = await prisma.order.findUnique({
-        where: { id: orderId },
-        select: { courierWaybillNumber: true },
-      });
-      trackingCode = updated?.courierWaybillNumber ?? undefined;
-    } catch (err) {
-      console.error("[checkout] trackingCode lookup failed (suppressed):", err);
-    }
-  }
+  // Synchronous booking with non-blocking failure
+  const trackingCode = await orchestrateCourierBooking(orderId, orderDetailsForEmail);
 
   // Send confirmation email to both customer and brand.
   try {
     await sendOrderConfirmationEmail({
-      orderId,
-      customerName,
-      customerEmail,
-      customerPhone: contactPhone,
-      items: orderItems,
-      subtotal,
-      shipping: shippingCost,
-      total,
-      shippingAddress,
-      paymentMethod,
-      paymentMethodDisplay: PAYMENT_METHOD_DISPLAY[paymentMethod],
+      ...orderDetailsForEmail,
       trackingCode,
-      notes: notes && notes.length > 0 ? notes : undefined,
     });
     await prisma.order.update({
       where: { id: orderId },
@@ -289,3 +289,4 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
 
   return { success: true, orderId, trackingCode, isGuest: !userId };
 }
+
