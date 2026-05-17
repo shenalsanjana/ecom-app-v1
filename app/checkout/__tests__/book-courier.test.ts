@@ -26,6 +26,10 @@ vi.mock("@/app/_lib/prisma", () => ({
     order: {
       update: vi.fn(),
     },
+    curfoxCity: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+    },
   },
 }));
 
@@ -85,8 +89,7 @@ describe("bookCourierAndNotify — happy path", () => {
     expect(envelope.general_data.origin_city_id).toBe(1500);
     expect(envelope.general_data.origin_warehouse_id).toBe(78);
     expect(envelope.order_data).toHaveLength(1);
-    expect(envelope.order_data[0].destination_city_name).toBe("Kotte");
-    expect(envelope.order_data[0].destination_state_name).toBe("Western");
+    expect(envelope.order_data[0].destination_city_id).toBe(1500); // Kotte is in the hardcoded list
     expect(envelope.order_data[0].cod).toBe(2440);
 
     expect(sendDispatchNotificationEmail).toHaveBeenCalledOnce();

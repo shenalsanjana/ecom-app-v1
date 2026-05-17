@@ -2,6 +2,7 @@
 import { auth } from "@/app/_lib/auth";
 import { CheckoutClient } from "./checkout-client";
 import { SiteFooter } from "@/app/_components/home/site-footer";
+import { listAvailableCities } from "@/app/_lib/courier/city-map";
 
 export default async function CheckoutPage() {
   const session = await auth();
@@ -12,8 +13,7 @@ export default async function CheckoutPage() {
       }
     : null;
 
-  // Empty list is OK — the client falls back to a free-text input.
-  const cities: Array<{ id: number; name: string }> = [];
+  const cities = await listAvailableCities();
 
   return (
     <>

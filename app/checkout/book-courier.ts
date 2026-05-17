@@ -6,6 +6,10 @@ import {
   CurfoxError,
 } from "@/app/_lib/courier/curfox-client";
 import {
+  resolveCurfoxCity,
+  getDistrictForCity,
+} from "@/app/_lib/courier/city-map";
+import {
   sendDispatchNotificationEmail,
   sendAdminFailureAlertEmail,
 } from "@/app/_lib/mailer";
@@ -72,6 +76,28 @@ export async function bookCourierAndNotify(params: {
 }): Promise<string | undefined> {
   const { order } = params;
 
+  // Resolve city ID or names
+  const cityResolution = await resolveCurfoxCity(order.shippingAddress.city);
+  const district = getDistrictForCity(order.shippingAddress.city, order.shippingAddress.region);
+
+  const orderItem: any = {
+    order_no: order.orderId,
+    customer_name: order.customerName,
+    customer_address: buildAddressLine(order.shippingAddress),
+    customer_phone: order.customerPhone?.replace(/\+/g, "") ?? "", // Remove + if present
+    customer_email: order.customerEmail ?? null,
+    weight: DEFAULT_WEIGHT(),
+    cod: order.paymentMethod === "COD" ? order.total : 0,
+    description: buildDescription(order.items),
+  };
+
+  if (cityResolution?.destinationCityId) {
+      orderItem.destination_city_id = cityResolution.destinationCityId;
+  } else {
+      orderItem.destination_city_name = order.shippingAddress.city;
+      orderItem.destination_state_name = district;
+  }
+
   // ⑥–⑧ Create order at Curfox ────────────────────────────────────────
   let waybillNumber: string;
   try {
@@ -81,20 +107,7 @@ export async function bookCourierAndNotify(params: {
         origin_city_id: ORIGIN_CITY_ID(),
         origin_warehouse_id: ORIGIN_WAREHOUSE_ID(),
       },
-      order_data: [
-        {
-          order_no: order.orderId,
-          customer_name: order.customerName,
-          customer_address: buildAddressLine(order.shippingAddress),
-          customer_phone: order.customerPhone ?? "",
-          customer_email: order.customerEmail ?? null,
-          weight: DEFAULT_WEIGHT(),
-          cod: order.paymentMethod === "COD" ? order.total : 0,
-          description: buildDescription(order.items),
-          destination_city_name: order.shippingAddress.city,
-          destination_state_name: order.shippingAddress.region,
-        },
-      ],
+      order_data: [orderItem],
     });
   } catch (err) {
     const isCurfoxErr = err instanceof CurfoxError;
@@ -191,4 +204,3 @@ export async function bookCourierAndNotify(params: {
 
   return waybillNumber;
 }
-

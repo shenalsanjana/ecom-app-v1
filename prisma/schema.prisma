@@ -175,3 +175,12 @@ model PasswordResetToken {
   @@index([userId])
   @@index([expiresAt])
 }
+
+model CurfoxCity {
+  id                  Int      @id
+  name                String
+  defaultWarehouseId  Int?
+  updatedAt           DateTime @updatedAt
+
+  @@index([name])
+}
