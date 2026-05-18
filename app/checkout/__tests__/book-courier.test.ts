@@ -3,7 +3,6 @@ import type { OrderDetails } from "@/app/_lib/mailer";
 
 vi.mock("@/app/_lib/courier/curfox-client", () => ({
   createCurfoxOrder: vi.fn(),
-  fetchCurfoxWaybillPdf: vi.fn(),
   CurfoxError: class CurfoxError extends Error {
     step: string;
     status?: number;
@@ -36,7 +35,6 @@ vi.mock("@/app/_lib/prisma", () => ({
 
 import {
   createCurfoxOrder,
-  fetchCurfoxWaybillPdf,
   CurfoxError as MockedCurfoxError,
 } from "@/app/_lib/courier/curfox-client";
 import {
@@ -66,7 +64,6 @@ const ORDER: OrderDetails = {
 
 beforeEach(() => {
   vi.mocked(createCurfoxOrder).mockReset();
-  vi.mocked(fetchCurfoxWaybillPdf).mockReset();
   vi.mocked(sendDispatchNotificationEmail).mockReset();
   vi.mocked(sendAdminFailureAlertEmail).mockReset();
   vi.mocked(prisma.order.update).mockReset();
@@ -74,9 +71,8 @@ beforeEach(() => {
 });
 
 describe("bookCourierAndNotify — happy path", () => {
-  it("sends direct city/region in the envelope, captures waybill + PDF, sends dispatch email", async () => {
+  it("sends direct city in the envelope, captures waybill, sends dispatch email without PDF", async () => {
     vi.mocked(createCurfoxOrder).mockResolvedValueOnce("RA03870247");
-    vi.mocked(fetchCurfoxWaybillPdf).mockResolvedValueOnce(Buffer.from("%PDF-x"));
     vi.mocked(sendDispatchNotificationEmail).mockResolvedValueOnce(undefined);
 
     const waybill = await bookCourierAndNotify({ order: ORDER });
@@ -94,9 +90,10 @@ describe("bookCourierAndNotify — happy path", () => {
     expect(sendDispatchNotificationEmail).toHaveBeenCalledOnce();
     const dispatchCall = vi.mocked(sendDispatchNotificationEmail).mock.calls[0][0];
     expect(dispatchCall.waybillNumber).toBe("RA03870247");
-    expect(dispatchCall.pdfBuffer).toBeInstanceOf(Buffer);
+    // Curfox does not expose a server-side PDF endpoint; we send the email
+    // with a portal link instead of a PDF attachment.
+    expect(dispatchCall.pdfBuffer).toBeUndefined();
 
-    expect(fetchCurfoxWaybillPdf).toHaveBeenCalledWith("RA03870247");
     expect(prisma.order.update).toHaveBeenCalled();
     expect(sendAdminFailureAlertEmail).not.toHaveBeenCalled();
   });
@@ -116,21 +113,6 @@ describe("bookCourierAndNotify — failure cascade", () => {
     const alert = vi.mocked(sendAdminFailureAlertEmail).mock.calls[0][0];
     expect(alert.step).toBe("curfox-create");
     expect(alert.errorDetail).toContain("errors");
-  });
-
-  it("PDF failure → still sends dispatch email without attachment + admin alert(curfox-pdf)", async () => {
-    vi.mocked(createCurfoxOrder).mockResolvedValueOnce("RA03870247");
-    vi.mocked(fetchCurfoxWaybillPdf).mockRejectedValueOnce(
-      new MockedCurfoxError("HTTP 404", "fetch-pdf", 404),
-    );
-
-    const waybill = await bookCourierAndNotify({ order: ORDER });
-
-    expect(waybill).toBe("RA03870247");
-    expect(sendDispatchNotificationEmail).toHaveBeenCalledOnce();
-    expect(vi.mocked(sendDispatchNotificationEmail).mock.calls[0][0].pdfBuffer).toBeUndefined();
-    expect(sendAdminFailureAlertEmail).toHaveBeenCalledOnce();
-    expect(vi.mocked(sendAdminFailureAlertEmail).mock.calls[0][0].step).toBe("curfox-pdf");
   });
 
   it("DB persist failure after Curfox booking → urgent admin alert(curfox-persist)", async () => {

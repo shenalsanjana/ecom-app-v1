@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   createCurfoxOrder,
-  fetchCurfoxWaybillPdf,
   __test_only_resetTokenCache,
 } from "../curfox-client";
 import type { CurfoxCreateOrderInput } from "../curfox-types";
@@ -37,7 +36,6 @@ beforeEach(() => {
   process.env.CURFOX_LOGIN_BASE_URL = "https://login.example.com";
   process.env.CURFOX_BASE_URL = "https://api.example.com";
   process.env.CURFOX_ORDER_CREATE_PATH = "/api/merchant/order/single";
-  process.env.CURFOX_WAYBILL_PDF_PATH_TEMPLATE = "/api/merchant/order/print/{waybill_number}";
 });
 
 afterEach(() => {
@@ -107,50 +105,7 @@ describe("createCurfoxOrder", () => {
   });
 });
 
-describe("fetchCurfoxWaybillPdf", () => {
-  it("returns a Buffer when response is application/pdf", async () => {
-    const pdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46]); // %PDF
-    mockFetch([
-      { status: 200, body: { token: "abc" } },
-      { status: 200, body: pdfBytes, contentType: "application/pdf" },
-    ]);
-    const buf = await fetchCurfoxWaybillPdf("RA03870247");
-    expect(Buffer.isBuffer(buf)).toBe(true);
-    expect(buf.slice(0, 4).toString("ascii")).toBe("%PDF");
-  });
-
-  it("follows JSON-wrapped download url", async () => {
-    const pdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
-    mockFetch([
-      { status: 200, body: { token: "abc" } },
-      { status: 200, body: { url: "https://files.example.com/waybill.pdf" } },
-      { status: 200, body: pdfBytes, contentType: "application/pdf" },
-    ]);
-    const buf = await fetchCurfoxWaybillPdf("RA03870247");
-    expect(buf.slice(0, 4).toString("ascii")).toBe("%PDF");
-  });
-
-  it("throws CurfoxError(step=fetch-pdf) on unexpected content-type", async () => {
-    mockFetch([
-      { status: 200, body: { token: "abc" } },
-      { status: 200, body: "<html>nope</html>", contentType: "text/html" },
-    ]);
-    await expect(fetchCurfoxWaybillPdf("X")).rejects.toMatchObject({
-      name: "CurfoxError",
-      step: "fetch-pdf",
-    });
-  });
-
-  it("substitutes {waybill_number} in the template", async () => {
-    process.env.CURFOX_WAYBILL_PDF_PATH_TEMPLATE = "/print/{waybill_number}";
-    const pdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
-    mockFetch([
-      { status: 200, body: { token: "abc" } },
-      { status: 200, body: pdfBytes, contentType: "application/pdf" },
-    ]);
-    await fetchCurfoxWaybillPdf("RA03870247");
-    const url = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[1][0];
-    expect(url).toBe("https://api.example.com/print/RA03870247");
-  });
-});
+// fetchCurfoxWaybillPdf was removed: Curfox does not expose a server-side
+// PDF endpoint. Tests for the PDF-fetch path are removed; see book-courier
+// tests for the "dispatch email with portal link, no PDF" coverage.
 

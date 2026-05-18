@@ -133,14 +133,6 @@ function orderCreatePath(): string {
   // Verified working endpoint per 2026-05-16 staging probe.
   return process.env.CURFOX_ORDER_CREATE_PATH ?? "/api/merchant/order/single";
 }
-function waybillPdfPathTemplate(): string {
-  // The create-order response no longer returns a numeric id, so the template
-  // can only reference {waybill_number}. The exact path is unverified — Curfox
-  // hasn't documented this endpoint publicly. Set CURFOX_WAYBILL_PDF_PATH_TEMPLATE
-  // explicitly once confirmed via the merchant portal Network tab.
-  return process.env.CURFOX_WAYBILL_PDF_PATH_TEMPLATE ?? "/api/merchant/order/print/{waybill_number}";
-}
-
 function redactPhone(phone: string): string {
   if (phone.length <= 4) return "****";
   return phone.slice(0, -4) + "****";
@@ -208,59 +200,8 @@ export async function createCurfoxOrder(
   return waybill;
 }
 
-/**
- * Downloads the airwaybill PDF for a booked order. The Curfox create-order
- * response does NOT include a numeric id, so this function takes only the
- * waybill string — the path template substitutes `{waybill_number}`.
- */
-export async function fetchCurfoxWaybillPdf(waybillNumber: string): Promise<Buffer> {
-  const template = waybillPdfPathTemplate();
-  const path = template.replace("{waybill_number}", waybillNumber);
-  const url = `${baseUrl()}${path}`;
-
-  let res: Response;
-  try {
-    res = await authedFetch(url, { method: "GET" });
-  } catch (err) {
-    throw new CurfoxError(
-      `Curfox waybill PDF network error: ${err instanceof Error ? err.message : String(err)}`,
-      "fetch-pdf",
-    );
-  }
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new CurfoxError(
-      `Curfox waybill PDF failed: HTTP ${res.status}`,
-      "fetch-pdf",
-      res.status,
-      body,
-    );
-  }
-
-  const ct = res.headers.get("content-type") ?? "";
-  if (ct.includes("application/pdf")) {
-    const ab = await res.arrayBuffer();
-    return Buffer.from(ab);
-  }
-  if (ct.includes("application/json")) {
-    const j = await res.json();
-    const downloadUrl =
-      (j as { url?: string }).url ??
-      (j as { data?: { url?: string } }).data?.url ??
-      (j as { pdf_url?: string }).pdf_url;
-    if (!downloadUrl) {
-      throw new CurfoxError("Waybill PDF: no url in JSON response", "fetch-pdf", res.status);
-    }
-    const pdfRes = await fetch(downloadUrl);
-    if (!pdfRes.ok) {
-      throw new CurfoxError(
-        `Waybill PDF download failed: HTTP ${pdfRes.status}`,
-        "fetch-pdf",
-        pdfRes.status,
-      );
-    }
-    const ab = await pdfRes.arrayBuffer();
-    return Buffer.from(ab);
-  }
-  throw new CurfoxError(`Waybill PDF: unexpected content-type ${ct}`, "fetch-pdf", res.status);
-}
+// fetchCurfoxWaybillPdf removed: Curfox does not expose a server-side PDF
+// endpoint. The waybill is rendered client-side inside the merchant portal
+// (using a layout JSON + the order JSON). The dispatch email now links to
+// the portal instead of attempting to attach a PDF. The "fetch-pdf" step
+// in CurfoxError stays as a recognised value for older lifecycle rows.

@@ -2,7 +2,6 @@
 import { prisma } from "@/app/_lib/prisma";
 import {
   createCurfoxOrder,
-  fetchCurfoxWaybillPdf,
   CurfoxError,
 } from "@/app/_lib/courier/curfox-client";
 import {
@@ -169,46 +168,12 @@ export async function bookCourierAndNotify(params: {
     return waybillNumber; // Still return it as we have it
   }
 
-  // ⑩ Fetch PDF ───────────────────────────────────────────────────────
-  let pdfBuffer: Buffer | undefined;
-  try {
-    pdfBuffer = await fetchCurfoxWaybillPdf(waybillNumber);
-    await prisma.order
-      .update({
-        where: { id: order.orderId },
-        data: { dispatchPdfFetchedAt: new Date() },
-      })
-      .catch((err) => {
-        console.error("[checkout] dispatchPdfFetchedAt update failed:", err);
-      });
-  } catch (err) {
-    pdfBuffer = undefined;
-    console.warn("[curfox] pdf-fetch failed", {
-      orderId: order.orderId,
-      waybillNumber: waybillNumber,
-      reason: err instanceof Error ? err.message : String(err),
-    });
-    await prisma.order
-      .update({
-        where: { id: order.orderId },
-        data: {
-          courierLastError: `pdf-fetch: ${err instanceof Error ? err.message : String(err)}`,
-          courierLastErrorAt: new Date(),
-        },
-      })
-      .catch(() => undefined);
-    await tryAlert({
-      orderId: order.orderId,
-      step: "curfox-pdf",
-      reason: err instanceof Error ? err.message : String(err),
-      order,
-      context: { waybillNumber: waybillNumber },
-    });
-    // Fall through — dispatch email still sends without attachment
-  }
-
-  // ⑪ Send dispatch notification (always — with or without PDF) ───────
-  await tryDispatchEmail(order, waybillNumber, pdfBuffer);
+  // ⑩ Send dispatch notification ─────────────────────────────────────
+  // Curfox does not expose a server-side PDF endpoint; the waybill renders
+  // client-side inside the merchant portal. The dispatch email links to
+  // the portal so the merchant prints from there. (See docs/spec/admin-email-overhaul.md
+  // for the broader rationale and the previously-attempted PDF probe history.)
+  await tryDispatchEmail(order, waybillNumber, undefined);
 
   return waybillNumber;
 }
