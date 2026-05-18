@@ -2,7 +2,6 @@
 import { auth } from "@/app/_lib/auth";
 import { CheckoutClient } from "./checkout-client";
 import { SiteFooter } from "@/app/_components/home/site-footer";
-import { listAvailableCities } from "@/app/_lib/courier/city-map";
 
 export default async function CheckoutPage() {
   const session = await auth();
@@ -13,11 +12,9 @@ export default async function CheckoutPage() {
       }
     : null;
 
-  const cities = await listAvailableCities();
-
   return (
     <>
-      <CheckoutClient user={user} cities={cities} />
+      <CheckoutClient user={user} />
       <SiteFooter />
     </>
   );

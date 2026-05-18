@@ -244,8 +244,6 @@ async function probeOrderEmail() {
       shippingAddress: {
         line1: "Diagnostic Address",
         city: "Colombo",
-        region: "Western",
-        postalCode: "00100",
         country: "Sri Lanka",
       },
       paymentMethod: "COD",

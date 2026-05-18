@@ -57,8 +57,6 @@ const ORDER: OrderDetails = {
   shippingAddress: {
     line1: "1 Walls Lane",
     city: "Kotte",
-    region: "Western",
-    postalCode: "00100",
     country: "Sri Lanka",
   },
   paymentMethod: "COD",

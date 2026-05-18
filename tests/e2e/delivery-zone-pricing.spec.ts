@@ -60,18 +60,18 @@ test("checkout delivery cost flips between Colombo (Rs.350) and Other (Rs.450)",
   // Fill address line 1 (label: "Address Line 1 *").
   await page.getByLabel(/Address Line 1/i).fill("123 Test St");
 
-  // Select Colombo → delivery should be LKR 350.
+  // Scope assertions to the Delivery row of the order summary so subtotal /
+  // total values containing 350 or 450 elsewhere on the page don't cause flakes.
+  const deliveryRow = page
+    .locator("div.flex.justify-between", { hasText: /^Delivery/ })
+    .first();
+
+  // Select Colombo → delivery should be LKR 350 inside the Delivery row.
   await page.locator("#city").selectOption("Colombo");
+  await expect(deliveryRow).toContainText("LKR 350", { timeout: 5_000 });
 
-  // Locate the Delivery row in the order summary: find the span containing "LKR 350".
-  // The row is: <div class="flex justify-between"><span>Delivery</span><span>{formatPrice(shipping)}</span></div>
-  // We assert the formatted price "LKR 350" is visible on the page.
-  await expect(page.locator("text=LKR 350")).toBeVisible({ timeout: 5_000 });
-
-  // Select Kandy (OTHER zone) → delivery should be LKR 450.
+  // Select Kandy (OTHER zone) → row flips to LKR 450.
   await page.locator("#city").selectOption("Kandy");
-  await expect(page.locator("text=LKR 450")).toBeVisible({ timeout: 5_000 });
-
-  // Verify Colombo price is no longer shown.
-  await expect(page.locator("text=LKR 350")).toHaveCount(0);
+  await expect(deliveryRow).toContainText("LKR 450", { timeout: 5_000 });
+  await expect(deliveryRow).not.toContainText("LKR 350");
 });

@@ -23,7 +23,6 @@ type CheckoutUser = { name: string; email: string } | null;
 
 type Props = {
   user: CheckoutUser;
-  cities: Array<{ id: number; name: string }>;
 };
 
 const PAYMENT_OPTIONS: {
@@ -45,7 +44,7 @@ function generateIdempotencyKey(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export function CheckoutClient({ user, cities }: Props) {
+export function CheckoutClient({ user }: Props) {
   const router = useRouter();
   const { items, clearCart } = useCart();
   const [isSubmitting, setIsSubmitting] = useState(false);
