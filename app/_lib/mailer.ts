@@ -1,6 +1,7 @@
 // app/_lib/mailer.ts
 import nodemailer from "nodemailer";
 import { formatPrice } from "@/app/_lib/format";
+import { paymentStatusLabel } from "@/app/_lib/order-status";
 
 function escapeHtml(s: string): string {
   return s
@@ -107,6 +108,8 @@ export type OrderDetails = {
   paymentMethodDisplay?: string;
   trackingCode?: string;
   notes?: string;
+  rbNumber?: string | null;       // Receipt book / invoice reference
+  paymentStatus?: string | null;  // e.g. "Awaiting payment", "Paid", "Cash on delivery"
 };
 
 export async function sendOrderConfirmationEmail(order: OrderDetails): Promise<void> {
@@ -135,13 +138,16 @@ export async function sendOrderConfirmationEmail(order: OrderDetails): Promise<v
     )
     .join("");
 
+  const paymentLabel = paymentStatusLabel(order.paymentStatus);
+
   const text = `
 Order Confirmation - ${BRAND_NAME}
 
-Order ID: ${order.orderId}
+Order: ${order.rbNumber ?? order.orderId}
 Customer: ${order.customerName}
 Email: ${order.customerEmail}${order.customerPhone ? `\nPhone: ${order.customerPhone}` : ""}
-Payment Method: ${paymentDisplay}${order.trackingCode ? `\nTracking Code: ${order.trackingCode}` : ""}
+Payment Method: ${paymentDisplay}
+${paymentLabel ? `Payment Status: ${paymentLabel}\n` : ""}${order.trackingCode ? `Tracking Code: ${order.trackingCode}\n` : ""}
 
 Items:
 ${itemsListText}
@@ -185,10 +191,11 @@ ${BRAND_NAME}
 
     <p>Hi ${escapeHtml(order.customerName)}, thank you for your order. Here are the details:</p>
 
-    <p><strong>Order ID:</strong> ${escapeHtml(order.orderId)}</p>
+    <p><strong>Order:</strong> ${escapeHtml(order.rbNumber ?? order.orderId)}</p>
     <p><strong>Email:</strong> ${escapeHtml(order.customerEmail)}</p>
     ${order.customerPhone ? `<p><strong>Phone:</strong> ${escapeHtml(order.customerPhone)}</p>` : ""}
     <p><strong>Payment Method:</strong> ${escapeHtml(paymentDisplay)}</p>
+    ${paymentLabel ? `<p><strong>Payment Status:</strong> ${escapeHtml(paymentLabel)}</p>` : ""}
     ${order.trackingCode ? `<p><strong>Tracking Code:</strong> ${escapeHtml(order.trackingCode)}</p>` : ""}
 
     <div class="items">
@@ -319,6 +326,14 @@ function formatItemsList(items: OrderItem[]): string {
     .join("\n");
 }
 
+/** Amount the courier should collect at delivery. Zero for any prepaid method;
+ *  the order total for COD. */
+function codAmountFor(
+  order: Pick<OrderDetails, "paymentMethod" | "total">,
+): number {
+  return order.paymentMethod === "COD" ? order.total : 0;
+}
+
 function formatAddress(addr: OrderDetails["shippingAddress"]): string {
   const lines = [addr.line1, addr.line2, addr.city, addr.country].filter(Boolean);
   return lines.join("\n  ");
@@ -338,14 +353,16 @@ export async function sendDispatchNotificationEmail(params: {
     ? "The printable airwaybill is attached as delivery-note.pdf."
     : "⚠ The PDF could not be fetched from Curfox — download it from the merchant portal at https://royalexpress.merchant.curfox.com/";
 
+  const paymentLabel = paymentStatusLabel(order.paymentStatus);
+
   const text = `A new COD order has been booked with Royal Express via Curfox.
 ${pdfNote}
 
-ORDER:        ${order.orderId}
+ORDER:        ${order.rbNumber ?? order.orderId}
 WAYBILL:      ${waybillNumber}
 CUSTOMER:     ${order.customerName}
-PHONE:        ${order.customerPhone ?? "n/a"}
-COD AMOUNT:   ${formatPrice(order.total)}
+PHONE:        ${order.customerPhone ?? "n/a"}${paymentLabel ? `\nPAYMENT:      ${paymentLabel}` : ""}
+COD AMOUNT:   ${formatPrice(codAmountFor(order))}
 DESTINATION:  ${order.shippingAddress.city}
 
 ITEMS:
@@ -353,7 +370,7 @@ ${formatItemsList(order.items)}
 
 ADDRESS:
   ${formatAddress(order.shippingAddress)}
-
+${order.notes && order.notes.trim() ? `\nNOTES:\n  ${order.notes}\n` : ""}
 Print ${pdfBuffer ? "the attached delivery-note.pdf" : "the waybill from the Curfox portal"} and hand the parcel + label to the Royal Express pickup rider.
 
 ─────────────
@@ -388,11 +405,12 @@ Dressing Bear · automated dispatch
     ${pdfBuffer ? "<p class=\"urgent\">The printable airwaybill is attached as delivery-note.pdf.</p>" : "<p class=\"urgent\">⚠ The PDF could not be fetched from Curfox. Please download it from the merchant portal.</p>"}
 
     <div class="section">
-      <p><span class="label">Order ID:</span> ${escapeHtml(order.orderId)}</p>
+      <p><span class="label">Order:</span> ${escapeHtml(order.rbNumber ?? order.orderId)}</p>
       <p><span class="label">Waybill:</span> <strong>${escapeHtml(waybillNumber)}</strong></p>
       <p><span class="label">Customer:</span> ${escapeHtml(order.customerName)}</p>
       <p><span class="label">Phone:</span> ${escapeHtml(order.customerPhone ?? "n/a")}</p>
-      <p><span class="label">COD Amount:</span> <strong>${formatPrice(order.total)}</strong></p>
+      ${paymentLabel ? `<p><span class="label">Payment:</span> ${escapeHtml(paymentLabel)}</p>` : ""}
+      <p><span class="label">COD Amount:</span> <strong>${formatPrice(codAmountFor(order))}</strong></p>
       <p><span class="label">Destination:</span> ${escapeHtml(order.shippingAddress.city)}</p>
     </div>
 
@@ -405,6 +423,11 @@ Dressing Bear · automated dispatch
       <h3>Shipping Address</h3>
       <p>${escapeHtml(formatAddress(order.shippingAddress)).replace(/\n/g, "<br>")}</p>
     </div>
+    ${order.notes && order.notes.trim() ? `
+<div class="section">
+  <h3>Delivery Notes</h3>
+  <p>${escapeHtml(order.notes).replace(/\n/g, "<br>")}</p>
+</div>` : ""}
 
     <p>Print ${pdfBuffer ? "the attached <strong>delivery-note.pdf</strong>" : "the waybill from the <strong>Curfox portal</strong>"} and hand the parcel + label to the Royal Express pickup rider.</p>
 
@@ -420,7 +443,7 @@ Dressing Bear · automated dispatch
     from,
     to: brandEmail,
     replyTo: brandReplyTo(),
-    subject: `[Dispatch] Order ${order.orderId} — Waybill ${waybillNumber}`,
+    subject: `[Dispatch] ${order.rbNumber ?? `Order ${order.orderId}`} — Waybill ${waybillNumber}`,
     text,
     html,
     attachments: pdfBuffer
@@ -437,22 +460,24 @@ export async function sendPendingPrepaidNotificationEmail(params: {
   const brandEmail = requireBrandEmail();
   const from = requireFrom();
   const gateway = order.paymentMethodDisplay ?? order.paymentMethod;
+  const paymentLabel = paymentStatusLabel(order.paymentStatus);
+  const orderRef = order.rbNumber ?? order.orderId;
 
   const text = `A new prepaid order has been placed. Courier booking is
 DEFERRED until the payment gateway confirms the transaction.
 Do NOT ship this order yet.
 
-ORDER:        ${order.orderId}
+ORDER:        ${orderRef}
 CUSTOMER:     ${order.customerName}
 PAYMENT:      ${gateway} (pending)
-TOTAL:        ${formatPrice(order.total)}
+${paymentLabel ? `STATUS:       ${paymentLabel}\n` : ""}TOTAL:        ${formatPrice(order.total)}
 
 ITEMS:
 ${formatItemsList(order.items)}
 
 ADDRESS:
   ${formatAddress(order.shippingAddress)}
-
+${order.notes && order.notes.trim() ? `\nDELIVERY NOTES:\n  ${order.notes}\n` : ""}
 When the gateway confirms (or you confirm manually in the dashboard),
 the courier booking will need to be triggered.
 
@@ -489,9 +514,10 @@ Dressing Bear · automated dispatch
     </div>
 
     <div class="section">
-      <p><span class="label">Order ID:</span> ${escapeHtml(order.orderId)}</p>
+      <p><span class="label">Order ID:</span> ${escapeHtml(orderRef)}</p>
       <p><span class="label">Customer:</span> ${escapeHtml(order.customerName)}</p>
       <p><span class="label">Payment:</span> ${escapeHtml(gateway)} (pending)</p>
+      ${paymentLabel ? `<p><span class="label">Status:</span> ${escapeHtml(paymentLabel)}</p>` : ""}
       <p><span class="label">Total:</span> <strong>${formatPrice(order.total)}</strong></p>
     </div>
 
@@ -504,6 +530,13 @@ Dressing Bear · automated dispatch
       <h3>Shipping Address</h3>
       <p>${escapeHtml(formatAddress(order.shippingAddress)).replace(/\n/g, "<br>")}</p>
     </div>
+
+    ${order.notes && order.notes.trim() ? `
+    <div class="section">
+      <h3>Delivery Notes</h3>
+      <p>${escapeHtml(order.notes.trim())}</p>
+    </div>
+    ` : ""}
 
     <p>When the gateway confirms (or you confirm manually in the dashboard), the courier booking will need to be triggered.</p>
 
@@ -519,7 +552,7 @@ Dressing Bear · automated dispatch
     from,
     to: brandEmail,
     replyTo: brandReplyTo(),
-    subject: `[PENDING PAYMENT] Order ${order.orderId} — ${formatPrice(order.total)} via ${gateway}`,
+    subject: `[Awaiting Payment] ${order.rbNumber ?? `Order ${order.orderId}`} — ${gateway}`,
     text,
     html,
   });
@@ -558,6 +591,8 @@ export async function sendAdminFailureAlertEmail(params: {
 
   const urgentPrefix = step === "curfox-persist" ? "[URGENT] " : "";
   const nextAction = NEXT_ACTION_BY_STEP[step](orderId, context ?? {});
+  const orderRef = order.rbNumber ?? orderId;
+  const paymentLabel = paymentStatusLabel(order.paymentStatus);
 
   const text = `A Dressing Bear order saved successfully but the downstream
 courier/dispatch step failed. The customer was NOT shown an
@@ -565,13 +600,13 @@ error. Manual action may be required.
 
 ORDER DETAILS
 ─────────────
-Order ID:      ${orderId}
+Order:         ${orderRef}
 Placed:        ${new Date().toISOString()}
 Customer:      ${order.customerName}
 Email:         ${order.customerEmail}
 Phone:         ${order.customerPhone ?? "n/a"}
 Payment:       ${order.paymentMethodDisplay ?? order.paymentMethod}
-Total:         ${formatPrice(order.total)}
+${paymentLabel ? `Status:        ${paymentLabel}\n` : ""}Total:         ${formatPrice(order.total)}
 
 ITEMS:
 ${formatItemsList(order.items)}
@@ -638,11 +673,12 @@ Dressing Bear · automated alert
 
     <div class="section">
       <h3>Order Details</h3>
-      <p><span class="label">Order ID:</span> ${escapeHtml(orderId)}</p>
+      <p><span class="label">Order:</span> ${escapeHtml(orderRef)}</p>
       <p><span class="label">Customer:</span> ${escapeHtml(order.customerName)}</p>
       <p><span class="label">Email:</span> ${escapeHtml(order.customerEmail)}</p>
       <p><span class="label">Phone:</span> ${escapeHtml(order.customerPhone ?? "n/a")}</p>
       <p><span class="label">Payment:</span> ${escapeHtml(order.paymentMethodDisplay ?? order.paymentMethod)}</p>
+      ${paymentLabel ? `<p><span class="label">Status:</span> ${escapeHtml(paymentLabel)}</p>` : ""}
       <p><span class="label">Total:</span> <strong>${formatPrice(order.total)}</strong></p>
     </div>
 
@@ -668,7 +704,7 @@ Dressing Bear · automated alert
     from,
     to: brandEmail,
     replyTo: brandReplyTo(),
-    subject: `${urgentPrefix}[Dressing Bear] Order ${orderId} — Curfox ${step} failed`,
+    subject: `${urgentPrefix}[Failure] ${order.rbNumber ?? `Order ${orderId}`} — Curfox ${step} failed`,
     text,
     html,
   });

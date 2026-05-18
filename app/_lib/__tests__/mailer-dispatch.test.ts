@@ -26,6 +26,9 @@ const SAMPLE_ORDER: OrderDetails = {
   },
   paymentMethod: "COD",
   paymentMethodDisplay: "Cash on Delivery",
+  rbNumber: "RB1001",
+  paymentStatus: "COD_PENDING",
+  notes: "Please leave at the gate.",
 };
 
 let transport: nodemailer.Transporter;
@@ -64,12 +67,28 @@ describe("sendDispatchNotificationEmail", () => {
     expect(opts.from).toBe("Dressing Bear <a9e490001@smtp-brevo.com>");
     expect(opts.replyTo).toBe("dressingbear@gmail.com");
     expect(opts.subject).toContain("RA03870247");
-    expect(opts.subject).toContain("ORD-TEST-1");
+    expect(opts.subject).toContain("RB1001");
     expect(opts.attachments).toHaveLength(1);
     expect(opts.attachments[0].filename).toBe("delivery-note.pdf");
     // nodemailer's jsonTransport may serialise the Buffer to base64 in-place;
     // we only care that a non-empty content was provided.
     expect(opts.attachments[0].content).toBeTruthy();
+    // New fields: RB number, payment status, notes, COD amount
+    expect(opts.text).toContain("RB1001");
+    expect(opts.text).toContain("Cash on delivery");
+    expect(opts.text).toContain("Please leave at the gate.");
+    expect(opts.text).toMatch(/COD AMOUNT:.*2.?440/);
+  });
+
+  it("renders COD amount = 0 for prepaid orders (not the order total)", async () => {
+    await sendDispatchNotificationEmail({
+      order: { ...SAMPLE_ORDER, paymentMethod: "PAYHERE", paymentMethodDisplay: "PayHere" },
+      waybillNumber: "RA03870248",
+    });
+    const opts = sendMailSpy.mock.calls[0][0];
+    expect(opts.text).toMatch(/COD AMOUNT:\s+LKR\s*0(?!\d)/);
+    // Sanity: ensure 2,440 (the total) is NOT rendered as the COD figure.
+    expect(opts.text).not.toMatch(/COD AMOUNT:.*2.?440/);
   });
 
   it("omits attachment when pdfBuffer is undefined and notes it in the body", async () => {
@@ -84,12 +103,13 @@ describe("sendDispatchNotificationEmail", () => {
 });
 
 describe("sendPendingPrepaidNotificationEmail", () => {
-  it("uses [PENDING PAYMENT] subject prefix and never attaches a PDF", async () => {
+  it("uses [Awaiting Payment] subject prefix with RB number and never attaches a PDF", async () => {
     await sendPendingPrepaidNotificationEmail({
       order: { ...SAMPLE_ORDER, paymentMethod: "PAYHERE", paymentMethodDisplay: "PayHere" },
     });
     const opts = sendMailSpy.mock.calls[0][0];
-    expect(opts.subject).toMatch(/^\[PENDING PAYMENT\]/);
+    expect(opts.subject).toMatch(/^\[Awaiting Payment\]/);
+    expect(opts.subject).toContain("RB1001");
     expect(opts.attachments).toBeUndefined();
     expect(opts.text).toContain("Do NOT ship");
   });
@@ -105,7 +125,7 @@ describe("sendAdminFailureAlertEmail", () => {
       order: SAMPLE_ORDER,
     });
     const opts = sendMailSpy.mock.calls[0][0];
-    expect(opts.subject).toContain("ORD-TEST-1");
+    expect(opts.subject).toContain("RB1001");
     expect(opts.subject).toContain("curfox-create");
     expect(opts.text).toContain("HTTP 422 — address too long");
     expect(opts.text).toContain("customer_address");

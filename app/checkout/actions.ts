@@ -198,8 +198,9 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
 
   // Create the order + decrement stock atomically. Stock decrement uses a
   // conditional update so concurrent purchases of the last unit can't oversell.
+  let created: { rbNumber: string | null; paymentStatus: string | null };
   try {
-    await prisma.$transaction(async (tx) => {
+    created = await prisma.$transaction(async (tx) => {
       for (const item of items) {
         const result = await tx.product.updateMany({
           where: { id: item.productId, stock: { gte: item.quantity } },
@@ -213,7 +214,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
       const rbNumber = await nextRbNumber(tx);
       const paymentStatus = initialPaymentStatus(paymentMethod);
 
-      await tx.order.create({
+      return tx.order.create({
         data: {
           id: orderId,
           userId,
@@ -272,6 +273,8 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
     paymentMethod,
     paymentMethodDisplay: PAYMENT_METHOD_DISPLAY[paymentMethod],
     notes: notes && notes.length > 0 ? notes : undefined,
+    rbNumber: created.rbNumber,
+    paymentStatus: created.paymentStatus,
   };
 
   // Synchronous booking with non-blocking failure
