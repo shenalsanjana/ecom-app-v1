@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { User } from "lucide-react";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -17,10 +17,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { firstName } from "@/app/_lib/format";
-import { logoutAction } from "@/app/(auth)/actions";
 
 export function ProfileMenu() {
-  const { data: session, status, update } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -33,10 +32,12 @@ export function ProfileMenu() {
   function handleLogout() {
     setOpen(false);
     startTransition(async () => {
-      await logoutAction();
-      await update();
-      router.refresh();
+      // Client-side signOut clears the cookie via /api/auth/signout AND
+      // calls _getSession({event:"storage"}) internally, which (unlike
+      // SessionProvider's update()) does setSession(null) on a null result.
+      await signOut({ redirect: false });
       router.push("/");
+      router.refresh();
     });
   }
 

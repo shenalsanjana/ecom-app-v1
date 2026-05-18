@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { randomBytes, createHash } from "crypto";
 import { AuthError } from "next-auth";
-import { signIn, signOut } from "@/app/_lib/auth";
+import { signIn } from "@/app/_lib/auth";
 import { prisma } from "@/app/_lib/prisma";
 import { sendPasswordResetEmail } from "@/app/_lib/mailer";
 import {
@@ -113,10 +113,6 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
     console.error("[Login Action]: Unexpected error during signIn", error);
     throw error;
   }
-}
-
-export async function logoutAction(): Promise<void> {
-  await signOut({ redirect: false });
 }
 
 export async function requestResetAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
