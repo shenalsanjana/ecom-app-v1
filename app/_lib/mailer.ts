@@ -339,6 +339,44 @@ function formatAddress(addr: OrderDetails["shippingAddress"]): string {
   return lines.join("\n  ");
 }
 
+/**
+ * Structured logger for failed email sends. nodemailer attaches
+ * code / responseCode / response / command to its errors when the SMTP server
+ * rejects something; surface those explicitly so failures are greppable in
+ * dev/prod logs. Email failures are otherwise swallowed by the checkout flow
+ * (orders must still succeed if the email pipe is broken), so this log line is
+ * the only signal the merchant has when something like a Brevo IP-rejection
+ * starts happening silently.
+ */
+export function logMailerError(
+  template:
+    | "order-confirmation"
+    | "dispatch"
+    | "pending-prepaid"
+    | "admin-failure-alert"
+    | "contact"
+    | "password-reset",
+  orderRef: { orderId?: string; rbNumber?: string | null },
+  err: unknown,
+): void {
+  const e = err as Partial<{
+    code: string;
+    command: string;
+    response: string;
+    responseCode: number;
+    message: string;
+  }>;
+  // eslint-disable-next-line no-console
+  console.error(`[mailer] ${template} FAILED`, {
+    order: orderRef.rbNumber ?? orderRef.orderId ?? "(none)",
+    code: e.code,
+    responseCode: e.responseCode,
+    response: e.response,
+    command: e.command,
+    message: e.message,
+  });
+}
+
 export async function sendDispatchNotificationEmail(params: {
   order: OrderDetails;
   waybillNumber: string;

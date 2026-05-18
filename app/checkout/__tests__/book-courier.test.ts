@@ -20,6 +20,7 @@ vi.mock("@/app/_lib/courier/curfox-client", () => ({
 vi.mock("@/app/_lib/mailer", () => ({
   sendDispatchNotificationEmail: vi.fn(),
   sendAdminFailureAlertEmail: vi.fn(),
+  logMailerError: vi.fn(),
 }));
 vi.mock("@/app/_lib/prisma", () => ({
   prisma: {

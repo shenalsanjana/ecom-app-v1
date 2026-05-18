@@ -12,6 +12,7 @@ import {
 import {
   sendDispatchNotificationEmail,
   sendAdminFailureAlertEmail,
+  logMailerError,
 } from "@/app/_lib/mailer";
 import type { OrderDetails } from "@/app/_lib/mailer";
 
@@ -40,7 +41,11 @@ async function tryAlert(params: Parameters<typeof sendAdminFailureAlertEmail>[0]
   try {
     await sendAdminFailureAlertEmail(params);
   } catch (err) {
-    console.error("[mailer] admin alert send failed (suppressed):", err);
+    logMailerError(
+      "admin-failure-alert",
+      { orderId: params.orderId, rbNumber: params.order.rbNumber },
+      err,
+    );
   }
 }
 
@@ -60,7 +65,11 @@ async function tryDispatchEmail(
         console.error("[checkout] dispatchEmailSentAt update failed:", err);
       });
   } catch (err) {
-    console.error("[mailer] dispatch send failed:", err);
+    logMailerError(
+      "dispatch",
+      { orderId: order.orderId, rbNumber: order.rbNumber },
+      err,
+    );
   }
 }
 
