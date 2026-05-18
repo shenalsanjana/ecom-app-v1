@@ -91,14 +91,18 @@ describe("sendDispatchNotificationEmail", () => {
     expect(opts.text).not.toMatch(/COD AMOUNT:.*2.?440/);
   });
 
-  it("omits attachment when pdfBuffer is undefined and notes it in the body", async () => {
+  it("links to the Curfox portal for waybill printing when no pdfBuffer is provided", async () => {
     await sendDispatchNotificationEmail({
       order: SAMPLE_ORDER,
       waybillNumber: "RA03870247",
     });
     const opts = sendMailSpy.mock.calls[0][0];
     expect(opts.attachments).toBeUndefined();
-    expect(opts.text).toContain("PDF could not be fetched");
+    expect(opts.text).toContain("PRINT THE WAYBILL:");
+    expect(opts.text).toContain("https://royalexpress.merchant.curfox.com/all-orders");
+    expect(opts.text).toContain("RA03870247");
+    // The alarmist "PDF could not be fetched" wording is no longer used.
+    expect(opts.text).not.toContain("PDF could not be fetched");
   });
 });
 

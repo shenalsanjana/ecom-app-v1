@@ -52,6 +52,9 @@ next-env.d.ts
 # bug-report screenshots (local debugging artefacts)
 bugs/
 
+# scratch outputs from diagnostic scripts (PDFs, screenshots, etc.)
+tmp/
+
 # sqlite dev db
 prisma/dev.db
 prisma/dev.db-journal

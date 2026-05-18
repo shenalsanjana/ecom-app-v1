@@ -387,14 +387,16 @@ export async function sendDispatchNotificationEmail(params: {
   const brandEmail = requireBrandEmail();
   const from = requireFrom();
 
-  const pdfNote = pdfBuffer
-    ? "The printable airwaybill is attached as delivery-note.pdf."
-    : "⚠ The PDF could not be fetched from Curfox — download it from the merchant portal at https://royalexpress.merchant.curfox.com/";
+  // Curfox does not expose a server-side PDF endpoint; the waybill is
+  // rendered client-side inside the merchant portal. Until we add server-side
+  // rendering, the dispatch email links to the portal where the merchant
+  // prints the waybill in one click. If a pdfBuffer is provided by a future
+  // renderer it is still attached.
+  const portalUrl = "https://royalexpress.merchant.curfox.com/all-orders";
 
   const paymentLabel = paymentStatusLabel(order.paymentStatus);
 
   const text = `A new COD order has been booked with Royal Express via Curfox.
-${pdfNote}
 
 ORDER:        ${order.rbNumber ?? order.orderId}
 WAYBILL:      ${waybillNumber}
@@ -409,7 +411,9 @@ ${formatItemsList(order.items)}
 ADDRESS:
   ${formatAddress(order.shippingAddress)}
 ${order.notes && order.notes.trim() ? `\nNOTES:\n  ${order.notes}\n` : ""}
-Print ${pdfBuffer ? "the attached delivery-note.pdf" : "the waybill from the Curfox portal"} and hand the parcel + label to the Royal Express pickup rider.
+PRINT THE WAYBILL:
+  ${portalUrl}
+  Find waybill ${waybillNumber}, open it, click the QR icon → Default to print.
 
 ─────────────
 Dressing Bear · automated dispatch
@@ -440,7 +444,6 @@ Dressing Bear · automated dispatch
     </div>
 
     <p>A new COD order has been booked with Royal Express via Curfox.</p>
-    ${pdfBuffer ? "<p class=\"urgent\">The printable airwaybill is attached as delivery-note.pdf.</p>" : "<p class=\"urgent\">⚠ The PDF could not be fetched from Curfox. Please download it from the merchant portal.</p>"}
 
     <div class="section">
       <p><span class="label">Order:</span> ${escapeHtml(order.rbNumber ?? order.orderId)}</p>
@@ -467,7 +470,12 @@ Dressing Bear · automated dispatch
   <p>${escapeHtml(order.notes).replace(/\n/g, "<br>")}</p>
 </div>` : ""}
 
-    <p>Print ${pdfBuffer ? "the attached <strong>delivery-note.pdf</strong>" : "the waybill from the <strong>Curfox portal</strong>"} and hand the parcel + label to the Royal Express pickup rider.</p>
+    <p style="margin-top: 20px;">
+      <a href="${portalUrl}" style="display: inline-block; background: #27ae60; color: #fff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold;">Print waybill in Curfox</a>
+    </p>
+    <p style="font-size: 13px; color: #666;">
+      Opens the all-orders list. Find waybill <strong>${escapeHtml(waybillNumber)}</strong>, open it, click the QR icon → <strong>Default</strong> to print.
+    </p>${pdfBuffer ? "<p>(A printable airwaybill is also attached as delivery-note.pdf.)</p>" : ""}
 
     <div style="margin-top: 30px; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 10px;">
       ${escapeHtml(BRAND_NAME)} &middot; automated dispatch
