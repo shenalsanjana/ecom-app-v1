@@ -4,6 +4,7 @@
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { randomBytes, createHash } from "crypto";
+import { AuthError } from "next-auth";
 import { signIn, signOut } from "@/app/_lib/auth";
 import { prisma } from "@/app/_lib/prisma";
 import { sendPasswordResetEmail } from "@/app/_lib/mailer";
@@ -14,7 +15,9 @@ import {
   ResetPasswordSchema,
 } from "@/app/_lib/validation";
 
-export type ActionState = { error?: string; success?: string } | null;
+export type ActionState =
+  | { error?: string; success?: string; redirectTo?: string }
+  | null;
 
 function safeCallbackUrl(raw: string | null | undefined): string {
   if (!raw) return "/";
@@ -66,14 +69,14 @@ export async function signupAction(_prev: ActionState, formData: FormData): Prom
     await signIn("credentials", {
       email: parsed.data.email,
       password: parsed.data.password,
-      redirectTo: callbackUrl,
+      redirect: false,
     });
-    console.log("[Signup Action]: signIn call finished (redirect expected)");
-    return null;
+    console.log("[Signup Action]: signIn cookie set, returning redirectTo for client navigation");
+    return { redirectTo: callbackUrl };
   } catch (error) {
-    if (error instanceof Error && (error as any).digest?.startsWith("NEXT_REDIRECT")) {
-      console.log("[Signup Action]: Caught expected redirect error");
-      throw error;
+    if (error instanceof AuthError) {
+      console.warn("[Signup Action]: AuthError during auto sign-in", error.type);
+      return { success: NEUTRAL_SIGNUP_MESSAGE };
     }
     console.error("[Signup Action]: Unexpected error during signIn", error);
     return { success: NEUTRAL_SIGNUP_MESSAGE };
@@ -98,22 +101,22 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
     await signIn("credentials", {
       email: parsed.data.email,
       password: parsed.data.password,
-      redirectTo: callbackUrl,
+      redirect: false,
     });
-    console.log("[Login Action]: signIn call finished (redirect expected)");
-    return null;
+    console.log("[Login Action]: signIn cookie set, returning redirectTo for client navigation");
+    return { redirectTo: callbackUrl };
   } catch (error) {
-    if (error instanceof Error && (error as any).digest?.startsWith("NEXT_REDIRECT")) {
-      console.log("[Login Action]: Caught expected redirect error");
-      throw error;
+    if (error instanceof AuthError) {
+      console.warn("[Login Action]: AuthError during signIn", error.type);
+      return { error: "Invalid email or password" };
     }
     console.error("[Login Action]: Unexpected error during signIn", error);
-    return { error: "Invalid email or password" };
+    throw error;
   }
 }
 
 export async function logoutAction(): Promise<void> {
-  await signOut({ redirectTo: "/" });
+  await signOut({ redirect: false });
 }
 
 export async function requestResetAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

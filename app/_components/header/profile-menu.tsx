@@ -1,7 +1,9 @@
 // app/_components/header/profile-menu.tsx
 "use client";
 
+import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { User } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -18,14 +20,28 @@ import { firstName } from "@/app/_lib/format";
 import { logoutAction } from "@/app/(auth)/actions";
 
 export function ProfileMenu() {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
   const user =
     status === "authenticated" && session?.user
       ? { name: session.user.name ?? "", email: session.user.email ?? "" }
       : null;
 
+  function handleLogout() {
+    setOpen(false);
+    startTransition(async () => {
+      await logoutAction();
+      await update();
+      router.refresh();
+      router.push("/");
+    });
+  }
+
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger
         render={
           <Button
@@ -57,10 +73,14 @@ export function ProfileMenu() {
               Saved addresses
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem render={<form action={logoutAction} />}>
-              <button type="submit" className="w-full text-left">
-                Log out
-              </button>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.preventDefault();
+                handleLogout();
+              }}
+              disabled={isPending}
+            >
+              {isPending ? "Logging out…" : "Log out"}
             </DropdownMenuItem>
           </>
         ) : (
