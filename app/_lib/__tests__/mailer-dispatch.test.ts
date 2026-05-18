@@ -93,12 +93,13 @@ describe("sendDispatchNotificationEmail", () => {
 });
 
 describe("sendPendingPrepaidNotificationEmail", () => {
-  it("uses [PENDING PAYMENT] subject prefix and never attaches a PDF", async () => {
+  it("uses [Awaiting Payment] subject prefix with RB number and never attaches a PDF", async () => {
     await sendPendingPrepaidNotificationEmail({
       order: { ...SAMPLE_ORDER, paymentMethod: "PAYHERE", paymentMethodDisplay: "PayHere" },
     });
     const opts = sendMailSpy.mock.calls[0][0];
-    expect(opts.subject).toMatch(/^\[PENDING PAYMENT\]/);
+    expect(opts.subject).toMatch(/^\[Awaiting Payment\]/);
+    expect(opts.subject).toContain("RB1001");
     expect(opts.attachments).toBeUndefined();
     expect(opts.text).toContain("Do NOT ship");
   });

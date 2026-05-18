@@ -456,22 +456,24 @@ export async function sendPendingPrepaidNotificationEmail(params: {
   const brandEmail = requireBrandEmail();
   const from = requireFrom();
   const gateway = order.paymentMethodDisplay ?? order.paymentMethod;
+  const paymentLabel = paymentStatusLabel(order.paymentStatus);
+  const orderRef = order.rbNumber ?? order.orderId;
 
   const text = `A new prepaid order has been placed. Courier booking is
 DEFERRED until the payment gateway confirms the transaction.
 Do NOT ship this order yet.
 
-ORDER:        ${order.orderId}
+ORDER:        ${orderRef}
 CUSTOMER:     ${order.customerName}
 PAYMENT:      ${gateway} (pending)
-TOTAL:        ${formatPrice(order.total)}
+${paymentLabel ? `STATUS:       ${paymentLabel}\n` : ""}TOTAL:        ${formatPrice(order.total)}
 
 ITEMS:
 ${formatItemsList(order.items)}
 
 ADDRESS:
   ${formatAddress(order.shippingAddress)}
-
+${order.notes && order.notes.trim() ? `\nDELIVERY NOTES:\n  ${order.notes}\n` : ""}
 When the gateway confirms (or you confirm manually in the dashboard),
 the courier booking will need to be triggered.
 
@@ -508,9 +510,10 @@ Dressing Bear · automated dispatch
     </div>
 
     <div class="section">
-      <p><span class="label">Order ID:</span> ${escapeHtml(order.orderId)}</p>
+      <p><span class="label">Order ID:</span> ${escapeHtml(orderRef)}</p>
       <p><span class="label">Customer:</span> ${escapeHtml(order.customerName)}</p>
       <p><span class="label">Payment:</span> ${escapeHtml(gateway)} (pending)</p>
+      ${paymentLabel ? `<p><span class="label">Status:</span> ${escapeHtml(paymentLabel)}</p>` : ""}
       <p><span class="label">Total:</span> <strong>${formatPrice(order.total)}</strong></p>
     </div>
 
@@ -523,6 +526,13 @@ Dressing Bear · automated dispatch
       <h3>Shipping Address</h3>
       <p>${escapeHtml(formatAddress(order.shippingAddress)).replace(/\n/g, "<br>")}</p>
     </div>
+
+    ${order.notes && order.notes.trim() ? `
+    <div class="section">
+      <h3>Delivery Notes</h3>
+      <p>${escapeHtml(order.notes.trim())}</p>
+    </div>
+    ` : ""}
 
     <p>When the gateway confirms (or you confirm manually in the dashboard), the courier booking will need to be triggered.</p>
 
@@ -538,7 +548,7 @@ Dressing Bear · automated dispatch
     from,
     to: brandEmail,
     replyTo: brandReplyTo(),
-    subject: `[PENDING PAYMENT] Order ${order.orderId} — ${formatPrice(order.total)} via ${gateway}`,
+    subject: `[Awaiting Payment] ${order.rbNumber ?? `Order ${order.orderId}`} — ${gateway}`,
     text,
     html,
   });
