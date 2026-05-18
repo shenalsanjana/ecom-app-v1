@@ -1,9 +1,10 @@
 // app/_components/account/account-sidebar.tsx
 "use client";
 
+import { useTransition } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { logoutAction } from "@/app/(auth)/actions";
+import { usePathname, useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 
 const ITEMS = [
   { href: "/account", label: "Profile" },
@@ -14,6 +15,17 @@ const ITEMS = [
 
 export function AccountSidebar({ userName }: { userName: string }) {
   const path = usePathname();
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  function handleLogout() {
+    startTransition(async () => {
+      await signOut({ redirect: false });
+      router.push("/");
+      router.refresh();
+    });
+  }
+
   return (
     <aside className="w-56 shrink-0 border-r pr-6">
       <div className="mb-6">
@@ -38,14 +50,14 @@ export function AccountSidebar({ userName }: { userName: string }) {
           );
         })}
       </nav>
-      <form action={logoutAction} className="mt-6">
-        <button
-          type="submit"
-          className="w-full rounded px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
-        >
-          Log out
-        </button>
-      </form>
+      <button
+        type="button"
+        onClick={handleLogout}
+        disabled={isPending}
+        className="mt-6 w-full rounded px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
+      >
+        {isPending ? "Logging out…" : "Log out"}
+      </button>
     </aside>
   );
 }
