@@ -101,8 +101,9 @@ export type OrderDetails = {
     line1: string;
     line2?: string;
     city: string;
-    region: string;
-    postalCode: string;
+    // region and postalCode are optional pending Task 9 DB schema drop.
+    region?: string;
+    postalCode?: string;
     country: string;
   };
   paymentMethod: "COD" | "PAYHERE" | "KOKO" | "MINITPAY";
@@ -154,7 +155,7 @@ Total: ${formatPrice(order.total)}
 
 Shipping Address:
 ${order.shippingAddress.line1}
-${order.shippingAddress.line2 ? order.shippingAddress.line2 + "\n" : ""}${order.shippingAddress.city}, ${order.shippingAddress.region} ${order.shippingAddress.postalCode}
+${order.shippingAddress.line2 ? order.shippingAddress.line2 + "\n" : ""}${order.shippingAddress.city}${order.shippingAddress.region ? ", " + order.shippingAddress.region : ""}${order.shippingAddress.postalCode ? " " + order.shippingAddress.postalCode : ""}
 ${order.shippingAddress.country}
 ${order.notes && order.notes.trim() ? `\nDelivery Notes:\n${order.notes}\n` : ""}
 Need help? Contact us at ${CONTACT_NUMBER} or ${brandEmail}.
@@ -207,7 +208,7 @@ ${BRAND_NAME}
       <p>
         ${escapeHtml(order.shippingAddress.line1)}<br>
         ${order.shippingAddress.line2 ? escapeHtml(order.shippingAddress.line2) + "<br>" : ""}
-        ${escapeHtml(order.shippingAddress.city)}, ${escapeHtml(order.shippingAddress.region)} ${escapeHtml(order.shippingAddress.postalCode)}<br>
+        ${escapeHtml(order.shippingAddress.city)}${order.shippingAddress.region ? ", " + escapeHtml(order.shippingAddress.region) : ""}${order.shippingAddress.postalCode ? " " + escapeHtml(order.shippingAddress.postalCode) : ""}<br>
         ${escapeHtml(order.shippingAddress.country)}
       </p>
       ${order.notes && order.notes.trim() ? `<h3>Delivery Notes</h3><p>${escapeHtml(order.notes).replace(/\n/g, "<br>")}</p>` : ""}
@@ -325,7 +326,7 @@ function formatAddress(addr: OrderDetails["shippingAddress"]): string {
   const lines = [
     addr.line1,
     addr.line2,
-    `${addr.city}, ${addr.region} ${addr.postalCode}`,
+    `${addr.city}${addr.region ? ", " + addr.region : ""}${addr.postalCode ? " " + addr.postalCode : ""}`,
     addr.country,
   ].filter(Boolean);
   return lines.join("\n  ");

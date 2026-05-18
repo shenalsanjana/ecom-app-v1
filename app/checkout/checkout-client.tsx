@@ -67,8 +67,6 @@ export function CheckoutClient({ user, cities }: Props) {
     line1: "",
     line2: "",
     city: "",
-    region: "",
-    postalCode: "",
     country: "Sri Lanka",
   });
 
@@ -303,67 +301,39 @@ export function CheckoutClient({ user, cities }: Props) {
                         placeholder="Apt, Suite, etc."
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label htmlFor="city" className="block text-sm font-medium mb-1">
-                          City *
-                        </label>
-                        <select
-                          id="city"
-                          name="city"
-                          required
-                          value={address.city ?? ""}
-                          onChange={(e) => setAddress({ ...address, city: e.target.value })}
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <option value="" disabled>
-                            Select a city
+                    <div>
+                      <label htmlFor="city" className="block text-sm font-medium mb-1">
+                        City *
+                      </label>
+                      <select
+                        id="city"
+                        name="city"
+                        required
+                        value={address.city ?? ""}
+                        onChange={(e) => setAddress({ ...address, city: e.target.value })}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="" disabled>
+                          Select a city
+                        </option>
+                        {DELIVERY_CITIES.map((c) => (
+                          <option key={c.name} value={c.name}>
+                            {c.name}
                           </option>
-                          {DELIVERY_CITIES.map((c) => (
-                            <option key={c.name} value={c.name}>
-                              {c.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label htmlFor="region" className="block text-sm font-medium mb-1">
-                          Province *
-                        </label>
-                        <Input
-                          id="region"
-                          value={address.region}
-                          onChange={(e) => setAddress({ ...address, region: e.target.value })}
-                          required
-                          placeholder="Western Province"
-                        />
-                      </div>
+                        ))}
+                      </select>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label htmlFor="postalCode" className="block text-sm font-medium mb-1">
-                          Postal Code *
-                        </label>
-                        <Input
-                          id="postalCode"
-                          value={address.postalCode}
-                          onChange={(e) => setAddress({ ...address, postalCode: e.target.value })}
-                          required
-                          placeholder="00100"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="country" className="block text-sm font-medium mb-1">
-                          Country *
-                        </label>
-                        <Input
-                          id="country"
-                          value={address.country}
-                          onChange={(e) => setAddress({ ...address, country: e.target.value })}
-                          required
-                          disabled
-                        />
-                      </div>
+                    <div>
+                      <label htmlFor="country" className="block text-sm font-medium mb-1">
+                        Country *
+                      </label>
+                      <Input
+                        id="country"
+                        value={address.country}
+                        onChange={(e) => setAddress({ ...address, country: e.target.value })}
+                        required
+                        disabled
+                      />
                     </div>
                   </div>
                 </div>

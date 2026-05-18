@@ -27,7 +27,7 @@ const DEFAULT_WEIGHT = (): number =>
 function buildAddressLine(addr: OrderDetails["shippingAddress"]): string {
   const parts = [addr.line1];
   if (addr.line2) parts.push(addr.line2);
-  parts.push(addr.postalCode);
+  if (addr.postalCode) parts.push(addr.postalCode);
   return parts.join(", ");
 }
 
@@ -78,7 +78,7 @@ export async function bookCourierAndNotify(params: {
 
   // Resolve city ID or names
   const cityResolution = await resolveCurfoxCity(order.shippingAddress.city);
-  const district = getDistrictForCity(order.shippingAddress.city, order.shippingAddress.region);
+  const district = getDistrictForCity(order.shippingAddress.city, order.shippingAddress.region ?? "");
 
   const orderItem: any = {
     order_no: order.orderId,
