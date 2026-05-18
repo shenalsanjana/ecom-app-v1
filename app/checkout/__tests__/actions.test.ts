@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+const { txOrderCreate } = vi.hoisted(() => ({
+  txOrderCreate: vi.fn(async () => ({})),
+}));
+
 vi.mock("@/app/_lib/auth", () => ({
   auth: vi.fn(async () => null),
 }));
@@ -20,8 +24,9 @@ vi.mock("@/app/_lib/prisma", () => ({
           updateMany: async () => ({ count: 1 }),
         },
         order: {
-          create: async () => ({}),
+          create: txOrderCreate,
         },
+        $queryRaw: vi.fn().mockResolvedValue([{ next: 1001n }]),
       }),
     ),
   },
@@ -61,6 +66,7 @@ beforeEach(() => {
   vi.mocked(bookCourierAndNotify).mockClear();
   vi.mocked(sendOrderConfirmationEmail).mockClear();
   vi.mocked(sendPendingPrepaidNotificationEmail).mockClear();
+  txOrderCreate.mockClear();
 });
 
 describe("processOrder — COD path", () => {
@@ -71,6 +77,18 @@ describe("processOrder — COD path", () => {
     expect(bookCourierAndNotify).toHaveBeenCalledOnce();
     expect(sendOrderConfirmationEmail).toHaveBeenCalledOnce();
     expect(sendPendingPrepaidNotificationEmail).not.toHaveBeenCalled();
+  });
+
+  it("persists COD_PENDING paymentStatus and an RB-prefixed rbNumber", async () => {
+    await processOrder({ ...baseInput, paymentMethod: "COD" });
+    expect(txOrderCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          paymentStatus: "COD_PENDING",
+          rbNumber: expect.stringMatching(/^RB\d+$/),
+        }),
+      }),
+    );
   });
 });
 
@@ -83,6 +101,21 @@ describe("processOrder — prepaid paths", () => {
       expect(bookCourierAndNotify).not.toHaveBeenCalled();
       expect(sendPendingPrepaidNotificationEmail).toHaveBeenCalledOnce();
       expect(sendOrderConfirmationEmail).toHaveBeenCalledOnce();
+    },
+  );
+
+  it.each(["PAYHERE", "KOKO", "MINITPAY"] as const)(
+    "%s: persists PENDING paymentStatus and an RB-prefixed rbNumber",
+    async (paymentMethod) => {
+      await processOrder({ ...baseInput, paymentMethod });
+      expect(txOrderCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            paymentStatus: "PENDING",
+            rbNumber: expect.stringMatching(/^RB\d+$/),
+          }),
+        }),
+      );
     },
   );
 });
