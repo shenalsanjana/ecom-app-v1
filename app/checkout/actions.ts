@@ -8,6 +8,7 @@ import {
   sendOrderConfirmationEmail,
   sendPendingPrepaidNotificationEmail,
   sendAdminFailureAlertEmail,
+  logMailerError,
   type OrderItem,
   type OrderDetails,
 } from "@/app/_lib/mailer";
@@ -92,7 +93,7 @@ async function orchestrateCourierBooking(orderId: string, details: OrderDetails)
       try {
         await sendPendingPrepaidNotificationEmail({ order: details });
       } catch (err) {
-        console.error("[mailer] pending-prepaid send failed:", err);
+        logMailerError("pending-prepaid", { orderId, rbNumber: details.rbNumber }, err);
       }
     }
   } catch (err) {
@@ -107,7 +108,7 @@ async function orchestrateCourierBooking(orderId: string, details: OrderDetails)
         errorDetail: err instanceof Error ? err.stack : undefined,
       });
     } catch (alertErr) {
-      console.error("[checkout] admin alert failed in orchestrateCourierBooking:", alertErr);
+      logMailerError("admin-failure-alert", { orderId }, alertErr);
     }
   }
   return undefined;
@@ -291,7 +292,11 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
       data: { emailSent: true },
     });
   } catch (error) {
-    console.error("Failed to send order email:", error);
+    logMailerError(
+      "order-confirmation",
+      { orderId, rbNumber: created.rbNumber },
+      error,
+    );
   }
 
   return { success: true, orderId, trackingCode, isGuest: !userId };
