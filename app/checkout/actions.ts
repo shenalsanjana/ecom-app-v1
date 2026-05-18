@@ -14,6 +14,8 @@ import {
 import { prisma } from "@/app/_lib/prisma";
 import { calculateDelivery } from "@/app/_lib/checkout-config";
 import { zoneForCity } from "@/app/_lib/delivery-zones";
+import { initialPaymentStatus } from "@/app/_lib/order-status";
+import { nextRbNumber } from "@/app/_lib/rb-number";
 import { bookCourierAndNotify } from "./book-courier";
 
 export type PaymentMethod = "COD" | "PAYHERE" | "KOKO" | "MINITPAY";
@@ -208,6 +210,9 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
         }
       }
 
+      const rbNumber = await nextRbNumber(tx);
+      const paymentStatus = initialPaymentStatus(paymentMethod);
+
       await tx.order.create({
         data: {
           id: orderId,
@@ -225,6 +230,8 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
           paymentMethod,
           paymentMethodDisplay: PAYMENT_METHOD_DISPLAY[paymentMethod],
           status: "PENDING",
+          paymentStatus,
+          rbNumber,
           idempotencyKey: idempotencyKey ?? null,
           notes: notes && notes.length > 0 ? notes : null,
           items: {

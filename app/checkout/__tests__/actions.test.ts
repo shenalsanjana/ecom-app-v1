@@ -22,6 +22,7 @@ vi.mock("@/app/_lib/prisma", () => ({
         order: {
           create: async () => ({}),
         },
+        $queryRaw: vi.fn().mockResolvedValue([{ next: 1001n }]),
       }),
     ),
   },
