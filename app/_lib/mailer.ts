@@ -1,6 +1,7 @@
 // app/_lib/mailer.ts
 import nodemailer from "nodemailer";
 import { formatPrice } from "@/app/_lib/format";
+import { paymentStatusLabel } from "@/app/_lib/order-status";
 
 function escapeHtml(s: string): string {
   return s
@@ -348,14 +349,16 @@ export async function sendDispatchNotificationEmail(params: {
     ? "The printable airwaybill is attached as delivery-note.pdf."
     : "⚠ The PDF could not be fetched from Curfox — download it from the merchant portal at https://royalexpress.merchant.curfox.com/";
 
+  const paymentLabel = paymentStatusLabel(order.paymentStatus);
+
   const text = `A new COD order has been booked with Royal Express via Curfox.
 ${pdfNote}
 
-ORDER:        ${order.orderId}
+ORDER:        ${order.rbNumber ?? order.orderId}
 WAYBILL:      ${waybillNumber}
 CUSTOMER:     ${order.customerName}
-PHONE:        ${order.customerPhone ?? "n/a"}
-COD AMOUNT:   ${formatPrice(order.total)}
+PHONE:        ${order.customerPhone ?? "n/a"}${paymentLabel ? `\nPAYMENT:      ${paymentLabel}` : ""}
+COD AMOUNT:   ${formatPrice(codAmountFor(order))}
 DESTINATION:  ${order.shippingAddress.city}
 
 ITEMS:
@@ -363,7 +366,7 @@ ${formatItemsList(order.items)}
 
 ADDRESS:
   ${formatAddress(order.shippingAddress)}
-
+${order.notes && order.notes.trim() ? `\nNOTES:\n  ${order.notes}\n` : ""}
 Print ${pdfBuffer ? "the attached delivery-note.pdf" : "the waybill from the Curfox portal"} and hand the parcel + label to the Royal Express pickup rider.
 
 ─────────────
@@ -398,11 +401,12 @@ Dressing Bear · automated dispatch
     ${pdfBuffer ? "<p class=\"urgent\">The printable airwaybill is attached as delivery-note.pdf.</p>" : "<p class=\"urgent\">⚠ The PDF could not be fetched from Curfox. Please download it from the merchant portal.</p>"}
 
     <div class="section">
-      <p><span class="label">Order ID:</span> ${escapeHtml(order.orderId)}</p>
+      <p><span class="label">Order:</span> ${escapeHtml(order.rbNumber ?? order.orderId)}</p>
       <p><span class="label">Waybill:</span> <strong>${escapeHtml(waybillNumber)}</strong></p>
       <p><span class="label">Customer:</span> ${escapeHtml(order.customerName)}</p>
       <p><span class="label">Phone:</span> ${escapeHtml(order.customerPhone ?? "n/a")}</p>
-      <p><span class="label">COD Amount:</span> <strong>${formatPrice(order.total)}</strong></p>
+      ${paymentLabel ? `<p><span class="label">Payment:</span> ${escapeHtml(paymentLabel)}</p>` : ""}
+      <p><span class="label">COD Amount:</span> <strong>${formatPrice(codAmountFor(order))}</strong></p>
       <p><span class="label">Destination:</span> ${escapeHtml(order.shippingAddress.city)}</p>
     </div>
 
@@ -415,6 +419,11 @@ Dressing Bear · automated dispatch
       <h3>Shipping Address</h3>
       <p>${escapeHtml(formatAddress(order.shippingAddress)).replace(/\n/g, "<br>")}</p>
     </div>
+    ${order.notes && order.notes.trim() ? `
+<div class="section">
+  <h3>Delivery Notes</h3>
+  <p>${escapeHtml(order.notes).replace(/\n/g, "<br>")}</p>
+</div>` : ""}
 
     <p>Print ${pdfBuffer ? "the attached <strong>delivery-note.pdf</strong>" : "the waybill from the <strong>Curfox portal</strong>"} and hand the parcel + label to the Royal Express pickup rider.</p>
 
@@ -430,7 +439,7 @@ Dressing Bear · automated dispatch
     from,
     to: brandEmail,
     replyTo: brandReplyTo(),
-    subject: `[Dispatch] Order ${order.orderId} — Waybill ${waybillNumber}`,
+    subject: `[Dispatch] ${order.rbNumber ?? `Order ${order.orderId}`} — Waybill ${waybillNumber}`,
     text,
     html,
     attachments: pdfBuffer

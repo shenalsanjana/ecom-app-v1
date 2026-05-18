@@ -26,6 +26,9 @@ const SAMPLE_ORDER: OrderDetails = {
   },
   paymentMethod: "COD",
   paymentMethodDisplay: "Cash on Delivery",
+  rbNumber: "RB1001",
+  paymentStatus: "COD_PENDING",
+  notes: "Please leave at the gate.",
 };
 
 let transport: nodemailer.Transporter;
@@ -64,12 +67,18 @@ describe("sendDispatchNotificationEmail", () => {
     expect(opts.from).toBe("Dressing Bear <a9e490001@smtp-brevo.com>");
     expect(opts.replyTo).toBe("dressingbear@gmail.com");
     expect(opts.subject).toContain("RA03870247");
-    expect(opts.subject).toContain("ORD-TEST-1");
+    expect(opts.subject).toContain("RB1001");
     expect(opts.attachments).toHaveLength(1);
     expect(opts.attachments[0].filename).toBe("delivery-note.pdf");
     // nodemailer's jsonTransport may serialise the Buffer to base64 in-place;
     // we only care that a non-empty content was provided.
     expect(opts.attachments[0].content).toBeTruthy();
+    // New fields: RB number, payment status, notes, COD amount
+    expect(opts.subject).toContain("RB1001");
+    expect(opts.text).toContain("RB1001");
+    expect(opts.text).toContain("Cash on delivery");
+    expect(opts.text).toContain("Please leave at the gate.");
+    expect(opts.text).toMatch(/COD AMOUNT:.*2.?440/);
   });
 
   it("omits attachment when pdfBuffer is undefined and notes it in the body", async () => {
