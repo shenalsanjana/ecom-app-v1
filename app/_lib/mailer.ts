@@ -704,7 +704,7 @@ Dressing Bear · automated alert
     from,
     to: brandEmail,
     replyTo: brandReplyTo(),
-    subject: `${urgentPrefix}[Dressing Bear] ${order.rbNumber ?? `Order ${orderId}`} — Curfox ${step} failed`,
+    subject: `${urgentPrefix}[Failure] ${order.rbNumber ?? `Order ${orderId}`} — Curfox ${step} failed`,
     text,
     html,
   });

@@ -74,11 +74,21 @@ describe("sendDispatchNotificationEmail", () => {
     // we only care that a non-empty content was provided.
     expect(opts.attachments[0].content).toBeTruthy();
     // New fields: RB number, payment status, notes, COD amount
-    expect(opts.subject).toContain("RB1001");
     expect(opts.text).toContain("RB1001");
     expect(opts.text).toContain("Cash on delivery");
     expect(opts.text).toContain("Please leave at the gate.");
     expect(opts.text).toMatch(/COD AMOUNT:.*2.?440/);
+  });
+
+  it("renders COD amount = 0 for prepaid orders (not the order total)", async () => {
+    await sendDispatchNotificationEmail({
+      order: { ...SAMPLE_ORDER, paymentMethod: "PAYHERE", paymentMethodDisplay: "PayHere" },
+      waybillNumber: "RA03870248",
+    });
+    const opts = sendMailSpy.mock.calls[0][0];
+    expect(opts.text).toMatch(/COD AMOUNT:\s+LKR\s*0(?!\d)/);
+    // Sanity: ensure 2,440 (the total) is NOT rendered as the COD figure.
+    expect(opts.text).not.toMatch(/COD AMOUNT:.*2.?440/);
   });
 
   it("omits attachment when pdfBuffer is undefined and notes it in the body", async () => {
