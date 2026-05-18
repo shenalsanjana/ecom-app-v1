@@ -107,6 +107,8 @@ export type OrderDetails = {
   paymentMethodDisplay?: string;
   trackingCode?: string;
   notes?: string;
+  rbNumber?: string | null;       // Receipt book / invoice reference
+  paymentStatus?: string | null;  // e.g. "Awaiting payment", "Paid", "Cash on delivery"
 };
 
 export async function sendOrderConfirmationEmail(order: OrderDetails): Promise<void> {
@@ -317,6 +319,14 @@ function formatItemsList(items: OrderItem[]): string {
   return items
     .map((it) => `  • ${it.name}${it.size ? ` (${it.size})` : ""} × ${it.quantity}`)
     .join("\n");
+}
+
+/** Amount the courier should collect at delivery. Zero for any prepaid method;
+ *  the order total for COD. */
+function codAmountFor(
+  order: Pick<OrderDetails, "paymentMethod" | "total">,
+): number {
+  return order.paymentMethod === "COD" ? order.total : 0;
 }
 
 function formatAddress(addr: OrderDetails["shippingAddress"]): string {
