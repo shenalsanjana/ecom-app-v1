@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { DELIVERY_CITIES } from "@/app/_lib/delivery-zones";
 import type { ActionState } from "@/app/(auth)/actions";
 
 type Address = {
@@ -14,8 +15,6 @@ type Address = {
   line1: string;
   line2: string | null;
   city: string;
-  region: string;
-  postalCode: string;
   country: string;
   isDefault: boolean;
 };
@@ -52,24 +51,31 @@ export function AddressForm({ action, initial, submitLabel }: Props) {
         </div>
         <div className="space-y-2">
           <Label htmlFor="city">City</Label>
-          <Input id="city" name="city" defaultValue={initial?.city ?? ""} required />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="region">State / Province</Label>
-          <Input id="region" name="region" defaultValue={initial?.region ?? ""} required />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="postalCode">Postal code</Label>
-          <Input id="postalCode" name="postalCode" defaultValue={initial?.postalCode ?? ""} required />
+          <select
+            id="city"
+            name="city"
+            required
+            defaultValue={initial?.city ?? ""}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="" disabled>
+              Select a city
+            </option>
+            {DELIVERY_CITIES.map((c) => (
+              <option key={c.name} value={c.name}>
+                {c.name}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="space-y-2">
           <Label htmlFor="country">Country (ISO-2)</Label>
           <Input
             id="country"
             name="country"
-            defaultValue={initial?.country ?? "US"}
+            defaultValue={initial?.country ?? "LK"}
             maxLength={2}
-            placeholder="US"
+            placeholder="LK"
             required
           />
         </div>

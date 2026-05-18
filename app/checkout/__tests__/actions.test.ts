@@ -51,8 +51,6 @@ const baseInput: Omit<ProcessOrderInput, "paymentMethod"> = {
     line1: "1 Walls Lane",
     line2: "Apt 5",
     city: "Colombo",
-    region: "Western Province",
-    postalCode: "00100",
     country: "Sri Lanka",
   },
   contactPhone: "+94770000000",

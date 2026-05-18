@@ -6,13 +6,13 @@ import { useCart } from "@/app/_lib/cart-context";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { formatPrice } from "@/app/_lib/format";
-import { calculateShipping } from "@/app/_lib/checkout-config";
+import { calculateDelivery } from "@/app/_lib/checkout-config";
 import { FreeShippingProgress } from "@/app/_components/cart/free-shipping-progress";
 
 export function CartSummary() {
   const { subtotal, totalItems } = useCart();
 
-  const shipping = calculateShipping(subtotal);
+  const shipping = calculateDelivery(subtotal, "COLOMBO");
   const total = subtotal + shipping;
 
   return (
@@ -29,7 +29,7 @@ export function CartSummary() {
           <span className="font-heading">{formatPrice(subtotal)}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground">Shipping</span>
+          <span className="text-muted-foreground">Delivery <span className="text-muted-foreground">(estimated)</span></span>
           <span className={`font-heading ${shipping === 0 ? "text-brand" : ""}`}>
             {shipping === 0 ? "Free" : formatPrice(shipping)}
           </span>
@@ -56,7 +56,7 @@ export function CartSummary() {
       </Link>
 
       <p className="mt-3 text-center text-xs text-muted-foreground">
-        Shipping calculated at checkout
+        Delivery calculated at checkout
       </p>
     </div>
   );

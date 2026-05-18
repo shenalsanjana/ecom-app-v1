@@ -14,7 +14,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { formatPrice } from "@/app/_lib/format";
-import { calculateShipping, FREE_SHIPPING_THRESHOLD } from "@/app/_lib/checkout-config";
+import { calculateDelivery, FREE_DELIVERY_THRESHOLD } from "@/app/_lib/checkout-config";
+import { DELIVERY_CITIES, zoneForCity } from "@/app/_lib/delivery-zones";
 
 type PaymentMethod = "COD" | "PAYHERE" | "KOKO" | "MINITPAY";
 
@@ -22,7 +23,6 @@ type CheckoutUser = { name: string; email: string } | null;
 
 type Props = {
   user: CheckoutUser;
-  cities: Array<{ id: number; name: string }>;
 };
 
 const PAYMENT_OPTIONS: {
@@ -44,7 +44,7 @@ function generateIdempotencyKey(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export function CheckoutClient({ user, cities }: Props) {
+export function CheckoutClient({ user }: Props) {
   const router = useRouter();
   const { items, clearCart } = useCart();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -66,15 +66,13 @@ export function CheckoutClient({ user, cities }: Props) {
     line1: "",
     line2: "",
     city: "",
-    region: "",
-    postalCode: "",
     country: "Sri Lanka",
   });
 
   const [notes, setNotes] = useState("");
 
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const shipping = calculateShipping(subtotal);
+  const shipping = calculateDelivery(subtotal, zoneForCity(address.city ?? ""));
   const total = subtotal + shipping;
 
   if (orderId) {
@@ -256,7 +254,7 @@ export function CheckoutClient({ user, cities }: Props) {
                 <div className="rounded-lg border p-6">
                   <div className="flex items-center gap-3 mb-4">
                     <Truck className="h-5 w-5 text-muted-foreground" />
-                    <h2 className="text-lg font-semibold">Shipping Address</h2>
+                    <h2 className="text-lg font-semibold">Delivery Address</h2>
                   </div>
 
                   <div className="space-y-4">
@@ -302,76 +300,39 @@ export function CheckoutClient({ user, cities }: Props) {
                         placeholder="Apt, Suite, etc."
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label htmlFor="city" className="block text-sm font-medium mb-1">
-                          City *
-                        </label>
-                        {cities.length > 0 ? (
-                          <select
-                            id="city"
-                            value={address.city}
-                            onChange={(e) => setAddress({ ...address, city: e.target.value })}
-                            required
-                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            <option value="" disabled>
-                              Select city
-                            </option>
-                            {cities.map((c) => (
-                              <option key={c.id} value={c.name}>
-                                {c.name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <Input
-                            id="city"
-                            value={address.city}
-                            onChange={(e) => setAddress({ ...address, city: e.target.value })}
-                            required
-                            placeholder="Colombo"
-                          />
-                        )}
-                      </div>
-                      <div>
-                        <label htmlFor="region" className="block text-sm font-medium mb-1">
-                          Province *
-                        </label>
-                        <Input
-                          id="region"
-                          value={address.region}
-                          onChange={(e) => setAddress({ ...address, region: e.target.value })}
-                          required
-                          placeholder="Western Province"
-                        />
-                      </div>
+                    <div>
+                      <label htmlFor="city" className="block text-sm font-medium mb-1">
+                        City *
+                      </label>
+                      <select
+                        id="city"
+                        name="city"
+                        required
+                        value={address.city ?? ""}
+                        onChange={(e) => setAddress({ ...address, city: e.target.value })}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="" disabled>
+                          Select a city
+                        </option>
+                        {DELIVERY_CITIES.map((c) => (
+                          <option key={c.name} value={c.name}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label htmlFor="postalCode" className="block text-sm font-medium mb-1">
-                          Postal Code *
-                        </label>
-                        <Input
-                          id="postalCode"
-                          value={address.postalCode}
-                          onChange={(e) => setAddress({ ...address, postalCode: e.target.value })}
-                          required
-                          placeholder="00100"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="country" className="block text-sm font-medium mb-1">
-                          Country *
-                        </label>
-                        <Input
-                          id="country"
-                          value={address.country}
-                          onChange={(e) => setAddress({ ...address, country: e.target.value })}
-                          required
-                          disabled
-                        />
-                      </div>
+                    <div>
+                      <label htmlFor="country" className="block text-sm font-medium mb-1">
+                        Country *
+                      </label>
+                      <Input
+                        id="country"
+                        value={address.country}
+                        onChange={(e) => setAddress({ ...address, country: e.target.value })}
+                        required
+                        disabled
+                      />
                     </div>
                   </div>
                 </div>
@@ -459,7 +420,7 @@ export function CheckoutClient({ user, cities }: Props) {
                       <span>{formatPrice(subtotal)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Shipping</span>
+                      <span className="text-muted-foreground">Delivery</span>
                       <span>{shipping === 0 ? "Free" : formatPrice(shipping)}</span>
                     </div>
                   </div>
@@ -471,9 +432,9 @@ export function CheckoutClient({ user, cities }: Props) {
                     <span>{formatPrice(total)}</span>
                   </div>
 
-                  {subtotal >= FREE_SHIPPING_THRESHOLD && (
+                  {subtotal >= FREE_DELIVERY_THRESHOLD && (
                     <p className="mt-2 text-sm text-green-600 font-medium">
-                      You qualify for free shipping!
+                      You qualify for free delivery!
                     </p>
                   )}
 

@@ -12,7 +12,8 @@ import {
   type OrderDetails,
 } from "@/app/_lib/mailer";
 import { prisma } from "@/app/_lib/prisma";
-import { calculateShipping } from "@/app/_lib/checkout-config";
+import { calculateDelivery } from "@/app/_lib/checkout-config";
+import { zoneForCity } from "@/app/_lib/delivery-zones";
 import { bookCourierAndNotify } from "./book-courier";
 
 export type PaymentMethod = "COD" | "PAYHERE" | "KOKO" | "MINITPAY";
@@ -40,8 +41,6 @@ const AddressSchema = z.object({
   line1: z.string().trim().min(1, "Address line 1 is required"),
   line2: z.string().optional(),
   city: z.string().trim().min(1, "City is required"),
-  region: z.string().trim().min(1, "Province is required"),
-  postalCode: z.string().trim().min(1, "Postal code is required"),
   country: z.string().trim().min(1),
 });
 
@@ -161,7 +160,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
   }
 
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const shippingCost = calculateShipping(subtotal);
+  const shippingCost = calculateDelivery(subtotal, zoneForCity(shippingAddress.city));
   const total = subtotal + shippingCost;
   const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
@@ -219,8 +218,6 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
           shippingLine1: shippingAddress.line1,
           shippingLine2: shippingAddress.line2 ?? null,
           shippingCity: shippingAddress.city,
-          shippingRegion: shippingAddress.region,
-          shippingPostalCode: shippingAddress.postalCode,
           shippingCountry: shippingAddress.country,
           subtotal,
           shippingCost,

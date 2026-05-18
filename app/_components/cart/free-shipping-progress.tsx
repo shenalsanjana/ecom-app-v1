@@ -2,7 +2,7 @@
 
 import { Truck } from "lucide-react";
 import { formatPrice } from "@/app/_lib/format";
-import { FREE_SHIPPING_THRESHOLD } from "@/app/_lib/checkout-config";
+import { FREE_DELIVERY_THRESHOLD } from "@/app/_lib/checkout-config";
 
 type Props = { subtotal: number };
 
@@ -15,19 +15,19 @@ export function FreeShippingProgress({ subtotal }: Props) {
   // Empty cart — no progress bar (a 0% strip would feel like a bug).
   if (subtotal <= 0) return null;
 
-  const qualified = subtotal >= FREE_SHIPPING_THRESHOLD;
-  const remaining = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
+  const qualified = subtotal >= FREE_DELIVERY_THRESHOLD;
+  const remaining = Math.max(0, FREE_DELIVERY_THRESHOLD - subtotal);
   const pct = qualified
     ? 100
-    : Math.round((subtotal / FREE_SHIPPING_THRESHOLD) * 100);
+    : Math.round((subtotal / FREE_DELIVERY_THRESHOLD) * 100);
   const near =
-    !qualified && subtotal / FREE_SHIPPING_THRESHOLD >= NEAR_THRESHOLD_FRACTION;
+    !qualified && subtotal / FREE_DELIVERY_THRESHOLD >= NEAR_THRESHOLD_FRACTION;
 
   if (qualified) {
     return (
       <div className="mb-4 flex items-center gap-2 rounded-md bg-brand px-3 py-2 text-sm font-medium text-brand-foreground transition-opacity duration-(--duration-slow) ease-(--ease-out)">
         <Truck className="h-4 w-4 shrink-0" aria-hidden />
-        You qualify for free shipping!
+        You qualify for free delivery!
       </div>
     );
   }
@@ -48,7 +48,7 @@ export function FreeShippingProgress({ subtotal }: Props) {
         >
           {formatPrice(remaining)}
         </span>{" "}
-        more for free shipping
+        more for free delivery
       </p>
       <div
         className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
@@ -56,7 +56,7 @@ export function FreeShippingProgress({ subtotal }: Props) {
         aria-valuenow={pct}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label="Progress to free shipping"
+        aria-label="Progress to free delivery"
       >
         <div
           className="h-full rounded-full bg-brand transition-[width,opacity] duration-(--duration-slow) ease-(--ease-out)"

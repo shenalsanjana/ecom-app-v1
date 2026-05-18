@@ -19,8 +19,6 @@ type Address = {
   line1: string;
   line2: string | null;
   city: string;
-  region: string;
-  postalCode: string;
   country: string;
   isDefault: boolean;
 };
@@ -67,7 +65,7 @@ export function AddressesList({ addresses }: { addresses: Address[] }) {
                       <div className="mt-1 text-sm text-muted-foreground">
                         {a.line1}{a.line2 ? `, ${a.line2}` : ""}
                         <br />
-                        {a.city}, {a.region} {a.postalCode}, {a.country}
+                        {a.city}, {a.country}
                       </div>
                     </div>
                     {a.isDefault ? <Badge>Default</Badge> : null}

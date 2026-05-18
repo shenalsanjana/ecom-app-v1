@@ -21,8 +21,6 @@ export default async function AddressesPage() {
           line1: a.line1,
           line2: a.line2,
           city: a.city,
-          region: a.region,
-          postalCode: a.postalCode,
           country: a.country,
           isDefault: a.isDefault,
         }))}

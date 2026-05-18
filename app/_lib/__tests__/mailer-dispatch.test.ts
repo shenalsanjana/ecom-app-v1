@@ -22,8 +22,6 @@ const SAMPLE_ORDER: OrderDetails = {
   shippingAddress: {
     line1: "1 Walls Lane",
     city: "Colombo",
-    region: "Western Province",
-    postalCode: "00100",
     country: "Sri Lanka",
   },
   paymentMethod: "COD",

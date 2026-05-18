@@ -101,8 +101,6 @@ export type OrderDetails = {
     line1: string;
     line2?: string;
     city: string;
-    region: string;
-    postalCode: string;
     country: string;
   };
   paymentMethod: "COD" | "PAYHERE" | "KOKO" | "MINITPAY";
@@ -149,12 +147,12 @@ Items:
 ${itemsListText}
 
 Subtotal: ${formatPrice(order.subtotal)}
-Shipping: ${order.shipping === 0 ? "Free" : formatPrice(order.shipping)}
+Delivery: ${order.shipping === 0 ? "Free" : formatPrice(order.shipping)}
 Total: ${formatPrice(order.total)}
 
-Shipping Address:
+Delivery Address:
 ${order.shippingAddress.line1}
-${order.shippingAddress.line2 ? order.shippingAddress.line2 + "\n" : ""}${order.shippingAddress.city}, ${order.shippingAddress.region} ${order.shippingAddress.postalCode}
+${order.shippingAddress.line2 ? order.shippingAddress.line2 + "\n" : ""}${order.shippingAddress.city}
 ${order.shippingAddress.country}
 ${order.notes && order.notes.trim() ? `\nDelivery Notes:\n${order.notes}\n` : ""}
 Need help? Contact us at ${CONTACT_NUMBER} or ${brandEmail}.
@@ -199,15 +197,15 @@ ${BRAND_NAME}
     </div>
 
     <p><strong>Subtotal:</strong> ${formatPrice(order.subtotal)}</p>
-    <p><strong>Shipping:</strong> ${order.shipping === 0 ? "Free" : formatPrice(order.shipping)}</p>
+    <p><strong>Delivery:</strong> ${order.shipping === 0 ? "Free" : formatPrice(order.shipping)}</p>
     <p class="total"><strong>Total:</strong> ${formatPrice(order.total)}</p>
 
     <div class="footer">
-      <h3>Shipping Address</h3>
+      <h3>Delivery Address</h3>
       <p>
         ${escapeHtml(order.shippingAddress.line1)}<br>
         ${order.shippingAddress.line2 ? escapeHtml(order.shippingAddress.line2) + "<br>" : ""}
-        ${escapeHtml(order.shippingAddress.city)}, ${escapeHtml(order.shippingAddress.region)} ${escapeHtml(order.shippingAddress.postalCode)}<br>
+        ${escapeHtml(order.shippingAddress.city)}<br>
         ${escapeHtml(order.shippingAddress.country)}
       </p>
       ${order.notes && order.notes.trim() ? `<h3>Delivery Notes</h3><p>${escapeHtml(order.notes).replace(/\n/g, "<br>")}</p>` : ""}
@@ -322,12 +320,7 @@ function formatItemsList(items: OrderItem[]): string {
 }
 
 function formatAddress(addr: OrderDetails["shippingAddress"]): string {
-  const lines = [
-    addr.line1,
-    addr.line2,
-    `${addr.city}, ${addr.region} ${addr.postalCode}`,
-    addr.country,
-  ].filter(Boolean);
+  const lines = [addr.line1, addr.line2, addr.city, addr.country].filter(Boolean);
   return lines.join("\n  ");
 }
 

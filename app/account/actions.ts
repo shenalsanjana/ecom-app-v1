@@ -84,8 +84,6 @@ export async function addAddressAction(_prev: ActionState, formData: FormData): 
     line1: formData.get("line1"),
     line2: formData.get("line2") || null,
     city: formData.get("city"),
-    region: formData.get("region"),
-    postalCode: formData.get("postalCode"),
     country: formData.get("country"),
     isDefault: formData.get("isDefault") === "on",
   });
@@ -95,7 +93,13 @@ export async function addAddressAction(_prev: ActionState, formData: FormData): 
     if (parsed.data.isDefault) {
       await tx.address.updateMany({ where: { userId }, data: { isDefault: false } });
     }
-    await tx.address.create({ data: { ...parsed.data, userId, line2: parsed.data.line2 ?? null } });
+    await tx.address.create({
+      data: {
+        ...parsed.data,
+        userId,
+        line2: parsed.data.line2 ?? null,
+      },
+    });
   });
 
   revalidatePath("/account/addresses");
@@ -115,8 +119,6 @@ export async function updateAddressAction(_prev: ActionState, formData: FormData
     line1: formData.get("line1"),
     line2: formData.get("line2") || null,
     city: formData.get("city"),
-    region: formData.get("region"),
-    postalCode: formData.get("postalCode"),
     country: formData.get("country"),
     isDefault: formData.get("isDefault") === "on",
   });
@@ -128,7 +130,10 @@ export async function updateAddressAction(_prev: ActionState, formData: FormData
     }
     await tx.address.update({
       where: { id },
-      data: { ...parsed.data, line2: parsed.data.line2 ?? null },
+      data: {
+        ...parsed.data,
+        line2: parsed.data.line2 ?? null,
+      },
     });
   });
 
