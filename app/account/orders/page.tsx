@@ -5,6 +5,7 @@ import { prisma } from "@/app/_lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatPrice } from "@/app/_lib/format";
+import { paymentStatusLabel } from "@/app/_lib/order-status";
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "Pending",
@@ -16,6 +17,22 @@ const STATUS_LABEL: Record<string, string> = {
 
 function formatDate(d: Date): string {
   return d.toLocaleDateString("en-LK", { year: "numeric", month: "short", day: "numeric" });
+}
+
+function paymentBadgeVariant(
+  status: string | null | undefined,
+): "default" | "secondary" | "destructive" | "outline" {
+  switch (status) {
+    case "PAID":
+    case "COD_COLLECTED":
+      return "default";
+    case "COD_PENDING":
+      return "secondary";
+    case "PENDING":
+      return "destructive";
+    default:
+      return "outline";
+  }
 }
 
 export default async function OrdersPage() {
@@ -43,7 +60,9 @@ export default async function OrdersPage() {
               <Card>
                 <CardHeader className="flex flex-row items-start justify-between gap-4">
                   <div>
-                    <CardTitle className="text-base">Order {o.id}</CardTitle>
+                    <CardTitle className="text-base">
+                      {o.rbNumber ?? `Order #${o.id.slice(-8)}`}
+                    </CardTitle>
                     <div className="text-sm text-muted-foreground">
                       Placed {formatDate(o.createdAt)} · {o.paymentMethodDisplay}
                     </div>
@@ -57,6 +76,11 @@ export default async function OrdersPage() {
                     <Badge variant={o.status === "DELIVERED" ? "default" : "secondary"}>
                       {STATUS_LABEL[o.status] ?? o.status}
                     </Badge>
+                    {o.paymentStatus ? (
+                      <Badge variant={paymentBadgeVariant(o.paymentStatus)}>
+                        {paymentStatusLabel(o.paymentStatus)}
+                      </Badge>
+                    ) : null}
                     <div className="text-sm font-medium">{formatPrice(o.total)}</div>
                   </div>
                 </CardHeader>
