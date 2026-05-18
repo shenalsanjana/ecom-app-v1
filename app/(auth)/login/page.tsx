@@ -1,8 +1,10 @@
 // app/(auth)/login/page.tsx
 "use client";
 
-import { useActionState, use } from "react";
+import { useActionState, use, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +32,25 @@ function LoginInner({
   searchParams: Promise<{ callbackUrl?: string; reset?: string }>;
 }) {
   const params = use(searchParams);
+  const router = useRouter();
+  const { update } = useSession();
+  const target = state?.redirectTo;
+
+  useEffect(() => {
+    if (!target) return;
+    let cancelled = false;
+    (async () => {
+      await update();
+      if (cancelled) return;
+      router.refresh();
+      router.push(target);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [target, router, update]);
+
+  const busy = pending || !!target;
 
   return (
     <main className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center px-4 py-10">
@@ -51,14 +72,14 @@ function LoginInner({
         <input type="hidden" name="callbackUrl" value={params.callbackUrl ?? "/"} />
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" required autoComplete="email" />
+          <Input id="email" name="email" type="email" required autoComplete="email" disabled={busy} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="password">Password</Label>
-          <Input id="password" name="password" type="password" required autoComplete="current-password" />
+          <Input id="password" name="password" type="password" required autoComplete="current-password" disabled={busy} />
         </div>
-        <Button type="submit" className="w-full" disabled={pending}>
-          {pending ? "Signing in…" : "Sign in"}
+        <Button type="submit" className="w-full" disabled={busy}>
+          {busy ? "Signing in…" : "Sign in"}
         </Button>
       </form>
       <div className="mt-4 flex justify-between text-sm">

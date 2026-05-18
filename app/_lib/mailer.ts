@@ -120,7 +120,7 @@ export async function sendOrderConfirmationEmail(order: OrderDetails): Promise<v
   const itemsListText = order.items
     .map((item) => {
       const sizeStr = item.size ? ` (Size ${item.size})` : "";
-      return `${item.name}${sizeStr} x${item.quantity} - ${formatPrice(item.price)}`;
+      return `${item.name}${sizeStr} x${item.quantity} - ${formatPrice(item.price * item.quantity)}`;
     })
     .join("\n");
 
@@ -352,7 +352,7 @@ ORDER:        ${order.orderId}
 WAYBILL:      ${waybillNumber}
 CUSTOMER:     ${order.customerName}
 PHONE:        ${order.customerPhone ?? "n/a"}
-COD AMOUNT:   LKR ${order.total.toFixed(2)}
+COD AMOUNT:   ${formatPrice(order.total)}
 DESTINATION:  ${order.shippingAddress.city}
 
 ITEMS:
@@ -367,12 +367,69 @@ Print ${pdfBuffer ? "the attached delivery-note.pdf" : "the waybill from the Cur
 Dressing Bear · automated dispatch
 `.trim();
 
+  const itemsHtml = order.items
+    .map((it) => `<li>${escapeHtml(it.name)}${it.size ? ` (${escapeHtml(it.size)})` : ""} &times; ${it.quantity}</li>`)
+    .join("");
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    .section { margin-bottom: 20px; padding: 15px; border: 1px solid #eee; border-radius: 8px; }
+    .label { font-weight: bold; color: #666; width: 120px; display: inline-block; }
+    .urgent { color: #e74c3c; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 style="margin: 0; color: #2c3e50;">${escapeHtml(BRAND_NAME)}</h1>
+      <h2 style="margin: 10px 0 0 0; color: #27ae60;">Dispatch Notification</h2>
+    </div>
+
+    <p>A new COD order has been booked with Royal Express via Curfox.</p>
+    ${pdfBuffer ? "<p class=\"urgent\">The printable airwaybill is attached as delivery-note.pdf.</p>" : "<p class=\"urgent\">⚠ The PDF could not be fetched from Curfox. Please download it from the merchant portal.</p>"}
+
+    <div class="section">
+      <p><span class="label">Order ID:</span> ${escapeHtml(order.orderId)}</p>
+      <p><span class="label">Waybill:</span> <strong>${escapeHtml(waybillNumber)}</strong></p>
+      <p><span class="label">Customer:</span> ${escapeHtml(order.customerName)}</p>
+      <p><span class="label">Phone:</span> ${escapeHtml(order.customerPhone ?? "n/a")}</p>
+      <p><span class="label">COD Amount:</span> <strong>${formatPrice(order.total)}</strong></p>
+      <p><span class="label">Destination:</span> ${escapeHtml(order.shippingAddress.city)}</p>
+    </div>
+
+    <div class="section">
+      <h3>Items</h3>
+      <ul>${itemsHtml}</ul>
+    </div>
+
+    <div class="section">
+      <h3>Shipping Address</h3>
+      <p>${escapeHtml(formatAddress(order.shippingAddress)).replace(/\n/g, "<br>")}</p>
+    </div>
+
+    <p>Print ${pdfBuffer ? "the attached <strong>delivery-note.pdf</strong>" : "the waybill from the <strong>Curfox portal</strong>"} and hand the parcel + label to the Royal Express pickup rider.</p>
+
+    <div style="margin-top: 30px; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 10px;">
+      ${escapeHtml(BRAND_NAME)} &middot; automated dispatch
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+
   await transport.sendMail({
     from,
     to: brandEmail,
     replyTo: brandReplyTo(),
     subject: `[Dispatch] Order ${order.orderId} — Waybill ${waybillNumber}`,
     text,
+    html,
     attachments: pdfBuffer
       ? [{ filename: "delivery-note.pdf", content: pdfBuffer }]
       : undefined,
@@ -395,7 +452,7 @@ Do NOT ship this order yet.
 ORDER:        ${order.orderId}
 CUSTOMER:     ${order.customerName}
 PAYMENT:      ${gateway} (pending)
-TOTAL:        LKR ${order.total.toFixed(2)}
+TOTAL:        ${formatPrice(order.total)}
 
 ITEMS:
 ${formatItemsList(order.items)}
@@ -410,17 +467,73 @@ the courier booking will need to be triggered.
 Dressing Bear · automated dispatch
 `.trim();
 
+  const itemsHtml = order.items
+    .map((it) => `<li>${escapeHtml(it.name)}${it.size ? ` (${escapeHtml(it.size)})` : ""} &times; ${it.quantity}</li>`)
+    .join("");
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #fff3cd; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ffeeba; }
+    .section { margin-bottom: 20px; padding: 15px; border: 1px solid #eee; border-radius: 8px; }
+    .label { font-weight: bold; color: #666; width: 120px; display: inline-block; }
+    .warning { color: #856404; font-weight: bold; background: #fff3cd; padding: 10px; border-radius: 4px; border: 1px solid #ffeeba; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 style="margin: 0; color: #2c3e50;">${escapeHtml(BRAND_NAME)}</h1>
+      <h2 style="margin: 10px 0 0 0; color: #856404;">Pending Payment Notification</h2>
+    </div>
+
+    <div class="warning">
+      A new prepaid order has been placed. Courier booking is <strong>DEFERRED</strong> until the payment gateway confirms the transaction. <strong>Do NOT ship this order yet.</strong>
+    </div>
+
+    <div class="section">
+      <p><span class="label">Order ID:</span> ${escapeHtml(order.orderId)}</p>
+      <p><span class="label">Customer:</span> ${escapeHtml(order.customerName)}</p>
+      <p><span class="label">Payment:</span> ${escapeHtml(gateway)} (pending)</p>
+      <p><span class="label">Total:</span> <strong>${formatPrice(order.total)}</strong></p>
+    </div>
+
+    <div class="section">
+      <h3>Items</h3>
+      <ul>${itemsHtml}</ul>
+    </div>
+
+    <div class="section">
+      <h3>Shipping Address</h3>
+      <p>${escapeHtml(formatAddress(order.shippingAddress)).replace(/\n/g, "<br>")}</p>
+    </div>
+
+    <p>When the gateway confirms (or you confirm manually in the dashboard), the courier booking will need to be triggered.</p>
+
+    <div style="margin-top: 30px; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 10px;">
+      ${escapeHtml(BRAND_NAME)} &middot; automated dispatch
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+
   await transport.sendMail({
     from,
     to: brandEmail,
     replyTo: brandReplyTo(),
-    subject: `[PENDING PAYMENT] Order ${order.orderId} — LKR ${order.total.toFixed(2)} via ${gateway}`,
+    subject: `[PENDING PAYMENT] Order ${order.orderId} — ${formatPrice(order.total)} via ${gateway}`,
     text,
+    html,
   });
 }
 
 const NEXT_ACTION_BY_STEP: Record<
-  "city-lookup" | "curfox-login" | "curfox-create" | "curfox-persist" | "curfox-pdf",
+  "city-lookup" | "curfox-login" | "curfox-create" | "curfox-persist" | "curfox-pdf" | "orchestrate-courier",
   (orderId: string, ctx: { city?: string; waybillNumber?: string }) => string
 > = {
   "city-lookup": (_o, c) =>
@@ -433,11 +546,13 @@ const NEXT_ACTION_BY_STEP: Record<
     `⚠ URGENT — Order was booked at Curfox (waybill ${c.waybillNumber ?? "<unknown>"}) but the local DB write failed. The order will not appear as "booked" in our system. Reconcile manually.`,
   "curfox-pdf": (_o, c) =>
     `The order was booked at Curfox (waybill ${c.waybillNumber ?? "<unknown>"}) but we could not fetch the printable PDF. Download it from https://royalexpress.merchant.curfox.com/`,
+  "orchestrate-courier": () =>
+    "An unexpected error occurred in the checkout orchestration layer. Review the server logs and the error detail above.",
 };
 
 export async function sendAdminFailureAlertEmail(params: {
   orderId: string;
-  step: "city-lookup" | "curfox-login" | "curfox-create" | "curfox-persist" | "curfox-pdf";
+  step: "city-lookup" | "curfox-login" | "curfox-create" | "curfox-persist" | "curfox-pdf" | "orchestrate-courier";
   reason: string;
   errorDetail?: string;
   order: OrderDetails;
@@ -463,7 +578,7 @@ Customer:      ${order.customerName}
 Email:         ${order.customerEmail}
 Phone:         ${order.customerPhone ?? "n/a"}
 Payment:       ${order.paymentMethodDisplay ?? order.paymentMethod}
-Total:         LKR ${order.total.toFixed(2)}
+Total:         ${formatPrice(order.total)}
 
 ITEMS:
 ${formatItemsList(order.items)}
@@ -486,11 +601,82 @@ ${nextAction}
 Dressing Bear · automated alert
 `.trim();
 
+  const itemsHtml = order.items
+    .map((it) => `<li>${escapeHtml(it.name)}${it.size ? ` (${escapeHtml(it.size)})` : ""} &times; ${it.quantity}</li>`)
+    .join("");
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #f8d7da; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #f5c6cb; }
+    .section { margin-bottom: 20px; padding: 15px; border: 1px solid #eee; border-radius: 8px; }
+    .label { font-weight: bold; color: #666; width: 120px; display: inline-block; }
+    .error-box { background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; border: 1px solid #f5c6cb; margin-bottom: 20px; }
+    .next-action { background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; border: 1px solid #c3e6cb; }
+    pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 style="margin: 0; color: #2c3e50;">${escapeHtml(BRAND_NAME)}</h1>
+      <h2 style="margin: 10px 0 0 0; color: #721c24;">Courier Dispatch Failure</h2>
+    </div>
+
+    <p>A Dressing Bear order saved successfully but the downstream courier/dispatch step failed. The customer was <strong>NOT</strong> shown an error. Manual action may be required.</p>
+
+    <div class="error-box">
+      <h3 style="margin-top: 0;">Failure Details</h3>
+      <p><span class="label">Step:</span> ${escapeHtml(step)}</p>
+      <p><span class="label">Reason:</span> ${escapeHtml(reason)}</p>
+      <p><span class="label">Server Time:</span> ${new Date().toISOString()}</p>
+    </div>
+
+    <div class="next-action">
+      <h3 style="margin-top: 0;">Next Action</h3>
+      <p>${escapeHtml(nextAction)}</p>
+    </div>
+
+    ${errorDetail ? `<h3>Error Detail</h3><pre>${escapeHtml(errorDetail)}</pre>` : ""}
+
+    <div class="section">
+      <h3>Order Details</h3>
+      <p><span class="label">Order ID:</span> ${escapeHtml(orderId)}</p>
+      <p><span class="label">Customer:</span> ${escapeHtml(order.customerName)}</p>
+      <p><span class="label">Email:</span> ${escapeHtml(order.customerEmail)}</p>
+      <p><span class="label">Phone:</span> ${escapeHtml(order.customerPhone ?? "n/a")}</p>
+      <p><span class="label">Payment:</span> ${escapeHtml(order.paymentMethodDisplay ?? order.paymentMethod)}</p>
+      <p><span class="label">Total:</span> <strong>${formatPrice(order.total)}</strong></p>
+    </div>
+
+    <div class="section">
+      <h3>Items</h3>
+      <ul>${itemsHtml}</ul>
+    </div>
+
+    <div class="section">
+      <h3>Shipping Address</h3>
+      <p>${escapeHtml(formatAddress(order.shippingAddress)).replace(/\n/g, "<br>")}</p>
+    </div>
+
+    <div style="margin-top: 30px; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 10px;">
+      ${escapeHtml(BRAND_NAME)} &middot; automated alert
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+
   await transport.sendMail({
     from,
     to: brandEmail,
     replyTo: brandReplyTo(),
     subject: `${urgentPrefix}[Dressing Bear] Order ${orderId} — Curfox ${step} failed`,
     text,
+    html,
   });
 }

@@ -13,13 +13,7 @@ export default async function CheckoutPage() {
       }
     : null;
 
-  // Empty list is OK — the client falls back to a free-text input.
-  let cities: Array<{ id: number; name: string }> = [];
-  try {
-    cities = await listAvailableCities();
-  } catch (err) {
-    console.error("[checkout] Failed to load city list, falling back to text input:", err);
-  }
+  const cities = await listAvailableCities();
 
   return (
     <>

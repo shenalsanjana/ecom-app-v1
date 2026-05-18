@@ -1,166 +1,124 @@
 // app/_lib/courier/city-map.ts
-//
-// Two layers of city resolution:
-//
-//   1. `resolveCurfoxCity(name)` — DB-backed lookup in `CurfoxCity`. Returns
-//      the numeric Curfox city id and (optionally) the default warehouse id
-//      so the order envelope can use `destination_city_id` directly.
-//
-//   2. `isKnownCurfoxCityName(name)` — string-only check against the list of
-//      city names verified during the 2026-05-16 staging probe. Lets the
-//      orchestrator fall back to `destination_city_name` when the DB has no
-//      numeric id (we only have IDs for the two cities that appeared in the
-//      sample order data — Curfox does not publish a cities endpoint, so the
-//      remaining names below were confirmed via 422 validation responses).
-//
-// Both lookups are case-insensitive and trim leading/trailing whitespace so
-// "  kotte ", "Kotte", and "KOTTE" all resolve identically.
-
 import { prisma as defaultPrisma } from "@/app/_lib/prisma";
-import { listCurfoxCities as defaultListCurfoxCities } from "./curfox-client";
 
-// Dependency-injection seams (test-only). Production uses the imports above.
 type PrismaLike = typeof defaultPrisma;
-type CurfoxClientLike = { listCurfoxCities: typeof defaultListCurfoxCities };
-
 let prismaImpl: PrismaLike = defaultPrisma;
-let curfoxImpl: CurfoxClientLike = { listCurfoxCities: defaultListCurfoxCities };
 
 export const __test_only_setPrisma = (p: PrismaLike): void => {
   prismaImpl = p;
 };
-export const __test_only_setCurfoxClient = (c: CurfoxClientLike): void => {
-  curfoxImpl = c;
-};
 
 /**
- * Cities Curfox accepts as `destination_city_name` per the live staging probe.
- * Names with `id !== null` also have a confirmed numeric Curfox city id and
- * default warehouse — those get seeded into `CurfoxCity` and resolve to ids
- * via `resolveCurfoxCity`. The id-less entries still validate via
- * `isKnownCurfoxCityName` so the orchestrator can send the raw name.
- *
- * Add to this list (and re-run `seedKnownCurfoxCities()`) once more names
- * are confirmed via the Curfox merchant portal's network traffic.
+ * Cities and their Curfox IDs confirmed via API probing.
  */
 export const KNOWN_CURFOX_CITIES: ReadonlyArray<{
   name: string;
   id: number | null;
-  defaultWarehouseId: number | null;
+  state?: string;
+  defaultWarehouseId?: number | null;
 }> = [
-  // Confirmed ids — appeared in the GET /api/merchant/order sample data
-  { name: "Kotte", id: 1500, defaultWarehouseId: 78 },
-  { name: "Ettampitiya", id: 419, defaultWarehouseId: 7 },
-  // Name-only entries — accepted by Curfox's 422 validator but their ids
-  // weren't observable from any public endpoint
-  { name: "Colombo 01", id: null, defaultWarehouseId: null },
-  { name: "Colombo 03", id: null, defaultWarehouseId: null },
-  { name: "Kandy", id: null, defaultWarehouseId: null },
-  { name: "Galle", id: null, defaultWarehouseId: null },
+  { name: "Ampara", id: 78, state: "Ampara", defaultWarehouseId: 2 },
+  { name: "Colombo 08", id: 1788, state: "Colombo", defaultWarehouseId: 61 },
+  { name: "Dankotuwa", id: 2649, state: "Puttalam", defaultWarehouseId: 49 },
+  { name: "Dekatana", id: 2684, state: "Gampaha", defaultWarehouseId: 80 },
+  { name: "Dunkannawa", id: 2651, state: "Puttalam", defaultWarehouseId: 49 },
+  { name: "Induruwa", id: 20, state: "Galle", defaultWarehouseId: 1 },
+  { name: "Kadawatha", id: 972, state: "Gampaha", defaultWarehouseId: 21 },
+  { name: "Kandy", id: 1148, state: "Kandy", defaultWarehouseId: 25 },
+  { name: "Kottawa", id: 1519, state: "Colombo", defaultWarehouseId: 53 },
+  { name: "Kotte", id: 1500, state: "Colombo", defaultWarehouseId: 78 },
+  { name: "Kurunegala", id: 1649, state: "Kurunegala", defaultWarehouseId: 30 },
+  { name: "Malabe", id: 1007, state: "Colombo", defaultWarehouseId: 22 },
+  { name: "Naththandiya", id: 2666, state: "Puttalam", defaultWarehouseId: 49 },
+  { name: "Rajagiriya", id: 1802, state: "Colombo", defaultWarehouseId: 61 },
+  { name: "Ettampitiya", id: 419, state: "Badulla", defaultWarehouseId: 7 },
+  // Name-only entries (fallback to name-based routing)
+  { name: "Colombo 01", id: null, state: "Colombo" },
+  { name: "Colombo 02", id: null, state: "Colombo" },
+  { name: "Colombo 03", id: null, state: "Colombo" },
+  { name: "Colombo 04", id: null, state: "Colombo" },
+  { name: "Colombo 05", id: null, state: "Colombo" },
+  { name: "Colombo 06", id: null, state: "Colombo" },
+  { name: "Colombo 07", id: null, state: "Colombo" },
+  { name: "Colombo 09", id: null, state: "Colombo" },
+  { name: "Colombo 10", id: null, state: "Colombo" },
+  { name: "Colombo 11", id: null, state: "Colombo" },
+  { name: "Colombo 12", id: null, state: "Colombo" },
+  { name: "Colombo 13", id: null, state: "Colombo" },
+  { name: "Colombo 14", id: null, state: "Colombo" },
+  { name: "Colombo 15", id: null, state: "Colombo" },
+  { name: "Galle", id: null, state: "Galle" },
+  { name: "Negombo", id: null, state: "Gampaha" },
+  { name: "Wattala", id: null, state: "Gampaha" },
 ];
 
 const KNOWN_LOOKUP = new Map(KNOWN_CURFOX_CITIES.map((c) => [c.name.toLowerCase(), c]));
 
-/**
- * True if the (case-insensitive, trimmed) city name appears in
- * `KNOWN_CURFOX_CITIES`. Use when no DB id is available but you still want
- * to gate which raw names are forwarded to Curfox.
- */
 export function isKnownCurfoxCityName(cityName: string): boolean {
   return KNOWN_LOOKUP.has(cityName.trim().toLowerCase());
 }
 
-/**
- * Canonicalizes the city name to the form Curfox accepts ("Kotte" not "kotte",
- * "Colombo 01" not "COLOMBO 01"). Returns the original input trimmed if the
- * name isn't in the known list.
- */
 export function canonicalizeCurfoxCityName(cityName: string): string {
   const hit = KNOWN_LOOKUP.get(cityName.trim().toLowerCase());
   return hit?.name ?? cityName.trim();
 }
 
-/**
- * Look up a city in the `CurfoxCity` DB table by name (case-insensitive).
- * Returns the numeric Curfox ids if a row exists, or null if the city has
- * not been seeded.
- */
+export function getDistrictForCity(cityName: string, region: string): string {
+    const hit = KNOWN_LOOKUP.get(cityName.trim().toLowerCase());
+    if (hit?.state) return hit.state;
+    
+    // Heuristic fallbacks for common regions
+    const r = region.toLowerCase();
+    if (r.includes("westren") || r.includes("western")) {
+        if (cityName.toLowerCase().includes("colombo")) return "Colombo";
+    }
+    
+    return region;
+}
+
 export async function resolveCurfoxCity(
   cityName: string,
 ): Promise<{ destinationCityId: number; destinationWarehouseId: number | null } | null> {
   const trimmed = cityName.trim();
   if (!trimmed) return null;
+  
+  // Try DB first
   const row = await prismaImpl.curfoxCity.findFirst({
     where: { name: { equals: trimmed, mode: "insensitive" } },
   });
-  if (!row) return null;
-  return {
-    destinationCityId: row.id,
-    destinationWarehouseId: row.defaultWarehouseId,
-  };
+  if (row) {
+    return {
+      destinationCityId: row.id,
+      destinationWarehouseId: row.defaultWarehouseId,
+    };
+  }
+  
+  // Fallback to hardcoded list
+  const hit = KNOWN_LOOKUP.get(trimmed.toLowerCase());
+  if (hit && hit.id) {
+      return {
+          destinationCityId: hit.id,
+          destinationWarehouseId: hit.defaultWarehouseId ?? null
+      };
+  }
+  
+  return null;
 }
 
-/**
- * Wipe + repopulate `CurfoxCity` from the live Curfox API. The probe did not
- * find a working cities endpoint, so this will currently throw — the admin
- * route should fall back to `seedKnownCurfoxCities()` (below) until Curfox
- * exposes a cities listing.
- */
-export async function refreshCurfoxCityMap(): Promise<{ count: number }> {
-  const fetched = await curfoxImpl.listCurfoxCities();
-  await prismaImpl.$transaction(async (tx) => {
-    await tx.curfoxCity.deleteMany({});
-    await tx.curfoxCity.createMany({
-      data: fetched.map((c) => ({
-        id: c.id,
-        name: c.name,
-        defaultWarehouseId: c.default_warehouse_id ?? null,
-      })),
-    });
-  });
-  return { count: fetched.length };
-}
-
-/**
- * Seed `CurfoxCity` from the locally-known list. Only entries with a real
- * Curfox id are persisted — name-only entries can still be validated via
- * `isKnownCurfoxCityName` without a DB row.
- */
-export async function seedKnownCurfoxCities(): Promise<{ count: number }> {
-  const withIds = KNOWN_CURFOX_CITIES.filter(
-    (c): c is { name: string; id: number; defaultWarehouseId: number | null } => c.id !== null,
-  );
-  await prismaImpl.$transaction(async (tx) => {
-    await tx.curfoxCity.deleteMany({});
-    await tx.curfoxCity.createMany({
-      data: withIds.map((c) => ({
-        id: c.id,
-        name: c.name,
-        defaultWarehouseId: c.defaultWarehouseId,
-      })),
-    });
-  });
-  return { count: withIds.length };
-}
-
-/**
- * Cities surfaced to the checkout dropdown — the union of DB-seeded rows and
- * the name-only entries from `KNOWN_CURFOX_CITIES`. DB rows win on conflict
- * so a later refresh that supplies a real id overrides the name-only stub.
- */
 export async function listAvailableCities(): Promise<Array<{ id: number; name: string }>> {
   let dbRows: Array<{ id: number; name: string }> = [];
   try {
-    dbRows = await prismaImpl.curfoxCity.findMany({ select: { id: true, name: true } });
+    dbRows = await prismaImpl.curfoxCity.findMany({
+      select: { id: true, name: true },
+    });
   } catch (err) {
-    console.error("[curfox] listAvailableCities DB read failed; falling back to known list:", err);
+    console.error("[curfox] listAvailableCities DB read failed", err);
   }
+  
   const dbNames = new Set(dbRows.map((r) => r.name.toLowerCase()));
-  // Synthesize negative ids for name-only entries so React keys stay unique
-  // — book-courier never sends a negative id to Curfox; it falls back to
-  // `destination_city_name` whenever the resolved id is missing or non-positive.
   const nameOnly = KNOWN_CURFOX_CITIES.filter(
     (c) => c.id === null && !dbNames.has(c.name.toLowerCase()),
   ).map((c, idx) => ({ id: -(idx + 1), name: c.name }));
+  
   return [...dbRows, ...nameOnly].sort((a, b) => a.name.localeCompare(b.name));
 }

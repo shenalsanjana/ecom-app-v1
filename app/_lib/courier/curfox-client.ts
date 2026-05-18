@@ -3,17 +3,16 @@ import {
   CurfoxLoginResponseSchema,
   CurfoxCreateOrderInputSchema,
   CurfoxOrderResponseSchema,
-  CurfoxCityListResponseSchema,
 } from "./curfox-types";
-import type { CurfoxCreateOrderInput, CurfoxCreatedOrder, CurfoxCity } from "./curfox-types";
+import type { CurfoxCreateOrderInput } from "./curfox-types";
 
 export class CurfoxError extends Error {
-  readonly step: "login" | "create-order" | "fetch-pdf" | "list-cities";
+  readonly step: "login" | "create-order" | "fetch-pdf";
   readonly status?: number;
   readonly responseBody?: string;
   constructor(
     message: string,
-    step: "login" | "create-order" | "fetch-pdf" | "list-cities",
+    step: "login" | "create-order" | "fetch-pdf",
     status?: number,
     responseBody?: string,
   ) {
@@ -141,10 +140,6 @@ function waybillPdfPathTemplate(): string {
   // explicitly once confirmed via the merchant portal Network tab.
   return process.env.CURFOX_WAYBILL_PDF_PATH_TEMPLATE ?? "/api/merchant/order/print/{waybill_number}";
 }
-function citiesPath(): string {
-  // No working endpoint discovered. Kept for the admin refresh route + tests.
-  return process.env.CURFOX_CITIES_PATH ?? "/api/merchant/city";
-}
 
 function redactPhone(phone: string): string {
   if (phone.length <= 4) return "****";
@@ -174,7 +169,7 @@ function redactEnvelopeForLog(envelope: CurfoxCreateOrderInput): CurfoxCreateOrd
  */
 export async function createCurfoxOrder(
   input: CurfoxCreateOrderInput,
-): Promise<CurfoxCreatedOrder> {
+): Promise<string> {
   const envelope = CurfoxCreateOrderInputSchema.parse(input);
   const url = `${baseUrl()}${orderCreatePath()}`;
   let res: Response;
@@ -207,7 +202,10 @@ export async function createCurfoxOrder(
   const json = await res.json();
   const parsed = CurfoxOrderResponseSchema.parse(json);
   const waybill = parsed.data[0];
-  return { waybill_number: waybill };
+  if (!waybill) {
+    throw new CurfoxError("Curfox create-order: waybill missing from response", "create-order");
+  }
+  return waybill;
 }
 
 /**
@@ -265,29 +263,4 @@ export async function fetchCurfoxWaybillPdf(waybillNumber: string): Promise<Buff
     return Buffer.from(ab);
   }
   throw new CurfoxError(`Waybill PDF: unexpected content-type ${ct}`, "fetch-pdf", res.status);
-}
-
-export async function listCurfoxCities(): Promise<CurfoxCity[]> {
-  const url = `${baseUrl()}${citiesPath()}`;
-  let res: Response;
-  try {
-    res = await authedFetch(url, { method: "GET" });
-  } catch (err) {
-    throw new CurfoxError(
-      `Curfox list-cities network error: ${err instanceof Error ? err.message : String(err)}`,
-      "list-cities",
-    );
-  }
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new CurfoxError(
-      `Curfox list-cities failed: HTTP ${res.status}`,
-      "list-cities",
-      res.status,
-      body,
-    );
-  }
-  const json = await res.json();
-  const parsed = CurfoxCityListResponseSchema.parse(json);
-  return parsed.data;
 }
