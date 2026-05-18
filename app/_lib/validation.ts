@@ -60,8 +60,6 @@ export const AddressSchema = z.object({
   line1: z.string().trim().min(1, "Address line 1 required"),
   line2: z.string().trim().optional().nullable(),
   city: z.string().trim().min(1, "City required"),
-  region: z.string().trim().min(1, "State/Province required"),
-  postalCode: z.string().trim().min(1, "Postal code required"),
   country: z.string().trim().length(2, "Country must be a 2-letter code"),
   isDefault: z.boolean().optional().default(false),
 });
