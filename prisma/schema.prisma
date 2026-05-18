@@ -28,8 +28,6 @@ model Address {
   line1       String
   line2       String?
   city        String
-  region      String
-  postalCode  String
   country     String
   isDefault   Boolean  @default(false)
   createdAt   DateTime @default(now())
@@ -114,8 +112,6 @@ model Order {
   shippingLine1         String
   shippingLine2         String?
   shippingCity          String
-  shippingRegion        String
-  shippingPostalCode    String
   shippingCountry       String
   subtotal              Float
   shippingCost          Float

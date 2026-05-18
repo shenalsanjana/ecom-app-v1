@@ -41,8 +41,6 @@ const AddressSchema = z.object({
   line1: z.string().trim().min(1, "Address line 1 is required"),
   line2: z.string().optional(),
   city: z.string().trim().min(1, "City is required"),
-  // region and postalCode removed from UI (Task 6/7); DB columns kept as empty
-  // strings until Task 9 drops them from the schema.
   country: z.string().trim().min(1),
 });
 
@@ -220,9 +218,6 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
           shippingLine1: shippingAddress.line1,
           shippingLine2: shippingAddress.line2 ?? null,
           shippingCity: shippingAddress.city,
-          // Placeholder empty strings until Task 9 drops these NOT NULL columns.
-          shippingRegion: "",
-          shippingPostalCode: "",
           shippingCountry: shippingAddress.country,
           subtotal,
           shippingCost,

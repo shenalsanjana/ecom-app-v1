@@ -98,8 +98,6 @@ export async function addAddressAction(_prev: ActionState, formData: FormData): 
         ...parsed.data,
         userId,
         line2: parsed.data.line2 ?? null,
-        region: "",       // dropped from form; column dropped in Task 9
-        postalCode: "",   // dropped from form; column dropped in Task 9
       },
     });
   });
@@ -135,8 +133,6 @@ export async function updateAddressAction(_prev: ActionState, formData: FormData
       data: {
         ...parsed.data,
         line2: parsed.data.line2 ?? null,
-        region: "",       // dropped from form; column dropped in Task 9
-        postalCode: "",   // dropped from form; column dropped in Task 9
       },
     });
   });
