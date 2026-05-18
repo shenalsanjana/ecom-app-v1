@@ -591,6 +591,8 @@ export async function sendAdminFailureAlertEmail(params: {
 
   const urgentPrefix = step === "curfox-persist" ? "[URGENT] " : "";
   const nextAction = NEXT_ACTION_BY_STEP[step](orderId, context ?? {});
+  const orderRef = order.rbNumber ?? orderId;
+  const paymentLabel = paymentStatusLabel(order.paymentStatus);
 
   const text = `A Dressing Bear order saved successfully but the downstream
 courier/dispatch step failed. The customer was NOT shown an
@@ -598,13 +600,13 @@ error. Manual action may be required.
 
 ORDER DETAILS
 ─────────────
-Order ID:      ${orderId}
+Order:         ${orderRef}
 Placed:        ${new Date().toISOString()}
 Customer:      ${order.customerName}
 Email:         ${order.customerEmail}
 Phone:         ${order.customerPhone ?? "n/a"}
 Payment:       ${order.paymentMethodDisplay ?? order.paymentMethod}
-Total:         ${formatPrice(order.total)}
+${paymentLabel ? `Status:        ${paymentLabel}\n` : ""}Total:         ${formatPrice(order.total)}
 
 ITEMS:
 ${formatItemsList(order.items)}
@@ -671,11 +673,12 @@ Dressing Bear · automated alert
 
     <div class="section">
       <h3>Order Details</h3>
-      <p><span class="label">Order ID:</span> ${escapeHtml(orderId)}</p>
+      <p><span class="label">Order:</span> ${escapeHtml(orderRef)}</p>
       <p><span class="label">Customer:</span> ${escapeHtml(order.customerName)}</p>
       <p><span class="label">Email:</span> ${escapeHtml(order.customerEmail)}</p>
       <p><span class="label">Phone:</span> ${escapeHtml(order.customerPhone ?? "n/a")}</p>
       <p><span class="label">Payment:</span> ${escapeHtml(order.paymentMethodDisplay ?? order.paymentMethod)}</p>
+      ${paymentLabel ? `<p><span class="label">Status:</span> ${escapeHtml(paymentLabel)}</p>` : ""}
       <p><span class="label">Total:</span> <strong>${formatPrice(order.total)}</strong></p>
     </div>
 
@@ -701,7 +704,7 @@ Dressing Bear · automated alert
     from,
     to: brandEmail,
     replyTo: brandReplyTo(),
-    subject: `${urgentPrefix}[Dressing Bear] Order ${orderId} — Curfox ${step} failed`,
+    subject: `${urgentPrefix}[Dressing Bear] ${order.rbNumber ?? `Order ${orderId}`} — Curfox ${step} failed`,
     text,
     html,
   });

@@ -115,7 +115,7 @@ describe("sendAdminFailureAlertEmail", () => {
       order: SAMPLE_ORDER,
     });
     const opts = sendMailSpy.mock.calls[0][0];
-    expect(opts.subject).toContain("ORD-TEST-1");
+    expect(opts.subject).toContain("RB1001");
     expect(opts.subject).toContain("curfox-create");
     expect(opts.text).toContain("HTTP 422 — address too long");
     expect(opts.text).toContain("customer_address");
