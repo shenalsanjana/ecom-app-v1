@@ -34,7 +34,22 @@ export const DELIVERY_CITIES: ReadonlyArray<DeliveryCity> = [
   { name: "Kaduwela", zone: "COLOMBO" },
   { name: "Malabe", zone: "COLOMBO" },
   { name: "Kohuwala", zone: "COLOMBO" },
-  { name: "Mount Lavinia", zone: "COLOMBO" }, // alternate spelling
+  { name: "Kottawa", zone: "COLOMBO" },
+  { name: "Colombo 01", zone: "COLOMBO" },
+  { name: "Colombo 02", zone: "COLOMBO" },
+  { name: "Colombo 03", zone: "COLOMBO" },
+  { name: "Colombo 04", zone: "COLOMBO" },
+  { name: "Colombo 05", zone: "COLOMBO" },
+  { name: "Colombo 06", zone: "COLOMBO" },
+  { name: "Colombo 07", zone: "COLOMBO" },
+  { name: "Colombo 08", zone: "COLOMBO" },
+  { name: "Colombo 09", zone: "COLOMBO" },
+  { name: "Colombo 10", zone: "COLOMBO" },
+  { name: "Colombo 11", zone: "COLOMBO" },
+  { name: "Colombo 12", zone: "COLOMBO" },
+  { name: "Colombo 13", zone: "COLOMBO" },
+  { name: "Colombo 14", zone: "COLOMBO" },
+  { name: "Colombo 15", zone: "COLOMBO" },
 
   // ---- Other zone (rest of country) ----
   { name: "Kandy", zone: "OTHER" },
