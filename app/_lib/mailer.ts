@@ -138,13 +138,16 @@ export async function sendOrderConfirmationEmail(order: OrderDetails): Promise<v
     )
     .join("");
 
+  const paymentLabel = paymentStatusLabel(order.paymentStatus);
+
   const text = `
 Order Confirmation - ${BRAND_NAME}
 
-Order ID: ${order.orderId}
+Order: ${order.rbNumber ?? order.orderId}
 Customer: ${order.customerName}
 Email: ${order.customerEmail}${order.customerPhone ? `\nPhone: ${order.customerPhone}` : ""}
-Payment Method: ${paymentDisplay}${order.trackingCode ? `\nTracking Code: ${order.trackingCode}` : ""}
+Payment Method: ${paymentDisplay}
+${paymentLabel ? `Payment Status: ${paymentLabel}\n` : ""}${order.trackingCode ? `Tracking Code: ${order.trackingCode}\n` : ""}
 
 Items:
 ${itemsListText}
@@ -188,10 +191,11 @@ ${BRAND_NAME}
 
     <p>Hi ${escapeHtml(order.customerName)}, thank you for your order. Here are the details:</p>
 
-    <p><strong>Order ID:</strong> ${escapeHtml(order.orderId)}</p>
+    <p><strong>Order:</strong> ${escapeHtml(order.rbNumber ?? order.orderId)}</p>
     <p><strong>Email:</strong> ${escapeHtml(order.customerEmail)}</p>
     ${order.customerPhone ? `<p><strong>Phone:</strong> ${escapeHtml(order.customerPhone)}</p>` : ""}
     <p><strong>Payment Method:</strong> ${escapeHtml(paymentDisplay)}</p>
+    ${paymentLabel ? `<p><strong>Payment Status:</strong> ${escapeHtml(paymentLabel)}</p>` : ""}
     ${order.trackingCode ? `<p><strong>Tracking Code:</strong> ${escapeHtml(order.trackingCode)}</p>` : ""}
 
     <div class="items">
