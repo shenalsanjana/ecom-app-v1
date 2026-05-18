@@ -118,6 +118,8 @@ model Order {
   total                 Float
   paymentMethod         String
   paymentMethodDisplay  String
+  paymentStatus         String?
+  rbNumber              String?   @unique
   status                String   @default("PENDING")
   trackingCode          String?
   royalExpressSubmitted Boolean  @default(false)
