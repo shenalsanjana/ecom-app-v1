@@ -1,0 +1,78 @@
+// app/_lib/delivery-zones.ts
+// Single source of truth for the customer-facing city dropdown at checkout
+// and for the zone classification that drives delivery pricing.
+//
+// Independent of app/_lib/courier/* so that a future courier swap does not
+// have to disturb pricing logic. The initial catalogue is seeded from the
+// existing Curfox city map but tagged with zone manually.
+
+export type DeliveryZone = "COLOMBO" | "OTHER";
+
+export type DeliveryCity = {
+  name: string;
+  zone: DeliveryZone;
+};
+
+export const DELIVERY_CITIES: ReadonlyArray<DeliveryCity> = [
+  // ---- Colombo zone ----
+  { name: "Colombo", zone: "COLOMBO" },
+  { name: "Dehiwala", zone: "COLOMBO" },
+  { name: "Mt. Lavinia", zone: "COLOMBO" },
+  { name: "Nugegoda", zone: "COLOMBO" },
+  { name: "Maharagama", zone: "COLOMBO" },
+  { name: "Kotte", zone: "COLOMBO" },
+  { name: "Rajagiriya", zone: "COLOMBO" },
+  { name: "Battaramulla", zone: "COLOMBO" },
+  { name: "Pannipitiya", zone: "COLOMBO" },
+  { name: "Wattala", zone: "COLOMBO" },
+  { name: "Kelaniya", zone: "COLOMBO" },
+  { name: "Moratuwa", zone: "COLOMBO" },
+  { name: "Ratmalana", zone: "COLOMBO" },
+  { name: "Boralesgamuwa", zone: "COLOMBO" },
+  { name: "Piliyandala", zone: "COLOMBO" },
+  { name: "Homagama", zone: "COLOMBO" },
+  { name: "Kaduwela", zone: "COLOMBO" },
+  { name: "Malabe", zone: "COLOMBO" },
+  { name: "Kohuwala", zone: "COLOMBO" },
+  { name: "Mount Lavinia", zone: "COLOMBO" }, // alternate spelling
+
+  // ---- Other zone (rest of country) ----
+  { name: "Kandy", zone: "OTHER" },
+  { name: "Galle", zone: "OTHER" },
+  { name: "Matara", zone: "OTHER" },
+  { name: "Jaffna", zone: "OTHER" },
+  { name: "Negombo", zone: "OTHER" },
+  { name: "Kurunegala", zone: "OTHER" },
+  { name: "Anuradhapura", zone: "OTHER" },
+  { name: "Polonnaruwa", zone: "OTHER" },
+  { name: "Trincomalee", zone: "OTHER" },
+  { name: "Batticaloa", zone: "OTHER" },
+  { name: "Ratnapura", zone: "OTHER" },
+  { name: "Badulla", zone: "OTHER" },
+  { name: "Nuwara Eliya", zone: "OTHER" },
+  { name: "Hambantota", zone: "OTHER" },
+  { name: "Ampara", zone: "OTHER" },
+  { name: "Kalutara", zone: "OTHER" },
+  { name: "Gampaha", zone: "OTHER" },
+  { name: "Matale", zone: "OTHER" },
+  { name: "Puttalam", zone: "OTHER" },
+  { name: "Vavuniya", zone: "OTHER" },
+  { name: "Mannar", zone: "OTHER" },
+  { name: "Kilinochchi", zone: "OTHER" },
+  { name: "Mullaitivu", zone: "OTHER" },
+  { name: "Chilaw", zone: "OTHER" },
+  { name: "Embilipitiya", zone: "OTHER" },
+];
+
+const ZONE_BY_NAME: ReadonlyMap<string, DeliveryZone> = new Map(
+  DELIVERY_CITIES.map((c) => [c.name.trim().toLowerCase(), c.zone]),
+);
+
+/**
+ * Returns the delivery zone for a city name. Case- and whitespace-insensitive.
+ * Unknown cities default to "OTHER" — under-charging is the failure mode we
+ * want to avoid, so falling to the higher tier is the merchant-safe default.
+ */
+export function zoneForCity(name: string): DeliveryZone {
+  return ZONE_BY_NAME.get(name.trim().toLowerCase()) ?? "OTHER";
+}
