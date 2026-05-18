@@ -100,6 +100,9 @@ test("COD order shows RB number and payment-status badge on /account/orders", as
   // RB number appears as the card title headline (e.g. "RB1001").
   await expect(page.getByText(/RB\d+/)).toBeVisible({ timeout: 5_000 });
 
-  // Payment-status badge for COD shows "Cash on delivery" (from paymentStatusLabel).
-  await expect(page.getByText(/Cash on delivery/i).first()).toBeVisible({ timeout: 5_000 });
+  // Payment-status badge for COD shows "Cash on delivery" (lowercase 'd' — from
+  // paymentStatusLabel("COD_PENDING")). Using a case-sensitive match so this assertion
+  // targets the badge specifically and not the payment-method display text
+  // "Cash on Delivery" (uppercase 'D') rendered in the card subtitle.
+  await expect(page.getByText(/Cash on delivery/)).toBeVisible({ timeout: 5_000 });
 });
