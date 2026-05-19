@@ -22,7 +22,7 @@ import { bookCourierAndNotify } from "./book-courier";
 export type PaymentMethod = "COD" | "PAYHERE" | "KOKO" | "MINITPAY";
 
 export type CheckoutResult =
-  | { success: true; orderId: string; trackingCode?: string; isGuest?: boolean }
+  | { success: true; orderId: string; webNumber?: string | null; trackingCode?: string; isGuest?: boolean }
   | { success: false; error: string };
 
 const PAYMENT_METHOD_DISPLAY: Record<PaymentMethod, string> = {
@@ -171,6 +171,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
       return {
         success: true,
         orderId: existing.id,
+        webNumber: existing.webNumber,
         trackingCode: existing.trackingCode ?? undefined,
         isGuest: !existing.userId,
       };
@@ -314,6 +315,6 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
     );
   }
 
-  return { success: true, orderId, trackingCode, isGuest: !userId };
+  return { success: true, orderId, webNumber: created.webNumber, trackingCode, isGuest: !userId };
 }
 

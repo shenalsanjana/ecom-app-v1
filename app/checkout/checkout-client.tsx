@@ -50,6 +50,7 @@ export function CheckoutClient({ user }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [orderReference, setOrderReference] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("COD");
   const idempotencyKey = useMemo(() => generateIdempotencyKey(), []);
 
@@ -93,7 +94,7 @@ export function CheckoutClient({ user }: Props) {
             </div>
             <h1 className="text-2xl font-bold mb-2">Order Confirmed!</h1>
             <p className="text-muted-foreground mb-2">Thank you for your order.</p>
-            <p className="text-lg font-semibold mb-6">Order ID: {orderId}</p>
+            <p className="text-lg font-semibold mb-6">Order: {orderReference ?? orderId}</p>
             <p className="text-sm text-muted-foreground mb-6">
               {paymentMethod === "COD"
                 ? "We&rsquo;ve emailed your confirmation. Your items will be delivered with Cash on Delivery."
@@ -167,6 +168,7 @@ export function CheckoutClient({ user }: Props) {
       if (result.success) {
         clearCart();
         setOrderId(result.orderId);
+        setOrderReference(result.webNumber ?? result.orderId);
       } else {
         setError(result.error);
       }
