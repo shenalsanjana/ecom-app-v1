@@ -4,11 +4,11 @@ This file defines the foundational architecture and workflows for the Dressing B
 
 ## 1. Lifecycle: Spec -> Plan -> Implement
 - **Phase 1: Brainstorming & Specification:** When a new feature, bug, or change is conceived, write a specification in `docs/spec/<change-name>.md`. This defines "what" we are building and "why" and do planing on `docs/superpowers/plans/<date-change-name.md>`with superpower planing skill.
-- **Phase 2: Execution:** Implement the plan on a feature branch from `develop`.
+- **Phase 2: Execution:** Implement the plan on a feature branch from `main` (or directly on `main` for small fixes).
 - **Phase 3: Archiving:** Once merged, move the implementation details to `openspec/archive/` and remove the active plan folder from `openspec/changes/`.
 
 ## 2. Development Workflow
-- **Branching:** Work exclusively from the `develop` branch. Never commit directly to `main`.
+- **Branching:** `main` is the integration branch. Use short-lived `feat/*` or `fix/*` branches off `main` for substantial work, or commit small fixes directly to `main`. The `develop` branch was retired in 2026-05 — historical commits referencing "merge develop into main" predate this change.
 - **Commit Process:** Follow the rules in `openspec/COMMIT_PROCESS.md`.
 - **Validation:** Every change must be verified with `npm run build` before merge.
 
