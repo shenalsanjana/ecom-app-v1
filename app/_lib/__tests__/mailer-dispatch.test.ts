@@ -12,6 +12,7 @@ const originalEnv = { ...process.env };
 
 const SAMPLE_ORDER: OrderDetails = {
   orderId: "ORD-TEST-1",
+  webNumber: "WEB0042",
   customerName: "Jane Doe",
   customerEmail: "jane@example.com",
   customerPhone: "+94770000000",
@@ -67,17 +68,22 @@ describe("sendDispatchNotificationEmail", () => {
     expect(opts.from).toBe("Dressing Bear <a9e490001@smtp-brevo.com>");
     expect(opts.replyTo).toBe("dressingbear@gmail.com");
     expect(opts.subject).toContain("RA03870247");
-    expect(opts.subject).toContain("RB1001");
+    expect(opts.subject).toContain("WEB0042");
     expect(opts.attachments).toHaveLength(1);
     expect(opts.attachments[0].filename).toBe("delivery-note.pdf");
     // nodemailer's jsonTransport may serialise the Buffer to base64 in-place;
     // we only care that a non-empty content was provided.
     expect(opts.attachments[0].content).toBeTruthy();
     // New fields: RB number, payment status, notes, COD amount
-    expect(opts.text).toContain("RB1001");
+    expect(opts.text).toContain("WEB0042");
     expect(opts.text).toContain("Cash on delivery");
     expect(opts.text).toContain("Please leave at the gate.");
     expect(opts.text).toMatch(/COD AMOUNT:.*2.?440/);
+    // Customer-entered details flow through unchanged in the email body
+    expect(opts.text).toContain("Jane Doe");
+    expect(opts.text).toContain("+94770000000");   // email shows the as-entered format
+    expect(opts.text).toContain("Colombo");        // city present in body
+    expect(opts.text).toContain("Cotton T-Shirt"); // itemized list
   });
 
   it("renders COD amount = 0 for prepaid orders (not the order total)", async () => {
@@ -104,6 +110,25 @@ describe("sendDispatchNotificationEmail", () => {
     // The alarmist "PDF could not be fetched" wording is no longer used.
     expect(opts.text).not.toContain("PDF could not be fetched");
   });
+
+  it("falls back to rbNumber in the subject when webNumber is null", async () => {
+    await sendDispatchNotificationEmail({
+      order: { ...SAMPLE_ORDER, webNumber: null },
+      waybillNumber: "RA03870247",
+    });
+    const opts = sendMailSpy.mock.calls[0][0];
+    expect(opts.subject).toContain("RB1001");
+    expect(opts.subject).not.toContain("WEB0042");
+  });
+
+  it("falls back to orderId in the subject when both webNumber and rbNumber are null", async () => {
+    await sendDispatchNotificationEmail({
+      order: { ...SAMPLE_ORDER, webNumber: null, rbNumber: null },
+      waybillNumber: "RA03870247",
+    });
+    const opts = sendMailSpy.mock.calls[0][0];
+    expect(opts.subject).toContain("ORD-TEST-1");
+  });
 });
 
 describe("sendPendingPrepaidNotificationEmail", () => {
@@ -113,7 +138,7 @@ describe("sendPendingPrepaidNotificationEmail", () => {
     });
     const opts = sendMailSpy.mock.calls[0][0];
     expect(opts.subject).toMatch(/^\[Awaiting Payment\]/);
-    expect(opts.subject).toContain("RB1001");
+    expect(opts.subject).toContain("WEB0042");
     expect(opts.attachments).toBeUndefined();
     expect(opts.text).toContain("Do NOT ship");
   });
@@ -129,7 +154,7 @@ describe("sendAdminFailureAlertEmail", () => {
       order: SAMPLE_ORDER,
     });
     const opts = sendMailSpy.mock.calls[0][0];
-    expect(opts.subject).toContain("RB1001");
+    expect(opts.subject).toContain("WEB0042");
     expect(opts.subject).toContain("curfox-create");
     expect(opts.text).toContain("HTTP 422 — address too long");
     expect(opts.text).toContain("customer_address");
