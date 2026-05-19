@@ -25,6 +25,7 @@ async function main() {
     take: 10,
     select: {
       id: true,
+      webNumber: true,
       rbNumber: true,
       createdAt: true,
       paymentMethod: true,
@@ -53,7 +54,7 @@ async function main() {
   for (const o of orders) {
     console.log("─".repeat(70));
     console.log(
-      `${o.rbNumber ?? o.id}  •  ${o.createdAt.toISOString()}  •  ${o.paymentMethod}  •  ${o.shippingCity}  •  LKR ${o.total}`,
+      `${o.webNumber ?? o.rbNumber ?? o.id}  •  ${o.createdAt.toISOString()}  •  ${o.paymentMethod}  •  ${o.shippingCity}  •  LKR ${o.total}`,
     );
     console.log("  status:                  ", o.status);
     console.log("  paymentStatus:           ", o.paymentStatus ?? "(null)");
