@@ -25,9 +25,7 @@ const DEFAULT_WEIGHT = (): number =>
   Number(process.env.CURFOX_DEFAULT_WEIGHT_KG ?? "1");
 
 function buildAddressLine(addr: OrderDetails["shippingAddress"]): string {
-  const parts = [addr.line1];
-  if (addr.line2) parts.push(addr.line2);
-  return parts.join(", ");
+  return [addr.line1, addr.line2, addr.city].filter(Boolean).join(", ");
 }
 
 function buildDescription(items: OrderDetails["items"]): string {

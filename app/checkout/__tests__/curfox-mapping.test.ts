@@ -84,4 +84,19 @@ describe("Curfox payload mirrors customer-entered details", () => {
       expect(item.customer_phone).toBe("0770000000");
     });
   });
+
+  describe("customer_address", () => {
+    it("joins line1, line2, and city", async () => {
+      const item = await callAndGetItem();
+      expect(item.customer_address).toBe("1 Walls Lane, Apt 4B, Kotte");
+    });
+
+    it("omits line2 when not provided", async () => {
+      const item = await callAndGetItem({
+        ...ORDER,
+        shippingAddress: { line1: "1 Walls Lane", city: "Kotte", country: "Sri Lanka" },
+      });
+      expect(item.customer_address).toBe("1 Walls Lane, Kotte");
+    });
+  });
 });
