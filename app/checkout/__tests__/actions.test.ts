@@ -26,7 +26,7 @@ vi.mock("@/app/_lib/prisma", () => ({
         order: {
           create: txOrderCreate,
         },
-        $queryRaw: vi.fn().mockResolvedValue([{ next: 1001n }]),
+        $queryRaw: vi.fn().mockResolvedValue([{ next: 42n }]),
       }),
     ),
   },
@@ -79,13 +79,13 @@ describe("processOrder — COD path", () => {
     expect(sendPendingPrepaidNotificationEmail).not.toHaveBeenCalled();
   });
 
-  it("persists COD_PENDING paymentStatus and an RB-prefixed rbNumber", async () => {
+  it("persists COD_PENDING paymentStatus and a WEB-prefixed webNumber", async () => {
     await processOrder({ ...baseInput, paymentMethod: "COD" });
     expect(txOrderCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           paymentStatus: "COD_PENDING",
-          rbNumber: expect.stringMatching(/^RB\d+$/),
+          webNumber: expect.stringMatching(/^WEB\d{4,}$/),
         }),
       }),
     );
@@ -105,19 +105,25 @@ describe("processOrder — prepaid paths", () => {
   );
 
   it.each(["PAYHERE", "KOKO", "MINITPAY"] as const)(
-    "%s: persists PENDING paymentStatus and an RB-prefixed rbNumber",
+    "%s: persists PENDING paymentStatus and a WEB-prefixed webNumber",
     async (paymentMethod) => {
       await processOrder({ ...baseInput, paymentMethod });
       expect(txOrderCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             paymentStatus: "PENDING",
-            rbNumber: expect.stringMatching(/^RB\d+$/),
+            webNumber: expect.stringMatching(/^WEB\d{4,}$/),
           }),
         }),
       );
     },
   );
+
+  it("does not write rbNumber for new orders", async () => {
+    await processOrder({ ...baseInput, paymentMethod: "COD" });
+    const call = vi.mocked(txOrderCreate).mock.calls[0]?.[0] as { data: Record<string, unknown> };
+    expect(call.data).not.toHaveProperty("rbNumber");
+  });
 });
 
 describe("processOrder — never throws downstream failures back to the customer", () => {

@@ -16,7 +16,7 @@ import { prisma } from "@/app/_lib/prisma";
 import { calculateDelivery } from "@/app/_lib/checkout-config";
 import { zoneForCity } from "@/app/_lib/delivery-zones";
 import { initialPaymentStatus } from "@/app/_lib/order-status";
-import { nextRbNumber } from "@/app/_lib/rb-number";
+import { nextWebNumber } from "@/app/_lib/web-number";
 import { bookCourierAndNotify } from "./book-courier";
 
 export type PaymentMethod = "COD" | "PAYHERE" | "KOKO" | "MINITPAY";
@@ -93,7 +93,7 @@ async function orchestrateCourierBooking(orderId: string, details: OrderDetails)
       try {
         await sendPendingPrepaidNotificationEmail({ order: details });
       } catch (err) {
-        logMailerError("pending-prepaid", { orderId, rbNumber: details.rbNumber }, err);
+        logMailerError("pending-prepaid", { orderId }, err);
       }
     }
   } catch (err) {
@@ -199,7 +199,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
 
   // Create the order + decrement stock atomically. Stock decrement uses a
   // conditional update so concurrent purchases of the last unit can't oversell.
-  let created: { rbNumber: string | null; paymentStatus: string | null };
+  let created: { webNumber: string | null; paymentStatus: string | null };
   try {
     created = await prisma.$transaction(async (tx) => {
       for (const item of items) {
@@ -212,7 +212,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
         }
       }
 
-      const rbNumber = await nextRbNumber(tx);
+      const webNumber = await nextWebNumber(tx);
       const paymentStatus = initialPaymentStatus(paymentMethod);
 
       return tx.order.create({
@@ -233,7 +233,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
           paymentMethodDisplay: PAYMENT_METHOD_DISPLAY[paymentMethod],
           status: "PENDING",
           paymentStatus,
-          rbNumber,
+          webNumber,
           idempotencyKey: idempotencyKey ?? null,
           notes: notes && notes.length > 0 ? notes : null,
           items: {
@@ -274,7 +274,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
     paymentMethod,
     paymentMethodDisplay: PAYMENT_METHOD_DISPLAY[paymentMethod],
     notes: notes && notes.length > 0 ? notes : undefined,
-    rbNumber: created.rbNumber,
+    webNumber: created.webNumber,
     paymentStatus: created.paymentStatus,
   };
 
@@ -292,11 +292,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
       data: { emailSent: true },
     });
   } catch (error) {
-    logMailerError(
-      "order-confirmation",
-      { orderId, rbNumber: created.rbNumber },
-      error,
-    );
+    logMailerError("order-confirmation", { orderId }, error);
   }
 
   return { success: true, orderId, trackingCode, isGuest: !userId };
