@@ -133,7 +133,14 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
 
   if (session?.user?.id) {
     userId = session.user.id;
-    customerName = session.user.name ?? "Customer";
+    const sessionName = session.user.name?.trim();
+    if (!sessionName) {
+      return {
+        success: false,
+        error: "Please add your name to your profile before checking out",
+      };
+    }
+    customerName = sessionName;
     customerEmail = session.user.email ?? "";
   } else if (guestInfo) {
     customerName = guestInfo.name;

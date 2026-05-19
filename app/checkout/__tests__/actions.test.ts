@@ -48,6 +48,7 @@ import {
   sendOrderConfirmationEmail,
   sendPendingPrepaidNotificationEmail,
 } from "@/app/_lib/mailer";
+import { auth } from "@/app/_lib/auth";
 import { processOrder, type ProcessOrderInput } from "../actions";
 
 const baseInput: Omit<ProcessOrderInput, "paymentMethod"> = {
@@ -138,5 +139,28 @@ describe("processOrder — never throws downstream failures back to the customer
     vi.mocked(sendOrderConfirmationEmail).mockRejectedValueOnce(new Error("smtp down"));
     const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
     expect(result.success).toBe(true);
+  });
+});
+
+describe("processOrder — customer name requirement", () => {
+  it("rejects logged-in checkout when session.user.name is empty", async () => {
+    vi.mocked(auth).mockResolvedValueOnce({
+      user: { id: "U1", name: "", email: "user@example.com" },
+    } as never);
+
+    const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/name/i);
+    }
+  });
+
+  it("rejects logged-in checkout when session.user.name is whitespace-only", async () => {
+    vi.mocked(auth).mockResolvedValueOnce({
+      user: { id: "U1", name: "   ", email: "user@example.com" },
+    } as never);
+
+    const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
+    expect(result.success).toBe(false);
   });
 });
