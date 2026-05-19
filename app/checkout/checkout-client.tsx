@@ -97,8 +97,8 @@ export function CheckoutClient({ user }: Props) {
             <p className="text-lg font-semibold mb-6">Order: {orderReference ?? orderId}</p>
             <p className="text-sm text-muted-foreground mb-6">
               {paymentMethod === "COD"
-                ? "We&rsquo;ve emailed your confirmation. Your items will be delivered with Cash on Delivery."
-                : `We&rsquo;ve emailed your confirmation. Your payment via ${PAYMENT_OPTIONS.find(p => p.id === paymentMethod)?.name} is being processed.`}
+                ? "We’ve emailed your confirmation. Your items will be delivered with Cash on Delivery."
+                : `We’ve emailed your confirmation. Your payment via ${PAYMENT_OPTIONS.find(p => p.id === paymentMethod)?.name} is being processed.`}
             </p>
             <Button onClick={() => router.push("/")} className="w-full">
               Continue Shopping
