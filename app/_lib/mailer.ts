@@ -108,7 +108,8 @@ export type OrderDetails = {
   paymentMethodDisplay?: string;
   trackingCode?: string;
   notes?: string;
-  rbNumber?: string | null;       // Receipt book / invoice reference
+  webNumber?: string | null;      // Customer-facing order code (new); preferred when set
+  rbNumber?: string | null;       // Legacy receipt book / invoice reference
   paymentStatus?: string | null;  // e.g. "Awaiting payment", "Paid", "Cash on delivery"
 };
 
