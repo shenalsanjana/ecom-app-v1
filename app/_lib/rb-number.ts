@@ -1,6 +1,9 @@
 // app/_lib/rb-number.ts
-// Sequence-backed generator for the customer-facing order reference
-// `RB####`. Atomic, race-free, never resets.
+//
+// Legacy sequence-backed generator. Superseded by `app/_lib/web-number.ts`
+// for new orders (which produce `WEB####` references). This file is retained
+// because old `Order` rows still carry `rbNumber` values; the helper itself
+// is no longer called from `processOrder`.
 
 import type { Prisma } from "@prisma/client";
 

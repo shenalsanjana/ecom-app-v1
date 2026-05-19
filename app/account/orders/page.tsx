@@ -61,7 +61,7 @@ export default async function OrdersPage() {
                 <CardHeader className="flex flex-row items-start justify-between gap-4">
                   <div>
                     <CardTitle className="text-base">
-                      {o.rbNumber ?? `Order #${o.id.slice(-8)}`}
+                      {o.webNumber ?? o.rbNumber ?? `Order #${o.id.slice(-8)}`}
                     </CardTitle>
                     <div className="text-sm text-muted-foreground">
                       Placed {formatDate(o.createdAt)} · {o.paymentMethodDisplay}
