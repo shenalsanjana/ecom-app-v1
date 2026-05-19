@@ -116,4 +116,55 @@ describe("Curfox payload mirrors customer-entered details", () => {
       expect(item.remark).toBeUndefined();
     });
   });
+
+  describe("order_no", () => {
+    it("uses webNumber when set", async () => {
+      const item = await callAndGetItem({ ...ORDER, webNumber: "WEB0042", rbNumber: null });
+      expect(item.order_no).toBe("WEB0042");
+    });
+
+    it("falls back to rbNumber when webNumber is absent", async () => {
+      const item = await callAndGetItem({
+        ...ORDER,
+        webNumber: null,
+        rbNumber: "RB1001",
+      });
+      expect(item.order_no).toBe("RB1001");
+    });
+
+    it("falls back to orderId when both web and rb are absent", async () => {
+      const item = await callAndGetItem({
+        ...ORDER,
+        webNumber: null,
+        rbNumber: null,
+      });
+      expect(item.order_no).toBe("ORD-1734567890-AB12CD");
+    });
+  });
+
+  describe("customer_name (no fallbacks at the Curfox boundary)", () => {
+    it("passes the customer-entered name through unchanged", async () => {
+      const item = await callAndGetItem({ ...ORDER, customerName: "Jane Doe" });
+      expect(item.customer_name).toBe("Jane Doe");
+    });
+  });
+
+  describe("customer_email", () => {
+    it("forwards the customer-entered email", async () => {
+      const item = await callAndGetItem();
+      expect(item.customer_email).toBe("jane@example.com");
+    });
+  });
+
+  describe("cod amount", () => {
+    it("equals total for COD orders", async () => {
+      const item = await callAndGetItem({ ...ORDER, paymentMethod: "COD", total: 2440 });
+      expect(item.cod).toBe(2440);
+    });
+
+    it("equals 0 for prepaid orders", async () => {
+      const item = await callAndGetItem({ ...ORDER, paymentMethod: "PAYHERE", total: 2440 });
+      expect(item.cod).toBe(0);
+    });
+  });
 });

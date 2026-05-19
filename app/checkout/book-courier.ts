@@ -14,6 +14,7 @@ import {
   logMailerError,
 } from "@/app/_lib/mailer";
 import type { OrderDetails } from "@/app/_lib/mailer";
+import { orderReference } from "@/app/_lib/order-reference";
 
 const MERCHANT_BUSINESS_ID = (): number =>
   Number(process.env.CURFOX_MERCHANT_BUSINESS_ID ?? "7290");
@@ -121,7 +122,7 @@ export async function bookCourierAndNotify(params: {
   }
 
   const orderItem: any = {
-    order_no: order.orderId,
+    order_no: orderReference(order),
     customer_name: order.customerName,
     customer_address: buildAddressLine(order.shippingAddress),
     customer_phone: toLocalSriLankaPhone(order.customerPhone),

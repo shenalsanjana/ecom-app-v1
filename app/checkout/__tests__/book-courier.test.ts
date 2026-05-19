@@ -46,6 +46,7 @@ import { bookCourierAndNotify } from "../book-courier";
 
 const ORDER: OrderDetails = {
   orderId: "ORD-TEST-1",
+  webNumber: "WEB0001",
   customerName: "Jane Doe",
   customerEmail: "jane@example.com",
   customerPhone: "+94770000000",
