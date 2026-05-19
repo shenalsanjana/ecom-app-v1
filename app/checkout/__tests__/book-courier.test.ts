@@ -133,3 +133,45 @@ describe("bookCourierAndNotify — failure cascade", () => {
     await expect(bookCourierAndNotify({ order: ORDER })).resolves.toBeUndefined();
   });
 });
+
+describe("bookCourierAndNotify — name-fallback payload", () => {
+  it("books bare 'Colombo' via destination_city_name + destination_state_name", async () => {
+    // Bare "Colombo" is not an exact match in KNOWN_CURFOX_CITIES (only
+    // "Colombo 01..15"), so resolveCurfoxCity returns null and we fall back
+    // to the name-pair envelope. The state must resolve to "Colombo" via
+    // prefix match — otherwise Curfox's refine rejects the payload.
+    vi.mocked(prisma.curfoxCity.findFirst).mockResolvedValueOnce(null as never);
+    vi.mocked(createCurfoxOrder).mockResolvedValueOnce("RA09999999");
+    vi.mocked(sendDispatchNotificationEmail).mockResolvedValueOnce(undefined);
+
+    const order: OrderDetails = {
+      ...ORDER,
+      shippingAddress: { ...ORDER.shippingAddress, city: "Colombo" },
+    };
+    const waybill = await bookCourierAndNotify({ order });
+
+    expect(waybill).toBe("RA09999999");
+    const envelope = vi.mocked(createCurfoxOrder).mock.calls[0][0];
+    expect(envelope.order_data[0].destination_city_id).toBeUndefined();
+    expect(envelope.order_data[0].destination_city_name).toBe("Colombo");
+    expect(envelope.order_data[0].destination_state_name).toBe("Colombo");
+    expect(sendAdminFailureAlertEmail).not.toHaveBeenCalled();
+  });
+
+  it("short-circuits with city-lookup alert for an unmapped city — no Curfox call", async () => {
+    vi.mocked(prisma.curfoxCity.findFirst).mockResolvedValueOnce(null as never);
+
+    const order: OrderDetails = {
+      ...ORDER,
+      shippingAddress: { ...ORDER.shippingAddress, city: "Trincomalee" },
+    };
+    const waybill = await bookCourierAndNotify({ order });
+
+    expect(waybill).toBeUndefined();
+    expect(createCurfoxOrder).not.toHaveBeenCalled();
+    expect(sendAdminFailureAlertEmail).toHaveBeenCalledOnce();
+    const alert = vi.mocked(sendAdminFailureAlertEmail).mock.calls[0][0];
+    expect(alert.step).toBe("city-lookup");
+    expect(alert.context?.city).toBe("Trincomalee");
+  });
+});

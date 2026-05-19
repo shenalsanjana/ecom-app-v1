@@ -28,8 +28,8 @@ export const CurfoxOrderDataItemSchema = z.object({
   cod: z.number().min(0),
   description: z.string(),
   destination_city_id: z.number().optional(),
-  destination_city_name: z.string().optional(),
-  destination_state_name: z.string().optional(),
+  destination_city_name: z.string().min(1).optional(),
+  destination_state_name: z.string().min(1).optional(),
   remark: z.string().optional()
 }).refine(data => data.destination_city_id || (data.destination_city_name && data.destination_state_name), {
   message: "Either destination_city_id or both destination_city_name and destination_state_name must be provided",

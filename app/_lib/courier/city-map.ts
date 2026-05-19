@@ -64,15 +64,29 @@ export function canonicalizeCurfoxCityName(cityName: string): string {
 }
 
 export function getDistrictForCity(cityName: string, region: string): string {
-    const hit = KNOWN_LOOKUP.get(cityName.trim().toLowerCase());
+    const trimmed = cityName.trim();
+    const hit = KNOWN_LOOKUP.get(trimmed.toLowerCase());
     if (hit?.state) return hit.state;
-    
+
+    // Bare base names like "Colombo" don't have a KNOWN_LOOKUP row of their own
+    // (the seed only contains "Colombo 01..15"), so fall through to a
+    // prefix match against the seeded entries. Every "Colombo NN" entry
+    // shares the same state ("Colombo"), so the first hit is authoritative.
+    if (trimmed) {
+        const prefix = trimmed.toLowerCase() + " ";
+        for (const c of KNOWN_CURFOX_CITIES) {
+            if (c.state && c.name.toLowerCase().startsWith(prefix)) {
+                return c.state;
+            }
+        }
+    }
+
     // Heuristic fallbacks for common regions
     const r = region.toLowerCase();
     if (r.includes("westren") || r.includes("western")) {
         if (cityName.toLowerCase().includes("colombo")) return "Colombo";
     }
-    
+
     return region;
 }
 

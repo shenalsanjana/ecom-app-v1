@@ -85,7 +85,28 @@ export async function bookCourierAndNotify(params: {
 
   // Resolve city ID or names
   const cityResolution = await resolveCurfoxCity(order.shippingAddress.city);
-  const district = getDistrictForCity(order.shippingAddress.city, "");
+  const district = getDistrictForCity(order.shippingAddress.city, "").trim();
+
+  // Without a city ID and without a non-empty district, the Curfox refine
+  // would reject the payload with a path-misleading "destination_city_id"
+  // error. Short-circuit with an actionable admin alert instead.
+  if (!cityResolution?.destinationCityId && !district) {
+    const reason = `Unmapped Curfox city: "${order.shippingAddress.city}"`;
+    await prisma.order
+      .update({
+        where: { id: order.orderId },
+        data: { courierLastError: `city-lookup: ${reason}`, courierLastErrorAt: new Date() },
+      })
+      .catch(() => undefined);
+    await tryAlert({
+      orderId: order.orderId,
+      step: "city-lookup",
+      reason,
+      order,
+      context: { city: order.shippingAddress.city },
+    });
+    return undefined;
+  }
 
   const orderItem: any = {
     order_no: order.orderId,
