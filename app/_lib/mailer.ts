@@ -2,6 +2,7 @@
 import nodemailer from "nodemailer";
 import { formatPrice } from "@/app/_lib/format";
 import { paymentStatusLabel } from "@/app/_lib/order-status";
+import { orderReference } from "@/app/_lib/order-reference";
 
 function escapeHtml(s: string): string {
   return s
@@ -144,7 +145,7 @@ export async function sendOrderConfirmationEmail(order: OrderDetails): Promise<v
   const text = `
 Order Confirmation - ${BRAND_NAME}
 
-Order: ${order.rbNumber ?? order.orderId}
+Order: ${orderReference(order)}
 Customer: ${order.customerName}
 Email: ${order.customerEmail}${order.customerPhone ? `\nPhone: ${order.customerPhone}` : ""}
 Payment Method: ${paymentDisplay}
@@ -192,7 +193,7 @@ ${BRAND_NAME}
 
     <p>Hi ${escapeHtml(order.customerName)}, thank you for your order. Here are the details:</p>
 
-    <p><strong>Order:</strong> ${escapeHtml(order.rbNumber ?? order.orderId)}</p>
+    <p><strong>Order:</strong> ${escapeHtml(orderReference(order))}</p>
     <p><strong>Email:</strong> ${escapeHtml(order.customerEmail)}</p>
     ${order.customerPhone ? `<p><strong>Phone:</strong> ${escapeHtml(order.customerPhone)}</p>` : ""}
     <p><strong>Payment Method:</strong> ${escapeHtml(paymentDisplay)}</p>
@@ -231,7 +232,7 @@ ${BRAND_NAME}
     to: order.customerEmail,
     bcc: brandEmail,
     replyTo: brandReplyTo(),
-    subject: `Order ${order.orderId} - ${BRAND_NAME}`,
+    subject: `Order ${orderReference(order)} - ${BRAND_NAME}`,
     text,
     html,
   });
@@ -357,7 +358,7 @@ export function logMailerError(
     | "admin-failure-alert"
     | "contact"
     | "password-reset",
-  orderRef: { orderId?: string; rbNumber?: string | null },
+  orderRef: { orderId?: string; webNumber?: string | null; rbNumber?: string | null },
   err: unknown,
 ): void {
   const e = err as Partial<{
@@ -369,7 +370,7 @@ export function logMailerError(
   }>;
   // eslint-disable-next-line no-console
   console.error(`[mailer] ${template} FAILED`, {
-    order: orderRef.rbNumber ?? orderRef.orderId ?? "(none)",
+    order: orderReference(orderRef) || "(none)",
     code: e.code,
     responseCode: e.responseCode,
     response: e.response,
@@ -399,7 +400,7 @@ export async function sendDispatchNotificationEmail(params: {
 
   const text = `A new COD order has been booked with Royal Express via Curfox.
 
-ORDER:        ${order.rbNumber ?? order.orderId}
+ORDER:        ${orderReference(order)}
 WAYBILL:      ${waybillNumber}
 CUSTOMER:     ${order.customerName}
 PHONE:        ${order.customerPhone ?? "n/a"}${paymentLabel ? `\nPAYMENT:      ${paymentLabel}` : ""}
@@ -447,7 +448,7 @@ Dressing Bear · automated dispatch
     <p>A new COD order has been booked with Royal Express via Curfox.</p>
 
     <div class="section">
-      <p><span class="label">Order:</span> ${escapeHtml(order.rbNumber ?? order.orderId)}</p>
+      <p><span class="label">Order:</span> ${escapeHtml(orderReference(order))}</p>
       <p><span class="label">Waybill:</span> <strong>${escapeHtml(waybillNumber)}</strong></p>
       <p><span class="label">Customer:</span> ${escapeHtml(order.customerName)}</p>
       <p><span class="label">Phone:</span> ${escapeHtml(order.customerPhone ?? "n/a")}</p>
@@ -490,7 +491,7 @@ Dressing Bear · automated dispatch
     from,
     to: brandEmail,
     replyTo: brandReplyTo(),
-    subject: `[Dispatch] ${order.rbNumber ?? `Order ${order.orderId}`} — Waybill ${waybillNumber}`,
+    subject: `[Dispatch] ${orderReference(order)} — Waybill ${waybillNumber}`,
     text,
     html,
     attachments: pdfBuffer
@@ -508,7 +509,7 @@ export async function sendPendingPrepaidNotificationEmail(params: {
   const from = requireFrom();
   const gateway = order.paymentMethodDisplay ?? order.paymentMethod;
   const paymentLabel = paymentStatusLabel(order.paymentStatus);
-  const orderRef = order.rbNumber ?? order.orderId;
+  const orderRef = orderReference(order);
 
   const text = `A new prepaid order has been placed. Courier booking is
 DEFERRED until the payment gateway confirms the transaction.
@@ -599,7 +600,7 @@ Dressing Bear · automated dispatch
     from,
     to: brandEmail,
     replyTo: brandReplyTo(),
-    subject: `[Awaiting Payment] ${order.rbNumber ?? `Order ${order.orderId}`} — ${gateway}`,
+    subject: `[Awaiting Payment] ${orderReference(order)} — ${gateway}`,
     text,
     html,
   });
@@ -638,7 +639,7 @@ export async function sendAdminFailureAlertEmail(params: {
 
   const urgentPrefix = step === "curfox-persist" ? "[URGENT] " : "";
   const nextAction = NEXT_ACTION_BY_STEP[step](orderId, context ?? {});
-  const orderRef = order.rbNumber ?? orderId;
+  const orderRef = orderReference(order);
   const paymentLabel = paymentStatusLabel(order.paymentStatus);
 
   const text = `A Dressing Bear order saved successfully but the downstream
@@ -751,7 +752,7 @@ Dressing Bear · automated alert
     from,
     to: brandEmail,
     replyTo: brandReplyTo(),
-    subject: `${urgentPrefix}[Failure] ${order.rbNumber ?? `Order ${orderId}`} — Curfox ${step} failed`,
+    subject: `${urgentPrefix}[Failure] ${orderReference(order)} — Curfox ${step} failed`,
     text,
     html,
   });

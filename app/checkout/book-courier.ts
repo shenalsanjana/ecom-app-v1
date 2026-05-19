@@ -55,7 +55,7 @@ async function tryAlert(params: Parameters<typeof sendAdminFailureAlertEmail>[0]
   } catch (err) {
     logMailerError(
       "admin-failure-alert",
-      { orderId: params.orderId, rbNumber: params.order.rbNumber },
+      { orderId: params.orderId, webNumber: params.order.webNumber, rbNumber: params.order.rbNumber },
       err,
     );
   }
@@ -79,7 +79,7 @@ async function tryDispatchEmail(
   } catch (err) {
     logMailerError(
       "dispatch",
-      { orderId: order.orderId, rbNumber: order.rbNumber },
+      { orderId: order.orderId, webNumber: order.webNumber, rbNumber: order.rbNumber },
       err,
     );
   }

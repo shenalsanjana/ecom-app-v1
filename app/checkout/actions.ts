@@ -93,7 +93,11 @@ async function orchestrateCourierBooking(orderId: string, details: OrderDetails)
       try {
         await sendPendingPrepaidNotificationEmail({ order: details });
       } catch (err) {
-        logMailerError("pending-prepaid", { orderId }, err);
+        logMailerError(
+          "pending-prepaid",
+          { orderId, webNumber: details.webNumber, rbNumber: details.rbNumber },
+          err,
+        );
       }
     }
   } catch (err) {
@@ -299,7 +303,11 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
       data: { emailSent: true },
     });
   } catch (error) {
-    logMailerError("order-confirmation", { orderId }, error);
+    logMailerError(
+      "order-confirmation",
+      { orderId, webNumber: created.webNumber },
+      error,
+    );
   }
 
   return { success: true, orderId, trackingCode, isGuest: !userId };
