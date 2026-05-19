@@ -27,7 +27,7 @@ function getTransport(): nodemailer.Transporter {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
     throw new Error(
-      "SMTP is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS in .env.local.",
+      "SMTP is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS in .env.local (locally) or in your hosting provider's environment variables (production).",
     );
   }
   cached = nodemailer.createTransport({
@@ -46,7 +46,7 @@ function requireFrom(): string {
   const from = process.env.SMTP_FROM;
   if (!from) {
     throw new Error(
-      "SMTP_FROM is not configured. Set SMTP_FROM in .env.local (e.g. \"Dressing Bear <no-reply@dressingbear.com>\").",
+      "SMTP_FROM is not configured. Set SMTP_FROM in .env.local (locally) or in your hosting provider's environment variables (production), e.g. \"Dressing Bear <no-reply@dressingbear.com>\".",
     );
   }
   return from;
@@ -56,7 +56,7 @@ function requireBrandEmail(): string {
   const email = process.env.BRAND_EMAIL;
   if (!email) {
     throw new Error(
-      "BRAND_EMAIL is not configured. Set BRAND_EMAIL in .env.local.",
+      "BRAND_EMAIL is not configured. Set BRAND_EMAIL in .env.local (locally) or in your hosting provider's environment variables (production).",
     );
   }
   return email;
