@@ -112,7 +112,11 @@ async function orchestrateCourierBooking(orderId: string, details: OrderDetails)
         errorDetail: err instanceof Error ? err.stack : undefined,
       });
     } catch (alertErr) {
-      logMailerError("admin-failure-alert", { orderId }, alertErr);
+      logMailerError(
+        "admin-failure-alert",
+        { orderId, webNumber: details.webNumber, rbNumber: details.rbNumber },
+        alertErr,
+      );
     }
   }
   return undefined;
