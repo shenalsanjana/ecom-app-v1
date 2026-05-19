@@ -36,6 +36,20 @@ function buildDescription(items: OrderDetails["items"]): string {
   return `Clothes (${totalQty} items)`;
 }
 
+/**
+ * Normalises a phone number for the Curfox/Sri Lanka local format.
+ * Couriers expect the leading `0` form (e.g., 0770000000), not the
+ * international `+94` form. Inputs may include spaces, dashes, or a
+ * leading `+`; output is digits-only with a leading `0`.
+ */
+function toLocalSriLankaPhone(phone: string | undefined): string {
+  if (!phone) return "";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("94")) return "0" + digits.slice(2);
+  if (digits.startsWith("0")) return digits;
+  return digits;
+}
+
 async function tryAlert(params: Parameters<typeof sendAdminFailureAlertEmail>[0]): Promise<void> {
   try {
     await sendAdminFailureAlertEmail(params);
@@ -112,7 +126,7 @@ export async function bookCourierAndNotify(params: {
     order_no: order.orderId,
     customer_name: order.customerName,
     customer_address: buildAddressLine(order.shippingAddress),
-    customer_phone: order.customerPhone?.replace(/\+/g, "") ?? "", // Remove + if present
+    customer_phone: toLocalSriLankaPhone(order.customerPhone),
     customer_email: order.customerEmail ?? null,
     weight: DEFAULT_WEIGHT(),
     cod: order.paymentMethod === "COD" ? order.total : 0,
