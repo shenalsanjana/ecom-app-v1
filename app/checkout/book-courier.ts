@@ -129,6 +129,7 @@ export async function bookCourierAndNotify(params: {
     weight: DEFAULT_WEIGHT(),
     cod: order.paymentMethod === "COD" ? order.total : 0,
     description: buildDescription(order.items),
+    remark: order.notes?.trim() || undefined,
   };
 
   if (cityResolution?.destinationCityId) {

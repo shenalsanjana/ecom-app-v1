@@ -99,4 +99,21 @@ describe("Curfox payload mirrors customer-entered details", () => {
       expect(item.customer_address).toBe("1 Walls Lane, Kotte");
     });
   });
+
+  describe("remark (delivery notes)", () => {
+    it("forwards trimmed notes to Curfox remark", async () => {
+      const item = await callAndGetItem({ ...ORDER, notes: "  Leave at the gate  " });
+      expect(item.remark).toBe("Leave at the gate");
+    });
+
+    it("omits remark entirely when notes are empty", async () => {
+      const item = await callAndGetItem({ ...ORDER, notes: undefined });
+      expect(item.remark).toBeUndefined();
+    });
+
+    it("omits remark when notes are whitespace-only", async () => {
+      const item = await callAndGetItem({ ...ORDER, notes: "   " });
+      expect(item.remark).toBeUndefined();
+    });
+  });
 });
