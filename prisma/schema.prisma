@@ -119,6 +119,7 @@ model Order {
   paymentMethod         String
   paymentMethodDisplay  String
   paymentStatus         String?
+  webNumber             String?   @unique
   rbNumber              String?   @unique
   status                String   @default("PENDING")
   trackingCode          String?
