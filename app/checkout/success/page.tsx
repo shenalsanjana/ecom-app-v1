@@ -10,7 +10,7 @@ import { formatPrice } from "@/app/_lib/format";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { ProfileMenu } from "@/app/_components/header/profile-menu";
 
-async function OrderDetails({ orderId }: { orderId: string }) {
+async function OrderDetails({ orderId, paymentStatus }: { orderId: string; paymentStatus?: string }) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: { items: true },
@@ -19,7 +19,7 @@ async function OrderDetails({ orderId }: { orderId: string }) {
   if (!order) return notFound();
 
   const ref = orderReference(order);
-  const isPaid = order.paymentStatus === "PAID";
+  const isPaid = paymentStatus === "COMPLETED" || order.paymentStatus === "PAID";
   const isCod = order.paymentMethod === "COD";
 
   return (
@@ -136,10 +136,22 @@ async function OrderDetails({ orderId }: { orderId: string }) {
 export default async function CheckoutSuccessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ orderId?: string }>;
+  searchParams: Promise<{ order_id?: string; status?: string }>;
 }) {
-  const { orderId } = await searchParams;
-  if (!orderId) return notFound();
+  const params = await searchParams;
+  const orderId = params.order_id;
+
+  if (!orderId) {
+    return (
+      <main className="flex-1 flex items-center justify-center py-20">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Invalid Order</h1>
+          <p className="text-muted-foreground mb-6">No order ID provided.</p>
+          <Link href="/" className="text-primary hover:underline">Return to Home</Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <>
@@ -160,7 +172,7 @@ export default async function CheckoutSuccessPage({
           </main>
         }
       >
-        <OrderDetails orderId={orderId} />
+        <OrderDetails orderId={orderId} paymentStatus={params.status} />
       </Suspense>
       <SiteFooter />
     </>
