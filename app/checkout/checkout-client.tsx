@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { payHereCheckoutScriptUrl } from "@/app/_lib/payhere-config";
 import { formatPrice } from "@/app/_lib/format";
 import { calculateDelivery, FREE_DELIVERY_THRESHOLD } from "@/app/_lib/checkout-config";
 import { DELIVERY_CITIES, zoneForCity } from "@/app/_lib/delivery-zones";
@@ -53,6 +54,22 @@ export function CheckoutClient({ user }: Props) {
   const [orderReference, setOrderReference] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("COD");
   const idempotencyKey = useMemo(() => generateIdempotencyKey(), []);
+
+  const [payhereReady, setPayhereReady] = useState(false);
+
+  useEffect(() => {
+    if (paymentMethod !== "PAYHERE") return;
+    if (typeof window === "undefined") return;
+    if ((window as unknown as Record<string, unknown>)["PayHerePayment"]) {
+      setPayhereReady(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = payHereCheckoutScriptUrl();
+    script.onload = () => setPayhereReady(true);
+    script.onerror = () => console.error("[checkout] Failed to load PayHere SDK");
+    document.head.appendChild(script);
+  }, [paymentMethod]);
 
   const isGuest = !user;
 
@@ -166,6 +183,46 @@ export function CheckoutClient({ user }: Props) {
       });
 
       if (result.success) {
+        if (paymentMethod === "PAYHERE") {
+          setOrderId(result.orderId);
+          setOrderReference(result.webNumber ?? result.orderId);
+
+          // Call /api/payhere/payment to get payment_id, then open the modal
+          try {
+            const res = await fetch("/api/payhere/payment", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                orderId: result.orderId,
+                amount: Math.round(total),
+                items: items.map((it) => ({
+                  name: it.name,
+                  quantity: it.quantity,
+                  amount: Math.round(it.price * it.quantity),
+                })),
+                customer: {
+                  name: isGuest ? guest.name : (user?.name ?? "Customer"),
+                  email: isGuest ? guest.email : (user?.email ?? ""),
+                  phone,
+                },
+              }),
+            });
+
+            const data = await res.json();
+            const win = window as unknown as Record<string, unknown>;
+            if (data.paymentId && win["PayHerePayment"]) {
+              const PayHerePayment = win["PayHerePayment"] as { checkout: (arg: { payment_id: string }) => void };
+              PayHerePayment.checkout({ payment_id: data.paymentId });
+            } else {
+              setError("Payment gateway error. Your order is saved. Please contact support.");
+            }
+          } catch {
+            setError("Failed to initialize PayHere. Your order is saved. Please contact support.");
+          }
+          return;
+        }
+
+        // COD and other methods: clear cart and show success immediately
         clearCart();
         setOrderId(result.orderId);
         setOrderReference(result.webNumber ?? result.orderId);
@@ -442,7 +499,7 @@ export function CheckoutClient({ user }: Props) {
 
                   {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-                  <Button type="submit" className="w-full mt-6" size="lg" disabled={isSubmitting}>
+                  <Button type="submit" className="w-full mt-6" size="lg" disabled={isSubmitting || (paymentMethod === "PAYHERE" && !payhereReady)}>
                     {isSubmitting
                       ? "Processing..."
                       : paymentMethod === "COD"
