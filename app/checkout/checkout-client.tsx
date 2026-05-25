@@ -193,6 +193,7 @@ export function CheckoutClient({ user }: Props) {
 
             const data = await res.json();
             if (data.paymentUrl) {
+              clearCart();
               window.location.href = data.paymentUrl;
               return;
             } else {

@@ -7,7 +7,7 @@ import { sendAdminFailureAlertEmail } from "@/app/_lib/mailer";
 
 /**
  * Verifies the MD5 signature PayHere sends with each webhook.
- * PayHere computes: md5(merchant_id + order_id + amount + currency + status)
+ * PayHere computes: md5(merchant_id + order_id + amount + currency + status_code + app_secret)
  * We recompute using our APP_SECRET and compare.
  */
 export function verifyPayHereSignature(params: {
@@ -20,7 +20,7 @@ export function verifyPayHereSignature(params: {
   secret: string;
 }): boolean {
   const { merchantId, orderId, amount, currency, status, md5sig, secret } = params;
-  const str = `${merchantId}${orderId}${amount}${currency}${status}`;
+  const str = `${merchantId}${orderId}${amount}${currency}${status}${secret}`;
   const expected = createHash("md5").update(str).digest("hex").toUpperCase();
   return expected === md5sig.toUpperCase();
 }
@@ -84,14 +84,14 @@ export async function POST(req: Request) {
   }
 
   // Verify amount matches (log discrepancy but don't block)
-  // PayHere amount is in the smallest currency unit (LKR, no decimals)
-  const storedAmountCents = Math.round(order.total * 100);
-  const webhookAmountCents = Math.round(Number(payhere_amount) * 100);
-  if (webhookAmountCents !== storedAmountCents) {
+  // PayHere and our DB both store LKR as a plain number (no cents subdivision)
+  const storedAmount = Math.round(order.total);
+  const webhookAmount = Math.round(Number(payhere_amount));
+  if (webhookAmount !== storedAmount) {
     console.error("[payhere/webhook] amount mismatch:", {
       orderId: order_id,
-      expected: storedAmountCents,
-      received: webhookAmountCents,
+      expected: storedAmount,
+      received: webhookAmount,
     });
   }
 

@@ -45,6 +45,7 @@ export async function POST(req: Request) {
   // Build PayHere Payment Link URL with query params
   // PayHere Payment Link format:
   // https://www.payhere.lk/pay/{merchant_id}?xxxxx
+  const returnUrlWithOrder = `${returnUrl}?order_id=${encodeURIComponent(orderId)}`;
   const params = new URLSearchParams({
     _fp_id: merchantId,
     _amount: String(amount),
@@ -56,8 +57,8 @@ export async function POST(req: Request) {
     _payer_name: customer.name,
     _payer_email: customer.email,
     _payer_phone: customer.phone,
-    _return_url: returnUrl,
-    _cancel_url: returnUrl,
+    _return_url: returnUrlWithOrder,
+    _cancel_url: returnUrlWithOrder,
     _notify_url: notifyUrl,
   });
 
