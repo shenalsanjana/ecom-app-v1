@@ -6,11 +6,20 @@ export function payHereApiUrl(): string {
     : "https://sandbox.payhere.lk/paycheckout.ps?identifier=payment_ticket";
 }
 
-/** Base URL for PayHere Checkout JS CDN script. */
-export function payHereCheckoutScriptUrl(): string {
+/** PayHere Payment Links base URL for redirect-based checkout. */
+export function payHerePaymentLinkUrl(): string {
   return process.env.PAYHERE_MODE === "live"
-    ? "https://www.payhere.lk/paycheckout.js"
-    : "https://sandbox.payhere.lk/paycheckout.js";
+    ? "https://www.payhere.lk/pay"
+    : "https://sandbox.payhere.lk/pay";
+}
+
+/** Merchant ID from PayHere dashboard. */
+export function payHereMerchantId(): string {
+  const id = process.env.PAYHERE_MERCHANT_ID;
+  if (!id) {
+    throw new Error("PAYHERE_MERCHANT_ID must be set in environment");
+  }
+  return id;
 }
 
 /** PayHere app credentials — server-side only. */
