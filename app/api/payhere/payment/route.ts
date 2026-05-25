@@ -1,7 +1,8 @@
 // app/api/payhere/payment/route.ts
 import { NextResponse } from "next/server";
-import { payHereApiUrl, payHereCredentials } from "@/app/_lib/payhere-config";
+import { payHereCredentials, payHereMerchantId, payHerePaymentLinkUrl } from "../../../_lib/payhere-config";
 import { z } from "zod";
+import { createHash } from "crypto";
 
 const PaymentRequestSchema = z.object({
   orderId: z.string().min(1),
@@ -37,70 +38,36 @@ export async function POST(req: Request) {
 
   const { orderId, amount, currency, items, customer, returnUrl, notifyUrl } = parsed.data;
 
-  const { app_id, app_secret } = payHereCredentials();
-  const apiUrl = payHereApiUrl();
+  const merchantId = payHereMerchantId();
+  const { app_secret } = payHereCredentials();
+  const baseUrl = payHerePaymentLinkUrl();
 
-  // Base64 encode "app_id:app_secret" for Basic auth
-  const authHeader = `Basic ${Buffer.from(`${app_id}:${app_secret}`).toString("base64")}`;
-
-  // PayHere expects items as a pipe-delimited string: "name|quantity|amount|name2|quantity2|amount2"
-  const itemsString = items.length > 0
-    ? items.map((it) => `${it.name}|${it.quantity}|${Math.round(it.amount)}`).join("|")
-    : undefined;
-
-  const nameParts = customer.name.split(" ");
-  const first_name = nameParts[0];
-  const last_name = nameParts.slice(1).join(" ") || customer.name;
-
-  const payload = new URLSearchParams({
-    return_url: returnUrl,
-    cancel_url: returnUrl,
-    notify_url: notifyUrl,
-    order_id: orderId,
-    items: itemsString ?? "Dressing Bear Order",
-    currency,
-    amount: String(amount),
-    first_name,
-    last_name,
-    email: customer.email,
-    phone: customer.phone,
+  // Build PayHere Payment Link URL with query params
+  // PayHere Payment Link format:
+  // https://www.payhere.lk/pay/{merchant_id}?xxxxx
+  const params = new URLSearchParams({
+    _fp_id: merchantId,
+    _amount: String(amount),
+    _currency: currency,
+    _order_id: orderId,
+    _items_description: items.length > 0
+      ? items.map((it) => `${it.name} x${it.quantity}`).join(", ")
+      : "Dressing Bear Order",
+    _payer_name: customer.name,
+    _payer_email: customer.email,
+    _payer_phone: customer.phone,
+    _return_url: returnUrl,
+    _cancel_url: returnUrl,
+    _notify_url: notifyUrl,
   });
 
-  let response: Response;
-  try {
-    response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: authHeader,
-      },
-      body: payload.toString(),
-    });
-  } catch (err) {
-    console.error("[payhere/payment] network error:", err);
-    return NextResponse.json({ error: "Failed to reach PayHere. Please try again." }, { status: 502 });
-  }
+  // Generate HMAC-MD5 signature for payment link
+  // Signature format: md5(merchant_id + order_id + amount + currency + app_secret)
+  const sigString = `${merchantId}${orderId}${amount}${currency}${app_secret}`;
+  const signature = createHash("md5").update(sigString).digest("hex").toUpperCase();
+  params.set("_signature", signature);
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    console.error("[payhere/payment] PayHere API error:", response.status, text);
-    return NextResponse.json({ error: "PayHere rejected the payment request." }, { status: 502 });
-  }
+  const paymentUrl = `${baseUrl}/${merchantId}?${params.toString()}`;
 
-  const data = await response.json().catch(() => null);
-
-  // PayHere returns { status: "success", payment_id: "..." } or { status: "error", message: "..." }
-  if (!data || data.status === "error") {
-    return NextResponse.json(
-      { error: data?.message ?? "PayHere returned an unexpected response." },
-      { status: 502 },
-    );
-  }
-
-  if (!data.payment_id) {
-    console.error("[payhere/payment] No payment_id in PayHere response:", data);
-    return NextResponse.json({ error: "PayHere did not return a payment ID." }, { status: 502 });
-  }
-
-  return NextResponse.json({ paymentId: data.payment_id });
+  return NextResponse.json({ paymentUrl });
 }
