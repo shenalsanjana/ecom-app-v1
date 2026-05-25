@@ -144,3 +144,50 @@ describe("PayHere API payload building", () => {
     expect(auth).toBe("YXBwLWlkOmFwcC1zZWNyZXQ=");
   });
 });
+
+describe("PayHere Payment Link URL building", () => {
+  it("includes order_id in the return URL", () => {
+    const baseUrl = "http://localhost:3000/checkout/success";
+    const orderId = "ORD-123";
+    const returnUrl = `${baseUrl}?order_id=${encodeURIComponent(orderId)}`;
+    expect(returnUrl).toBe("http://localhost:3000/checkout/success?order_id=ORD-123");
+  });
+
+  it("encodes special characters in order_id for URL safety", () => {
+    const baseUrl = "http://localhost:3000/checkout/success";
+    const orderId = "ORD 123&foo=bar";
+    const returnUrl = `${baseUrl}?order_id=${encodeURIComponent(orderId)}`;
+    expect(returnUrl).toBe("http://localhost:3000/checkout/success?order_id=ORD%20123%26foo%3Dbar");
+  });
+
+  it("builds a valid PayHere payment link URL with all required params", () => {
+    const merchantId = "256312";
+    const baseUrl = "https://sandbox.payhere.lk/pay";
+    const orderId = "ORD-456";
+    const amount = 2999;
+    const currency = "LKR";
+    const returnUrl = `http://localhost:3000/checkout/success?order_id=${encodeURIComponent(orderId)}`;
+
+    const params = new URLSearchParams({
+      _fp_id: merchantId,
+      _amount: String(amount),
+      _currency: currency,
+      _order_id: orderId,
+      _return_url: returnUrl,
+      _cancel_url: returnUrl,
+      _notify_url: "http://localhost:3000/api/payhere/webhook",
+    });
+
+    const paymentUrl = `${baseUrl}/${merchantId}?${params.toString()}`;
+    const parsed = new URL(paymentUrl);
+    const queryParams = parsed.searchParams;
+
+    expect(queryParams.get("_fp_id")).toBe(merchantId);
+    expect(queryParams.get("_amount")).toBe("2999");
+    expect(queryParams.get("_currency")).toBe("LKR");
+    expect(queryParams.get("_order_id")).toBe("ORD-456");
+    expect(queryParams.get("_return_url")).toContain("order_id=ORD-456");
+    expect(queryParams.get("_cancel_url")).toContain("order_id=ORD-456");
+    expect(queryParams.get("_notify_url")).toBe("http://localhost:3000/api/payhere/webhook");
+  });
+});

@@ -1,5 +1,5 @@
 // app/checkout/__tests__/payhere-webhook.test.ts
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import crypto from "crypto";
 
 // ── Re-implement the signature verification from the webhook route ───────────
@@ -15,13 +15,13 @@ export function verifyPayHereSignature(params: {
   secret: string;
 }): boolean {
   const { merchantId, orderId, amount, currency, status, md5sig, secret } = params;
-  const str = `${merchantId}${orderId}${amount}${currency}${status}`;
+  const str = `${merchantId}${orderId}${amount}${currency}${status}${secret}`;
   const expected = crypto.createHash("md5").update(str).digest("hex").toUpperCase();
   return expected === md5sig.toUpperCase();
 }
 
 function signPayload(merchantId: string, orderId: string, amount: number, currency: string, status: string, secret: string): string {
-  const str = `${merchantId}${orderId}${amount}${currency}${status}`;
+  const str = `${merchantId}${orderId}${amount}${currency}${status}${secret}`;
   return crypto.createHash("md5").update(str).digest("hex").toUpperCase();
 }
 
@@ -97,6 +97,20 @@ describe("verifyPayHereSignature", () => {
     expect(result).toBe(false);
   });
 
+  it("returns false when secret differs", () => {
+    const sig = signPayload("256312", "ORD-123", 1500, "LKR", "COMPLETED", SECRET);
+    const result = verifyPayHereSignature({
+      merchantId: "256312",
+      orderId: "ORD-123",
+      amount: 1500,
+      currency: "LKR",
+      status: "COMPLETED",
+      md5sig: sig,
+      secret: "wrong-secret",
+    });
+    expect(result).toBe(false);
+  });
+
   it("signature is case-insensitive (uppercase hex)", () => {
     const sig = signPayload("256312", "ORD-123", 1500, "LKR", "COMPLETED", SECRET);
     // PayHere sends uppercase; our function normalizes to uppercase before comparing
@@ -123,17 +137,17 @@ describe("PayHere webhook data parsing", () => {
     expect(Number(params.get("amount"))).toBe(2999);
   });
 
-  it("converts PayHere amount to cents correctly (LKR, no decimals)", () => {
-    // PayHere sends 2999 = LKR 2999.00
+  it("converts PayHere amount to LKR correctly (no cents subdivision)", () => {
+    // PayHere sends 2999 = LKR 2999 (no cents, Sri Lankan Rupee is not subdivided)
     const payhereAmount = Number("2999");
-    const cents = Math.round(payhereAmount * 100); // 299900
-    expect(cents).toBe(299900);
+    const amountLkr = Math.round(payhereAmount);
+    expect(amountLkr).toBe(2999);
   });
 
   it("handles decimal amounts correctly", () => {
     // In case PayHere sends decimal (unlikely but safe)
     const payhereAmount = Number("2999.50");
-    const cents = Math.round(payhereAmount * 100);
-    expect(cents).toBe(299950);
+    const amountLkr = Math.round(payhereAmount);
+    expect(amountLkr).toBe(3000);
   });
 });
