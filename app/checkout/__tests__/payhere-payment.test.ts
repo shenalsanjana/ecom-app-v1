@@ -17,6 +17,7 @@ const PaymentRequestSchema = z.object({
     phone: z.string(),
   }),
   returnUrl: z.string().url().default("http://localhost:3000/checkout/success"),
+  cancelUrl: z.string().url().default("http://localhost:3000/checkout/success?status=cancelled"),
   notifyUrl: z.string().url().default("http://localhost:3000/api/payhere/webhook"),
 });
 
@@ -86,25 +87,28 @@ describe("PaymentRequestSchema validation", () => {
     expect(result.currency).toBe("LKR");
   });
 
-  it("defaults returnUrl and notifyUrl", () => {
+  it("defaults returnUrl, cancelUrl, and notifyUrl", () => {
     const result = PaymentRequestSchema.parse({
       orderId: "ORD-123",
       amount: 1500,
       customer: { name: "Test User", email: "test@example.com", phone: "0712345678" },
     });
     expect(result.returnUrl).toBe("http://localhost:3000/checkout/success");
+    expect(result.cancelUrl).toBe("http://localhost:3000/checkout/success?status=cancelled");
     expect(result.notifyUrl).toBe("http://localhost:3000/api/payhere/webhook");
   });
 
-  it("accepts custom returnUrl and notifyUrl", () => {
+  it("accepts custom returnUrl, cancelUrl, and notifyUrl", () => {
     const result = PaymentRequestSchema.parse({
       orderId: "ORD-123",
       amount: 1500,
       customer: { name: "Test User", email: "test@example.com", phone: "0712345678" },
       returnUrl: "https://shop.example.com/success",
+      cancelUrl: "https://shop.example.com/cancel",
       notifyUrl: "https://shop.example.com/api/notify",
     });
     expect(result.returnUrl).toBe("https://shop.example.com/success");
+    expect(result.cancelUrl).toBe("https://shop.example.com/cancel");
     expect(result.notifyUrl).toBe("https://shop.example.com/api/notify");
   });
 });
@@ -167,6 +171,7 @@ describe("PayHere Payment Link URL building", () => {
     const amount = 2999;
     const currency = "LKR";
     const returnUrl = `http://localhost:3000/checkout/success?order_id=${encodeURIComponent(orderId)}`;
+    const cancelUrl = `http://localhost:3000/checkout/success?status=cancelled&order_id=${encodeURIComponent(orderId)}`;
 
     const params = new URLSearchParams({
       _fp_id: merchantId,
@@ -174,7 +179,7 @@ describe("PayHere Payment Link URL building", () => {
       _currency: currency,
       _order_id: orderId,
       _return_url: returnUrl,
-      _cancel_url: returnUrl,
+      _cancel_url: cancelUrl,
       _notify_url: "http://localhost:3000/api/payhere/webhook",
     });
 
@@ -187,7 +192,9 @@ describe("PayHere Payment Link URL building", () => {
     expect(queryParams.get("_currency")).toBe("LKR");
     expect(queryParams.get("_order_id")).toBe("ORD-456");
     expect(queryParams.get("_return_url")).toContain("order_id=ORD-456");
+    expect(queryParams.get("_return_url")).not.toContain("status=cancelled");
     expect(queryParams.get("_cancel_url")).toContain("order_id=ORD-456");
+    expect(queryParams.get("_cancel_url")).toContain("status=cancelled");
     expect(queryParams.get("_notify_url")).toBe("http://localhost:3000/api/payhere/webhook");
   });
 });

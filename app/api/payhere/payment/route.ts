@@ -17,6 +17,7 @@ const PaymentRequestSchema = z.object({
     phone: z.string(),
   }),
   returnUrl: z.string().url().default(`${process.env.APP_URL}/checkout/success`),
+  cancelUrl: z.string().url().default(`${process.env.APP_URL}/checkout/success?status=cancelled`),
   notifyUrl: z.string().url().default(`${process.env.APP_URL}/api/payhere/webhook`),
 });
 
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { orderId, amount, currency, items, customer, returnUrl, notifyUrl } = parsed.data;
+  const { orderId, amount, currency, items, customer, returnUrl, cancelUrl, notifyUrl } = parsed.data;
 
   const merchantId = payHereMerchantId();
   const { app_secret } = payHereCredentials();
@@ -46,6 +47,7 @@ export async function POST(req: Request) {
   // PayHere Payment Link format:
   // https://www.payhere.lk/pay/{merchant_id}?xxxxx
   const returnUrlWithOrder = `${returnUrl}?order_id=${encodeURIComponent(orderId)}`;
+  const cancelUrlWithOrder = `${cancelUrl}&order_id=${encodeURIComponent(orderId)}`;
   const params = new URLSearchParams({
     _fp_id: merchantId,
     _amount: String(amount),
@@ -58,7 +60,7 @@ export async function POST(req: Request) {
     _payer_email: customer.email,
     _payer_phone: customer.phone,
     _return_url: returnUrlWithOrder,
-    _cancel_url: returnUrlWithOrder,
+    _cancel_url: cancelUrlWithOrder,
     _notify_url: notifyUrl,
   });
 

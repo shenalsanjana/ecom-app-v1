@@ -168,7 +168,6 @@ export function CheckoutClient({ user }: Props) {
 
       if (result.success) {
         if (paymentMethod === "PAYHERE") {
-          setOrderId(result.orderId);
           setOrderReference(result.webNumber ?? result.orderId);
 
           try {
@@ -197,9 +196,13 @@ export function CheckoutClient({ user }: Props) {
               window.location.href = data.paymentUrl;
               return;
             } else {
+              // Payment URL generation failed — show order as saved but with error
+              setOrderId(result.orderId);
               setError("Payment gateway error. Your order is saved. Please contact support.");
             }
           } catch {
+            // Payment initialization failed — show order as saved but with error
+            setOrderId(result.orderId);
             setError("Failed to initialize PayHere. Your order is saved. Please contact support.");
           }
           return;

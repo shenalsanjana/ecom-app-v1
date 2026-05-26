@@ -21,6 +21,7 @@ async function OrderDetails({ orderId, paymentStatus }: { orderId: string; payme
   const ref = orderReference(order);
   const isPaid = paymentStatus === "COMPLETED" || order.paymentStatus === "PAID";
   const isCod = order.paymentMethod === "COD";
+  const isCancelled = paymentStatus === "cancelled" && !isPaid;
 
   return (
     <main className="flex-1">
@@ -28,11 +29,13 @@ async function OrderDetails({ orderId, paymentStatus }: { orderId: string; payme
         {/* Icon */}
         <div
           className={`mx-auto w-20 h-20 rounded-full flex items-center justify-center mb-6 ${
-            isPaid || isCod ? "bg-green-100" : "bg-yellow-100"
+            isPaid || isCod ? "bg-green-100" : isCancelled ? "bg-red-100" : "bg-yellow-100"
           }`}
         >
           {isPaid || isCod ? (
             <CheckCircle className="h-10 w-10 text-green-600" />
+          ) : isCancelled ? (
+            <ShoppingBag className="h-10 w-10 text-red-600" />
           ) : (
             <ShoppingBag className="h-10 w-10 text-yellow-600" />
           )}
@@ -44,6 +47,13 @@ async function OrderDetails({ orderId, paymentStatus }: { orderId: string; payme
             <h1 className="text-3xl font-bold mb-3">Payment Confirmed!</h1>
             <p className="text-muted-foreground text-lg mb-2">
               Thank you for your order. Your payment has been received.
+            </p>
+          </>
+        ) : isCancelled ? (
+          <>
+            <h1 className="text-3xl font-bold mb-3">Payment Cancelled</h1>
+            <p className="text-muted-foreground text-lg mb-2">
+              Your payment was cancelled. Your order has not been confirmed.
             </p>
           </>
         ) : (
@@ -63,24 +73,26 @@ async function OrderDetails({ orderId, paymentStatus }: { orderId: string; payme
 
         {/* Payment and delivery info */}
         <div className="bg-card border rounded-xl p-6 mb-8 text-left space-y-4">
-          <div className="flex items-start gap-4">
-            <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                isPaid ? "bg-green-100" : "bg-yellow-100"
-              }`}
-            >
-              <Truck className={`h-5 w-5 ${isPaid ? "text-green-600" : "text-yellow-600"}`} />
+          {!isCancelled && (
+            <div className="flex items-start gap-4">
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  isPaid ? "bg-green-100" : "bg-yellow-100"
+                }`}
+              >
+                <Truck className={`h-5 w-5 ${isPaid ? "text-green-600" : "text-yellow-600"}`} />
+              </div>
+              <div>
+                <p className="font-semibold">Estimated Delivery</p>
+                <p className="text-sm text-muted-foreground">
+                  {order.shippingCity}, {order.shippingCountry}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  via Royal Express · 2–5 business days
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="font-semibold">Estimated Delivery</p>
-              <p className="text-sm text-muted-foreground">
-                {order.shippingCity}, {order.shippingCountry}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                via Royal Express · 2–5 business days
-              </p>
-            </div>
-          </div>
+          )}
 
           <div className="flex items-start gap-4">
             <div
@@ -122,12 +134,29 @@ async function OrderDetails({ orderId, paymentStatus }: { orderId: string; payme
         </div>
 
         {/* CTA */}
-        <Link
-          href="/"
-          className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-6 py-2"
-        >
-          Continue Shopping
-        </Link>
+        {isCancelled ? (
+          <div className="flex flex-col items-center gap-3">
+            <Link
+              href="/checkout"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-6 py-2"
+            >
+              Try Again
+            </Link>
+            <Link
+              href="/"
+              className="text-sm text-muted-foreground hover:text-foreground underline"
+            >
+              Continue Shopping
+            </Link>
+          </div>
+        ) : (
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-6 py-2"
+          >
+            Continue Shopping
+          </Link>
+        )}
       </div>
     </main>
   );
