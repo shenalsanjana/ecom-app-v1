@@ -30,18 +30,20 @@
 **Files:**
 - Modify: `.env.local:44-46`
 
-Replace the existing `PAYHERE_MERCHANT_ID` / `PAYHERE_MERCHANT_SECRET` with the App ID / App Secret format:
+Configure both Domain Credentials and Business App credentials. These are separate PayHere secrets:
 
 ```env
 # ==========================================
 # 6. PAYHERE GATEWAY CONFIGURATION
 # ==========================================
 PAYHERE_MODE="sandbox" # Change to "live" when you launch production
-PAYHERE_APP_ID="4J9MIkFKo1V4J9Mbj0Yjf43sXFJ1QyO8117uH1N3o3u"
-PAYHERE_APP_SECRET="4KEQTWQqCSi8m1nlh92Hqe8Rkt8rCfLEZ4Z7h65YXBa9"
+PAYHERE_MERCHANT_ID="your-domain-merchant-id"
+PAYHERE_MERCHANT_SECRET="your-domain-merchant-secret"
+PAYHERE_APP_ID="your-business-app-id"
+PAYHERE_APP_SECRET="your-business-app-secret"
 ```
 
-> **Note:** The old `PAYHERE_MERCHANT_ID` and `PAYHERE_MERCHANT_SECRET` keys are no longer used. Remove them if desired.
+> **Note:** `PAYHERE_MERCHANT_SECRET` is used for checkout hashes and webhook signatures. `PAYHERE_APP_SECRET` is only used for Merchant API OAuth.
 
 ---
 
@@ -317,7 +319,9 @@ beforeEach(() => {
     ...originalEnv,
     PAYHERE_MODE: "sandbox",
     PAYHERE_APP_ID: "256312",
-    PAYHERE_APP_SECRET: "4KEQTWQqCSi8m1nlh92Hqe8Rkt8rCfLEZ4Z7h65YXBa9",
+    PAYHERE_APP_SECRET: "test-business-app-secret",
+    PAYHERE_MERCHANT_ID: "256312",
+    PAYHERE_MERCHANT_SECRET: "test-merchant-secret",
     APP_URL: "http://localhost:3000",
     DATABASE_URL: "file:./dev.db",
     ROYAL_EXPRESS_ENABLED: "false",

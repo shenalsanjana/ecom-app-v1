@@ -124,7 +124,11 @@ describe("processOrder — prepaid paths", () => {
 
   it("does not write rbNumber for new orders", async () => {
     await processOrder({ ...baseInput, paymentMethod: "COD" });
-    const call = vi.mocked(txOrderCreate).mock.calls[0]?.[0] as { data: Record<string, unknown> };
+    const calls = vi.mocked(txOrderCreate).mock.calls as unknown as [
+      [{ data: Record<string, unknown> }],
+      ...[{ data: Record<string, unknown> }][],
+    ];
+    const call = calls[0][0];
     expect(call.data).not.toHaveProperty("rbNumber");
   });
 });

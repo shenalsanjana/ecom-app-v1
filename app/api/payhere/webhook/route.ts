@@ -8,7 +8,7 @@ import {
 } from "@/app/_lib/mailer";
 import { sendAdminFailureAlertEmail } from "@/app/_lib/mailer";
 import { verifyPayment } from "@/app/_lib/payhere-api";
-import { payHereMerchantSecret } from "@/app/_lib/payhere-config";
+import { payHereMerchantId, payHereMerchantSecret } from "@/app/_lib/payhere-config";
 
 /**
  * Verifies the MD5 signature PayHere sends with each webhook.
@@ -31,6 +31,10 @@ export function verifyPayHereSignature(params: {
   return expected === md5sig.toUpperCase();
 }
 
+function amountsMatch(left: number, right: number): boolean {
+  return Math.round(left * 100) === Math.round(right * 100);
+}
+
 export async function POST(req: Request) {
   // PayHere sends form-urlencoded data
   let params: URLSearchParams;
@@ -44,11 +48,12 @@ export async function POST(req: Request) {
   const payment_id = params.get("payment_id") ?? "";
   const merchant_id = params.get("merchant_id") ?? "";
   const order_id = params.get("order_id") ?? "";
-  const payhere_amount = params.get("amount") ?? "";
-  const currency = params.get("currency") ?? "LKR";
+  const payhere_amount = params.get("payhere_amount") ?? params.get("amount") ?? "";
+  const currency = params.get("payhere_currency") ?? params.get("currency") ?? "LKR";
   const status = params.get("status") ?? "";
   const md5sig = params.get("md5sig") ?? "";
   const status_code = params.get("status_code") ?? "";
+  const paymentStatusCode = status_code || status;
   const method = params.get("method") ?? "";
   const status_message = params.get("status_message") ?? "";
 
@@ -64,6 +69,16 @@ export async function POST(req: Request) {
     status_message,
   });
 
+  const expectedMerchantId = payHereMerchantId();
+  if (merchant_id !== expectedMerchantId) {
+    console.warn("[payhere/webhook] Merchant ID mismatch", {
+      order_id,
+      merchant_id,
+      expectedMerchantId,
+    });
+    return NextResponse.json({ error: "Merchant verification failed" }, { status: 403 });
+  }
+
   // Verify signature using merchant_secret
   const merchantSecret = payHereMerchantSecret();
   const isValid = verifyPayHereSignature({
@@ -71,7 +86,7 @@ export async function POST(req: Request) {
     orderId: order_id,
     amount: payhere_amount,
     currency,
-    status: status_code,
+    status: paymentStatusCode,
     md5sig,
     secret: merchantSecret,
   });
@@ -88,20 +103,31 @@ export async function POST(req: Request) {
   console.log("[payhere/webhook] Signature verified successfully", { order_id });
 
   // Only process completed payments (status_code "2" = success)
-  if (status_code !== "2") {
+  if (paymentStatusCode !== "2") {
     console.log("[payhere/webhook] Non-success status code — ignoring", {
       order_id,
-      status_code,
+      status_code: paymentStatusCode,
       status_message,
     });
-    return NextResponse.json({ status: "ignored", reason: `status_code=${status_code}` });
+    return NextResponse.json({ status: "ignored", reason: `status_code=${paymentStatusCode}` });
   }
 
   // Load the order
-  const order = await prisma.order.findUnique({ where: { id: order_id } });
+  const order = await prisma.order.findUnique({
+    where: { id: order_id },
+    include: { user: { select: { name: true, email: true } } },
+  });
   if (!order) {
     console.warn("[payhere/webhook] Order not found", { order_id });
     return NextResponse.json({ status: "order_not_found" });
+  }
+
+  if (order.paymentMethod !== "PAYHERE") {
+    console.warn("[payhere/webhook] Order payment method is not PayHere", {
+      order_id,
+      paymentMethod: order.paymentMethod,
+    });
+    return NextResponse.json({ status: "ignored", reason: "payment_method_mismatch" });
   }
 
   // Idempotency: if already PAID, skip
@@ -142,15 +168,36 @@ export async function POST(req: Request) {
     api_status: verification.status,
   });
 
-  // Verify amount matches (log discrepancy but don't block)
+  // Verify amount and currency match before confirming the order.
   const storedAmount = Number(order.total.toFixed(2));
-  const verifiedAmount = verification.amount ?? Number(Number(payhere_amount).toFixed(2));
-  if (verifiedAmount !== storedAmount) {
+  const callbackAmount = Number(payhere_amount);
+  const verifiedAmount = verification.amount ?? (Number.isFinite(callbackAmount) ? Number(callbackAmount.toFixed(2)) : NaN);
+  if (!Number.isFinite(verifiedAmount) || !amountsMatch(verifiedAmount, storedAmount)) {
     console.error("[payhere/webhook] Amount mismatch between order and verified payment", {
       order_id,
       expected: storedAmount,
       verified: verifiedAmount,
       webhook_amount: payhere_amount,
+    });
+    return NextResponse.json({
+      status: "amount_mismatch",
+      expected: storedAmount,
+      verified: verifiedAmount,
+    });
+  }
+
+  const verifiedCurrency = verification.currency ?? currency;
+  if (verifiedCurrency !== "LKR" || currency !== "LKR") {
+    console.error("[payhere/webhook] Currency mismatch between order and verified payment", {
+      order_id,
+      expected: "LKR",
+      verified: verifiedCurrency,
+      webhook_currency: currency,
+    });
+    return NextResponse.json({
+      status: "currency_mismatch",
+      expected: "LKR",
+      verified: verifiedCurrency,
     });
   }
 
@@ -163,7 +210,10 @@ export async function POST(req: Request) {
   console.log("[payhere/webhook] Order payment status updated to PAID", { order_id });
 
   // Re-fetch updated order for downstream steps
-  const updated = await prisma.order.findUnique({ where: { id: order_id } });
+  const updated = await prisma.order.findUnique({
+    where: { id: order_id },
+    include: { user: { select: { name: true, email: true } } },
+  });
   if (!updated) {
     return NextResponse.json({ status: "success" });
   }
@@ -172,8 +222,8 @@ export async function POST(req: Request) {
   const orderItems = await prisma.orderItem.findMany({ where: { orderId: order_id } });
   const details = {
     orderId: order_id,
-    customerName: updated.guestName ?? updated.userId ?? "Customer",
-    customerEmail: updated.guestEmail ?? "",
+    customerName: updated.guestName ?? updated.user?.name ?? "Customer",
+    customerEmail: updated.guestEmail ?? updated.user?.email ?? "",
     customerPhone: updated.customerPhone,
     items: orderItems.map((it) => ({
       name: it.name,

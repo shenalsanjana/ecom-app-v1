@@ -48,12 +48,22 @@ interface PaymentSearchResponse {
   status: number;
   msg: string;
   data?: {
-    payment_id?: string;
+    payment_id?: string | number;
     order_id?: string;
-    amount?: number;
+    amount?: number | string;
+    payhere_amount?: number | string;
+    amount_detail?: {
+      gross?: number | string;
+      [key: string]: unknown;
+    };
     currency?: string;
-    status?: number;
+    payhere_currency?: string;
+    status?: number | string;
     method?: string;
+    payment_method?: {
+      method?: string;
+      [key: string]: unknown;
+    };
     [key: string]: unknown;
   }[];
 }
@@ -231,12 +241,32 @@ export async function createPaymentLink(
 
 export interface PaymentVerificationResult {
   verified: boolean;
-  status?: number;
+  status?: number | string;
   statusText?: string;
   paymentId?: string;
   amount?: number;
+  currency?: string;
   method?: string;
   error?: string;
+}
+
+function parsePaymentAmount(payment: NonNullable<PaymentSearchResponse["data"]>[number]): number | undefined {
+  const raw = payment.payhere_amount ?? payment.amount ?? payment.amount_detail?.gross;
+  if (raw === undefined || raw === null || raw === "") return undefined;
+  const amount = Number(raw);
+  return Number.isFinite(amount) ? Number(amount.toFixed(2)) : undefined;
+}
+
+function paymentMethod(payment: NonNullable<PaymentSearchResponse["data"]>[number]): string | undefined {
+  return payment.payment_method?.method ?? payment.method;
+}
+
+function paymentCurrency(payment: NonNullable<PaymentSearchResponse["data"]>[number]): string | undefined {
+  return payment.payhere_currency ?? payment.currency;
+}
+
+function isSuccessfulPaymentStatus(status: number | string | undefined): boolean {
+  return status === 2 || status === "2" || status === "RECEIVED";
 }
 
 /** Verify a payment by querying the PayHere Merchant API. */
@@ -293,25 +323,32 @@ export async function verifyPayment(orderId: string): Promise<PaymentVerificatio
 
   // Find the most relevant payment (latest successful one, or latest overall)
   const payments = data.data;
-  const successfulPayment = payments.find((p) => p.status === 2) ?? payments[0];
+  const successfulPayment = payments.find((p) => isSuccessfulPaymentStatus(p.status)) ?? payments[0];
+  const amount = parsePaymentAmount(successfulPayment);
+  const currency = paymentCurrency(successfulPayment);
+  const method = paymentMethod(successfulPayment);
+  const paymentId =
+    successfulPayment.payment_id === undefined ? undefined : String(successfulPayment.payment_id);
 
   console.log("[payhere-api] Payment found", {
-    payment_id: successfulPayment.payment_id,
+    payment_id: paymentId,
     order_id: successfulPayment.order_id,
-    amount: successfulPayment.amount,
+    amount,
+    currency,
     status: successfulPayment.status,
-    method: successfulPayment.method,
+    method,
   });
 
   // PayHere status codes: 2=success, 0=pending, -1=canceled, -2=failed, -3=chargedback
-  if (successfulPayment.status === 2) {
+  if (isSuccessfulPaymentStatus(successfulPayment.status)) {
     return {
       verified: true,
       status: successfulPayment.status,
       statusText: "success",
-      paymentId: successfulPayment.payment_id,
-      amount: successfulPayment.amount,
-      method: successfulPayment.method,
+      paymentId,
+      amount,
+      currency,
+      method,
     };
   }
 
@@ -319,22 +356,33 @@ export async function verifyPayment(orderId: string): Promise<PaymentVerificatio
     verified: false,
     status: successfulPayment.status,
     statusText: getPayHereStatusText(successfulPayment.status),
-    paymentId: successfulPayment.payment_id,
+    paymentId,
   };
 }
 
-function getPayHereStatusText(code: number | undefined): string {
+function getPayHereStatusText(code: number | string | undefined): string {
   switch (code) {
     case 2:
+    case "2":
+    case "RECEIVED":
       return "success";
     case 0:
+    case "0":
       return "pending";
     case -1:
+    case "-1":
+    case "CANCELED":
       return "canceled";
     case -2:
+    case "-2":
+    case "FAILED":
       return "failed";
     case -3:
+    case "-3":
+    case "CHARGEDBACK":
       return "chargedback";
+    case "REFUNDED":
+      return "refunded";
     default:
       return `unknown (${code})`;
   }

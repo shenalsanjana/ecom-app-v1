@@ -5,6 +5,7 @@ import {
   paymentStatusLabel,
   type PaymentStatus,
 } from "@/app/_lib/order-status";
+import * as orderStatus from "@/app/_lib/order-status";
 
 describe("PAYMENT_STATUSES", () => {
   it("lists the four canonical values", () => {
@@ -45,5 +46,46 @@ describe("paymentStatusLabel", () => {
     expect(paymentStatusLabel(null)).toBeNull();
     expect(paymentStatusLabel(undefined)).toBeNull();
     expect(paymentStatusLabel("WHATEVER")).toBeNull();
+  });
+});
+
+describe("checkout payment state", () => {
+  it("does not trust a URL status alone for PayHere payment confirmation", () => {
+    const stateFn = (
+      orderStatus as typeof orderStatus & {
+        checkoutPaymentState?: (args: {
+          paymentMethod: string;
+          paymentStatus: string | null;
+          urlStatus?: string;
+        }) => { isPaid: boolean; isCancelled: boolean };
+      }
+    ).checkoutPaymentState;
+
+    expect(typeof stateFn).toBe("function");
+    if (typeof stateFn !== "function") return;
+
+    expect(
+      stateFn({
+        paymentMethod: "PAYHERE",
+        paymentStatus: "PENDING",
+        urlStatus: "COMPLETED",
+      }),
+    ).toMatchObject({ isPaid: false, isCancelled: false });
+
+    expect(
+      stateFn({
+        paymentMethod: "PAYHERE",
+        paymentStatus: "PAID",
+        urlStatus: undefined,
+      }),
+    ).toMatchObject({ isPaid: true, isCancelled: false });
+
+    expect(
+      stateFn({
+        paymentMethod: "PAYHERE",
+        paymentStatus: "PENDING",
+        urlStatus: "cancelled",
+      }),
+    ).toMatchObject({ isPaid: false, isCancelled: true });
   });
 });

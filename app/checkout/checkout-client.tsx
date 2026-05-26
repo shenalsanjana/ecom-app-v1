@@ -176,20 +176,6 @@ export function CheckoutClient({ user }: Props) {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 orderId: result.orderId,
-                amount: Math.round(total),
-                items: items.map((it) => ({
-                  name: it.name,
-                  quantity: it.quantity,
-                  amount: Math.round(it.price * it.quantity),
-                })),
-                customer: {
-                  name: isGuest ? guest.name : (user?.name ?? "Customer"),
-                  email: isGuest ? guest.email : (user?.email ?? ""),
-                  phone,
-                  address: `${address.line1}${address.line2 ? ", " + address.line2 : ""}`,
-                  city: address.city,
-                  country: address.country,
-                },
               }),
             });
 

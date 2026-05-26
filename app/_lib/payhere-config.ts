@@ -19,9 +19,9 @@ export function payHereMerchantId(): string {
 
 /** Merchant Secret — per domain/app, from PayHere dashboard → Settings > Domain Credentials. */
 export function payHereMerchantSecret(): string {
-  const secret = process.env.PAYHERE_MERCHANT_SECRET ?? process.env.PAYHERE_APP_SECRET;
+  const secret = process.env.PAYHERE_MERCHANT_SECRET;
   if (!secret) {
-    throw new Error("PAYHERE_MERCHANT_SECRET (or PAYHERE_APP_SECRET) must be set in environment");
+    throw new Error("PAYHERE_MERCHANT_SECRET must be set in environment");
   }
   return secret;
 }

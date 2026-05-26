@@ -36,3 +36,15 @@ export function paymentStatusLabel(
       return null;
   }
 }
+
+export function checkoutPaymentState(args: {
+  paymentMethod: string;
+  paymentStatus: PaymentStatus | string | null | undefined;
+  urlStatus?: string | null;
+}): { isPaid: boolean; isCod: boolean; isCancelled: boolean } {
+  const isCod = args.paymentMethod === "COD";
+  const isPaid = args.paymentStatus === "PAID" || args.paymentStatus === "COD_COLLECTED";
+  const isCancelled = !isPaid && !isCod && args.urlStatus === "cancelled";
+
+  return { isPaid, isCod, isCancelled };
+}

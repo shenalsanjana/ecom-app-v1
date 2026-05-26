@@ -2,11 +2,12 @@
 import { NextResponse } from "next/server";
 import { payHereMerchantId, payHereCheckoutHash } from "../../../_lib/payhere-config";
 import { createPaymentLink, CreatePaymentLinkInput } from "../../../_lib/payhere-api";
+import { prisma } from "@/app/_lib/prisma";
 import { z } from "zod";
 
 const PaymentRequestSchema = z.object({
   orderId: z.string().min(1),
-  amount: z.number().positive(),
+  amount: z.number().positive().optional(),
   currency: z.literal("LKR").default("LKR"),
   items: z
     .array(
@@ -16,21 +17,20 @@ const PaymentRequestSchema = z.object({
         amount: z.number().nonnegative(),
       }),
     )
-    .default([]),
-  customer: z.object({
-    name: z.string().min(1),
-    email: z.string().email(),
-    phone: z.string(),
-    address: z.string().optional().default(""),
-    city: z.string().optional().default(""),
-    country: z.string().optional().default("Sri Lanka"),
-  }),
-  returnUrl: z.string().url().default(`${process.env.APP_URL}/checkout/success`),
-  cancelUrl: z
-    .string()
-    .url()
-    .default(`${process.env.APP_URL}/checkout/success?status=cancelled`),
-  notifyUrl: z.string().url().default(`${process.env.APP_URL}/api/payhere/webhook`),
+    .optional(),
+  customer: z
+    .object({
+      name: z.string().min(1),
+      email: z.string().email(),
+      phone: z.string(),
+      address: z.string().optional().default(""),
+      city: z.string().optional().default(""),
+      country: z.string().optional().default("Sri Lanka"),
+    })
+    .optional(),
+  returnUrl: z.string().url().optional(),
+  cancelUrl: z.string().url().optional(),
+  notifyUrl: z.string().url().optional(),
 });
 
 function splitName(fullName: string): { first_name: string; last_name: string } {
@@ -42,6 +42,16 @@ function splitName(fullName: string): { first_name: string; last_name: string } 
     first_name: parts[0],
     last_name: parts.slice(1).join(" "),
   };
+}
+
+function appBaseUrl(req: Request): string {
+  return process.env.APP_URL || new URL(req.url).origin;
+}
+
+function urlWithOrderId(url: string, orderId: string): string {
+  const nextUrl = new URL(url);
+  nextUrl.searchParams.set("order_id", orderId);
+  return nextUrl.toString();
 }
 
 export async function POST(req: Request) {
@@ -60,26 +70,63 @@ export async function POST(req: Request) {
     );
   }
 
-  const { orderId, amount, currency, items, customer, returnUrl, cancelUrl, notifyUrl } =
-    parsed.data;
+  const { orderId, currency } = parsed.data;
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      items: {
+        select: { name: true, quantity: true, price: true },
+      },
+      user: {
+        select: { name: true, email: true },
+      },
+    },
+  });
+
+  if (!order) {
+    return NextResponse.json({ error: "Order not found" }, { status: 404 });
+  }
+
+  if (order.paymentMethod !== "PAYHERE") {
+    return NextResponse.json({ error: "Order was not created for PayHere" }, { status: 409 });
+  }
+
+  if (order.paymentStatus === "PAID") {
+    return NextResponse.json({ error: "Order is already paid" }, { status: 409 });
+  }
 
   const merchantId = payHereMerchantId();
+  const amount = Number(order.total.toFixed(2));
+  const baseUrl = appBaseUrl(req);
+  const returnUrl = `${baseUrl}/checkout/success`;
+  const cancelUrl = `${baseUrl}/checkout/success?status=cancelled`;
+  const notifyUrl = `${baseUrl}/api/payhere/webhook`;
 
   console.log("[payhere/payment] Payment link creation initiated", {
     merchant_id: merchantId,
     order_id: orderId,
     amount,
     currency,
-    customer_name: customer.name,
-    customer_email: customer.email,
-    customer_phone: customer.phone,
-    items_count: items.length,
+    customer_name: order.guestName ?? order.user?.name ?? parsed.data.customer?.name,
+    customer_email: order.guestEmail ?? order.user?.email ?? parsed.data.customer?.email,
+    customer_phone: order.customerPhone,
+    items_count: order.items.length,
   });
 
-  const { first_name, last_name } = splitName(customer.name);
+  const customerName = order.guestName ?? order.user?.name ?? parsed.data.customer?.name;
+  const customerEmail = order.guestEmail ?? order.user?.email ?? parsed.data.customer?.email;
+  if (!customerName || !customerEmail) {
+    return NextResponse.json(
+      { error: "Order is missing customer name or email" },
+      { status: 409 },
+    );
+  }
+
+  const { first_name, last_name } = splitName(customerName);
   const itemsDescription =
-    items.length > 0
-      ? items.map((it) => `${it.name} x${it.quantity}`).join(", ")
+    order.items.length > 0
+      ? order.items.map((it) => `${it.name} x${it.quantity}`).join(", ")
       : "Dressing Bear Order";
 
   // Generate the checkout hash per PayHere docs
@@ -97,13 +144,13 @@ export async function POST(req: Request) {
     items: itemsDescription,
     firstName: first_name,
     lastName: last_name,
-    email: customer.email,
-    phone: customer.phone,
-    address: customer.address,
-    city: customer.city,
-    country: customer.country,
-    returnUrl: `${returnUrl}?order_id=${encodeURIComponent(orderId)}`,
-    cancelUrl: `${cancelUrl}&order_id=${encodeURIComponent(orderId)}`,
+    email: customerEmail,
+    phone: order.customerPhone,
+    address: `${order.shippingLine1}${order.shippingLine2 ? ", " + order.shippingLine2 : ""}`,
+    city: order.shippingCity,
+    country: order.shippingCountry,
+    returnUrl: urlWithOrderId(returnUrl, orderId),
+    cancelUrl: urlWithOrderId(cancelUrl, orderId),
     notifyUrl,
     hash,
   };

@@ -16,8 +16,10 @@ Stored in `.env.local`:
 
 ```
 PAYHERE_MODE="sandbox"          # "sandbox" | "live"
-PAYHERE_APP_ID="4J9MIkFKo1V4J9Mbj0Yjf43sXFJ1QyO8117uH1N3o3u"
-PAYHERE_APP_SECRET="4KEQTWQqCSi8m1nlh92Hqe8Rkt8rCfLEZ4Z7h65YXBa9"
+PAYHERE_MERCHANT_ID="your-domain-merchant-id"
+PAYHERE_MERCHANT_SECRET="your-domain-merchant-secret"
+PAYHERE_APP_ID="your-business-app-id"
+PAYHERE_APP_SECRET="your-business-app-secret"
 ```
 
 Credentials are accessed server-side only via `process.env`.
@@ -65,14 +67,14 @@ Implementation:
 Receives PayHere's asynchronous payment notification. Updates the order's `paymentStatus` to `PAID` and triggers courier booking.
 
 PayHere POSTs to this URL with `application/x-www-form-urlencoded`. Fields include:
-- `payment_id`, `order_id`, `status`, `amount`, `currency`, `md5sig`
+- `payment_id`, `merchant_id`, `order_id`, `payhere_amount`, `payhere_currency`, `status_code`, `md5sig`
 
 Verification:
-- Compute HMAC-SHA256 of `merchant_id + order_id + amount + currency + status` using `PAYHERE_APP_SECRET`
-- Compare against `md5sig` header
-- Reject if signature mismatch
+- Compute `md5(merchant_id + order_id + payhere_amount + payhere_currency + status_code + upper(md5(PAYHERE_MERCHANT_SECRET)))`
+- Compare against `md5sig`
+- Reject if signature mismatch, and only confirm after PayHere Merchant API verification plus amount/currency match
 
-Side effects on success (`status === "COMPLETED"`):
+Side effects on success (`status_code === "2"`):
 1. `prisma.order.update({ where: { id }, data: { paymentStatus: "PAID" } })`
 2. Re-fetch order details and call `orchestrateCourierBooking(orderId, orderDetails)` — same pattern as COD flow
 3. Send order confirmation email if not already sent
@@ -122,7 +124,7 @@ No schema changes needed. The `Order.paymentStatus` field already supports `"PEN
 
 ## 7. Implementation Order
 
-1. Add `PAYHERE_APP_ID`, `PAYHERE_APP_SECRET`, `PAYHERE_MODE` to `.env.local`
+1. Add `PAYHERE_MERCHANT_ID`, `PAYHERE_MERCHANT_SECRET`, `PAYHERE_APP_ID`, `PAYHERE_APP_SECRET`, `PAYHERE_MODE` to `.env.local`
 2. Create `app/api/payhere/payment/route.ts` — creates payment ticket
 3. Create `app/api/payhere/webhook/route.ts` — receives and verifies webhook
 4. Create `app/checkout/success/page.tsx` — success confirmation page
@@ -132,7 +134,7 @@ No schema changes needed. The `Order.paymentStatus` field already supports `"PEN
 
 ## 8. Security Considerations
 
-- `PAYHERE_APP_SECRET` never leaves the server — only used in API routes
+- PayHere secrets never leave the server — `PAYHERE_MERCHANT_SECRET` signs checkout/webhooks and `PAYHERE_APP_SECRET` is only used for Merchant API OAuth
 - Webhook signature verification using HMAC-SHA256 prevents spoofed notifications
 - Idempotent webhook handler prevents double-charging or double-processing
 - Order amount on webhook is validated server-side against stored order total

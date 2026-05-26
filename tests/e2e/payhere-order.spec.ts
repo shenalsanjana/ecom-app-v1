@@ -17,12 +17,13 @@ const NAME = "PayHere Test";
 function signPayHereWebhook(params: {
   merchantId: string;
   orderId: string;
-  amount: number;
+  amount: string;
   currency: string;
-  status: string;
+  statusCode: string;
 }): string {
-  const secret = process.env.PAYHERE_APP_SECRET ?? "";
-  const str = `${params.merchantId}${params.orderId}${params.amount}${params.currency}${params.status}${secret}`;
+  const secret = process.env.PAYHERE_MERCHANT_SECRET ?? "";
+  const hashedSecret = crypto.createHash("md5").update(secret).digest("hex").toUpperCase();
+  const str = `${params.merchantId}${params.orderId}${params.amount}${params.currency}${params.statusCode}${hashedSecret}`;
   return crypto.createHash("md5").update(str).digest("hex").toUpperCase();
 }
 
@@ -131,9 +132,9 @@ test("PayHere checkout creates order with PENDING payment status", async ({ page
   expect(order!.items.length).toBeGreaterThan(0);
 });
 
-// ── Test: Webhook with valid signature marks order PAID ─────────────────────
+// ── Test: Signed webhook without Merchant API confirmation stays pending ─────
 
-test("PayHere webhook with valid signature marks order PAID", async ({ request }) => {
+test("PayHere webhook with valid signature but no PayHere API match stays PENDING", async ({ request }) => {
   // Create a test order directly in the database to simulate what checkout created.
   const orderId = `ORD-E2E-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
   const user = await prisma.user.findUnique({ where: { email: EMAIL } });
@@ -179,24 +180,24 @@ test("PayHere webhook with valid signature marks order PAID", async ({ request }
   // Build the webhook payload with a valid signature.
   const merchantId = process.env.PAYHERE_MERCHANT_ID ?? "256312";
   const currency = "LKR";
-  const status = "COMPLETED";
-  const amount = total;
+  const statusCode = "2";
+  const amount = total.toFixed(2);
 
   const md5sig = signPayHereWebhook({
     merchantId,
     orderId,
     amount,
     currency,
-    status,
+    statusCode,
   });
 
   const body = new URLSearchParams({
     payment_id: `pmt-e2e-${Date.now()}`,
     merchant_id: merchantId,
     order_id: orderId,
-    amount: String(amount),
-    currency,
-    status,
+    payhere_amount: amount,
+    payhere_currency: currency,
+    status_code: statusCode,
     md5sig,
   });
 
@@ -208,11 +209,11 @@ test("PayHere webhook with valid signature marks order PAID", async ({ request }
 
   expect(response.status()).toBe(200);
   const json = await response.json();
-  expect(json.status).toBe("success");
+  expect(json.status).toBe("verification_failed");
 
-  // Verify the order is now PAID.
+  // Verify the order remains pending until PayHere's Merchant API confirms it.
   const after = await prisma.order.findUnique({ where: { id: orderId } });
-  expect(after!.paymentStatus).toBe("PAID");
+  expect(after!.paymentStatus).toBe("PENDING");
 });
 
 // ── Test: Webhook with invalid signature is rejected ────────────────────────
@@ -255,9 +256,9 @@ test("PayHere webhook with invalid signature returns 403", async ({ request }) =
     payment_id: `pmt-e2e-invalid-${Date.now()}`,
     merchant_id: process.env.PAYHERE_MERCHANT_ID ?? "256312",
     order_id: orderId,
-    amount: "2440",
-    currency: "LKR",
-    status: "COMPLETED",
+    payhere_amount: "2440.00",
+    payhere_currency: "LKR",
+    status_code: "2",
     md5sig: "INVALIDSIGNATURE000000000000000000",
   });
 
@@ -315,18 +316,18 @@ test("duplicate PayHere webhook is idempotent (already_processed)", async ({ req
   const md5sig = signPayHereWebhook({
     merchantId,
     orderId,
-    amount: 2440,
+    amount: "2440.00",
     currency: "LKR",
-    status: "COMPLETED",
+    statusCode: "2",
   });
 
   const body = new URLSearchParams({
     payment_id: `pmt-e2e-dup-${Date.now()}`,
     merchant_id: merchantId,
     order_id: orderId,
-    amount: "2440",
-    currency: "LKR",
-    status: "COMPLETED",
+    payhere_amount: "2440.00",
+    payhere_currency: "LKR",
+    status_code: "2",
     md5sig,
   });
 

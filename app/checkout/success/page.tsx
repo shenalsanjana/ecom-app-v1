@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { ShoppingBag, Truck, CheckCircle } from "lucide-react";
 import { prisma } from "@/app/_lib/prisma";
 import { orderReference } from "@/app/_lib/order-reference";
-import { paymentStatusLabel } from "@/app/_lib/order-status";
+import { checkoutPaymentState, paymentStatusLabel } from "@/app/_lib/order-status";
 import { formatPrice } from "@/app/_lib/format";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { ProfileMenu } from "@/app/_components/header/profile-menu";
@@ -19,9 +19,11 @@ async function OrderDetails({ orderId, paymentStatus }: { orderId: string; payme
   if (!order) return notFound();
 
   const ref = orderReference(order);
-  const isPaid = paymentStatus === "COMPLETED" || order.paymentStatus === "PAID";
-  const isCod = order.paymentMethod === "COD";
-  const isCancelled = paymentStatus === "cancelled" && !isPaid;
+  const { isPaid, isCod, isCancelled } = checkoutPaymentState({
+    paymentMethod: order.paymentMethod,
+    paymentStatus: order.paymentStatus,
+    urlStatus: paymentStatus,
+  });
 
   return (
     <main className="flex-1">
