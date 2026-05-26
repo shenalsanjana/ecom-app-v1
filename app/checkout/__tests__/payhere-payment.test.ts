@@ -1,6 +1,7 @@
 // app/checkout/__tests__/payhere-payment.test.ts
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { z } from "zod";
+import crypto from "crypto";
 
 // ── Reusable helpers matching the route's validation schema ──────────────────
 
@@ -56,7 +57,6 @@ describe("PaymentRequestSchema validation", () => {
       customer: { name: "Test User", phone: "0712345678" },
     });
     expect(result.success).toBe(false);
-    // Zod returns "Invalid input" for missing nested fields — confirm failure
     expect(result.error).toBeDefined();
   });
 
@@ -113,43 +113,77 @@ describe("PaymentRequestSchema validation", () => {
   });
 });
 
-describe("PayHere API payload building", () => {
-  it("builds pipe-delimited items string", () => {
-    const items = [
-      { name: "T-Shirt", quantity: 2, amount: 1500 },
-      { name: "Jeans", quantity: 1, amount: 3000 },
-    ];
-    const itemsString = items
-      .map((it) => `${it.name}|${it.quantity}|${Math.round(it.amount)}`)
-      .join("|");
-    expect(itemsString).toBe("T-Shirt|2|1500|Jeans|1|3000");
+describe("PayHere hash generation", () => {
+  function generateHash(
+    merchantId: string,
+    orderId: string,
+    amount: string,
+    currency: string,
+    appSecret: string,
+  ): string {
+    const secretHash = crypto.createHash("md5").update(appSecret).digest("hex").toUpperCase();
+    const str = `${merchantId}${orderId}${amount}${currency}${secretHash}`;
+    return crypto.createHash("md5").update(str).digest("hex").toUpperCase();
+  }
+
+  const SECRET = "test-secret-123";
+
+  it("produces a valid uppercase MD5 hash", () => {
+    const hash = generateHash("256312", "ORD-123", "1500", "LKR", SECRET);
+    expect(hash).toMatch(/^[A-F0-9]{32}$/);
   });
 
-  it("splits customer name into first_name and last_name", () => {
-    const name = "John Peter Smith";
-    const parts = name.split(" ");
-    const first_name = parts[0];
-    const last_name = parts.slice(1).join(" ") || name;
-    expect(first_name).toBe("John");
-    expect(last_name).toBe("Peter Smith");
+  it("hash changes when order_id changes", () => {
+    const hash1 = generateHash("256312", "ORD-123", "1500", "LKR", SECRET);
+    const hash2 = generateHash("256312", "ORD-456", "1500", "LKR", SECRET);
+    expect(hash1).not.toBe(hash2);
   });
 
-  it("handles single-word customer name as both first and last", () => {
-    const name = "Madhavi";
-    const parts = name.split(" ");
-    const first_name = parts[0];
-    const last_name = parts.slice(1).join(" ") || name;
-    expect(first_name).toBe("Madhavi");
-    expect(last_name).toBe("Madhavi");
+  it("hash changes when amount changes", () => {
+    const hash1 = generateHash("256312", "ORD-123", "1500", "LKR", SECRET);
+    const hash2 = generateHash("256312", "ORD-123", "2000", "LKR", SECRET);
+    expect(hash1).not.toBe(hash2);
   });
 
-  it("encodes Basic auth header correctly", () => {
-    const auth = Buffer.from("app-id:app-secret").toString("base64");
-    expect(auth).toBe("YXBwLWlkOmFwcC1zZWNyZXQ=");
+  it("hash changes when secret changes", () => {
+    const hash1 = generateHash("256312", "ORD-123", "1500", "LKR", SECRET);
+    const hash2 = generateHash("256312", "ORD-123", "1500", "LKR", "different-secret");
+    expect(hash1).not.toBe(hash2);
   });
 });
 
-describe("PayHere Payment Link URL building", () => {
+describe("Customer name splitting", () => {
+  function splitName(fullName: string): { first_name: string; last_name: string } {
+    const parts = fullName.trim().split(/\s+/);
+    if (parts.length === 1) {
+      return { first_name: parts[0], last_name: parts[0] };
+    }
+    return {
+      first_name: parts[0],
+      last_name: parts.slice(1).join(" "),
+    };
+  }
+
+  it("splits full name into first_name and last_name", () => {
+    const result = splitName("John Peter Smith");
+    expect(result.first_name).toBe("John");
+    expect(result.last_name).toBe("Peter Smith");
+  });
+
+  it("handles single-word customer name as both first and last", () => {
+    const result = splitName("Madhavi");
+    expect(result.first_name).toBe("Madhavi");
+    expect(result.last_name).toBe("Madhavi");
+  });
+
+  it("handles two-word names", () => {
+    const result = splitName("John Doe");
+    expect(result.first_name).toBe("John");
+    expect(result.last_name).toBe("Doe");
+  });
+});
+
+describe("PayHere Checkout URL building", () => {
   it("includes order_id in the return URL", () => {
     const baseUrl = "http://localhost:3000/checkout/success";
     const orderId = "ORD-123";
@@ -164,37 +198,78 @@ describe("PayHere Payment Link URL building", () => {
     expect(returnUrl).toBe("http://localhost:3000/checkout/success?order_id=ORD%20123%26foo%3Dbar");
   });
 
-  it("builds a valid PayHere payment link URL with all required params", () => {
+  it("builds a valid PayHere checkout URL with all required params", () => {
     const merchantId = "256312";
-    const baseUrl = "https://sandbox.payhere.lk/pay";
+    const baseUrl = "https://sandbox.payhere.lk/pay/checkout";
     const orderId = "ORD-456";
-    const amount = 2999;
+    const amount = "2999";
     const currency = "LKR";
     const returnUrl = `http://localhost:3000/checkout/success?order_id=${encodeURIComponent(orderId)}`;
     const cancelUrl = `http://localhost:3000/checkout/success?status=cancelled&order_id=${encodeURIComponent(orderId)}`;
 
     const params = new URLSearchParams({
-      _fp_id: merchantId,
-      _amount: String(amount),
-      _currency: currency,
-      _order_id: orderId,
-      _return_url: returnUrl,
-      _cancel_url: cancelUrl,
-      _notify_url: "http://localhost:3000/api/payhere/webhook",
+      merchant_id: merchantId,
+      order_id: orderId,
+      amount,
+      currency,
+      items: "T-Shirt x2, Jeans x1",
+      first_name: "John",
+      last_name: "Doe",
+      email: "john@example.com",
+      phone: "0712345678",
+      address: "",
+      country: "Sri Lanka",
+      return_url: returnUrl,
+      cancel_url: cancelUrl,
+      notify_url: "http://localhost:3000/api/payhere/webhook",
+      hash: "ABCDEF0123456789ABCDEF0123456789",
     });
 
-    const paymentUrl = `${baseUrl}/${merchantId}?${params.toString()}`;
+    const paymentUrl = `${baseUrl}?${params.toString()}`;
     const parsed = new URL(paymentUrl);
     const queryParams = parsed.searchParams;
 
-    expect(queryParams.get("_fp_id")).toBe(merchantId);
-    expect(queryParams.get("_amount")).toBe("2999");
-    expect(queryParams.get("_currency")).toBe("LKR");
-    expect(queryParams.get("_order_id")).toBe("ORD-456");
-    expect(queryParams.get("_return_url")).toContain("order_id=ORD-456");
-    expect(queryParams.get("_return_url")).not.toContain("status=cancelled");
-    expect(queryParams.get("_cancel_url")).toContain("order_id=ORD-456");
-    expect(queryParams.get("_cancel_url")).toContain("status=cancelled");
-    expect(queryParams.get("_notify_url")).toBe("http://localhost:3000/api/payhere/webhook");
+    // Verify the base URL is the correct checkout endpoint
+    expect(parsed.origin + parsed.pathname).toBe("https://sandbox.payhere.lk/pay/checkout");
+
+    // Verify all required params are present
+    expect(queryParams.get("merchant_id")).toBe(merchantId);
+    expect(queryParams.get("order_id")).toBe("ORD-456");
+    expect(queryParams.get("amount")).toBe("2999");
+    expect(queryParams.get("currency")).toBe("LKR");
+    expect(queryParams.get("first_name")).toBe("John");
+    expect(queryParams.get("last_name")).toBe("Doe");
+    expect(queryParams.get("email")).toBe("john@example.com");
+    expect(queryParams.get("phone")).toBe("0712345678");
+    expect(queryParams.get("country")).toBe("Sri Lanka");
+    expect(queryParams.get("hash")).toBe("ABCDEF0123456789ABCDEF0123456789");
+
+    // Verify return/cancel URLs
+    expect(queryParams.get("return_url")).toContain("order_id=ORD-456");
+    expect(queryParams.get("return_url")).not.toContain("status=cancelled");
+    expect(queryParams.get("cancel_url")).toContain("order_id=ORD-456");
+    expect(queryParams.get("cancel_url")).toContain("status=cancelled");
+    expect(queryParams.get("notify_url")).toBe("http://localhost:3000/api/payhere/webhook");
+  });
+
+  it("does NOT contain deprecated _fp_id or _signature params", () => {
+    const baseUrl = "https://sandbox.payhere.lk/pay/checkout";
+    const params = new URLSearchParams({
+      merchant_id: "256312",
+      order_id: "ORD-456",
+      amount: "2999",
+      currency: "LKR",
+      hash: "ABCDEF0123456789ABCDEF0123456789",
+    });
+
+    const paymentUrl = `${baseUrl}?${params.toString()}`;
+    const parsed = new URL(paymentUrl);
+    const queryParams = parsed.searchParams;
+
+    expect(queryParams.has("_fp_id")).toBe(false);
+    expect(queryParams.has("_signature")).toBe(false);
+    expect(queryParams.has("_payer_name")).toBe(false);
+    expect(queryParams.has("_payer_email")).toBe(false);
+    expect(queryParams.has("_payer_phone")).toBe(false);
   });
 });

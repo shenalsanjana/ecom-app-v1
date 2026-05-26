@@ -95,13 +95,15 @@ describe("processOrder — COD path", () => {
 
 describe("processOrder — prepaid paths", () => {
   it.each(["PAYHERE", "KOKO", "MINITPAY"] as const)(
-    "%s: skips courier, sends pending-prepaid email + customer confirmation",
+    "%s: skips courier, sends pending-prepaid email; no customer confirmation until payment verified",
     async (paymentMethod) => {
       const result = await processOrder({ ...baseInput, paymentMethod });
       expect(result.success).toBe(true);
       expect(bookCourierAndNotify).not.toHaveBeenCalled();
       expect(sendPendingPrepaidNotificationEmail).toHaveBeenCalledOnce();
-      expect(sendOrderConfirmationEmail).toHaveBeenCalledOnce();
+      // Customer confirmation email must NOT be sent here — it is sent by the
+      // webhook handler only after payment is successfully verified.
+      expect(sendOrderConfirmationEmail).not.toHaveBeenCalled();
     },
   );
 

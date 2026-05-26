@@ -1,16 +1,14 @@
 // app/_lib/payhere-config.ts
-/** PayHere base API URL for creating a payment ticket. */
-export function payHereApiUrl(): string {
+/** PayHere Checkout API URL — the form POST / redirect target for hosted checkout. */
+export function payHereCheckoutUrl(): string {
   return process.env.PAYHERE_MODE === "live"
-    ? "https://www.payhere.lk/paycheckout.ps?identifier=payment_ticket"
-    : "https://sandbox.payhere.lk/paycheckout.ps?identifier=payment_ticket";
+    ? "https://www.payhere.lk/pay/checkout"
+    : "https://sandbox.payhere.lk/pay/checkout";
 }
 
-/** PayHere Payment Links base URL for redirect-based checkout. */
+/** @deprecated Use payHereCheckoutUrl() instead. */
 export function payHerePaymentLinkUrl(): string {
-  return process.env.PAYHERE_MODE === "live"
-    ? "https://www.payhere.lk/pay"
-    : "https://sandbox.payhere.lk/pay";
+  return payHereCheckoutUrl();
 }
 
 /** Merchant ID from PayHere dashboard. */

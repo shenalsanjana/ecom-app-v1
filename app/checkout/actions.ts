@@ -297,22 +297,26 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
   // Synchronous booking with non-blocking failure
   const trackingCode = await orchestrateCourierBooking(orderId, orderDetailsForEmail);
 
-  // Send confirmation email to both customer and brand.
-  try {
-    await sendOrderConfirmationEmail({
-      ...orderDetailsForEmail,
-      trackingCode,
-    });
-    await prisma.order.update({
-      where: { id: orderId },
-      data: { emailSent: true },
-    });
-  } catch (error) {
-    logMailerError(
-      "order-confirmation",
-      { orderId, webNumber: created.webNumber },
-      error,
-    );
+  // For COD: send confirmation email immediately (payment collected at delivery).
+  // For prepaid (PAYHERE/KOKO/MINITPAY): confirmation email is sent by the
+  // webhook handler only after payment is verified — do NOT send it here.
+  if (paymentMethod === "COD") {
+    try {
+      await sendOrderConfirmationEmail({
+        ...orderDetailsForEmail,
+        trackingCode,
+      });
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { emailSent: true },
+      });
+    } catch (error) {
+      logMailerError(
+        "order-confirmation",
+        { orderId, webNumber: created.webNumber },
+        error,
+      );
+    }
   }
 
   return { success: true, orderId, webNumber: created.webNumber, trackingCode, isGuest: !userId };

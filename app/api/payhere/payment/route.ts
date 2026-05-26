@@ -1,6 +1,6 @@
 // app/api/payhere/payment/route.ts
 import { NextResponse } from "next/server";
-import { payHereCredentials, payHereMerchantId, payHerePaymentLinkUrl } from "../../../_lib/payhere-config";
+import { payHereCredentials, payHereMerchantId, payHereCheckoutUrl } from "../../../_lib/payhere-config";
 import { z } from "zod";
 import { createHash } from "crypto";
 
@@ -20,6 +20,37 @@ const PaymentRequestSchema = z.object({
   cancelUrl: z.string().url().default(`${process.env.APP_URL}/checkout/success?status=cancelled`),
   notifyUrl: z.string().url().default(`${process.env.APP_URL}/api/payhere/webhook`),
 });
+
+/**
+ * Generates the PayHere Checkout hash.
+ * Per PayHere docs: md5(merchant_id + order_id + amount + currency + upper(md5(app_secret)))
+ */
+function generatePayHereHash(
+  merchantId: string,
+  orderId: string,
+  amount: string,
+  currency: string,
+  appSecret: string,
+): string {
+  const secretHash = createHash("md5").update(appSecret).digest("hex").toUpperCase();
+  const str = `${merchantId}${orderId}${amount}${currency}${secretHash}`;
+  return createHash("md5").update(str).digest("hex").toUpperCase();
+}
+
+/**
+ * Splits a full name into first_name and last_name.
+ * Single-word names are used as both first and last.
+ */
+function splitName(fullName: string): { first_name: string; last_name: string } {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length === 1) {
+    return { first_name: parts[0], last_name: parts[0] };
+  }
+  return {
+    first_name: parts[0],
+    last_name: parts.slice(1).join(" "),
+  };
+}
 
 export async function POST(req: Request) {
   let body: unknown;
@@ -41,36 +72,35 @@ export async function POST(req: Request) {
 
   const merchantId = payHereMerchantId();
   const { app_secret } = payHereCredentials();
-  const baseUrl = payHerePaymentLinkUrl();
+  const baseUrl = payHereCheckoutUrl();
 
-  // Build PayHere Payment Link URL with query params
-  // PayHere Payment Link format:
-  // https://www.payhere.lk/pay/{merchant_id}?xxxxx
-  const returnUrlWithOrder = `${returnUrl}?order_id=${encodeURIComponent(orderId)}`;
-  const cancelUrlWithOrder = `${cancelUrl}&order_id=${encodeURIComponent(orderId)}`;
+  const amountStr = String(amount);
+  const { first_name, last_name } = splitName(customer.name);
+  const itemsDescription = items.length > 0
+    ? items.map((it) => `${it.name} x${it.quantity}`).join(", ")
+    : "Dressing Bear Order";
+
+  const hash = generatePayHereHash(merchantId, orderId, amountStr, currency, app_secret);
+
   const params = new URLSearchParams({
-    _fp_id: merchantId,
-    _amount: String(amount),
-    _currency: currency,
-    _order_id: orderId,
-    _items_description: items.length > 0
-      ? items.map((it) => `${it.name} x${it.quantity}`).join(", ")
-      : "Dressing Bear Order",
-    _payer_name: customer.name,
-    _payer_email: customer.email,
-    _payer_phone: customer.phone,
-    _return_url: returnUrlWithOrder,
-    _cancel_url: cancelUrlWithOrder,
-    _notify_url: notifyUrl,
+    merchant_id: merchantId,
+    order_id: orderId,
+    amount: amountStr,
+    currency,
+    items: itemsDescription,
+    first_name,
+    last_name,
+    email: customer.email,
+    phone: customer.phone,
+    address: "",        // collected on the checkout form but not mapped here
+    country: "Sri Lanka",
+    return_url: `${returnUrl}?order_id=${encodeURIComponent(orderId)}`,
+    cancel_url: `${cancelUrl}&order_id=${encodeURIComponent(orderId)}`,
+    notify_url: notifyUrl,
+    hash,
   });
 
-  // Generate HMAC-MD5 signature for payment link
-  // Signature format: md5(merchant_id + order_id + amount + currency + app_secret)
-  const sigString = `${merchantId}${orderId}${amount}${currency}${app_secret}`;
-  const signature = createHash("md5").update(sigString).digest("hex").toUpperCase();
-  params.set("_signature", signature);
-
-  const paymentUrl = `${baseUrl}/${merchantId}?${params.toString()}`;
+  const paymentUrl = `${baseUrl}?${params.toString()}`;
 
   return NextResponse.json({ paymentUrl });
 }
