@@ -186,6 +186,9 @@ export function CheckoutClient({ user }: Props) {
                   name: isGuest ? guest.name : (user?.name ?? "Customer"),
                   email: isGuest ? guest.email : (user?.email ?? ""),
                   phone,
+                  address: `${address.line1}${address.line2 ? ", " + address.line2 : ""}`,
+                  city: address.city,
+                  country: address.country,
                 },
               }),
             });
