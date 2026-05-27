@@ -2,6 +2,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ShoppingBag, Truck, CreditCard, User, FileText, Loader2 } from "lucide-react";
@@ -168,11 +169,17 @@ export function CheckoutClient({ user }: Props) {
 
       const data = await readPayHerePaymentResponse(res);
       if (res.ok && data.gatewayUrl && data.fields) {
-        setIsRedirectingToPayHere(true);
-        // Defer the navigation one tick so React commits the overlay first;
-        // otherwise the browser paints a blank screen until PayHere responds.
+        // flushSync commits the overlay to the DOM synchronously; the
+        // double-rAF then guarantees the browser actually paints it before
+        // we hand control to PayHere's navigation. Without this the user
+        // sees a blank screen until PayHere responds.
+        flushSync(() => setIsRedirectingToPayHere(true));
         const { gatewayUrl, fields } = data;
-        window.setTimeout(() => submitPayHereCheckoutForm(gatewayUrl, fields), 50);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() =>
+            submitPayHereCheckoutForm(gatewayUrl, fields),
+          );
+        });
         return;
       }
 
