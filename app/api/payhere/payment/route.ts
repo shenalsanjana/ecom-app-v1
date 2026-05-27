@@ -47,12 +47,6 @@ function appBaseUrl(req: Request): string {
   return process.env.APP_URL || new URL(req.url).origin;
 }
 
-function urlWithOrderId(url: string, orderId: string): string {
-  const nextUrl = new URL(url);
-  nextUrl.searchParams.set("order_id", orderId);
-  return nextUrl.toString();
-}
-
 function isPayHereConfigError(error: unknown): boolean {
   return error instanceof Error && /^PAYHERE_/.test(error.message);
 }
@@ -103,6 +97,11 @@ export async function POST(req: Request) {
     const merchantId = payHereMerchantId();
     const amount = Number(order.total.toFixed(2));
     const baseUrl = appBaseUrl(req);
+    // PayHere appends `order_id` to return_url and cancel_url itself when it
+    // redirects the buyer back. If we also set it here, the customer lands on
+    // `/checkout/success?order_id=X&order_id=X`, which Next.js parses as a
+    // string[] and breaks the success page. Leave the order_id off — PayHere
+    // adds it.
     const returnUrl = `${baseUrl}/checkout/success`;
     const cancelUrl = `${baseUrl}/checkout/success?status=cancelled`;
     const notifyUrl = `${baseUrl}/api/payhere/webhook`;
@@ -143,8 +142,8 @@ export async function POST(req: Request) {
 
     const fields = {
       merchant_id: merchantId,
-      return_url: urlWithOrderId(returnUrl, orderId),
-      cancel_url: urlWithOrderId(cancelUrl, orderId),
+      return_url: returnUrl,
+      cancel_url: cancelUrl,
       notify_url: notifyUrl,
       first_name,
       last_name,

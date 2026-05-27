@@ -253,6 +253,9 @@ describe("Customer name splitting", () => {
 
 describe("Payment link request body construction", () => {
   it("builds correct request body for PayHere merchant API", () => {
+    // Note: return_url and cancel_url do NOT include order_id — PayHere appends
+    // it itself on redirect. If we set it too, Next.js parses the duplicate as
+    // a string[] and the success page breaks.
     const body = {
       order_id: "ORD-456",
       items: "T-Shirt x2, Jeans x1",
@@ -265,8 +268,8 @@ describe("Payment link request body construction", () => {
       address: "123 Main St",
       city: "Colombo",
       country: "Sri Lanka",
-      return_url: "http://localhost:3000/checkout/success?order_id=ORD-456",
-      cancel_url: "http://localhost:3000/checkout/success?status=cancelled&order_id=ORD-456",
+      return_url: "http://localhost:3000/checkout/success",
+      cancel_url: "http://localhost:3000/checkout/success?status=cancelled",
       notify_url: "http://localhost:3000/api/payhere/webhook",
       hash: "ABCDEF0123456789ABCDEF0123456789",
     };
@@ -281,17 +284,17 @@ describe("Payment link request body construction", () => {
     expect(body.address).toBe("123 Main St");
     expect(body.city).toBe("Colombo");
     expect(body.country).toBe("Sri Lanka");
-    expect(body.return_url).toContain("order_id=ORD-456");
+    expect(body.return_url).not.toContain("order_id");
     expect(body.return_url).not.toContain("status=cancelled");
-    expect(body.cancel_url).toContain("order_id=ORD-456");
+    expect(body.cancel_url).not.toContain("order_id");
     expect(body.cancel_url).toContain("status=cancelled");
     expect(body.notify_url).toBe("http://localhost:3000/api/payhere/webhook");
     expect(body.hash).toMatch(/^[A-F0-9]{32}$/);
   });
 
   it("return_url and cancel_url are different", () => {
-    const returnUrl = "http://localhost:3000/checkout/success?order_id=ORD-456";
-    const cancelUrl = "http://localhost:3000/checkout/success?status=cancelled&order_id=ORD-456";
+    const returnUrl = "http://localhost:3000/checkout/success";
+    const cancelUrl = "http://localhost:3000/checkout/success?status=cancelled";
     expect(returnUrl).not.toBe(cancelUrl);
   });
 });

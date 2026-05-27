@@ -106,10 +106,13 @@ describe("POST /api/payhere/payment", () => {
     );
 
     expect(res.status).toBe(200);
+    // PayHere appends `order_id` itself when it redirects the buyer back, so
+    // our return_url/cancel_url must NOT include it — duplicates would be
+    // parsed as string[] by Next.js and break the success page.
     await expect(res.json()).resolves.toMatchObject({
       fields: {
-        return_url: `https://shop.example.com/checkout/success?order_id=${ORDER.id}`,
-        cancel_url: `https://shop.example.com/checkout/success?status=cancelled&order_id=${ORDER.id}`,
+        return_url: "https://shop.example.com/checkout/success",
+        cancel_url: "https://shop.example.com/checkout/success?status=cancelled",
         notify_url: "https://shop.example.com/api/payhere/webhook",
       },
     });
@@ -129,8 +132,8 @@ describe("POST /api/payhere/payment", () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({
       fields: {
-        return_url: `https://shop.example.com/checkout/success?order_id=${ORDER.id}`,
-        cancel_url: `https://shop.example.com/checkout/success?status=cancelled&order_id=${ORDER.id}`,
+        return_url: "https://shop.example.com/checkout/success",
+        cancel_url: "https://shop.example.com/checkout/success?status=cancelled",
         notify_url: "https://shop.example.com/api/payhere/webhook",
       },
     });
