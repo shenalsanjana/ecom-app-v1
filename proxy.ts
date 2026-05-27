@@ -14,13 +14,24 @@ export default auth((req) => {
   const isAuthed = !!req.auth;
   const isAdmin = req.auth?.user?.role === "ADMIN";
 
-  if (path.startsWith("/admin")) {
+  // Admin routes: both /admin/* pages and /api/admin/* API endpoints require role === "ADMIN".
+  // Page routes redirect to /login or /; API routes return JSON-shaped responses so the
+  // client can react without parsing HTML.
+  const isAdminApiRoute = path.startsWith("/api/admin");
+  const isAdminRoute = isAdminApiRoute || path.startsWith("/admin");
+  if (isAdminRoute) {
     if (!isAuthed) {
+      if (isAdminApiRoute) {
+        return new NextResponse("Unauthorized", { status: 401 });
+      }
       return NextResponse.redirect(
         new URL(`/login?callbackUrl=${encodeURIComponent(path)}`, req.url),
       );
     }
     if (!isAdmin) {
+      if (isAdminApiRoute) {
+        return new NextResponse("Forbidden", { status: 403 });
+      }
       return NextResponse.redirect(new URL("/", req.url));
     }
     return;
@@ -38,5 +49,10 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/account/:path*", "/admin/:path*", "/wishlist/:path*"],
+  matcher: [
+    "/account/:path*",
+    "/admin/:path*",
+    "/api/admin/:path*",
+    "/wishlist/:path*",
+  ],
 };
