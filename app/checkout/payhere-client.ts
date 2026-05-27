@@ -31,6 +31,12 @@ export function submitPayHereCheckoutForm(
   const form = document.createElement("form");
   form.method = "POST";
   form.action = gatewayUrl;
+  // `_top` forces navigation in the top-level browsing context. If the page
+  // is ever loaded inside an iframe (a partner embed, a phishing wrapper,
+  // certain in-app browsers), `_self` would navigate the iframe and PayHere
+  // would render inside that constrained box — producing the cramped card
+  // with inner scrollbars. `_top` guarantees the full browser viewport.
+  form.target = "_top";
   form.style.display = "none";
 
   for (const [name, value] of Object.entries(fields)) {
