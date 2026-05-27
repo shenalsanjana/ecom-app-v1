@@ -2,13 +2,15 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ShoppingBag, Truck, CheckCircle } from "lucide-react";
+import { Loader2, ShoppingBag, Truck, CheckCircle } from "lucide-react";
 import { prisma } from "@/app/_lib/prisma";
 import { orderReference } from "@/app/_lib/order-reference";
 import { checkoutPaymentState, paymentStatusLabel } from "@/app/_lib/order-status";
 import { formatPrice } from "@/app/_lib/format";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { ProfileMenu } from "@/app/_components/header/profile-menu";
+import { PaymentStatusPoll } from "./payment-status-poll";
+import { ClearCartOnPaid } from "./clear-cart-on-paid";
 
 async function OrderDetails({ orderId, paymentStatus }: { orderId: string; paymentStatus?: string }) {
   const order = await prisma.order.findUnique({
@@ -24,9 +26,15 @@ async function OrderDetails({ orderId, paymentStatus }: { orderId: string; payme
     paymentStatus: order.paymentStatus,
     urlStatus: paymentStatus,
   });
+  // Non-COD order that hasn't been marked PAID yet and wasn't cancelled —
+  // the PayHere webhook is still in flight.
+  const isConfirming = !isPaid && !isCod && !isCancelled;
 
   return (
     <main className="flex-1">
+      {/* Clear local cart as soon as the user lands on success (covers the
+          polling window between redirect and webhook). */}
+      <ClearCartOnPaid shouldClear={!isCancelled} />
       <div className="mx-auto max-w-2xl px-4 py-20 text-center">
         {/* Icon */}
         <div
@@ -38,6 +46,8 @@ async function OrderDetails({ orderId, paymentStatus }: { orderId: string; payme
             <CheckCircle className="h-10 w-10 text-green-600" />
           ) : isCancelled ? (
             <ShoppingBag className="h-10 w-10 text-red-600" />
+          ) : isConfirming ? (
+            <Loader2 className="h-10 w-10 text-yellow-600 animate-spin" />
           ) : (
             <ShoppingBag className="h-10 w-10 text-yellow-600" />
           )}
@@ -57,6 +67,16 @@ async function OrderDetails({ orderId, paymentStatus }: { orderId: string; payme
             <p className="text-muted-foreground text-lg mb-2">
               Your payment was cancelled. Your order has not been confirmed.
             </p>
+          </>
+        ) : isConfirming ? (
+          <>
+            <h1 className="text-3xl font-bold mb-3">Confirming your payment…</h1>
+            <p className="text-muted-foreground text-lg mb-2">
+              PayHere received your payment. We&apos;re finalizing your order — this usually takes just a few seconds.
+            </p>
+            <div className="mb-2">
+              <PaymentStatusPoll orderId={order.id} />
+            </div>
           </>
         ) : (
           <>
