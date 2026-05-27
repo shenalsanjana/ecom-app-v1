@@ -4,7 +4,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ShoppingBag, Truck, CreditCard, User, FileText } from "lucide-react";
+import { ArrowLeft, ShoppingBag, Truck, CreditCard, User, FileText, Loader2 } from "lucide-react";
 import { useCart } from "@/app/_lib/cart-context";
 import { processOrder } from "./actions";
 import { ProfileMenu } from "@/app/_components/header/profile-menu";
@@ -57,6 +57,11 @@ export function CheckoutClient({ user }: Props) {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [orderReference, setOrderReference] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("COD");
+  // Once a PayHere order exists in the DB, hold its id so a failed redirect
+  // (network blip, gateway init error) can be retried without creating a
+  // duplicate order.
+  const [pendingPayHereOrderId, setPendingPayHereOrderId] = useState<string | null>(null);
+  const [isRedirectingToPayHere, setIsRedirectingToPayHere] = useState(false);
   const idempotencyKey = useMemo(() => generateIdempotencyKey(), []);
 
 
@@ -145,6 +150,40 @@ export function CheckoutClient({ user }: Props) {
     );
   }
 
+  // Calls the PayHere init endpoint and, on success, paints the redirect
+  // overlay before submitting the hidden checkout form. The DB order already
+  // exists at this point, so failures here can be retried without creating a
+  // duplicate. The local cart is intentionally NOT cleared here — the success
+  // page clears it (covers cancel/back from PayHere too).
+  async function initiatePayHere(payHereOrderId: string) {
+    setError(null);
+    setPendingPayHereOrderId(payHereOrderId);
+    setIsSubmitting(true);
+    try {
+      const res = await fetch("/api/payhere/payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: payHereOrderId }),
+      });
+
+      const data = await readPayHerePaymentResponse(res);
+      if (res.ok && data.gatewayUrl && data.fields) {
+        setIsRedirectingToPayHere(true);
+        // Defer the navigation one tick so React commits the overlay first;
+        // otherwise the browser paints a blank screen until PayHere responds.
+        const { gatewayUrl, fields } = data;
+        window.setTimeout(() => submitPayHereCheckoutForm(gatewayUrl, fields), 50);
+        return;
+      }
+
+      setError(payHerePaymentErrorMessage(data.error));
+    } catch {
+      setError(payHerePaymentErrorMessage("Failed to initialize PayHere"));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -174,27 +213,7 @@ export function CheckoutClient({ user }: Props) {
       if (result.success) {
         if (paymentMethod === "PAYHERE") {
           setOrderReference(result.webNumber ?? result.orderId);
-
-          try {
-            const res = await fetch("/api/payhere/payment", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                orderId: result.orderId,
-              }),
-            });
-
-            const data = await readPayHerePaymentResponse(res);
-            if (res.ok && data.gatewayUrl && data.fields) {
-              clearCart();
-              submitPayHereCheckoutForm(data.gatewayUrl, data.fields);
-              return;
-            }
-
-            setError(payHerePaymentErrorMessage(data.error));
-          } catch {
-            setError(payHerePaymentErrorMessage("Failed to initialize PayHere"));
-          }
+          await initiatePayHere(result.orderId);
           return;
         }
 
@@ -214,6 +233,22 @@ export function CheckoutClient({ user }: Props) {
 
   return (
     <>
+      {isRedirectingToPayHere && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="text-center max-w-sm px-4">
+            <Loader2 className="mx-auto h-10 w-10 text-primary animate-spin mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Redirecting to PayHere…</h2>
+            <p className="text-sm text-muted-foreground">
+              Please don&apos;t close or refresh this page. You&apos;ll be taken to
+              the PayHere secure checkout in a moment.
+            </p>
+          </div>
+        </div>
+      )}
       <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
           <Link
@@ -474,6 +509,23 @@ export function CheckoutClient({ user }: Props) {
                   )}
 
                   {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+
+                  {error && pendingPayHereOrderId && paymentMethod === "PAYHERE" && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="w-full mt-3"
+                      size="lg"
+                      disabled={isSubmitting}
+                      onClick={() => {
+                        if (pendingPayHereOrderId) {
+                          void initiatePayHere(pendingPayHereOrderId);
+                        }
+                      }}
+                    >
+                      {isSubmitting ? "Retrying…" : "Retry payment"}
+                    </Button>
+                  )}
 
                   <Button type="submit" className="w-full mt-6" size="lg" disabled={isSubmitting}>
                     {isSubmitting
