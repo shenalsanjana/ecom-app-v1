@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createPaymentLink, orderFindUnique } = vi.hoisted(() => ({
+const { createPaymentLink, orderFindUnique, payHereCheckoutHash } = vi.hoisted(() => ({
   createPaymentLink: vi.fn(),
   orderFindUnique: vi.fn(),
+  payHereCheckoutHash: vi.fn(() => "CHECKOUT_HASH"),
 }));
 
 vi.mock("@/app/_lib/payhere-config", () => ({
   payHereMerchantId: () => "256312",
-  payHereCheckoutHash: vi.fn(() => "CHECKOUT_HASH"),
+  payHereCheckoutHash,
 }));
 
 vi.mock("@/app/_lib/payhere-api", () => ({
@@ -50,6 +51,8 @@ describe("POST /api/payhere/payment", () => {
   beforeEach(() => {
     createPaymentLink.mockReset();
     orderFindUnique.mockReset();
+    payHereCheckoutHash.mockReset();
+    payHereCheckoutHash.mockReturnValue("CHECKOUT_HASH");
     process.env.APP_URL = "https://shop.example.com";
     createPaymentLink.mockResolvedValue({
       success: true,
@@ -128,5 +131,64 @@ describe("POST /api/payhere/payment", () => {
 
     expect(res.status).toBe(409);
     expect(createPaymentLink).not.toHaveBeenCalled();
+  });
+
+  it("returns a JSON error when PayHere link creation throws", async () => {
+    orderFindUnique.mockResolvedValue(ORDER);
+    createPaymentLink.mockRejectedValue(new Error("OAuth unavailable"));
+
+    const res = await POST(
+      new Request("https://shop.example.com/api/payhere/payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: ORDER.id }),
+      }),
+    );
+
+    expect(res.status).toBe(502);
+    await expect(res.json()).resolves.toEqual({
+      error: "Payment gateway temporarily unavailable",
+    });
+  });
+
+  it("does not expose raw PayHere API errors to the browser", async () => {
+    orderFindUnique.mockResolvedValue(ORDER);
+    createPaymentLink.mockResolvedValue({
+      success: false,
+      error: "PayHere API error: 401 Unauthorized - invalid_client",
+    });
+
+    const res = await POST(
+      new Request("https://shop.example.com/api/payhere/payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: ORDER.id }),
+      }),
+    );
+
+    expect(res.status).toBe(502);
+    await expect(res.json()).resolves.toEqual({
+      error: "Payment gateway temporarily unavailable",
+    });
+  });
+
+  it("returns a JSON error when PayHere credentials are not configured", async () => {
+    orderFindUnique.mockResolvedValue(ORDER);
+    payHereCheckoutHash.mockImplementation(() => {
+      throw new Error("PAYHERE_MERCHANT_SECRET must be set in environment");
+    });
+
+    const res = await POST(
+      new Request("https://shop.example.com/api/payhere/payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: ORDER.id }),
+      }),
+    );
+
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toEqual({
+      error: "Payment gateway is not configured",
+    });
   });
 });

@@ -16,6 +16,10 @@ import { Separator } from "@/components/ui/separator";
 import { formatPrice } from "@/app/_lib/format";
 import { calculateDelivery, FREE_DELIVERY_THRESHOLD } from "@/app/_lib/checkout-config";
 import { DELIVERY_CITIES, zoneForCity } from "@/app/_lib/delivery-zones";
+import {
+  payHerePaymentErrorMessage,
+  readPayHerePaymentResponse,
+} from "./payhere-client";
 
 type PaymentMethod = "COD" | "PAYHERE" | "KOKO" | "MINITPAY";
 
@@ -179,20 +183,16 @@ export function CheckoutClient({ user }: Props) {
               }),
             });
 
-            const data = await res.json();
-            if (data.paymentUrl) {
+            const data = await readPayHerePaymentResponse(res);
+            if (res.ok && data.paymentUrl) {
               clearCart();
               window.location.href = data.paymentUrl;
               return;
-            } else {
-              // Payment URL generation failed — show order as saved but with error
-              setOrderId(result.orderId);
-              setError("Payment gateway error. Your order is saved. Please contact support.");
             }
+
+            setError(payHerePaymentErrorMessage(data.error));
           } catch {
-            // Payment initialization failed — show order as saved but with error
-            setOrderId(result.orderId);
-            setError("Failed to initialize PayHere. Your order is saved. Please contact support.");
+            setError(payHerePaymentErrorMessage("Failed to initialize PayHere"));
           }
           return;
         }

@@ -54,6 +54,15 @@ function urlWithOrderId(url: string, orderId: string): string {
   return nextUrl.toString();
 }
 
+function isPayHereConfigError(error: unknown): boolean {
+  return error instanceof Error && /^PAYHERE_/.test(error.message);
+}
+
+function isPayHereGatewayError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return /PayHere|OAuth|fetch|network/i.test(error.message);
+}
+
 export async function POST(req: Request) {
   let body: unknown;
   try {
@@ -72,110 +81,136 @@ export async function POST(req: Request) {
 
   const { orderId, currency } = parsed.data;
 
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    include: {
-      items: {
-        select: { name: true, quantity: true, price: true },
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          select: { name: true, quantity: true, price: true },
+        },
+        user: {
+          select: { name: true, email: true },
+        },
       },
-      user: {
-        select: { name: true, email: true },
-      },
-    },
-  });
-
-  if (!order) {
-    return NextResponse.json({ error: "Order not found" }, { status: 404 });
-  }
-
-  if (order.paymentMethod !== "PAYHERE") {
-    return NextResponse.json({ error: "Order was not created for PayHere" }, { status: 409 });
-  }
-
-  if (order.paymentStatus === "PAID") {
-    return NextResponse.json({ error: "Order is already paid" }, { status: 409 });
-  }
-
-  const merchantId = payHereMerchantId();
-  const amount = Number(order.total.toFixed(2));
-  const baseUrl = appBaseUrl(req);
-  const returnUrl = `${baseUrl}/checkout/success`;
-  const cancelUrl = `${baseUrl}/checkout/success?status=cancelled`;
-  const notifyUrl = `${baseUrl}/api/payhere/webhook`;
-
-  console.log("[payhere/payment] Payment link creation initiated", {
-    merchant_id: merchantId,
-    order_id: orderId,
-    amount,
-    currency,
-    customer_name: order.guestName ?? order.user?.name ?? parsed.data.customer?.name,
-    customer_email: order.guestEmail ?? order.user?.email ?? parsed.data.customer?.email,
-    customer_phone: order.customerPhone,
-    items_count: order.items.length,
-  });
-
-  const customerName = order.guestName ?? order.user?.name ?? parsed.data.customer?.name;
-  const customerEmail = order.guestEmail ?? order.user?.email ?? parsed.data.customer?.email;
-  if (!customerName || !customerEmail) {
-    return NextResponse.json(
-      { error: "Order is missing customer name or email" },
-      { status: 409 },
-    );
-  }
-
-  const { first_name, last_name } = splitName(customerName);
-  const itemsDescription =
-    order.items.length > 0
-      ? order.items.map((it) => `${it.name} x${it.quantity}`).join(", ")
-      : "Dressing Bear Order";
-
-  // Generate the checkout hash per PayHere docs
-  const hash = payHereCheckoutHash(merchantId, orderId, amount, currency);
-
-  console.log("[payhere/payment] Checkout hash generated", {
-    order_id: orderId,
-    hash_prefix: hash.substring(0, 8) + "...",
-  });
-
-  const input: CreatePaymentLinkInput = {
-    orderId,
-    amount,
-    currency,
-    items: itemsDescription,
-    firstName: first_name,
-    lastName: last_name,
-    email: customerEmail,
-    phone: order.customerPhone,
-    address: `${order.shippingLine1}${order.shippingLine2 ? ", " + order.shippingLine2 : ""}`,
-    city: order.shippingCity,
-    country: order.shippingCountry,
-    returnUrl: urlWithOrderId(returnUrl, orderId),
-    cancelUrl: urlWithOrderId(cancelUrl, orderId),
-    notifyUrl,
-    hash,
-  };
-
-  const result = await createPaymentLink(input);
-
-  if (!result.success || !result.paymentUrl) {
-    console.error("[payhere/payment] Payment link creation failed", {
-      order_id: orderId,
-      error: result.error,
     });
+
+    if (!order) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    if (order.paymentMethod !== "PAYHERE") {
+      return NextResponse.json({ error: "Order was not created for PayHere" }, { status: 409 });
+    }
+
+    if (order.paymentStatus === "PAID") {
+      return NextResponse.json({ error: "Order is already paid" }, { status: 409 });
+    }
+
+    const merchantId = payHereMerchantId();
+    const amount = Number(order.total.toFixed(2));
+    const baseUrl = appBaseUrl(req);
+    const returnUrl = `${baseUrl}/checkout/success`;
+    const cancelUrl = `${baseUrl}/checkout/success?status=cancelled`;
+    const notifyUrl = `${baseUrl}/api/payhere/webhook`;
+
+    console.log("[payhere/payment] Payment link creation initiated", {
+      merchant_id: merchantId,
+      order_id: orderId,
+      amount,
+      currency,
+      customer_name: order.guestName ?? order.user?.name ?? parsed.data.customer?.name,
+      customer_email: order.guestEmail ?? order.user?.email ?? parsed.data.customer?.email,
+      customer_phone: order.customerPhone,
+      items_count: order.items.length,
+    });
+
+    const customerName = order.guestName ?? order.user?.name ?? parsed.data.customer?.name;
+    const customerEmail = order.guestEmail ?? order.user?.email ?? parsed.data.customer?.email;
+    if (!customerName || !customerEmail) {
+      return NextResponse.json(
+        { error: "Order is missing customer name or email" },
+        { status: 409 },
+      );
+    }
+
+    const { first_name, last_name } = splitName(customerName);
+    const itemsDescription =
+      order.items.length > 0
+        ? order.items.map((it) => `${it.name} x${it.quantity}`).join(", ")
+        : "Dressing Bear Order";
+
+    // Generate the checkout hash per PayHere docs
+    const hash = payHereCheckoutHash(merchantId, orderId, amount, currency);
+
+    console.log("[payhere/payment] Checkout hash generated", {
+      order_id: orderId,
+      hash_prefix: hash.substring(0, 8) + "...",
+    });
+
+    const input: CreatePaymentLinkInput = {
+      orderId,
+      amount,
+      currency,
+      items: itemsDescription,
+      firstName: first_name,
+      lastName: last_name,
+      email: customerEmail,
+      phone: order.customerPhone,
+      address: `${order.shippingLine1}${order.shippingLine2 ? ", " + order.shippingLine2 : ""}`,
+      city: order.shippingCity,
+      country: order.shippingCountry,
+      returnUrl: urlWithOrderId(returnUrl, orderId),
+      cancelUrl: urlWithOrderId(cancelUrl, orderId),
+      notifyUrl,
+      hash,
+    };
+
+    const result = await createPaymentLink(input);
+
+    if (!result.success || !result.paymentUrl) {
+      console.error("[payhere/payment] Payment link creation failed", {
+        order_id: orderId,
+        error: result.error,
+      });
+      return NextResponse.json(
+        { error: "Payment gateway temporarily unavailable" },
+        { status: 502 },
+      );
+    }
+
+    console.log("[payhere/payment] Payment link created successfully", {
+      order_id: orderId,
+      payment_id: result.paymentId,
+      payment_url: result.paymentUrl,
+    });
+
+    return NextResponse.json({
+      paymentUrl: result.paymentUrl,
+      paymentId: result.paymentId,
+    });
+  } catch (error) {
+    console.error("[payhere/payment] Unexpected payment initialization failure", {
+      order_id: orderId,
+      error,
+    });
+
+    if (isPayHereConfigError(error)) {
+      return NextResponse.json(
+        { error: "Payment gateway is not configured" },
+        { status: 500 },
+      );
+    }
+
+    if (isPayHereGatewayError(error)) {
+      return NextResponse.json(
+        { error: "Payment gateway temporarily unavailable" },
+        { status: 502 },
+      );
+    }
+
     return NextResponse.json(
-      { error: result.error ?? "Failed to create payment link" },
-      { status: 502 },
+      { error: "Failed to initialize payment" },
+      { status: 500 },
     );
   }
-
-  console.log("[payhere/payment] Payment link created successfully", {
-    order_id: orderId,
-    payment_id: result.paymentId,
-    payment_url: result.paymentUrl,
-  });
-
-  return NextResponse.json({
-    paymentUrl: result.paymentUrl,
-    paymentId: result.paymentId,
-  });
 }
