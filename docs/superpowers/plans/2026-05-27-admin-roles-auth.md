@@ -1230,3 +1230,15 @@ If all six pass, this spec is complete and unblocks spec #2.
 - Migration history: this plan used `prisma db push`. Spec #2 or a separate housekeeping spec should establish a migrations baseline (`prisma migrate dev --name baseline` followed by `prisma migrate resolve --applied <name>` against prod) before any further schema changes.
 - Audit log of admin actions (out of scope for spec #1) will likely fold into spec #3 (order management) once admins start mutating order state.
 - Session revocation on role change: defer to spec #9 (Settings) if a force-logout-all knob is wanted.
+
+---
+
+## Execution notes (added during Task 11)
+
+Two deviations from the plan emerged during implementation; both are recorded here for traceability.
+
+1. **`Session` type derivation (Task 6).** The plan's `type Session = NonNullable<Awaited<ReturnType<typeof auth>>>` resolves to `NextMiddleware` because NextAuth v5's `auth` is overloaded and TypeScript picks the last overload. Fixed by `import type { Session } from "next-auth"` — the augmentation in `auth-types.d.ts` provides the correct shape. (Commit 6675d4b.)
+
+2. **`middleware.ts` → `proxy.ts` (Task 9).** Next.js 16 renamed `middleware.ts` to `proxy.ts`. The build refuses to coexist with both. The implementation lives at `proxy.ts` with identical logic and matcher. (Commit 318cd1d.)
+
+3. **Pre-`signIn` role lookup (Task 10).** The plan called `await auth()` after `await signIn(..., { redirect: false })` to read the role. NextAuth v5 doesn't reliably propagate the new cookie to a same-request `auth()` call. Switched to a pre-`signIn` indexed `prisma.user.findUnique({ select: { role: true } })`. (Commit 9ae4124.)
