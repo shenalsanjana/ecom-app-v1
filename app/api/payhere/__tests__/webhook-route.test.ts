@@ -173,6 +173,25 @@ describe("POST /api/payhere/webhook", () => {
     });
   });
 
+  it("confirms a signed notification without depending on the Merchant API", async () => {
+    verifyPayment.mockRejectedValueOnce(new Error("PayHere OAuth failed: 403 Forbidden"));
+
+    const res = await POST(
+      new Request("https://shop.example.com/api/payhere/webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: notificationBody().toString(),
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ status: "success" });
+    expect(orderUpdate).toHaveBeenCalledWith({
+      where: { id: ORDER.id },
+      data: expect.objectContaining({ paymentStatus: "PAID" }),
+    });
+  });
+
   it("does not mark the order paid when the verified amount differs from the order total", async () => {
     verifyPayment.mockResolvedValueOnce({
       verified: true,

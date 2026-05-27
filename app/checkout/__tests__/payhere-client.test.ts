@@ -5,15 +5,28 @@ import {
 } from "../payhere-client";
 
 describe("readPayHerePaymentResponse", () => {
-  it("parses a successful payment URL response", async () => {
+  it("parses a successful PayHere Checkout form response", async () => {
     const response = new Response(
-      JSON.stringify({ paymentUrl: "https://sandbox.payhere.lk/pay/test", paymentId: "pmt-123" }),
+      JSON.stringify({
+        gatewayUrl: "https://sandbox.payhere.lk/pay/checkout",
+        fields: {
+          merchant_id: "256312",
+          order_id: "ORD-123",
+          amount: "2440.00",
+          hash: "CHECKOUT_HASH",
+        },
+      }),
       { status: 200 },
     );
 
     await expect(readPayHerePaymentResponse(response)).resolves.toEqual({
-      paymentUrl: "https://sandbox.payhere.lk/pay/test",
-      paymentId: "pmt-123",
+      gatewayUrl: "https://sandbox.payhere.lk/pay/checkout",
+      fields: {
+        merchant_id: "256312",
+        order_id: "ORD-123",
+        amount: "2440.00",
+        hash: "CHECKOUT_HASH",
+      },
     });
   });
 

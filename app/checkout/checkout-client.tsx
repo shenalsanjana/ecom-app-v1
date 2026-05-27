@@ -19,6 +19,7 @@ import { DELIVERY_CITIES, zoneForCity } from "@/app/_lib/delivery-zones";
 import {
   payHerePaymentErrorMessage,
   readPayHerePaymentResponse,
+  submitPayHereCheckoutForm,
 } from "./payhere-client";
 
 type PaymentMethod = "COD" | "PAYHERE" | "KOKO" | "MINITPAY";
@@ -184,9 +185,9 @@ export function CheckoutClient({ user }: Props) {
             });
 
             const data = await readPayHerePaymentResponse(res);
-            if (res.ok && data.paymentUrl) {
+            if (res.ok && data.gatewayUrl && data.fields) {
               clearCart();
-              window.location.href = data.paymentUrl;
+              submitPayHereCheckoutForm(data.gatewayUrl, data.fields);
               return;
             }
 

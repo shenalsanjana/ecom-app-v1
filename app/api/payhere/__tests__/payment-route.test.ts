@@ -1,18 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createPaymentLink, orderFindUnique, payHereCheckoutHash } = vi.hoisted(() => ({
-  createPaymentLink: vi.fn(),
+const { orderFindUnique, payHereCheckoutHash } = vi.hoisted(() => ({
   orderFindUnique: vi.fn(),
   payHereCheckoutHash: vi.fn(() => "CHECKOUT_HASH"),
 }));
 
 vi.mock("@/app/_lib/payhere-config", () => ({
   payHereMerchantId: () => "256312",
+  payHereCheckoutUrl: () => "https://www.payhere.lk/pay/checkout",
   payHereCheckoutHash,
-}));
-
-vi.mock("@/app/_lib/payhere-api", () => ({
-  createPaymentLink,
 }));
 
 vi.mock("@/app/_lib/prisma", () => ({
@@ -49,19 +45,13 @@ const ORDER = {
 
 describe("POST /api/payhere/payment", () => {
   beforeEach(() => {
-    createPaymentLink.mockReset();
     orderFindUnique.mockReset();
     payHereCheckoutHash.mockReset();
     payHereCheckoutHash.mockReturnValue("CHECKOUT_HASH");
     process.env.APP_URL = "https://shop.example.com";
-    createPaymentLink.mockResolvedValue({
-      success: true,
-      paymentUrl: "https://sandbox.payhere.lk/pay/payment-id",
-      paymentId: "payment-id",
-    });
   });
 
-  it("uses the stored order total instead of the client supplied amount", async () => {
+  it("returns PayHere Checkout POST fields using the stored order total", async () => {
     orderFindUnique.mockResolvedValue(ORDER);
 
     const res = await POST(
@@ -81,22 +71,28 @@ describe("POST /api/payhere/payment", () => {
     );
 
     expect(res.status).toBe(200);
-    expect(createPaymentLink).toHaveBeenCalledWith(
-      expect.objectContaining({
-        orderId: ORDER.id,
-        amount: ORDER.total,
-        firstName: "Jane",
-        lastName: "Buyer",
+    await expect(res.json()).resolves.toMatchObject({
+      gatewayUrl: "https://www.payhere.lk/pay/checkout",
+      fields: {
+        merchant_id: "256312",
+        order_id: ORDER.id,
+        amount: "2440.00",
+        currency: "LKR",
+        items: "Oversize Tee x2",
+        first_name: "Jane",
+        last_name: "Buyer",
         email: "jane@example.com",
         phone: ORDER.customerPhone,
-      }),
-    );
+        hash: "CHECKOUT_HASH",
+      },
+    });
+    expect(payHereCheckoutHash).toHaveBeenCalledWith("256312", ORDER.id, ORDER.total, "LKR");
   });
 
   it("uses server-derived callback URLs instead of client supplied URLs", async () => {
     orderFindUnique.mockResolvedValue(ORDER);
 
-    await POST(
+    const res = await POST(
       new Request("https://shop.example.com/api/payhere/payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -109,16 +105,38 @@ describe("POST /api/payhere/payment", () => {
       }),
     );
 
-    expect(createPaymentLink).toHaveBeenCalledWith(
-      expect.objectContaining({
-        returnUrl: `https://shop.example.com/checkout/success?order_id=${ORDER.id}`,
-        cancelUrl: `https://shop.example.com/checkout/success?status=cancelled&order_id=${ORDER.id}`,
-        notifyUrl: "https://shop.example.com/api/payhere/webhook",
-      }),
-    );
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      fields: {
+        return_url: `https://shop.example.com/checkout/success?order_id=${ORDER.id}`,
+        cancel_url: `https://shop.example.com/checkout/success?status=cancelled&order_id=${ORDER.id}`,
+        notify_url: "https://shop.example.com/api/payhere/webhook",
+      },
+    });
   });
 
-  it("rejects payment link creation for non-PayHere orders", async () => {
+  it("uses PayHere's required snake_case callback field names", async () => {
+    orderFindUnique.mockResolvedValue(ORDER);
+
+    const res = await POST(
+      new Request("https://shop.example.com/api/payhere/payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: ORDER.id }),
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      fields: {
+        return_url: `https://shop.example.com/checkout/success?order_id=${ORDER.id}`,
+        cancel_url: `https://shop.example.com/checkout/success?status=cancelled&order_id=${ORDER.id}`,
+        notify_url: "https://shop.example.com/api/payhere/webhook",
+      },
+    });
+  });
+
+  it("rejects checkout field creation for non-PayHere orders", async () => {
     orderFindUnique.mockResolvedValue({ ...ORDER, paymentMethod: "COD" });
 
     const res = await POST(
@@ -130,46 +148,6 @@ describe("POST /api/payhere/payment", () => {
     );
 
     expect(res.status).toBe(409);
-    expect(createPaymentLink).not.toHaveBeenCalled();
-  });
-
-  it("returns a JSON error when PayHere link creation throws", async () => {
-    orderFindUnique.mockResolvedValue(ORDER);
-    createPaymentLink.mockRejectedValue(new Error("OAuth unavailable"));
-
-    const res = await POST(
-      new Request("https://shop.example.com/api/payhere/payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: ORDER.id }),
-      }),
-    );
-
-    expect(res.status).toBe(502);
-    await expect(res.json()).resolves.toEqual({
-      error: "Payment gateway temporarily unavailable",
-    });
-  });
-
-  it("does not expose raw PayHere API errors to the browser", async () => {
-    orderFindUnique.mockResolvedValue(ORDER);
-    createPaymentLink.mockResolvedValue({
-      success: false,
-      error: "PayHere API error: 401 Unauthorized - invalid_client",
-    });
-
-    const res = await POST(
-      new Request("https://shop.example.com/api/payhere/payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: ORDER.id }),
-      }),
-    );
-
-    expect(res.status).toBe(502);
-    await expect(res.json()).resolves.toEqual({
-      error: "Payment gateway temporarily unavailable",
-    });
   });
 
   it("returns a JSON error when PayHere credentials are not configured", async () => {

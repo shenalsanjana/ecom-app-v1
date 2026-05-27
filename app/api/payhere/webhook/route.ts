@@ -7,7 +7,6 @@ import {
   logMailerError,
 } from "@/app/_lib/mailer";
 import { sendAdminFailureAlertEmail } from "@/app/_lib/mailer";
-import { verifyPayment } from "@/app/_lib/payhere-api";
 import { payHereMerchantId, payHereMerchantSecret } from "@/app/_lib/payhere-config";
 
 /**
@@ -136,68 +135,33 @@ export async function POST(req: Request) {
     return NextResponse.json({ status: "already_processed" });
   }
 
-  // ── Cross-verify payment with PayHere Merchant API ──────────────────────
-  console.log("[payhere/webhook] Cross-verifying payment with PayHere Merchant API", {
-    order_id,
-  });
-
-  const verification = await verifyPayment(order_id);
-
-  if (!verification.verified) {
-    console.error("[payhere/webhook] Payment verification via API failed", {
-      order_id,
-      error: verification.error,
-      api_status: verification.status,
-      api_status_text: verification.statusText,
-    });
-    // Do NOT confirm the order — the webhook signature was valid but the
-    // merchant API could not confirm the payment. This could be a race condition
-    // or a spoofed callback. Return 200 so PayHere doesn't retry, but don't
-    // update the order.
-    return NextResponse.json({
-      status: "verification_failed",
-      error: verification.error,
-    });
-  }
-
-  console.log("[payhere/webhook] Payment verified via Merchant API", {
-    order_id,
-    payment_id: verification.paymentId,
-    amount: verification.amount,
-    method: verification.method,
-    api_status: verification.status,
-  });
-
-  // Verify amount and currency match before confirming the order.
+  // Verify amount and currency match before confirming the order. The signed
+  // md5sig above proves these callback fields came from PayHere.
   const storedAmount = Number(order.total.toFixed(2));
   const callbackAmount = Number(payhere_amount);
-  const verifiedAmount = verification.amount ?? (Number.isFinite(callbackAmount) ? Number(callbackAmount.toFixed(2)) : NaN);
-  if (!Number.isFinite(verifiedAmount) || !amountsMatch(verifiedAmount, storedAmount)) {
-    console.error("[payhere/webhook] Amount mismatch between order and verified payment", {
+  if (!Number.isFinite(callbackAmount) || !amountsMatch(callbackAmount, storedAmount)) {
+    console.error("[payhere/webhook] Amount mismatch between order and PayHere notification", {
       order_id,
       expected: storedAmount,
-      verified: verifiedAmount,
       webhook_amount: payhere_amount,
     });
     return NextResponse.json({
       status: "amount_mismatch",
       expected: storedAmount,
-      verified: verifiedAmount,
+      received: payhere_amount,
     });
   }
 
-  const verifiedCurrency = verification.currency ?? currency;
-  if (verifiedCurrency !== "LKR" || currency !== "LKR") {
-    console.error("[payhere/webhook] Currency mismatch between order and verified payment", {
+  if (currency !== "LKR") {
+    console.error("[payhere/webhook] Currency mismatch between order and PayHere notification", {
       order_id,
       expected: "LKR",
-      verified: verifiedCurrency,
       webhook_currency: currency,
     });
     return NextResponse.json({
       status: "currency_mismatch",
       expected: "LKR",
-      verified: verifiedCurrency,
+      received: currency,
     });
   }
 
@@ -281,7 +245,7 @@ export async function POST(req: Request) {
 
   console.log("[payhere/webhook] Payment confirmation flow completed successfully", {
     order_id,
-    payment_id: verification.paymentId,
+    payment_id,
   });
 
   return NextResponse.json({ status: "success" });

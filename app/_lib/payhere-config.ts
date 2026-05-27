@@ -8,6 +8,13 @@ export function payHereBaseUrl(): string {
     : "https://sandbox.payhere.lk";
 }
 
+/** PayHere hosted checkout form endpoint. */
+export function payHereCheckoutUrl(): string {
+  return process.env.PAYHERE_MODE === "live"
+    ? "https://www.payhere.lk/pay/checkout"
+    : "https://sandbox.payhere.lk/pay/checkout";
+}
+
 /** Merchant ID from PayHere dashboard → Settings > Domain Credentials. */
 export function payHereMerchantId(): string {
   const id = process.env.PAYHERE_MERCHANT_ID;

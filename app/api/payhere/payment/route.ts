@@ -1,7 +1,6 @@
 // app/api/payhere/payment/route.ts
 import { NextResponse } from "next/server";
-import { payHereMerchantId, payHereCheckoutHash } from "../../../_lib/payhere-config";
-import { createPaymentLink, CreatePaymentLinkInput } from "../../../_lib/payhere-api";
+import { payHereMerchantId, payHereCheckoutHash, payHereCheckoutUrl } from "../../../_lib/payhere-config";
 import { prisma } from "@/app/_lib/prisma";
 import { z } from "zod";
 
@@ -58,11 +57,6 @@ function isPayHereConfigError(error: unknown): boolean {
   return error instanceof Error && /^PAYHERE_/.test(error.message);
 }
 
-function isPayHereGatewayError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  return /PayHere|OAuth|fetch|network/i.test(error.message);
-}
-
 export async function POST(req: Request) {
   let body: unknown;
   try {
@@ -113,7 +107,7 @@ export async function POST(req: Request) {
     const cancelUrl = `${baseUrl}/checkout/success?status=cancelled`;
     const notifyUrl = `${baseUrl}/api/payhere/webhook`;
 
-    console.log("[payhere/payment] Payment link creation initiated", {
+    console.log("[payhere/payment] Checkout field creation initiated", {
       merchant_id: merchantId,
       order_id: orderId,
       amount,
@@ -147,46 +141,33 @@ export async function POST(req: Request) {
       hash_prefix: hash.substring(0, 8) + "...",
     });
 
-    const input: CreatePaymentLinkInput = {
-      orderId,
-      amount,
-      currency,
-      items: itemsDescription,
-      firstName: first_name,
-      lastName: last_name,
+    const fields = {
+      merchant_id: merchantId,
+      return_url: urlWithOrderId(returnUrl, orderId),
+      cancel_url: urlWithOrderId(cancelUrl, orderId),
+      notify_url: notifyUrl,
+      first_name,
+      last_name,
       email: customerEmail,
       phone: order.customerPhone,
       address: `${order.shippingLine1}${order.shippingLine2 ? ", " + order.shippingLine2 : ""}`,
       city: order.shippingCity,
       country: order.shippingCountry,
-      returnUrl: urlWithOrderId(returnUrl, orderId),
-      cancelUrl: urlWithOrderId(cancelUrl, orderId),
-      notifyUrl,
+      order_id: orderId,
+      items: itemsDescription,
+      currency,
+      amount: amount.toFixed(2),
       hash,
     };
 
-    const result = await createPaymentLink(input);
-
-    if (!result.success || !result.paymentUrl) {
-      console.error("[payhere/payment] Payment link creation failed", {
-        order_id: orderId,
-        error: result.error,
-      });
-      return NextResponse.json(
-        { error: "Payment gateway temporarily unavailable" },
-        { status: 502 },
-      );
-    }
-
-    console.log("[payhere/payment] Payment link created successfully", {
+    console.log("[payhere/payment] Checkout fields created successfully", {
       order_id: orderId,
-      payment_id: result.paymentId,
-      payment_url: result.paymentUrl,
+      gateway_url: payHereCheckoutUrl(),
     });
 
     return NextResponse.json({
-      paymentUrl: result.paymentUrl,
-      paymentId: result.paymentId,
+      gatewayUrl: payHereCheckoutUrl(),
+      fields,
     });
   } catch (error) {
     console.error("[payhere/payment] Unexpected payment initialization failure", {
@@ -198,13 +179,6 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: "Payment gateway is not configured" },
         { status: 500 },
-      );
-    }
-
-    if (isPayHereGatewayError(error)) {
-      return NextResponse.json(
-        { error: "Payment gateway temporarily unavailable" },
-        { status: 502 },
       );
     }
 
