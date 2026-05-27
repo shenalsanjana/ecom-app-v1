@@ -17,7 +17,7 @@ export default auth((req) => {
   if (path.startsWith("/admin")) {
     if (!isAuthed) {
       return NextResponse.redirect(
-        new URL(`/login?callbackUrl=${path}`, req.url),
+        new URL(`/login?callbackUrl=${encodeURIComponent(path)}`, req.url),
       );
     }
     if (!isAdmin) {
@@ -31,7 +31,7 @@ export default auth((req) => {
   if (path.startsWith("/account") || path.startsWith("/wishlist")) {
     if (!isAuthed) {
       return NextResponse.redirect(
-        new URL(`/login?callbackUrl=${path}`, req.url),
+        new URL(`/login?callbackUrl=${encodeURIComponent(path)}`, req.url),
       );
     }
   }

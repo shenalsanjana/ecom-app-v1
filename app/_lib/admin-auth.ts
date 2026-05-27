@@ -1,8 +1,9 @@
 // app/_lib/admin-auth.ts
 // Server-side admin guards. Use in any /admin server component, server
-// action, or API route. The middleware (middleware.ts) also blocks /admin
-// at the edge — these helpers are the defense-in-depth layer that catches
-// any route the middleware matcher might miss.
+// action, or API route. The edge proxy (proxy.ts; Next.js 16 renamed
+// middleware.ts → proxy.ts) also blocks /admin at the edge — these
+// helpers are the defense-in-depth layer that catches any route the
+// proxy matcher might miss.
 import { redirect } from "next/navigation";
 import type { Session } from "next-auth";
 import { auth } from "@/app/_lib/auth";
