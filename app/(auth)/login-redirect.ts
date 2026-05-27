@@ -8,7 +8,7 @@ type Role = "ADMIN" | "CUSTOMER";
 
 export function chooseLoginRedirect(role: Role, callbackUrl: string): string {
   const normalized = callbackUrl || "/";
-  if (role === "ADMIN" && (normalized === "/" || normalized === "")) {
+  if (role === "ADMIN" && normalized === "/") {
     return "/admin";
   }
   return normalized;

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { randomBytes, createHash } from "crypto";
 import { AuthError } from "next-auth";
-import { signIn, auth } from "@/app/_lib/auth";
+import { signIn } from "@/app/_lib/auth";
 import { prisma } from "@/app/_lib/prisma";
 import { sendPasswordResetEmail } from "@/app/_lib/mailer";
 import {
@@ -98,6 +98,16 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   const callbackUrl = safeCallbackUrl(formData.get("callbackUrl") as string | null);
   console.log(`[Login Action]: Attempting signIn for ${parsed.data.email} with callbackUrl: ${callbackUrl}`);
 
+  // Read role from the DB BEFORE signIn — auth() in the same request does not
+  // reliably see the just-set session cookie under NextAuth v5 + JWT sessions.
+  // This is one extra indexed lookup; the alternative (relying on auth() to
+  // see the new cookie) silently sends admins to the wrong page on miss.
+  const dbUser = await prisma.user.findUnique({
+    where: { email: parsed.data.email },
+    select: { role: true },
+  });
+  const role = dbUser?.role === "ADMIN" ? "ADMIN" : "CUSTOMER";
+
   try {
     await signIn("credentials", {
       email: parsed.data.email,
@@ -105,11 +115,7 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
       redirect: false,
     });
 
-    // signIn set the session cookie; auth() now returns the new session.
-    const session = await auth();
-    const role = session?.user?.role === "ADMIN" ? "ADMIN" : "CUSTOMER";
     const redirectTo = chooseLoginRedirect(role, callbackUrl);
-
     console.log(`[Login Action]: signIn cookie set, role=${role}, redirectTo=${redirectTo}`);
     return { redirectTo };
   } catch (error) {
