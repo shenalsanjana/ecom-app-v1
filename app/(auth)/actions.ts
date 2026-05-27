@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { randomBytes, createHash } from "crypto";
 import { AuthError } from "next-auth";
-import { signIn } from "@/app/_lib/auth";
+import { signIn, auth } from "@/app/_lib/auth";
 import { prisma } from "@/app/_lib/prisma";
 import { sendPasswordResetEmail } from "@/app/_lib/mailer";
 import {
@@ -14,6 +14,7 @@ import {
   RequestResetSchema,
   ResetPasswordSchema,
 } from "@/app/_lib/validation";
+import { chooseLoginRedirect } from "./login-redirect";
 
 export type ActionState =
   | { error?: string; success?: string; redirectTo?: string }
@@ -103,8 +104,14 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
       password: parsed.data.password,
       redirect: false,
     });
-    console.log("[Login Action]: signIn cookie set, returning redirectTo for client navigation");
-    return { redirectTo: callbackUrl };
+
+    // signIn set the session cookie; auth() now returns the new session.
+    const session = await auth();
+    const role = session?.user?.role === "ADMIN" ? "ADMIN" : "CUSTOMER";
+    const redirectTo = chooseLoginRedirect(role, callbackUrl);
+
+    console.log(`[Login Action]: signIn cookie set, role=${role}, redirectTo=${redirectTo}`);
+    return { redirectTo };
   } catch (error) {
     if (error instanceof AuthError) {
       console.warn("[Login Action]: AuthError during signIn", error.type);
