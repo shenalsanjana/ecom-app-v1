@@ -13,11 +13,12 @@ vi.mock("@/app/_lib/auth", () => ({ auth: authMock }));
 
 import { requireAdmin, requireAdminApi } from "../admin-auth";
 
+beforeEach(() => {
+  redirectMock.mockClear();
+  authMock.mockReset();
+});
+
 describe("requireAdmin", () => {
-  beforeEach(() => {
-    redirectMock.mockClear();
-    authMock.mockReset();
-  });
 
   it("redirects to /login when no session", async () => {
     authMock.mockResolvedValue(null);
@@ -37,10 +38,6 @@ describe("requireAdmin", () => {
 });
 
 describe("requireAdminApi", () => {
-  beforeEach(() => {
-    authMock.mockReset();
-  });
-
   it("returns 401 Response when no session", async () => {
     authMock.mockResolvedValue(null);
     const result = await requireAdminApi();
