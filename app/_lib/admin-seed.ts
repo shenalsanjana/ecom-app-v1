@@ -21,7 +21,7 @@ export type CreateAdminResult =
   | { ok: true; action: "created" | "promoted"; userId: string }
   | {
       ok: false;
-      reason: "already_admin" | "needs_promote_flag" | "invalid_input";
+      reason: "already_admin" | "needs_promote_flag" | "invalid_input" | "unexpected_role";
       message: string;
     };
 
@@ -46,6 +46,16 @@ export async function createAdminUser(input: CreateAdminInput): Promise<CreateAd
         ok: false,
         reason: "already_admin",
         message: `User ${email} already exists as admin.`,
+      };
+    }
+    if (existing.role !== "CUSTOMER") {
+      // The DB column is a plain String, so unexpected values are possible
+      // (manual edits, legacy data, future role rollouts). Refuse rather than
+      // silently overwriting an unrecognized role.
+      return {
+        ok: false,
+        reason: "unexpected_role",
+        message: `User ${email} has unexpected role "${existing.role}". Manual intervention required.`,
       };
     }
     if (!promote) {

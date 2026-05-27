@@ -92,6 +92,20 @@ describe("createAdminUser", () => {
     expect(Object.keys(arg.data)).not.toContain("passwordHash");
   });
 
+  it("refuses a user with an unknown role even with --promote", async () => {
+    userFindUnique.mockResolvedValue({ id: "u1", role: "STAFF" });
+
+    const result = await createAdminUser({ ...BASE_INPUT, promote: true });
+
+    expect(result).toEqual({
+      ok: false,
+      reason: "unexpected_role",
+      message: expect.stringContaining("unexpected role"),
+    });
+    expect(userUpdate).not.toHaveBeenCalled();
+    expect(userCreate).not.toHaveBeenCalled();
+  });
+
   it("rejects invalid input (bad email)", async () => {
     const result = await createAdminUser({ ...BASE_INPUT, email: "not-an-email" });
     expect(result.ok).toBe(false);
