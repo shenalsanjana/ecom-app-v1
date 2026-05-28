@@ -1,5 +1,8 @@
-// Single source for admin dashboard KPI queries. Four indexed COUNTs
-// in parallel; expected ~30-100ms on Prisma Postgres. No caching —
+// Single source for admin dashboard KPI queries. Four COUNT queries
+// in parallel; expected ~30-100ms on Prisma Postgres. Only createdAt
+// has a schema-level index today — the others are unindexed scans on
+// small tables (acceptable for current traffic; revisit if Order or
+// Product rows grow significantly). No caching —
 // the /admin route is dynamic via requireAdmin() reading cookies, and
 // freshness wins over micro-latency on a low-traffic admin route.
 import { prisma } from "@/app/_lib/prisma";

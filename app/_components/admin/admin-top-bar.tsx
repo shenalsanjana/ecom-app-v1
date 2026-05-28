@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
+  SheetTitle,
   SheetTrigger,
   SheetClose,
 } from "@/components/ui/sheet";
@@ -56,6 +57,7 @@ export function AdminTopBar({ userLabel }: { userLabel: string }) {
           <Menu className="h-5 w-5" />
         </SheetTrigger>
         <SheetContent side="left" className="w-64">
+          <SheetTitle className="sr-only">Admin navigation</SheetTitle>
           <nav className="mt-6 flex flex-col gap-1 text-sm">
             {ADMIN_NAV.map((it) => {
               const active = isActive(it.href, pathname);
