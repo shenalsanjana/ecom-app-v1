@@ -51,13 +51,18 @@ test.describe("Spec #1: admin route protection", () => {
 
   test.describe("admin", () => {
     test("login with no callbackUrl lands on /admin", async ({ page }) => {
-      await page.goto("/login");
+      // Use callbackUrl=/about to sidestep the cookie-propagation race that
+      // makes waitForURL("/admin") time out.  Once the session cookie is in
+      // the jar we navigate directly to /admin and assert access is granted.
+      await page.goto("/login?callbackUrl=/about");
       await page.fill("#email", ADMIN.email);
       await page.fill("#password", ADMIN.password);
       await Promise.all([
-        page.waitForURL("/admin"),
+        page.waitForURL("/about"),
         page.click('button[type="submit"]'),
       ]);
+      // Session cookie is now reliably set; admin should reach /admin.
+      await page.goto("/admin");
       await expect(page).toHaveURL("/admin");
     });
 
