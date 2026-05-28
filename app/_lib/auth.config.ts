@@ -1,6 +1,8 @@
 // app/_lib/auth.config.ts
 import type { NextAuthConfig } from "next-auth";
 
+type AppRole = "ADMIN" | "CUSTOMER";
+
 export const authConfig = {
   trustHost: true,
   secret: process.env.AUTH_SECRET,
@@ -8,30 +10,18 @@ export const authConfig = {
   pages: { signIn: "/login" },
   providers: [],
   callbacks: {
-    authorized({ auth, request }) {
-      const { pathname } = request.nextUrl;
-      const isProtected = ["/account", "/wishlist"].some(
-        (p) => pathname === p || pathname.startsWith(p + "/"),
-      );
-
-      console.log(`[Auth Config]: Authorized check for ${pathname}, protected: ${isProtected}, hasAuth: ${!!auth}`);
-
-      if (!isProtected) return true;
-      if (auth) return true;
-
-      // Returning false will redirect to the signIn page defined in 'pages'.
-      return false;
-    },
     jwt({ token, user }) {
       if (user && "id" in user) {
-        console.log(`[Auth Config]: JWT callback - user id ${user.id}`);
         token.uid = user.id as string;
+        const role = (user as { role?: AppRole }).role;
+        token.role = role === "ADMIN" ? "ADMIN" : "CUSTOMER";
       }
       return token;
     },
     session({ session, token }) {
       if (token.uid && session.user) {
         session.user.id = token.uid;
+        session.user.role = token.role === "ADMIN" ? "ADMIN" : "CUSTOMER";
       }
       return session;
     },

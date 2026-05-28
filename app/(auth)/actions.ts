@@ -14,6 +14,7 @@ import {
   RequestResetSchema,
   ResetPasswordSchema,
 } from "@/app/_lib/validation";
+import { chooseLoginRedirect } from "./login-redirect";
 
 export type ActionState =
   | { error?: string; success?: string; redirectTo?: string }
@@ -97,14 +98,26 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   const callbackUrl = safeCallbackUrl(formData.get("callbackUrl") as string | null);
   console.log(`[Login Action]: Attempting signIn for ${parsed.data.email} with callbackUrl: ${callbackUrl}`);
 
+  // Read role from the DB BEFORE signIn — auth() in the same request does not
+  // reliably see the just-set session cookie under NextAuth v5 + JWT sessions.
+  // This is one extra indexed lookup; the alternative (relying on auth() to
+  // see the new cookie) silently sends admins to the wrong page on miss.
+  const dbUser = await prisma.user.findUnique({
+    where: { email: parsed.data.email },
+    select: { role: true },
+  });
+  const role = dbUser?.role === "ADMIN" ? "ADMIN" : "CUSTOMER";
+
   try {
     await signIn("credentials", {
       email: parsed.data.email,
       password: parsed.data.password,
       redirect: false,
     });
-    console.log("[Login Action]: signIn cookie set, returning redirectTo for client navigation");
-    return { redirectTo: callbackUrl };
+
+    const redirectTo = chooseLoginRedirect(role, callbackUrl);
+    console.log(`[Login Action]: signIn cookie set, role=${role}, redirectTo=${redirectTo}`);
+    return { redirectTo };
   } catch (error) {
     if (error instanceof AuthError) {
       console.warn("[Login Action]: AuthError during signIn", error.type);

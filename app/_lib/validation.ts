@@ -93,3 +93,6 @@ export type RequestResetInput = z.infer<typeof RequestResetSchema>;
 export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
 export type AddressInput = z.infer<typeof AddressSchema>;
 export type LkPhoneInput = z.infer<typeof LkPhoneSchema>;
+
+export const RoleSchema = z.enum(["ADMIN", "CUSTOMER"]);
+export type Role = z.infer<typeof RoleSchema>;

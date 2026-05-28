@@ -69,7 +69,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           }
 
           console.log(`[Auth]: Login success for ${parsed.data.email} (${user.id})`);
-          return { id: user.id, name: user.name, email: user.email };
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role === "ADMIN" ? "ADMIN" : "CUSTOMER",
+          };
         } catch (error) {
           console.error("[Auth]: Unexpected error in authorize:", error);
           // Return null instead of throwing to avoid generic "Server Configuration" error if possible
