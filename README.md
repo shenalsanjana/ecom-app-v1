@@ -76,6 +76,26 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
+### 5. Create the Default Admin
+
+The admin dashboard at `/admin` is gated to users with `role = "ADMIN"`. Bootstrap the default admin with:
+
+```bash
+npm run admin:create -- --email "dressingbear@gmail.com" --password "1996@Abc" --name "Dressing Bear"
+```
+
+**Default admin credentials (sign in at [http://localhost:3000/login](http://localhost:3000/login)):**
+
+| Field | Value |
+|-------|-------|
+| Email | `dressingbear@gmail.com` |
+| Password | `1996@Abc` |
+| Name | `Dressing Bear` |
+
+After signing in, you'll land on `/admin` — the dashboard shows live KPI tiles (pending dispatch, today's orders, pending COD, low-stock products).
+
+To promote an existing customer instead of creating a new account, add `--promote` to the command (password is unchanged on promotion).
+
 ## Product Categories
 
 - Oversize T-Shirts
@@ -93,6 +113,9 @@ Open [http://localhost:3000](http://localhost:3000)
 | `npm run db:push` | Push schema to database |
 | `npm run db:seed` | Seed demo data |
 | `npm run db:reset` | Reset database |
+| `npm run admin:create` | Create or promote an admin user (see Getting Started §5) |
+| `npm test` | Run unit tests (vitest) |
+| `npm run test:e2e` | Run end-to-end tests (Playwright) |
 
 ## Demo Data
 
