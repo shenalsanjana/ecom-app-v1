@@ -6,6 +6,7 @@
 // Note: this project's UI primitives wrap @base-ui/react (not Radix UI).
 // The slot-composition pattern is `render={<Element />}` (not `asChild`).
 // Sign-out uses onClick (not onSelect) — matching profile-menu.tsx.
+import { useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -29,11 +30,14 @@ import { ADMIN_NAV, isActive } from "./admin-sidebar";
 export function AdminTopBar({ userLabel }: { userLabel: string }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
-  async function handleSignOut() {
-    await signOut({ redirect: false });
-    router.push("/");
-    router.refresh();
+  function handleSignOut() {
+    startTransition(async () => {
+      await signOut({ redirect: false });
+      router.push("/");
+      router.refresh();
+    });
   }
 
   return (
@@ -98,12 +102,13 @@ export function AdminTopBar({ userLabel }: { userLabel: string }) {
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
+            disabled={isPending}
             onClick={(e) => {
               e.preventDefault();
               handleSignOut();
             }}
           >
-            Sign out
+            {isPending ? "Signing out…" : "Sign out"}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
