@@ -76,15 +76,11 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
-### 5. Create the Default Admin
+### 5. Default Admin
 
-The admin dashboard at `/admin` is gated to users with `role = "ADMIN"`. Bootstrap the default admin with:
+The admin dashboard at `/admin` is gated to users with `role = "ADMIN"`. A default admin is created automatically — both on Vercel deploys (as part of `vercel build`) and locally via a single command.
 
-```bash
-npm run admin:create -- --email "dressingbear@gmail.com" --password "1996@Abc" --name "Dressing Bear"
-```
-
-**Default admin credentials (sign in at [http://localhost:3000/login](http://localhost:3000/login)):**
+**Default credentials (sign in at [http://localhost:3000/login](http://localhost:3000/login) or your production URL):**
 
 | Field | Value |
 |-------|-------|
@@ -92,9 +88,42 @@ npm run admin:create -- --email "dressingbear@gmail.com" --password "1996@Abc" -
 | Password | `1996@Abc` |
 | Name | `Dressing Bear` |
 
-After signing in, you'll land on `/admin` — the dashboard shows live KPI tiles (pending dispatch, today's orders, pending COD, low-stock products).
+After signing in you land on `/admin` — the dashboard shows live KPI tiles (pending dispatch, today's orders, pending COD, low-stock products).
 
-To promote an existing customer instead of creating a new account, add `--promote` to the command (password is unchanged on promotion).
+#### Auto-creation on Vercel deploy
+
+`vercel.json`'s `buildCommand` includes `tsx scripts/ensure-admin.ts`, which runs on every deploy after `prisma migrate deploy`. The script:
+
+- creates the default admin if missing → logs `Sample admin created`
+- skips if it already exists → logs `Admin already exists`
+- warns (without auto-promoting) if the email is registered as a regular customer
+- soft-fails on any error so the build continues — the admin can still be created manually with `npm run admin:create`
+
+It uses bcrypt for password hashing (cost 10) and is fully idempotent — safe to run on every deploy.
+
+To override the defaults per environment (recommended for production), set these in **Vercel → Settings → Environment Variables**:
+
+| Env var | Default |
+|---------|---------|
+| `SAMPLE_ADMIN_EMAIL` | `dressingbear@gmail.com` |
+| `SAMPLE_ADMIN_PASSWORD` | `1996@Abc` |
+| `SAMPLE_ADMIN_NAME` | `Dressing Bear` |
+
+#### Manual (local or one-off)
+
+Run the same script against any DB:
+
+```bash
+npm run admin:ensure
+```
+
+Or create / promote a specific user with explicit args:
+
+```bash
+npm run admin:create -- --email "you@example.com" --password "<strong-pw>" --name "Your Name" [--promote]
+```
+
+`--promote` flips an existing CUSTOMER to ADMIN without changing their password — use this when you want to grant admin to someone who already signed up.
 
 ## Product Categories
 
@@ -113,7 +142,8 @@ To promote an existing customer instead of creating a new account, add `--promot
 | `npm run db:push` | Push schema to database |
 | `npm run db:seed` | Seed demo data |
 | `npm run db:reset` | Reset database |
-| `npm run admin:create` | Create or promote an admin user (see Getting Started §5) |
+| `npm run admin:create` | Create or promote a specific admin user (see Getting Started §5) |
+| `npm run admin:ensure` | Idempotent default-admin bootstrap (auto-runs on Vercel build) |
 | `npm test` | Run unit tests (vitest) |
 | `npm run test:e2e` | Run end-to-end tests (Playwright) |
 

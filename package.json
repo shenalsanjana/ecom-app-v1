@@ -13,6 +13,7 @@
     "test:e2e": "playwright test",
     "check:contrast": "tsx scripts/check-contrast.ts",
     "admin:create": "tsx scripts/create-admin.ts",
+    "admin:ensure": "tsx scripts/ensure-admin.ts",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
