@@ -1,13 +1,11 @@
 // app/api/payhere/webhook/route.ts
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/_lib/prisma";
 import { createHash } from "crypto";
-import {
-  sendOrderConfirmationEmail,
-  logMailerError,
-} from "@/app/_lib/mailer";
-import { sendAdminFailureAlertEmail } from "@/app/_lib/mailer";
 import { payHereMerchantId, payHereMerchantSecret } from "@/app/_lib/payhere-config";
+import { finalizePaidPayment } from "@/app/_lib/payments/order-finalization";
 
 /**
  * Verifies the MD5 signature PayHere sends with each webhook.
@@ -165,88 +163,6 @@ export async function POST(req: Request) {
     });
   }
 
-  // Update payment status to PAID
-  await prisma.order.update({
-    where: { id: order_id },
-    data: { paymentStatus: "PAID" },
-  });
-
-  console.log("[payhere/webhook] Order payment status updated to PAID", { order_id });
-
-  // Re-fetch updated order for downstream steps
-  const updated = await prisma.order.findUnique({
-    where: { id: order_id },
-    include: { user: { select: { name: true, email: true } } },
-  });
-  if (!updated) {
-    return NextResponse.json({ status: "success" });
-  }
-
-  // Build order details for mailer and courier booking
-  const orderItems = await prisma.orderItem.findMany({ where: { orderId: order_id } });
-  const details = {
-    orderId: order_id,
-    customerName: updated.guestName ?? updated.user?.name ?? "Customer",
-    customerEmail: updated.guestEmail ?? updated.user?.email ?? "",
-    customerPhone: updated.customerPhone,
-    items: orderItems.map((it) => ({
-      name: it.name,
-      size: it.size,
-      price: it.price,
-      quantity: it.quantity,
-    })),
-    subtotal: updated.subtotal,
-    shipping: updated.shippingCost,
-    total: updated.total,
-    shippingAddress: {
-      line1: updated.shippingLine1,
-      line2: updated.shippingLine2 ?? undefined,
-      city: updated.shippingCity,
-      country: updated.shippingCountry,
-    },
-    paymentMethod: updated.paymentMethod as "COD" | "PAYHERE" | "KOKO" | "MINTPAY",
-    paymentMethodDisplay: updated.paymentMethodDisplay ?? undefined,
-    webNumber: updated.webNumber,
-    rbNumber: updated.rbNumber,
-    paymentStatus: "PAID",
-  };
-
-  // Trigger courier booking (same pattern as COD flow)
-  if (process.env.ROYAL_EXPRESS_ENABLED === "true") {
-    try {
-      const { bookCourierAndNotify } = await import("@/app/checkout/book-courier");
-      await bookCourierAndNotify({ order: details });
-      console.log("[payhere/webhook] Courier booking triggered successfully", { order_id });
-    } catch (err) {
-      console.error("[payhere/webhook] Courier booking failed:", err);
-      try {
-        await sendAdminFailureAlertEmail({
-          orderId: order_id,
-          step: "orchestrate-courier",
-          reason: err instanceof Error ? err.message : "unknown",
-          order: details,
-        });
-      } catch {
-        // swallow — don't fail the webhook response
-      }
-    }
-  }
-
-  // Send confirmation email if not already sent
-  if (!updated.emailSent) {
-    try {
-      await sendOrderConfirmationEmail(details);
-      await prisma.order.update({ where: { id: order_id }, data: { emailSent: true } });
-      console.log("[payhere/webhook] Order confirmation email sent", { order_id });
-    } catch (err) {
-      logMailerError("order-confirmation", { orderId: order_id, webNumber: updated.webNumber }, err);
-    }
-  }
-
-  console.log("[payhere/webhook] Payment confirmation flow completed successfully", {
-    order_id,
-    payment_id,
-  });
-
-  return NextResponse.json({ status: "success" });
+  const result = await finalizePaidPayment(order_id, "PAYHERE");
+  return NextResponse.json(result.status === "success" ? { status: "success" } : result);
 }

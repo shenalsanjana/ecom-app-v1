@@ -7,12 +7,14 @@ const {
   orderItemFindMany,
   verifyPayment,
   sendOrderConfirmationEmail,
+  finalizePaidPayment,
 } = vi.hoisted(() => ({
   orderFindUnique: vi.fn(),
   orderUpdate: vi.fn(),
   orderItemFindMany: vi.fn(),
   verifyPayment: vi.fn(),
   sendOrderConfirmationEmail: vi.fn(),
+  finalizePaidPayment: vi.fn(),
 }));
 
 vi.mock("@/app/_lib/prisma", () => ({
@@ -40,6 +42,10 @@ vi.mock("@/app/_lib/mailer", () => ({
   sendOrderConfirmationEmail,
   logMailerError: vi.fn(),
   sendAdminFailureAlertEmail: vi.fn(),
+}));
+
+vi.mock("@/app/_lib/payments/order-finalization", () => ({
+  finalizePaidPayment,
 }));
 
 import { POST } from "../webhook/route";
@@ -120,8 +126,10 @@ describe("POST /api/payhere/webhook", () => {
     orderItemFindMany.mockReset();
     verifyPayment.mockReset();
     sendOrderConfirmationEmail.mockReset();
+    finalizePaidPayment.mockReset();
 
-    orderFindUnique.mockResolvedValueOnce(ORDER).mockResolvedValueOnce({ ...ORDER, paymentStatus: "PAID" });
+    // Webhook calls prisma.order.findUnique once for amount/currency verification
+    orderFindUnique.mockResolvedValue(ORDER);
     orderUpdate.mockResolvedValue({ ...ORDER, paymentStatus: "PAID" });
     orderItemFindMany.mockResolvedValue([{ name: "Oversize Tee", size: "M", price: 2090, quantity: 1 }]);
     verifyPayment.mockResolvedValue({
@@ -133,6 +141,7 @@ describe("POST /api/payhere/webhook", () => {
       status: "RECEIVED",
     });
     sendOrderConfirmationEmail.mockResolvedValue(undefined);
+    finalizePaidPayment.mockResolvedValue({ status: "success" });
   });
 
   it("accepts real PayHere notification amount and currency field names", async () => {
@@ -146,10 +155,7 @@ describe("POST /api/payhere/webhook", () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ status: "success" });
-    expect(orderUpdate).toHaveBeenCalledWith({
-      where: { id: ORDER.id },
-      data: expect.objectContaining({ paymentStatus: "PAID" }),
-    });
+    expect(finalizePaidPayment).toHaveBeenCalledWith("ORD-123", "PAYHERE");
   });
 
   it("accepts legacy status when status_code is absent", async () => {
@@ -167,10 +173,7 @@ describe("POST /api/payhere/webhook", () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ status: "success" });
-    expect(orderUpdate).toHaveBeenCalledWith({
-      where: { id: ORDER.id },
-      data: expect.objectContaining({ paymentStatus: "PAID" }),
-    });
+    expect(finalizePaidPayment).toHaveBeenCalledWith("ORD-123", "PAYHERE");
   });
 
   it("confirms a signed notification without depending on the Merchant API", async () => {
@@ -186,22 +189,10 @@ describe("POST /api/payhere/webhook", () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ status: "success" });
-    expect(orderUpdate).toHaveBeenCalledWith({
-      where: { id: ORDER.id },
-      data: expect.objectContaining({ paymentStatus: "PAID" }),
-    });
+    expect(finalizePaidPayment).toHaveBeenCalledWith("ORD-123", "PAYHERE");
   });
 
   it("does not mark the order paid when the verified amount differs from the order total", async () => {
-    verifyPayment.mockResolvedValueOnce({
-      verified: true,
-      paymentId: "320025",
-      amount: 1000,
-      currency: "LKR",
-      method: "VISA",
-      status: "RECEIVED",
-    });
-
     const res = await POST(
       new Request("https://shop.example.com/api/payhere/webhook", {
         method: "POST",
@@ -212,6 +203,34 @@ describe("POST /api/payhere/webhook", () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ status: "amount_mismatch" });
-    expect(orderUpdate).not.toHaveBeenCalled();
+    expect(finalizePaidPayment).not.toHaveBeenCalled();
+  });
+
+  it("rejects a notification whose merchant id does not match", async () => {
+    // merchant_id check happens before signature verification in the route,
+    // so a mismatched merchant_id returns 403 regardless of md5sig
+    const body = new URLSearchParams({
+      merchant_id: "999",
+      order_id: ORDER.id,
+      payment_id: "320025",
+      payhere_amount: "2440.00",
+      payhere_currency: "LKR",
+      status_code: "2",
+      md5sig: signPayHereNotification({ merchantId: "999" }),
+      method: "VISA",
+      status_message: "Successfully received the payment",
+    });
+
+    const res = await POST(
+      new Request("https://shop.example.com/api/payhere/webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: body.toString(),
+      }),
+    );
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ error: "Merchant verification failed" });
+    expect(finalizePaidPayment).not.toHaveBeenCalled();
   });
 });
