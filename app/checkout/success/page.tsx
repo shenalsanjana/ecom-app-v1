@@ -102,7 +102,7 @@ async function OrderDetails({ orderId, paymentStatus }: { orderId: string; payme
           <>
             <h1 className="text-3xl font-bold mb-3">Confirming your payment…</h1>
             <p className="text-muted-foreground text-lg mb-2">
-              PayHere received your payment. We&apos;re finalizing your order — this usually takes just a few seconds.
+              Your payment provider received your request. We&apos;re finalizing your order — this usually takes just a few seconds.
             </p>
             <div className="mb-2">
               <PaymentStatusPoll orderId={order.id} />
@@ -237,9 +237,9 @@ export default async function CheckoutSuccessPage({
     </header>
   );
 
-  // Cancellation can arrive without an order_id if PayHere drops the query
-  // param on the cancel redirect — still show the cancelled state rather than
-  // a generic "invalid order" page.
+  // Cancellation can arrive without an order_id if the payment provider drops
+  // the query param on the cancel redirect — still show the cancelled state
+  // rather than a generic "invalid order" page.
   if (!orderId) {
     if (isCancelled) {
       return (

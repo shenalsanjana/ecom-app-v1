@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ShoppingBag, Truck, CreditCard, User, FileText, Loader2 } from "lucide-react";
 import { useCart } from "@/app/_lib/cart-context";
-import { processOrder } from "./actions";
+import { processOrder, type PaymentMethod } from "./actions";
 import { ProfileMenu } from "@/app/_components/header/profile-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,30 +18,17 @@ import { formatPrice } from "@/app/_lib/format";
 import { calculateDelivery, FREE_DELIVERY_THRESHOLD } from "@/app/_lib/checkout-config";
 import { DELIVERY_CITIES, zoneForCity } from "@/app/_lib/delivery-zones";
 import {
-  payHerePaymentErrorMessage,
-  readPayHerePaymentResponse,
-  submitPayHereCheckoutForm,
+  paymentErrorMessage,
+  readPaymentInitiationResponse,
+  submitPaymentCheckoutForm,
 } from "./payhere-client";
-
-type PaymentMethod = "COD" | "PAYHERE" | "KOKO" | "MINITPAY";
 
 type CheckoutUser = { name: string; email: string } | null;
 
 type Props = {
   user: CheckoutUser;
+  paymentOptions: { id: PaymentMethod; name: string; description: string; icon: string }[];
 };
-
-const PAYMENT_OPTIONS: {
-  id: PaymentMethod;
-  name: string;
-  description: string;
-  icon: string;
-}[] = [
-  { id: "COD", name: "Cash on Delivery", description: "Pay when you receive your order", icon: "💵" },
-  { id: "PAYHERE", name: "PayHere", description: "Pay via PayHere gateway", icon: "💳" },
-  { id: "KOKO", name: "Koko", description: "Pay with Koko", icon: "🐘" },
-  { id: "MINITPAY", name: "MinitPay", description: "Pay with MinitPay", icon: "📱" },
-];
 
 function generateIdempotencyKey(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -50,7 +37,7 @@ function generateIdempotencyKey(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export function CheckoutClient({ user }: Props) {
+export function CheckoutClient({ user, paymentOptions }: Props) {
   const router = useRouter();
   const { items, clearCart } = useCart();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,11 +45,11 @@ export function CheckoutClient({ user }: Props) {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [orderReference, setOrderReference] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("COD");
-  // Once a PayHere order exists in the DB, hold its id so a failed redirect
+  // Once an online order exists in the DB, hold its id so a failed redirect
   // (network blip, gateway init error) can be retried without creating a
   // duplicate order.
-  const [pendingPayHereOrderId, setPendingPayHereOrderId] = useState<string | null>(null);
-  const [isRedirectingToPayHere, setIsRedirectingToPayHere] = useState(false);
+  const [pendingOnlineOrderId, setPendingOnlineOrderId] = useState<string | null>(null);
+  const [redirectingProvider, setRedirectingProvider] = useState<string | null>(null);
   const idempotencyKey = useMemo(() => generateIdempotencyKey(), []);
 
 
@@ -110,14 +97,14 @@ export function CheckoutClient({ user }: Props) {
             <p className="text-sm text-muted-foreground mb-6">
               {paymentMethod === "COD"
                 ? "Your items will be delivered with Cash on Delivery."
-                : `Your payment via ${PAYMENT_OPTIONS.find(p => p.id === paymentMethod)?.name} is being processed.`}
+                : `Your payment via ${paymentOptions.find((p) => p.id === paymentMethod)?.name ?? paymentMethod} is being processed.`}
             </p>
             <Button onClick={() => router.push("/")} className="w-full">
               Continue Shopping
             </Button>
           </div>
         </main>
-        
+
       </>
     );
   }
@@ -146,46 +133,40 @@ export function CheckoutClient({ user }: Props) {
             </Link>
           </div>
         </main>
-        
+
       </>
     );
   }
 
-  // Calls the PayHere init endpoint and, on success, paints the redirect
-  // overlay before submitting the hidden checkout form. The DB order already
-  // exists at this point, so failures here can be retried without creating a
-  // duplicate. The local cart is intentionally NOT cleared here — the success
-  // page clears it (covers cancel/back from PayHere too).
-  async function initiatePayHere(payHereOrderId: string) {
+  // Calls the generic payment initiation endpoint and, on success, paints the
+  // redirect overlay before submitting the hidden checkout form. The DB order
+  // already exists at this point, so failures here can be retried without
+  // creating a duplicate. The local cart is intentionally NOT cleared here —
+  // the success page clears it (covers cancel/back from gateway too).
+  async function initiateOnlinePayment(onlineOrderId: string) {
     setError(null);
-    setPendingPayHereOrderId(payHereOrderId);
+    setPendingOnlineOrderId(onlineOrderId);
     setIsSubmitting(true);
     try {
-      const res = await fetch("/api/payhere/payment", {
+      const res = await fetch("/api/payments/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: payHereOrderId }),
+        body: JSON.stringify({ orderId: onlineOrderId }),
       });
-
-      const data = await readPayHerePaymentResponse(res);
+      const data = await readPaymentInitiationResponse(res);
       if (res.ok && data.gatewayUrl && data.fields) {
-        // flushSync commits the overlay to the DOM synchronously; the
-        // double-rAF then guarantees the browser actually paints it before
-        // we hand control to PayHere's navigation. Without this the user
-        // sees a blank screen until PayHere responds.
-        flushSync(() => setIsRedirectingToPayHere(true));
+        // flushSync commits the overlay synchronously; double-rAF guarantees a
+        // paint before we hand control to the gateway navigation.
+        flushSync(() => setRedirectingProvider(data.displayName ?? data.provider ?? "payment gateway"));
         const { gatewayUrl, fields } = data;
         requestAnimationFrame(() => {
-          requestAnimationFrame(() =>
-            submitPayHereCheckoutForm(gatewayUrl, fields),
-          );
+          requestAnimationFrame(() => submitPaymentCheckoutForm(gatewayUrl, fields));
         });
         return;
       }
-
-      setError(payHerePaymentErrorMessage(data.error));
+      setError(paymentErrorMessage(data.error));
     } catch {
-      setError(payHerePaymentErrorMessage("Failed to initialize PayHere"));
+      setError(paymentErrorMessage("Failed to initialize payment"));
     } finally {
       setIsSubmitting(false);
     }
@@ -218,13 +199,13 @@ export function CheckoutClient({ user }: Props) {
       });
 
       if (result.success) {
-        if (paymentMethod === "PAYHERE") {
+        if (paymentMethod !== "COD") {
           setOrderReference(result.webNumber ?? result.orderId);
-          await initiatePayHere(result.orderId);
+          await initiateOnlinePayment(result.orderId);
           return;
         }
 
-        // COD and other methods: clear cart and show success immediately
+        // COD: clear cart and show success immediately
         clearCart();
         setOrderId(result.orderId);
         setOrderReference(result.webNumber ?? result.orderId);
@@ -240,7 +221,7 @@ export function CheckoutClient({ user }: Props) {
 
   return (
     <>
-      {isRedirectingToPayHere && (
+      {redirectingProvider && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur"
           role="status"
@@ -248,10 +229,9 @@ export function CheckoutClient({ user }: Props) {
         >
           <div className="text-center max-w-sm px-4">
             <Loader2 className="mx-auto h-10 w-10 text-primary animate-spin mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Redirecting to PayHere…</h2>
+            <h2 className="text-xl font-semibold mb-2">Redirecting to {redirectingProvider}…</h2>
             <p className="text-sm text-muted-foreground">
-              Please don&apos;t close or refresh this page. You&apos;ll be taken to
-              the PayHere secure checkout in a moment.
+              Please don&apos;t close or refresh this page. You&apos;ll be taken to secure checkout in a moment.
             </p>
           </div>
         </div>
@@ -443,7 +423,7 @@ export function CheckoutClient({ user }: Props) {
                   </div>
 
                   <div className="space-y-3">
-                    {PAYMENT_OPTIONS.map((option) => (
+                    {paymentOptions.map((option) => (
                       <label
                         key={option.id}
                         className={`flex items-center gap-4 p-4 rounded-lg border cursor-pointer transition-colors ${
@@ -457,7 +437,11 @@ export function CheckoutClient({ user }: Props) {
                           name="payment"
                           value={option.id}
                           checked={paymentMethod === option.id}
-                          onChange={() => setPaymentMethod(option.id)}
+                          onChange={() => {
+                            setPaymentMethod(option.id);
+                            setPendingOnlineOrderId(null);
+                            setError(null);
+                          }}
                           className="h-4 w-4"
                         />
                         <span className="text-2xl">{option.icon}</span>
@@ -517,7 +501,7 @@ export function CheckoutClient({ user }: Props) {
 
                   {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-                  {error && pendingPayHereOrderId && paymentMethod === "PAYHERE" && (
+                  {error && pendingOnlineOrderId && paymentMethod !== "COD" && (
                     <Button
                       type="button"
                       variant="secondary"
@@ -525,8 +509,8 @@ export function CheckoutClient({ user }: Props) {
                       size="lg"
                       disabled={isSubmitting}
                       onClick={() => {
-                        if (pendingPayHereOrderId) {
-                          void initiatePayHere(pendingPayHereOrderId);
+                        if (pendingOnlineOrderId) {
+                          void initiateOnlinePayment(pendingOnlineOrderId);
                         }
                       }}
                     >
@@ -539,7 +523,7 @@ export function CheckoutClient({ user }: Props) {
                       ? "Processing..."
                       : paymentMethod === "COD"
                       ? "Place Order (Cash on Delivery)"
-                      : `Pay with ${PAYMENT_OPTIONS.find((p) => p.id === paymentMethod)?.name}`}
+                      : `Pay with ${paymentOptions.find((p) => p.id === paymentMethod)?.name ?? paymentMethod}`}
                   </Button>
 
                   <p className="mt-3 text-center text-xs text-muted-foreground">
@@ -552,7 +536,7 @@ export function CheckoutClient({ user }: Props) {
         </div>
       </main>
 
-      
+
     </>
   );
 }

@@ -94,7 +94,7 @@ describe("processOrder — COD path", () => {
 });
 
 describe("processOrder — prepaid paths", () => {
-  it.each(["PAYHERE", "KOKO", "MINITPAY"] as const)(
+  it.each(["PAYHERE", "KOKO", "MINTPAY"] as const)(
     "%s: skips courier, sends pending-prepaid email; no customer confirmation until payment verified",
     async (paymentMethod) => {
       const result = await processOrder({ ...baseInput, paymentMethod });
@@ -107,7 +107,7 @@ describe("processOrder — prepaid paths", () => {
     },
   );
 
-  it.each(["PAYHERE", "KOKO", "MINITPAY"] as const)(
+  it.each(["PAYHERE", "KOKO", "MINTPAY"] as const)(
     "%s: persists PENDING paymentStatus and a WEB-prefixed webNumber",
     async (paymentMethod) => {
       await processOrder({ ...baseInput, paymentMethod });
@@ -121,6 +121,17 @@ describe("processOrder — prepaid paths", () => {
       );
     },
   );
+
+  it("persists the Mintpay display name", async () => {
+    await processOrder({ ...baseInput, paymentMethod: "MINTPAY" });
+    expect(txOrderCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          paymentMethodDisplay: "Mintpay",
+        }),
+      }),
+    );
+  });
 
   it("does not write rbNumber for new orders", async () => {
     await processOrder({ ...baseInput, paymentMethod: "COD" });

@@ -8,10 +8,11 @@ import {
 import * as orderStatus from "@/app/_lib/order-status";
 
 describe("PAYMENT_STATUSES", () => {
-  it("lists the four canonical values", () => {
+  it("lists the five canonical values", () => {
     expect([...PAYMENT_STATUSES]).toEqual([
       "PENDING",
       "PAID",
+      "PAYMENT_FAILED",
       "COD_PENDING",
       "COD_COLLECTED",
     ]);
@@ -26,7 +27,7 @@ describe("initialPaymentStatus", () => {
   it("returns PENDING for each online provider", () => {
     expect(initialPaymentStatus("PAYHERE")).toBe<PaymentStatus>("PENDING");
     expect(initialPaymentStatus("KOKO")).toBe<PaymentStatus>("PENDING");
-    expect(initialPaymentStatus("MINITPAY")).toBe<PaymentStatus>("PENDING");
+    expect(initialPaymentStatus("MINTPAY")).toBe<PaymentStatus>("PENDING");
   });
 
   it("defaults to PENDING for an unknown method", () => {
