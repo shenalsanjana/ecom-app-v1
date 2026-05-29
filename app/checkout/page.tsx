@@ -2,6 +2,7 @@
 import { auth } from "@/app/_lib/auth";
 import { CheckoutClient } from "./checkout-client";
 import { SiteFooter } from "@/app/_components/home/site-footer";
+import { checkoutPaymentOptions } from "@/app/_lib/payments/registry";
 
 export default async function CheckoutPage() {
   const session = await auth();
@@ -14,7 +15,7 @@ export default async function CheckoutPage() {
 
   return (
     <>
-      <CheckoutClient user={user} />
+      <CheckoutClient user={user} paymentOptions={checkoutPaymentOptions()} />
       <SiteFooter />
     </>
   );

@@ -46,6 +46,10 @@ export function PaymentStatusPoll({ orderId }: { orderId: string }) {
             router.refresh();
             return;
           }
+          if (data.paymentStatus === "PAYMENT_FAILED") {
+            router.refresh();
+            return;
+          }
         }
       } catch {
         // Network blip — keep polling until timeout.
@@ -68,9 +72,9 @@ export function PaymentStatusPoll({ orderId }: { orderId: string }) {
   if (timedOut) {
     return (
       <p className="text-sm text-muted-foreground max-w-md mx-auto">
-        Your payment was received by PayHere — confirmation is taking longer
-        than usual. You&apos;ll get an email when it completes. You can refresh
-        this page in a minute or check your email.
+        Your payment was received — confirmation is taking longer than usual.
+        You&apos;ll get an email when it completes. You can refresh this page in
+        a minute or check your email.
       </p>
     );
   }
