@@ -1,18 +1,12 @@
 import { createPrivateKey, sign } from "crypto";
 import { getKokoConfig } from "./config";
-import type { PaymentOrder, PaymentProvider } from "./types";
+import type { PaymentProvider } from "./types";
+import { requireNameAndEmail } from "./shared";
 
 function splitName(fullName: string): { firstName: string; lastName: string } {
   const parts = fullName.trim().split(/\s+/);
   if (parts.length === 1) return { firstName: parts[0], lastName: parts[0] };
   return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
-}
-
-function customer(order: PaymentOrder) {
-  const name = order.guestName ?? order.user?.name;
-  const email = order.guestEmail ?? order.user?.email;
-  if (!name || !email) throw new Error("Order is missing customer name or email");
-  return { name, email };
 }
 
 export function signKokoDataString(dataString: string, privateKeyPem: string): string {
@@ -25,7 +19,7 @@ export const kokoProvider: PaymentProvider = {
   displayName: "Koko",
   async initiate(order, baseUrl) {
     const cfg = getKokoConfig();
-    const buyer = customer(order);
+    const buyer = requireNameAndEmail(order);
     const { firstName, lastName } = splitName(buyer.name);
     const amount = order.total.toFixed(2);
     const description =

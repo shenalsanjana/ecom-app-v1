@@ -1,17 +1,11 @@
 import { payHereCheckoutHash, payHereCheckoutUrl, payHereMerchantId } from "@/app/_lib/payhere-config";
-import type { PaymentOrder, PaymentProvider } from "./types";
+import type { PaymentProvider } from "./types";
+import { requireNameAndEmail } from "./shared";
 
 function splitName(fullName: string): { first_name: string; last_name: string } {
   const parts = fullName.trim().split(/\s+/);
   if (parts.length === 1) return { first_name: parts[0], last_name: parts[0] };
   return { first_name: parts[0], last_name: parts.slice(1).join(" ") };
-}
-
-function customer(order: PaymentOrder) {
-  const name = order.guestName ?? order.user?.name;
-  const email = order.guestEmail ?? order.user?.email;
-  if (!name || !email) throw new Error("Order is missing customer name or email");
-  return { name, email };
 }
 
 export const payHereProvider: PaymentProvider = {
@@ -20,7 +14,7 @@ export const payHereProvider: PaymentProvider = {
   async initiate(order, baseUrl) {
     const merchantId = payHereMerchantId();
     const amount = Number(order.total.toFixed(2));
-    const buyer = customer(order);
+    const buyer = requireNameAndEmail(order);
     const { first_name, last_name } = splitName(buyer.name);
     const items =
       order.items.length > 0

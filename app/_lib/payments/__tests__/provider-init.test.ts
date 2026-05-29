@@ -82,6 +82,50 @@ describe("provider initiation", () => {
     ).toBe(true);
   });
 
+  it("throws when Koko order has no resolvable customer name or email", async () => {
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 1024 });
+    process.env.KOKO_MERCHANT_ID = "merchant-1";
+    process.env.KOKO_API_KEY = "api-key-1";
+    process.env.KOKO_PRIVATE_KEY = privateKey.export({ type: "pkcs1", format: "pem" }).toString();
+    process.env.KOKO_PLUGIN_NAME = "customapi";
+    process.env.KOKO_PLUGIN_VERSION = "1";
+
+    const { kokoProvider } = await import("../koko");
+    await expect(
+      kokoProvider.initiate(
+        { ...ORDER, paymentMethod: "KOKO", guestName: null, guestEmail: null, user: null },
+        "https://shop.example.com",
+      ),
+    ).rejects.toThrow(/missing customer/i);
+  });
+
+  it("throws when PayHere order has no resolvable customer name or email", async () => {
+    const { payHereProvider } = await import("../payhere");
+    await expect(
+      payHereProvider.initiate(
+        { ...ORDER, guestName: null, guestEmail: null, user: null },
+        "https://shop.example.com",
+      ),
+    ).rejects.toThrow(/missing customer/i);
+  });
+
+  it("throws a diagnostic error when Mintpay gateway responds non-OK", async () => {
+    process.env.MINTPAY_MERCHANT_ID = "mp0001";
+    process.env.MINTPAY_MERCHANT_SECRET = "secret";
+    mintpayFetch.mockResolvedValue({
+      ok: false,
+      status: 401,
+      text: async () => "Unauthorized",
+      json: async () => ({}),
+    });
+    vi.stubGlobal("fetch", mintpayFetch);
+
+    const { mintpayProvider } = await import("../mintpay");
+    await expect(
+      mintpayProvider.initiate({ ...ORDER, paymentMethod: "MINTPAY" }, "https://shop.example.com"),
+    ).rejects.toThrow(/Mintpay order creation failed/);
+  });
+
   it("creates Mintpay purchase and returns purchase_id form fields", async () => {
     process.env.MINTPAY_MERCHANT_ID = "mp0001";
     process.env.MINTPAY_MERCHANT_SECRET = "secret";

@@ -69,9 +69,13 @@ export const mintpayProvider: PaymentProvider = {
       },
       body: JSON.stringify(payload),
     });
+    if (!response.ok) {
+      const detail = await response.text().catch(() => String(response.status));
+      throw new Error(`Mintpay order creation failed: ${response.status} ${detail.slice(0, 200)}`);
+    }
     const body = (await response.json()) as { message?: string; data?: string };
-    if (!response.ok || body.message !== "Success" || !body.data) {
-      throw new Error("Mintpay order creation failed");
+    if (body.message !== "Success" || !body.data) {
+      throw new Error(`Mintpay order creation failed: ${body.message ?? "no message"}`);
     }
 
     return {
