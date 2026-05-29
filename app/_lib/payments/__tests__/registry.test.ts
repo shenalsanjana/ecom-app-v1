@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { checkoutPaymentOptions, isOnlinePaymentMethod } from "../registry";
+import {
+  assertPaymentMethod,
+  checkoutPaymentOptions,
+  isOnlinePaymentMethod,
+} from "../registry";
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -32,5 +36,18 @@ describe("payment registry", () => {
       "KOKO",
       "MINTPAY",
     ]);
+  });
+});
+
+describe("assertPaymentMethod", () => {
+  it("does not throw for known payment methods", () => {
+    expect(() => assertPaymentMethod("COD")).not.toThrow();
+    expect(() => assertPaymentMethod("PAYHERE")).not.toThrow();
+    expect(() => assertPaymentMethod("KOKO")).not.toThrow();
+    expect(() => assertPaymentMethod("MINTPAY")).not.toThrow();
+  });
+
+  it("throws for an unknown payment method", () => {
+    expect(() => assertPaymentMethod("VENMO")).toThrow();
   });
 });
