@@ -1,3 +1,4 @@
+import { type OrderItem, type Prisma } from "@prisma/client";
 import { prisma } from "@/app/_lib/prisma";
 import { bookCourierAndNotify } from "@/app/checkout/book-courier";
 import {
@@ -7,7 +8,9 @@ import {
   type OrderDetails,
 } from "@/app/_lib/mailer";
 
-function paidDetails(order: any, items: any[]): OrderDetails {
+type OrderWithUser = Prisma.OrderGetPayload<{ include: { user: { select: { name: true; email: true } } } }>;
+
+function paidDetails(order: OrderWithUser, items: OrderItem[]): OrderDetails {
   return {
     orderId: order.id,
     customerName: order.guestName ?? order.user?.name ?? "Customer",
@@ -28,7 +31,7 @@ function paidDetails(order: any, items: any[]): OrderDetails {
       city: order.shippingCity,
       country: order.shippingCountry,
     },
-    paymentMethod: order.paymentMethod,
+    paymentMethod: order.paymentMethod as OrderDetails["paymentMethod"],
     paymentMethodDisplay: order.paymentMethodDisplay ?? undefined,
     webNumber: order.webNumber,
     rbNumber: order.rbNumber,
