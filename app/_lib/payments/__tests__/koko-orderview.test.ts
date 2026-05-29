@@ -142,6 +142,30 @@ describe("fetchKokoOrderStatus — status extraction", () => {
   });
 });
 
+describe("fetchKokoOrderStatus — resilience", () => {
+  beforeEach(() => {
+    setupKokoEnv();
+  });
+
+  it("returns PENDING when orderView responds non-OK", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => ({}),
+    }));
+
+    const { fetchKokoOrderStatus } = await import("../koko");
+    await expect(fetchKokoOrderStatus("ORD-1")).resolves.toBe("PENDING");
+  });
+
+  it("returns PENDING when the orderView request throws", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network")));
+
+    const { fetchKokoOrderStatus } = await import("../koko");
+    await expect(fetchKokoOrderStatus("ORD-1")).resolves.toBe("PENDING");
+  });
+});
+
 describe("fetchKokoOrderStatus — A3 response signature verification", () => {
   it("does NOT call console.warn when response signature is valid", async () => {
     setupKokoEnv({ KOKO_PUBLIC_KEY: TEST_PUBLIC_KEY_PEM });

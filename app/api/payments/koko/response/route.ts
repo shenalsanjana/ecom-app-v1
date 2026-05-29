@@ -18,12 +18,17 @@ export async function POST(req: Request) {
   const orderId = await orderIdFromRequest(req);
   if (!orderId) return NextResponse.json({ error: "Missing order id" }, { status: 400 });
 
-  const status = await fetchKokoOrderStatus(orderId);
-  if (status === "SUCCESS") {
-    return NextResponse.json(await finalizePaidPayment(orderId, "KOKO"));
+  try {
+    const status = await fetchKokoOrderStatus(orderId);
+    if (status === "SUCCESS") {
+      return NextResponse.json(await finalizePaidPayment(orderId, "KOKO"));
+    }
+    if (status === "FAILED") {
+      return NextResponse.json(await finalizeFailedPayment(orderId, "KOKO", "failed"));
+    }
+    return NextResponse.json({ status: "pending" });
+  } catch (err) {
+    console.error("[koko] response route error", { orderId, err });
+    return NextResponse.json({ status: "pending" });
   }
-  if (status === "FAILED") {
-    return NextResponse.json(await finalizeFailedPayment(orderId, "KOKO", "failed"));
-  }
-  return NextResponse.json({ status: "pending" });
 }

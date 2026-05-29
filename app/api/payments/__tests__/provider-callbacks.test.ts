@@ -58,6 +58,12 @@ describe("provider callback routes", () => {
     expect(finalizeFailedPayment).not.toHaveBeenCalled();
   });
 
+  it("rejects Mintpay return without an order id", async () => {
+    const { GET } = await import("../mintpay/return/route");
+    const res = await GET(new Request("https://shop.example.com/api/payments/mintpay/return?hash=x&result=success"));
+    expect(res.status).toBe(400);
+  });
+
   // ---------- Koko return (browser GET) ----------
   it("finalizes Koko paid on SUCCESS status and redirects", async () => {
     fetchKokoOrderStatus.mockResolvedValue("SUCCESS");
@@ -113,5 +119,29 @@ describe("provider callback routes", () => {
     }));
     expect(res.status).toBe(200);
     expect(finalizeFailedPayment).toHaveBeenCalledWith("ORD-1", "KOKO", "failed");
+  });
+
+  it("Koko return degrades to a redirect when status lookup fails", async () => {
+    fetchKokoOrderStatus.mockRejectedValue(new Error("down"));
+    const { GET } = await import("../koko/return/route");
+    const res = await GET(new Request("https://shop.example.com/api/payments/koko/return?order_id=ORD-1"));
+    expect(res.status).toBe(302);
+    expect(finalizePaidPayment).not.toHaveBeenCalled();
+    expect(finalizeFailedPayment).not.toHaveBeenCalled();
+  });
+
+  it("Koko response returns pending when status lookup fails", async () => {
+    fetchKokoOrderStatus.mockRejectedValue(new Error("down"));
+    const { POST } = await import("../koko/response/route");
+    const res = await POST(new Request("https://shop.example.com/api/payments/koko/response", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ order_id: "ORD-1" }).toString(),
+    }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ status: "pending" });
+    expect(finalizePaidPayment).not.toHaveBeenCalled();
+    expect(finalizeFailedPayment).not.toHaveBeenCalled();
   });
 });

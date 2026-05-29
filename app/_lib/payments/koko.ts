@@ -121,52 +121,63 @@ function verifyKokoResponseSignature(
 type KokoStatus = "PENDING" | "SUCCESS" | "FAILED";
 
 export async function fetchKokoOrderStatus(orderId: string): Promise<KokoStatus> {
-  const cfg = getKokoConfig();
-  const body = new URLSearchParams({
-    _mId: cfg.merchantId,
-    _pluginName: cfg.pluginName,
-    _pluginVersion: cfg.pluginVersion,
-    api_key: cfg.apiKey,
-    _orderId: orderId,
-    signature: signKokoOrderViewString({
-      merchantId: cfg.merchantId,
-      pluginName: cfg.pluginName,
-      pluginVersion: cfg.pluginVersion,
-      orderId,
-      apiKey: cfg.apiKey,
-      privateKey: cfg.privateKey,
-    }),
-  });
+  try {
+    const cfg = getKokoConfig();
+    const body = new URLSearchParams({
+      _mId: cfg.merchantId,
+      _pluginName: cfg.pluginName,
+      _pluginVersion: cfg.pluginVersion,
+      api_key: cfg.apiKey,
+      _orderId: orderId,
+      signature: signKokoOrderViewString({
+        merchantId: cfg.merchantId,
+        pluginName: cfg.pluginName,
+        pluginVersion: cfg.pluginVersion,
+        orderId,
+        apiKey: cfg.apiKey,
+        privateKey: cfg.privateKey,
+      }),
+    });
 
-  const response = await fetch(cfg.orderViewUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-  const json = (await response.json()) as {
-    orderId?: string;
-    trnId?: string;
-    status?: string;
-    signature?: string;
-    data?: { orderId?: string; trnId?: string; status?: string; signature?: string };
-  };
-  const payload = json.data ?? json;
-  const status = (payload.status ?? "PENDING") as string;
+    const response = await fetch(cfg.orderViewUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    });
 
-  // A3: verify-when-present, never fail-closed.
-  if (cfg.publicKey && payload.signature) {
-    const ok = verifyKokoResponseSignature(
-      payload.orderId ?? orderId,
-      payload.trnId ?? "",
-      status,
-      payload.signature,
-      cfg.publicKey,
-    );
-    if (!ok) {
-      console.warn("[koko] orderView response signature mismatch — honoring server status anyway", { orderId });
+    if (!response.ok) {
+      console.warn("[koko] orderView returned non-OK", { orderId, status: response.status });
+      return "PENDING";
     }
-  }
 
-  if (status === "SUCCESS" || status === "FAILED" || status === "PENDING") return status;
-  return "PENDING";
+    const json = (await response.json()) as {
+      orderId?: string;
+      trnId?: string;
+      status?: string;
+      signature?: string;
+      data?: { orderId?: string; trnId?: string; status?: string; signature?: string };
+    };
+    const payload = json.data ?? json;
+    const status = (payload.status ?? "PENDING") as string;
+
+    // A3: verify-when-present, never fail-closed.
+    if (cfg.publicKey && payload.signature) {
+      const ok = verifyKokoResponseSignature(
+        payload.orderId ?? orderId,
+        payload.trnId ?? "",
+        status,
+        payload.signature,
+        cfg.publicKey,
+      );
+      if (!ok) {
+        console.warn("[koko] orderView response signature mismatch — honoring server status anyway", { orderId });
+      }
+    }
+
+    if (status === "SUCCESS" || status === "FAILED" || status === "PENDING") return status;
+    return "PENDING";
+  } catch (err) {
+    console.warn("[koko] orderView lookup failed", { orderId, err });
+    return "PENDING";
+  }
 }
