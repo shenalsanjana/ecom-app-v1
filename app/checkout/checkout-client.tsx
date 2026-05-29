@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ShoppingBag, Truck, CreditCard, User, FileText, Loader2 } from "lucide-react";
 import { useCart } from "@/app/_lib/cart-context";
-import { processOrder } from "./actions";
+import { processOrder, type PaymentMethod } from "./actions";
 import { ProfileMenu } from "@/app/_components/header/profile-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,8 +22,6 @@ import {
   readPayHerePaymentResponse,
   submitPayHereCheckoutForm,
 } from "./payhere-client";
-
-type PaymentMethod = "COD" | "PAYHERE" | "KOKO" | "MINTPAY";
 
 type CheckoutUser = { name: string; email: string } | null;
 

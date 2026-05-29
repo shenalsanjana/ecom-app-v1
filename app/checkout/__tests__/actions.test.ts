@@ -122,6 +122,17 @@ describe("processOrder — prepaid paths", () => {
     },
   );
 
+  it("persists the Mintpay display name", async () => {
+    await processOrder({ ...baseInput, paymentMethod: "MINTPAY" });
+    expect(txOrderCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          paymentMethodDisplay: "Mintpay",
+        }),
+      }),
+    );
+  });
+
   it("does not write rbNumber for new orders", async () => {
     await processOrder({ ...baseInput, paymentMethod: "COD" });
     const calls = vi.mocked(txOrderCreate).mock.calls as unknown as [

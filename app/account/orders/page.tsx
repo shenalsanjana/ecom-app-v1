@@ -29,6 +29,7 @@ function paymentBadgeVariant(
     case "COD_PENDING":
       return "secondary";
     case "PENDING":
+    case "PAYMENT_FAILED":
       return "destructive";
     default:
       return "outline";
