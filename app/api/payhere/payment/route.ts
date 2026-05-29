@@ -1,1 +1,1 @@
-export { POST } from "@/app/api/payments/initiate/route";
+export { POST, runtime } from "@/app/api/payments/initiate/route";

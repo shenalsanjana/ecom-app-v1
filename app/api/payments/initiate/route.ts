@@ -4,6 +4,8 @@ import { prisma } from "@/app/_lib/prisma";
 import { isPaymentConfigError } from "@/app/_lib/payments/config";
 import { getPaymentProvider, isOnlinePaymentMethod } from "@/app/_lib/payments/registry";
 
+export const runtime = "nodejs";
+
 const InitiateSchema = z.object({ orderId: z.string().min(1) });
 
 function appBaseUrl(req: Request): string {
@@ -23,13 +25,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request" }, { status: 400 });
   }
 
-  const order = await prisma.order.findUnique({
-    where: { id: parsed.data.orderId },
-    include: {
-      items: { select: { productId: true, name: true, quantity: true, price: true, size: true } },
-      user: { select: { name: true, email: true } },
-    },
-  });
+  let order;
+  try {
+    order = await prisma.order.findUnique({
+      where: { id: parsed.data.orderId },
+      include: {
+        items: { select: { productId: true, name: true, quantity: true, price: true, size: true } },
+        user: { select: { name: true, email: true } },
+      },
+    });
+  } catch (error) {
+    console.error("[payments/initiate] order lookup failed", { orderId: parsed.data.orderId, error });
+    return NextResponse.json({ error: "Failed to initialize payment" }, { status: 500 });
+  }
   if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
   const method = order.paymentMethod;

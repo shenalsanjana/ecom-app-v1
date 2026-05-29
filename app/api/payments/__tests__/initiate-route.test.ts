@@ -64,4 +64,39 @@ describe("POST /api/payments/initiate", () => {
 
     expect(res.status).toBe(409);
   });
+
+  it("returns 404 when the order does not exist", async () => {
+    orderFindUnique.mockResolvedValue(null);
+
+    const res = await POST(new Request("https://shop.example.com/api/payments/initiate", {
+      method: "POST",
+      body: JSON.stringify({ orderId: "ORD-1" }),
+    }));
+
+    expect(res.status).toBe(404);
+  });
+
+  it("rejects an already-paid order with 409", async () => {
+    orderFindUnique.mockResolvedValue({ ...ORDER, paymentStatus: "PAID" });
+
+    const res = await POST(new Request("https://shop.example.com/api/payments/initiate", {
+      method: "POST",
+      body: JSON.stringify({ orderId: "ORD-1" }),
+    }));
+
+    expect(res.status).toBe(409);
+  });
+
+  it("returns 500 when the provider reports a config error", async () => {
+    orderFindUnique.mockResolvedValue(ORDER);
+    initiate.mockRejectedValueOnce(new Error("KOKO_API_KEY must be set"));
+
+    const res = await POST(new Request("https://shop.example.com/api/payments/initiate", {
+      method: "POST",
+      body: JSON.stringify({ orderId: "ORD-1" }),
+    }));
+
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toEqual({ error: "Payment gateway is not configured" });
+  });
 });
