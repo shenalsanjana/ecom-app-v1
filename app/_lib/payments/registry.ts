@@ -1,5 +1,8 @@
 import { envFlag } from "./config";
-import type { CheckoutPaymentOption, OnlinePaymentMethod, PaymentMethod } from "./types";
+import { kokoProvider } from "./koko";
+import { mintpayProvider } from "./mintpay";
+import { payHereProvider } from "./payhere";
+import type { CheckoutPaymentOption, OnlinePaymentMethod, PaymentMethod, PaymentProvider } from "./types";
 
 export const ONLINE_PAYMENT_METHODS = ["PAYHERE", "KOKO", "MINTPAY"] as const;
 
@@ -27,4 +30,14 @@ export function assertPaymentMethod(value: string): asserts value is PaymentMeth
   if (value !== "COD" && !isOnlinePaymentMethod(value)) {
     throw new Error(`Unsupported payment method: ${value}`);
   }
+}
+
+const PROVIDERS: Record<OnlinePaymentMethod, PaymentProvider> = {
+  PAYHERE: payHereProvider,
+  KOKO: kokoProvider,
+  MINTPAY: mintpayProvider,
+};
+
+export function getPaymentProvider(method: OnlinePaymentMethod): PaymentProvider {
+  return PROVIDERS[method];
 }
