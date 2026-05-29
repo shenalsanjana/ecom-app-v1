@@ -90,6 +90,18 @@ describe("provider callback routes", () => {
     expect(finalizeFailedPayment).not.toHaveBeenCalled();
   });
 
+  it("Koko return shows cancelled state on a cancel redirect while status is pending", async () => {
+    fetchKokoOrderStatus.mockResolvedValue("PENDING");
+    const { GET } = await import("../koko/return/route");
+    const res = await GET(new Request("https://shop.example.com/api/payments/koko/return?order_id=ORD-1&status=cancelled"));
+    expect(res.status).toBe(302);
+    const location = res.headers.get("location") ?? "";
+    expect(location).toContain("status=cancelled");
+    expect(location).toContain("order_id=ORD-1");
+    expect(finalizePaidPayment).not.toHaveBeenCalled();
+    expect(finalizeFailedPayment).not.toHaveBeenCalled();
+  });
+
   it("rejects Koko return without an order id", async () => {
     const { GET } = await import("../koko/return/route");
     const res = await GET(new Request("https://shop.example.com/api/payments/koko/return"));

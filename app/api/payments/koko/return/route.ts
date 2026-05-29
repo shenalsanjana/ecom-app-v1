@@ -20,6 +20,14 @@ export async function GET(req: Request) {
       await finalizeFailedPayment(orderId, "KOKO", "failed");
       return NextResponse.redirect(checkoutSuccessUrl(req, orderId, "cancelled"), 302);
     }
+    // PENDING: authoritative status not resolved yet. If the buyer arrived via
+    // Koko's cancel redirect, show the cancelled state — but do NOT mutate order
+    // state on this unverified browser hint; the order stays PENDING so a
+    // genuinely completed payment can still be finalized by the `response`
+    // (server-to-server) callback.
+    if (url.searchParams.get("status") === "cancelled") {
+      return NextResponse.redirect(checkoutSuccessUrl(req, orderId, "cancelled"), 302);
+    }
     return NextResponse.redirect(checkoutSuccessUrl(req, orderId), 302);
   } catch (err) {
     console.error("[koko] return route error", { orderId, err });
