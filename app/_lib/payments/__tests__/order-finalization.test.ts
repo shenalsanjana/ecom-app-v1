@@ -7,6 +7,7 @@ const {
   productUpdate,
   orderItemFindMany,
   sendOrderConfirmationEmail,
+  sendAdminFailureAlertEmail,
   bookCourierAndNotify,
 } = vi.hoisted(() => ({
   orderFindUnique: vi.fn(),
@@ -15,6 +16,7 @@ const {
   productUpdate: vi.fn(),
   orderItemFindMany: vi.fn(),
   sendOrderConfirmationEmail: vi.fn(),
+  sendAdminFailureAlertEmail: vi.fn(),
   bookCourierAndNotify: vi.fn(),
 }));
 
@@ -34,7 +36,7 @@ vi.mock("@/app/_lib/prisma", () => ({
 
 vi.mock("@/app/_lib/mailer", () => ({
   sendOrderConfirmationEmail,
-  sendAdminFailureAlertEmail: vi.fn(),
+  sendAdminFailureAlertEmail,
   logMailerError: vi.fn(),
 }));
 
@@ -120,6 +122,55 @@ describe("order finalization", () => {
     await finalizeFailedPayment("ORD-1", "KOKO", "cancelled");
 
     expect(orderUpdateMany).not.toHaveBeenCalled();
+    expect(productUpdate).not.toHaveBeenCalled();
+  });
+
+  it("books courier when RoyalExpress is enabled", async () => {
+    process.env.ROYAL_EXPRESS_ENABLED = "true";
+
+    const result = await finalizePaidPayment("ORD-1", "KOKO");
+
+    expect(bookCourierAndNotify).toHaveBeenCalledOnce();
+    expect(result).toEqual({ status: "success" });
+
+    process.env.ROYAL_EXPRESS_ENABLED = "false";
+  });
+
+  it("alerts admin and still succeeds when courier booking throws", async () => {
+    process.env.ROYAL_EXPRESS_ENABLED = "true";
+    bookCourierAndNotify.mockRejectedValueOnce(new Error("curfox down"));
+
+    const result = await finalizePaidPayment("ORD-1", "KOKO");
+
+    expect(sendAdminFailureAlertEmail).toHaveBeenCalledOnce();
+    expect(result).toEqual({ status: "success" });
+    expect(sendOrderConfirmationEmail).toHaveBeenCalledOnce();
+
+    process.env.ROYAL_EXPRESS_ENABLED = "false";
+  });
+
+  it("returns payment_method_mismatch when method differs", async () => {
+    const result = await finalizePaidPayment("ORD-1", "PAYHERE");
+
+    expect(result).toEqual({ status: "payment_method_mismatch" });
+    expect(orderUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("returns order_not_found when order is missing", async () => {
+    orderFindUnique.mockResolvedValueOnce(null);
+
+    const result = await finalizePaidPayment("ORD-1", "KOKO");
+
+    expect(result).toEqual({ status: "order_not_found" });
+  });
+
+  it("returns already_failed when failure claim is a no-op", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...ORDER, items: ITEMS });
+    orderUpdateMany.mockResolvedValueOnce({ count: 0 });
+
+    const result = await finalizeFailedPayment("ORD-1", "KOKO", "duplicate callback");
+
+    expect(result).toEqual({ status: "already_failed" });
     expect(productUpdate).not.toHaveBeenCalled();
   });
 });

@@ -65,32 +65,51 @@ export async function finalizePaidPayment(orderId: string, expectedMethod: strin
   });
   if (!updated) return { status: "success" as const };
 
-  const items = await prisma.orderItem.findMany({ where: { orderId } });
-  const details = paidDetails(updated, items);
+  try {
+    const items = await prisma.orderItem.findMany({ where: { orderId } });
+    const details = paidDetails(updated, items);
 
-  if (process.env.ROYAL_EXPRESS_ENABLED === "true") {
-    try {
-      await bookCourierAndNotify({ order: details });
-    } catch (err) {
+    if (process.env.ROYAL_EXPRESS_ENABLED === "true") {
       try {
-        await sendAdminFailureAlertEmail({
-          orderId,
-          step: "orchestrate-courier",
-          reason: err instanceof Error ? err.message : "unknown",
-          order: details,
-        });
-      } catch {
-        /* webhook response must not fail because alert delivery failed */
+        await bookCourierAndNotify({ order: details });
+      } catch (err) {
+        try {
+          await sendAdminFailureAlertEmail({
+            orderId,
+            step: "orchestrate-courier",
+            reason: err instanceof Error ? err.message : "unknown",
+            order: details,
+          });
+        } catch {
+          /* webhook response must not fail because alert delivery failed */
+        }
       }
     }
-  }
 
-  if (!updated.emailSent) {
+    // NOTE: emailSent is a best-effort dedup hint for the mailer; the atomic
+    // claim (updateMany above) is the real idempotency gate — do not remove the
+    // claim assuming this flag alone suffices.
+    if (!updated.emailSent) {
+      try {
+        await sendOrderConfirmationEmail(details);
+        await prisma.order.update({ where: { id: orderId }, data: { emailSent: true } });
+      } catch (err) {
+        logMailerError("order-confirmation", { orderId, webNumber: updated.webNumber }, err);
+      }
+    }
+  } catch (err) {
+    // Safety net: findMany or paidDetails threw after the order was already
+    // marked PAID. The payment is finalized; alert the admin so post-processing
+    // (courier + confirmation email) can be handled manually.
     try {
-      await sendOrderConfirmationEmail(details);
-      await prisma.order.update({ where: { id: orderId }, data: { emailSent: true } });
-    } catch (err) {
-      logMailerError("order-confirmation", { orderId, webNumber: updated.webNumber }, err);
+      await sendAdminFailureAlertEmail({
+        orderId,
+        step: "orchestrate-courier",
+        reason: err instanceof Error ? err.message : "finalize-paid post-claim failure",
+        order: paidDetails(updated, []),
+      });
+    } catch {
+      /* alert delivery must not prevent the success response */
     }
   }
 
@@ -106,6 +125,7 @@ export async function finalizeFailedPayment(orderId: string, expectedMethod: str
     return { status: "already_failed" as const };
   }
 
+  let claimed = false;
   await prisma.$transaction(async (tx) => {
     // Atomically claim the failure so concurrent callbacks restore stock
     // exactly once (design doc: "Stock is restored ... exactly once"). (Amendment A2)
@@ -118,6 +138,7 @@ export async function finalizeFailedPayment(orderId: string, expectedMethod: str
       data: { paymentStatus: "PAYMENT_FAILED", status: "CANCELLED" },
     });
     if (claim.count !== 1) return;
+    claimed = true;
     for (const item of order.items) {
       await tx.product.update({
         where: { id: item.productId },
@@ -126,5 +147,7 @@ export async function finalizeFailedPayment(orderId: string, expectedMethod: str
     }
   });
 
-  return { status: "failed" as const, reason };
+  return claimed
+    ? { status: "failed" as const, reason }
+    : { status: "already_failed" as const };
 }
