@@ -237,9 +237,9 @@ export default async function CheckoutSuccessPage({
     </header>
   );
 
-  // Cancellation can arrive without an order_id if PayHere drops the query
-  // param on the cancel redirect — still show the cancelled state rather than
-  // a generic "invalid order" page.
+  // Cancellation can arrive without an order_id if the payment provider drops
+  // the query param on the cancel redirect — still show the cancelled state
+  // rather than a generic "invalid order" page.
   if (!orderId) {
     if (isCancelled) {
       return (

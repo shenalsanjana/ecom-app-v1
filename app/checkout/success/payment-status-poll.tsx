@@ -1,15 +1,15 @@
 "use client";
 
-// Polls the order's payment status while the PayHere webhook is in flight.
-// PayHere redirects the buyer back to /checkout/success the instant their
-// payment is accepted, but the server-to-server webhook (which flips the order
-// to PAID) is a separate request that can land a few seconds later. Without
-// this poller, the user sees a yellow "awaiting payment" page directly after
-// they pay — confusing.
+// Polls the order's payment status while the provider's server-to-server
+// callback is in flight. Online payment providers (PayHere, Koko, Mintpay)
+// redirect the buyer back to /checkout/success as soon as the payment is
+// accepted, but the server-to-server webhook/callback that flips the order to
+// PAID is a separate request that can arrive a few seconds later. Without this
+// poller, the user sees a yellow "awaiting payment" page directly after paying.
 //
 // Strategy: poll every POLL_INTERVAL_MS for at most MAX_POLL_MS, then stop.
-// When we observe PAID/COD_COLLECTED, call router.refresh() so the success
-// page re-renders against the now-updated DB row.
+// When we observe a terminal status (PAID, COD_COLLECTED, PAYMENT_FAILED),
+// call router.refresh() so the success page re-renders against the updated DB row.
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -39,14 +39,7 @@ export function PaymentStatusPoll({ orderId }: { orderId: string }) {
         if (cancelled) return;
         if (res.ok) {
           const data = (await res.json()) as PaymentStatusResponse;
-          if (
-            data.paymentStatus === "PAID" ||
-            data.paymentStatus === "COD_COLLECTED"
-          ) {
-            router.refresh();
-            return;
-          }
-          if (data.paymentStatus === "PAYMENT_FAILED") {
+          if (["PAID", "COD_COLLECTED", "PAYMENT_FAILED"].includes(data.paymentStatus ?? "")) {
             router.refresh();
             return;
           }

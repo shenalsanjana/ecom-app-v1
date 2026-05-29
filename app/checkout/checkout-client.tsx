@@ -97,7 +97,7 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
             <p className="text-sm text-muted-foreground mb-6">
               {paymentMethod === "COD"
                 ? "Your items will be delivered with Cash on Delivery."
-                : `Your payment via ${paymentOptions.find((p) => p.id === paymentMethod)?.name} is being processed.`}
+                : `Your payment via ${paymentOptions.find((p) => p.id === paymentMethod)?.name ?? paymentMethod} is being processed.`}
             </p>
             <Button onClick={() => router.push("/")} className="w-full">
               Continue Shopping
@@ -437,7 +437,11 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
                           name="payment"
                           value={option.id}
                           checked={paymentMethod === option.id}
-                          onChange={() => setPaymentMethod(option.id)}
+                          onChange={() => {
+                            setPaymentMethod(option.id);
+                            setPendingOnlineOrderId(null);
+                            setError(null);
+                          }}
                           className="h-4 w-4"
                         />
                         <span className="text-2xl">{option.icon}</span>
@@ -519,7 +523,7 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
                       ? "Processing..."
                       : paymentMethod === "COD"
                       ? "Place Order (Cash on Delivery)"
-                      : `Pay with ${paymentOptions.find((p) => p.id === paymentMethod)?.name}`}
+                      : `Pay with ${paymentOptions.find((p) => p.id === paymentMethod)?.name ?? paymentMethod}`}
                   </Button>
 
                   <p className="mt-3 text-center text-xs text-muted-foreground">
