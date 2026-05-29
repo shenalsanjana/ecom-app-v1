@@ -204,7 +204,7 @@ export async function POST(req: Request) {
       city: updated.shippingCity,
       country: updated.shippingCountry,
     },
-    paymentMethod: updated.paymentMethod as "COD" | "PAYHERE" | "KOKO" | "MINITPAY",
+    paymentMethod: updated.paymentMethod as "COD" | "PAYHERE" | "KOKO" | "MINTPAY",
     paymentMethodDisplay: updated.paymentMethodDisplay ?? undefined,
     webNumber: updated.webNumber,
     rbNumber: updated.rbNumber,

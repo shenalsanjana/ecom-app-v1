@@ -105,7 +105,7 @@ export type OrderDetails = {
     city: string;
     country: string;
   };
-  paymentMethod: "COD" | "PAYHERE" | "KOKO" | "MINITPAY";
+  paymentMethod: "COD" | "PAYHERE" | "KOKO" | "MINTPAY";
   paymentMethodDisplay?: string;
   trackingCode?: string;
   notes?: string;

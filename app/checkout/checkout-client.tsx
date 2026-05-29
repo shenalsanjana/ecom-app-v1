@@ -23,7 +23,7 @@ import {
   submitPayHereCheckoutForm,
 } from "./payhere-client";
 
-type PaymentMethod = "COD" | "PAYHERE" | "KOKO" | "MINITPAY";
+type PaymentMethod = "COD" | "PAYHERE" | "KOKO" | "MINTPAY";
 
 type CheckoutUser = { name: string; email: string } | null;
 
@@ -40,7 +40,7 @@ const PAYMENT_OPTIONS: {
   { id: "COD", name: "Cash on Delivery", description: "Pay when you receive your order", icon: "💵" },
   { id: "PAYHERE", name: "PayHere", description: "Pay via PayHere gateway", icon: "💳" },
   { id: "KOKO", name: "Koko", description: "Pay with Koko", icon: "🐘" },
-  { id: "MINITPAY", name: "MinitPay", description: "Pay with MinitPay", icon: "📱" },
+  { id: "MINTPAY", name: "Mintpay", description: "Pay with Mintpay", icon: "📱" },
 ];
 
 function generateIdempotencyKey(): string {

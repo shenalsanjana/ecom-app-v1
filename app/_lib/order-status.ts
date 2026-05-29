@@ -4,6 +4,7 @@
 export const PAYMENT_STATUSES = [
   "PENDING",
   "PAID",
+  "PAYMENT_FAILED",
   "COD_PENDING",
   "COD_COLLECTED",
 ] as const;
@@ -32,6 +33,8 @@ export function paymentStatusLabel(
       return "Paid";
     case "COD_PENDING":
       return "Cash on delivery";
+    case "PAYMENT_FAILED":
+      return "Payment failed";
     default:
       return null;
   }
@@ -44,7 +47,10 @@ export function checkoutPaymentState(args: {
 }): { isPaid: boolean; isCod: boolean; isCancelled: boolean } {
   const isCod = args.paymentMethod === "COD";
   const isPaid = args.paymentStatus === "PAID" || args.paymentStatus === "COD_COLLECTED";
-  const isCancelled = !isPaid && !isCod && args.urlStatus === "cancelled";
+  const isCancelled =
+    !isPaid &&
+    !isCod &&
+    (args.urlStatus === "cancelled" || args.paymentStatus === "PAYMENT_FAILED");
 
   return { isPaid, isCod, isCancelled };
 }

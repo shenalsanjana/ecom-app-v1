@@ -19,7 +19,7 @@ import { initialPaymentStatus } from "@/app/_lib/order-status";
 import { nextWebNumber } from "@/app/_lib/web-number";
 import { bookCourierAndNotify } from "./book-courier";
 
-export type PaymentMethod = "COD" | "PAYHERE" | "KOKO" | "MINITPAY";
+export type PaymentMethod = "COD" | "PAYHERE" | "KOKO" | "MINTPAY";
 
 export type CheckoutResult =
   | { success: true; orderId: string; webNumber?: string | null; trackingCode?: string; isGuest?: boolean }
@@ -29,7 +29,7 @@ const PAYMENT_METHOD_DISPLAY: Record<PaymentMethod, string> = {
   COD: "Cash on Delivery",
   PAYHERE: "PayHere",
   KOKO: "Koko",
-  MINITPAY: "MinitPay",
+  MINTPAY: "Mintpay",
 };
 
 const ItemInputSchema = z.object({
@@ -56,7 +56,7 @@ const GuestInfoSchema = z.object({
 const ProcessOrderSchema = z.object({
   items: z.array(ItemInputSchema).min(1, "Cart is empty"),
   shippingAddress: AddressSchema,
-  paymentMethod: z.enum(["COD", "PAYHERE", "KOKO", "MINITPAY"]),
+  paymentMethod: z.enum(["COD", "PAYHERE", "KOKO", "MINTPAY"]),
   contactPhone: LkPhoneSchema,
   guestInfo: GuestInfoSchema.optional(),
   idempotencyKey: z.string().min(8).max(128).optional(),
@@ -298,7 +298,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
   const trackingCode = await orchestrateCourierBooking(orderId, orderDetailsForEmail);
 
   // For COD: send confirmation email immediately (payment collected at delivery).
-  // For prepaid (PAYHERE/KOKO/MINITPAY): confirmation email is sent by the
+  // For prepaid (PAYHERE/KOKO/MINTPAY): confirmation email is sent by the
   // webhook handler only after payment is verified — do NOT send it here.
   if (paymentMethod === "COD") {
     try {
