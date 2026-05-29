@@ -1,4 +1,4 @@
-import { createPrivateKey, sign } from "crypto";
+import { createPrivateKey, createPublicKey, sign, verify } from "crypto";
 import { getKokoConfig } from "./config";
 import type { PaymentProvider } from "./types";
 import { requireNameAndEmail } from "./shared";
@@ -74,3 +74,99 @@ export const kokoProvider: PaymentProvider = {
     };
   },
 };
+
+// ---------------------------------------------------------------------------
+// Order-view helpers (server-to-server status lookup)
+// ---------------------------------------------------------------------------
+
+export function signKokoOrderViewString(args: {
+  merchantId: string;
+  pluginName: string;
+  pluginVersion: string;
+  orderId: string;
+  apiKey: string;
+  privateKey: string;
+}): string {
+  return signKokoDataString(
+    args.merchantId + args.pluginName + args.pluginVersion + args.orderId + args.apiKey,
+    args.privateKey,
+  );
+}
+
+// Defense-in-depth (Amendment A3): the orderView response carries a signature
+// over `${orderId}${trnId}${status}` signed with Koko's private key, validated
+// with Koko's public key (RSA-SHA256). The trust anchor for finalization is the
+// server-to-server orderView call itself; this check only adds tamper-evidence.
+// Verify ONLY when a public key and signature are present, and NEVER fail closed:
+// on mismatch we log and still honor the server-reported status.
+function verifyKokoResponseSignature(
+  orderId: string,
+  trnId: string,
+  status: string,
+  signatureB64: string,
+  publicKeyPem: string,
+): boolean {
+  try {
+    return verify(
+      "RSA-SHA256",
+      Buffer.from(`${orderId}${trnId}${status}`),
+      createPublicKey(publicKeyPem),
+      Buffer.from(signatureB64, "base64"),
+    );
+  } catch {
+    return false;
+  }
+}
+
+type KokoStatus = "PENDING" | "SUCCESS" | "FAILED";
+
+export async function fetchKokoOrderStatus(orderId: string): Promise<KokoStatus> {
+  const cfg = getKokoConfig();
+  const body = new URLSearchParams({
+    _mId: cfg.merchantId,
+    _pluginName: cfg.pluginName,
+    _pluginVersion: cfg.pluginVersion,
+    api_key: cfg.apiKey,
+    _orderId: orderId,
+    signature: signKokoOrderViewString({
+      merchantId: cfg.merchantId,
+      pluginName: cfg.pluginName,
+      pluginVersion: cfg.pluginVersion,
+      orderId,
+      apiKey: cfg.apiKey,
+      privateKey: cfg.privateKey,
+    }),
+  });
+
+  const response = await fetch(cfg.orderViewUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  const json = (await response.json()) as {
+    orderId?: string;
+    trnId?: string;
+    status?: string;
+    signature?: string;
+    data?: { orderId?: string; trnId?: string; status?: string; signature?: string };
+  };
+  const payload = json.data ?? json;
+  const status = (payload.status ?? "PENDING") as string;
+
+  // A3: verify-when-present, never fail-closed.
+  if (cfg.publicKey && payload.signature) {
+    const ok = verifyKokoResponseSignature(
+      payload.orderId ?? orderId,
+      payload.trnId ?? "",
+      status,
+      payload.signature,
+      cfg.publicKey,
+    );
+    if (!ok) {
+      console.warn("[koko] orderView response signature mismatch — honoring server status anyway", { orderId });
+    }
+  }
+
+  if (status === "SUCCESS" || status === "FAILED" || status === "PENDING") return status;
+  return "PENDING";
+}
