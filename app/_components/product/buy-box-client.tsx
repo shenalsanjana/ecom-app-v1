@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { AddToCartButton } from "@/app/_components/cart/add-to-cart-button";
 import { SizeChartDialog } from "@/app/_components/product/size-chart-dialog";
 import { StockIndicator } from "@/app/_components/shared/stock-indicator";
+import { InstallmentNote } from "@/app/_components/shared/installment-note";
 import { useCart } from "@/app/_lib/cart-context";
 import { useWishlist } from "@/app/_lib/wishlist-context";
 import { formatPrice } from "@/app/_lib/format";
@@ -126,6 +127,7 @@ export function BuyBoxClient({
           </>
         )}
       </div>
+      <InstallmentNote total={price} />
 
       <div><StockIndicator stock={stock} /></div>
 
