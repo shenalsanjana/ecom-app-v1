@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AddToCartButton } from "@/app/_components/cart/add-to-cart-button";
 import { SizeChartDialog } from "@/app/_components/product/size-chart-dialog";
+import { StockIndicator } from "@/app/_components/shared/stock-indicator";
 import { useCart } from "@/app/_lib/cart-context";
 import { useWishlist } from "@/app/_lib/wishlist-context";
 import { formatPrice } from "@/app/_lib/format";
@@ -26,28 +27,6 @@ type Props = {
 
 function discountPct(price: number, original: number): number {
   return Math.round(((original - price) / original) * 100);
-}
-
-function StockChip({ stock }: { stock: number }) {
-  if (stock === 0) {
-    return (
-      <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-800 dark:bg-red-950 dark:text-red-300">
-        Out of stock
-      </span>
-    );
-  }
-  if (stock <= 5) {
-    return (
-      <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-        Only {stock} left
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-      In stock
-    </span>
-  );
 }
 
 export function BuyBoxClient({
@@ -148,7 +127,7 @@ export function BuyBoxClient({
         )}
       </div>
 
-      <div><StockChip stock={stock} /></div>
+      <div><StockIndicator stock={stock} /></div>
 
       {/* Size Selection */}
       {sizeList.length > 0 && (
