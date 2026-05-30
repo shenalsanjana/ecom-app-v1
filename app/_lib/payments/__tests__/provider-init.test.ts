@@ -140,7 +140,10 @@ describe("provider initiation", () => {
     await mintpayProvider.initiate({ ...ORDER, paymentMethod: "MINTPAY" }, "https://shop.example.com");
 
     const body = JSON.parse(mintpayFetch.mock.calls[0][1].body as string);
-    expect(body.customer_id.length).toBeLessThanOrEqual(10);
+    // Mintpay casts customer_id to a 32-bit int server-side: it must be numeric,
+    // <= 10 chars, and fit in a signed 32-bit int (values > 2^31-1 return a 500).
+    expect(body.customer_id).toMatch(/^\d{1,10}$/);
+    expect(Number(body.customer_id)).toBeLessThanOrEqual(2147483647);
     expect(body.customer_email).toBe("jane@example.com");
 
     // Stable: the same customer email yields the same customer_id.

@@ -18,13 +18,17 @@ function customer(order: PaymentOrder) {
   return { email };
 }
 
-// Mintpay caps `customer_id` at 10 characters (DRF max_length). We have no short
-// numeric customer key on PaymentOrder — the email overflows and order ids are
-// longer still — so derive a stable opaque 10-char id from the email. customer_id
-// is not a reconciliation key (only order_id is matched on the return URL), so an
-// opaque value is safe; deterministic-from-email keeps the same buyer consistent.
+// Mintpay's `customer_id` is validated as max_length=10 but then cast to a 32-bit
+// integer server-side: a non-numeric value (e.g. a hex hash) throws server-side and
+// returns a 500, and a numeric value > 2^31-1 overflows and also 500s (both verified
+// against the Mintpay sandbox). We have no short numeric customer key on PaymentOrder,
+// so derive a stable 9-digit number from the email: sha256 -> first 32 bits -> mod 1e9
+// yields 0..999,999,999, always within signed-32-bit range. customer_id is not a
+// reconciliation key (only order_id is matched on the return URL), so a derived value
+// is safe; deterministic-from-email keeps the same buyer consistent across orders.
 function shortCustomerId(email: string): string {
-  return createHash("sha256").update(email.trim().toLowerCase()).digest("hex").slice(0, 10);
+  const hex = createHash("sha256").update(email.trim().toLowerCase()).digest("hex").slice(0, 8);
+  return String(parseInt(hex, 16) % 1_000_000_000);
 }
 
 export const mintpayProvider: PaymentProvider = {
