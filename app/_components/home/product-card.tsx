@@ -4,9 +4,10 @@ import Link from "next/link";
 import { Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { QuickBuyButtons } from "@/app/_components/cart/quick-buy-buttons";
+import { AddToCartDialog } from "@/app/_components/cart/add-to-cart-dialog";
 import { WishlistHeart } from "@/app/_components/wishlist/wishlist-heart";
 import { formatPrice } from "@/app/_lib/format";
+import { prettifyCategory } from "@/app/_lib/category-label";
 
 export type ProductCardProps = {
   id: string;
@@ -17,6 +18,7 @@ export type ProductCardProps = {
   rating: number;
   reviewCount: number;
   sizes: string;
+  category?: string;
   fromPath?: string;
 };
 
@@ -33,17 +35,22 @@ export function ProductCard({
   rating,
   reviewCount,
   sizes,
+  category,
   fromPath = "/",
 }: ProductCardProps) {
   const onSale = originalPrice != null && originalPrice > price;
   const pct = onSale ? discountPct(price, originalPrice as number) : 0;
   const href = `/products/${id}`;
+  const eyebrow = category ? prettifyCategory(category) : "";
 
   return (
-    <Card className="overflow-hidden p-0">
-      <div className="relative flex h-48 items-center justify-center bg-muted">
+    <Card className="group overflow-hidden p-0">
+      <div className="relative aspect-[4/5] overflow-hidden bg-muted">
         {onSale && (
-          <Badge className="absolute left-3 top-3 z-10" variant="brand">
+          <Badge
+            variant="outline"
+            className="absolute left-3 top-3 z-10 bg-card/90 text-brand"
+          >
             -{pct}%
           </Badge>
         )}
@@ -53,14 +60,19 @@ export function ProductCard({
             alt={name}
             fill
             sizes="(min-width:1024px) 25vw, 50vw"
-            className="object-cover"
+            className="object-cover transition-transform duration-(--duration-slow) ease-(--ease-out) group-hover:scale-105"
           />
         </Link>
         <div className="absolute right-2 top-2 z-10">
           <WishlistHeart productId={id} fromPath={fromPath} />
         </div>
       </div>
-      <CardContent className="space-y-2 p-4">
+      <CardContent className="space-y-1.5 p-4">
+        {eyebrow && (
+          <p className="text-[0.65rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+            {eyebrow}
+          </p>
+        )}
         <h3 className="font-heading line-clamp-2 min-h-[2.75rem] text-base font-medium leading-snug">
           <Link href={href} className="hover:underline underline-offset-4">{name}</Link>
         </h3>
@@ -70,12 +82,7 @@ export function ProductCard({
           <span>({reviewCount.toLocaleString()})</span>
         </div>
         <div className="flex items-baseline gap-2">
-          <span
-            className={
-              "font-heading text-base font-semibold " +
-              (onSale ? "text-brand" : "")
-            }
-          >
+          <span className={"font-heading text-base font-semibold " + (onSale ? "text-brand" : "")}>
             {formatPrice(price)}
           </span>
           {onSale && (
@@ -86,12 +93,14 @@ export function ProductCard({
         </div>
       </CardContent>
       <CardFooter className="p-4 pt-0">
-        <QuickBuyButtons
+        <AddToCartDialog
           productId={id}
           name={name}
           price={price}
           image={image}
           sizes={sizes}
+          triggerVariant="default"
+          triggerClassName="w-full"
         />
       </CardFooter>
     </Card>
