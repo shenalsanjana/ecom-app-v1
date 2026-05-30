@@ -1,4 +1,4 @@
-import { createHmac } from "crypto";
+import { createHash, createHmac } from "crypto";
 import { getMintpayConfig } from "./config";
 import type { PaymentOrder, PaymentProvider } from "./types";
 
@@ -16,6 +16,15 @@ function customer(order: PaymentOrder) {
   const email = order.guestEmail ?? order.user?.email;
   if (!email) throw new Error("Order is missing customer email");
   return { email };
+}
+
+// Mintpay caps `customer_id` at 10 characters (DRF max_length). We have no short
+// numeric customer key on PaymentOrder — the email overflows and order ids are
+// longer still — so derive a stable opaque 10-char id from the email. customer_id
+// is not a reconciliation key (only order_id is matched on the return URL), so an
+// opaque value is safe; deterministic-from-email keeps the same buyer consistent.
+function shortCustomerId(email: string): string {
+  return createHash("sha256").update(email.trim().toLowerCase()).digest("hex").slice(0, 10);
 }
 
 export const mintpayProvider: PaymentProvider = {
@@ -38,7 +47,7 @@ export const mintpayProvider: PaymentProvider = {
       total_price: order.total.toFixed(2),
       discount: "0",
       customer_email: buyer.email,
-      customer_id: order.user?.email ?? order.guestEmail ?? "guest",
+      customer_id: shortCustomerId(buyer.email),
       delivery_street: `${order.shippingLine1}${order.shippingLine2 ? ", " + order.shippingLine2 : ""}`,
       customer_telephone: order.customerPhone,
       ip: "0.0.0.0",

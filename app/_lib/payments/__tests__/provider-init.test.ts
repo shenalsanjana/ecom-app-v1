@@ -126,6 +126,33 @@ describe("provider initiation", () => {
     ).rejects.toThrow(/Mintpay order creation failed/);
   });
 
+  it("sends a Mintpay customer_id within the 10-character limit and keeps the email separate", async () => {
+    process.env.MINTPAY_MERCHANT_ID = "mp0001";
+    process.env.MINTPAY_MERCHANT_SECRET = "secret";
+    mintpayFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ message: "Success", data: "PURCHASE-1" }),
+      text: async () => "",
+    });
+    vi.stubGlobal("fetch", mintpayFetch);
+
+    const { mintpayProvider } = await import("../mintpay");
+    await mintpayProvider.initiate({ ...ORDER, paymentMethod: "MINTPAY" }, "https://shop.example.com");
+
+    const body = JSON.parse(mintpayFetch.mock.calls[0][1].body as string);
+    expect(body.customer_id.length).toBeLessThanOrEqual(10);
+    expect(body.customer_email).toBe("jane@example.com");
+
+    // Stable: the same customer email yields the same customer_id.
+    mintpayFetch.mockClear();
+    await mintpayProvider.initiate(
+      { ...ORDER, paymentMethod: "MINTPAY", id: "ORD-999" },
+      "https://shop.example.com",
+    );
+    const body2 = JSON.parse(mintpayFetch.mock.calls[0][1].body as string);
+    expect(body2.customer_id).toBe(body.customer_id);
+  });
+
   it("creates Mintpay purchase and returns purchase_id form fields", async () => {
     process.env.MINTPAY_MERCHANT_ID = "mp0001";
     process.env.MINTPAY_MERCHANT_SECRET = "secret";
