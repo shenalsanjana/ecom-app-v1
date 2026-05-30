@@ -31,6 +31,32 @@ rules. Order mirrors the homepage and funnel:
 This is a **visual/UX refresh**. Where a UI change requires data or backend work, it is
 called out under "Dependencies & backend impact" — those are the parts that are NOT just CSS.
 
+## Decisions (2026-05-30, post data-review)
+
+Confirmed after inspecting the Prisma schema and test setup:
+
+- **Delivery is phase-by-phase.** The refresh ships as a sequence of small plans, each
+  producing working, reviewable software, in this order:
+  1. **Foundation** — shared pricing/payment primitives (this plan): `installmentAmount`
+     helper, `InstallmentNote`, `StockIndicator`, payment-option relabel, `PaymentMethodIcon`.
+  2. **Home surfaces** — announcement bar + header wordmark + hero, category tiles, product
+     card + grid.
+  3. **Product page** — buy box (size selector, BNPL line, stock indicator, trust row, sticky).
+  4. **Cart + Checkout** — line items, summary, numbered steps, payment tiles, **alternate
+     mobile (migration)**, optional email, order-confirmed restyle.
+  5. **Footer + global a11y/mobile pass.**
+- **Colour swatches are CUT.** `Product` has `sizes` but **no colour/variant data**. Swatches
+  are removed from the card and product page (the "don't fake them" rule). Revisit only if a
+  colour-variant data model is added later.
+- **Size already persists.** `OrderItem.size` exists and the cart/checkout already show it;
+  the size selector is a **UI addition + enforcement** on the product page, not a migration.
+- **Alternate mobile is IN SCOPE now** as a real change: new nullable `Order.customerPhoneAlt`
+  column (Prisma migration) + checkout form/action wiring + courier/email/admin surfaces.
+- **Email becomes optional** at checkout (kept *recommended* in copy).
+- **Testing reality:** vitest runs in **node environment** — there is **no RTL/jsdom
+  component testing**. So plans use **TDD (vitest) for pure logic/helpers**, and
+  **`npm run build` + visual verification** for components/styling. No invented `render()` tests.
+
 ## Surface-by-surface decisions
 
 ### 1. Top of page
