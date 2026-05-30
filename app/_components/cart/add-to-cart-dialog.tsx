@@ -22,9 +22,19 @@ type Props = {
   price: number;
   image: string;
   sizes: string;
+  triggerVariant?: "outline" | "default";
+  triggerClassName?: string;
 };
 
-export function AddToCartDialog({ productId, name, price, image, sizes }: Props) {
+export function AddToCartDialog({
+  productId,
+  name,
+  price,
+  image,
+  sizes,
+  triggerVariant = "outline",
+  triggerClassName = "flex-1 min-w-0 whitespace-nowrap",
+}: Props) {
   const sizeList = sizes ? sizes.split(",").map((s) => s.trim()).filter(Boolean) : [];
   const { addItem } = useCart();
   const [open, setOpen] = useState(false);
@@ -65,8 +75,8 @@ export function AddToCartDialog({ productId, name, price, image, sizes }: Props)
       <DialogTrigger
         className={buttonVariants({
           size: "sm",
-          variant: "outline",
-          className: "flex-1 min-w-0 whitespace-nowrap",
+          variant: triggerVariant,
+          className: triggerClassName,
         })}
         aria-label="Add to cart"
       >
