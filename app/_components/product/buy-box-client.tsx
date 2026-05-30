@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Heart, Star, Loader2 } from "lucide-react";
+import { Heart, Star, Loader2, Truck, RotateCcw, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AddToCartButton } from "@/app/_components/cart/add-to-cart-button";
@@ -13,6 +13,7 @@ import { InstallmentNote } from "@/app/_components/shared/installment-note";
 import { useCart } from "@/app/_lib/cart-context";
 import { useWishlist } from "@/app/_lib/wishlist-context";
 import { formatPrice } from "@/app/_lib/format";
+import { FREE_DELIVERY_THRESHOLD } from "@/app/_lib/checkout-config";
 
 type Props = {
   productId: string;
@@ -233,6 +234,18 @@ export function BuyBoxClient({
           {wishlisted ? "Wishlisted" : "Wishlist"}
         </Button>
       </div>
+
+      <ul className="flex flex-wrap gap-x-5 gap-y-2 border-t border-border pt-4 text-xs text-muted-foreground">
+        <li className="flex items-center gap-1.5">
+          <Truck className="h-4 w-4" aria-hidden /> Free shipping over {formatPrice(FREE_DELIVERY_THRESHOLD)}
+        </li>
+        <li className="flex items-center gap-1.5">
+          <RotateCcw className="h-4 w-4" aria-hidden /> Free 14-day returns
+        </li>
+        <li className="flex items-center gap-1.5">
+          <ShieldCheck className="h-4 w-4" aria-hidden /> Secure checkout
+        </li>
+      </ul>
     </div>
   );
 }
