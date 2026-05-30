@@ -168,22 +168,32 @@ export function BuyBoxClient({
 
       {inStock && (
         <div className="flex items-center gap-3">
-          <label htmlFor="qty" className="text-sm font-medium">Quantity</label>
-          <select
-            id="qty"
-            name="qty"
-            value={quantity}
-            onChange={(e) => setQuantity(Number(e.target.value))}
-            className="h-9 rounded-md border bg-background px-2 text-sm"
-          >
-            {Array.from({ length: qtyMax }).map((_, i) => (
-              <option key={i + 1} value={i + 1}>{i + 1}</option>
-            ))}
-          </select>
-          {inCartQty > 0 && (
-            <span className="text-sm text-muted-foreground">
-              ({inCartQty} in cart)
+          <span className="text-sm font-medium">Quantity</span>
+          <div className="inline-flex items-center rounded-md border border-border">
+            <button
+              type="button"
+              onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+              disabled={quantity <= 1}
+              aria-label="Decrease quantity"
+              className="px-3 py-2 text-sm transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
+            >
+              −
+            </button>
+            <span className="min-w-[2.5rem] border-x border-border px-2 py-2 text-center text-sm tabular-nums">
+              {quantity}
             </span>
+            <button
+              type="button"
+              onClick={() => setQuantity((q) => Math.min(qtyMax, q + 1))}
+              disabled={quantity >= qtyMax}
+              aria-label="Increase quantity"
+              className="px-3 py-2 text-sm transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
+            >
+              +
+            </button>
+          </div>
+          {inCartQty > 0 && (
+            <span className="text-sm text-muted-foreground">({inCartQty} in cart)</span>
           )}
         </div>
       )}
