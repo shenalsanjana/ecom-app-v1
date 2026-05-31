@@ -11,6 +11,14 @@
 **Spec:** `docs/superpowers/specs/2026-05-30-ui-ux-boutique-refresh-design.md`
 **Builds on:** Plans 01–04 (this branch). Uses `PaymentMethodIcon` from Plan 01.
 
+**DEFERRED on execution (2026-05-31): the alternate-mobile column + wiring (Tasks 1, 2, 4).**
+The hosted dev DB (`db.prisma.io`) has migration-history drift (`20260527000000_add_user_role`
+was modified after being applied), so `prisma migrate dev` would only proceed by `migrate
+reset` — i.e. wiping all data. The additive nullable column is safe in principle, but per the
+user's decision the alt-mobile feature is deferred until the migration drift is reconciled
+properly. **Only Tasks 3, 5, 6 (no-DB checkout polish) were executed.** The underlying drift
+should be fixed regardless — it will block every future migration.
+
 **DEFERRED (not in this plan): "email optional".** Making guest email optional ripples into
 `GuestInfoSchema` validation AND disables order-confirmation/receipt emails (and may affect the
 courier/admin email path). Recommendation: keep email **required-but-clearly-worded** rather
