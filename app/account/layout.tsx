@@ -13,7 +13,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
     <>
       <SiteHeader />
       <main className="flex-1">
-        <div className="mx-auto flex max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 md:flex-row lg:px-8">
           <AccountSidebar userName={session.user.name ?? session.user.email ?? "Account"} />
           <div className="flex-1">{children}</div>
         </div>

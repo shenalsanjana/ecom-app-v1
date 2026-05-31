@@ -27,7 +27,7 @@ export function AccountSidebar({ userName }: { userName: string }) {
   }
 
   return (
-    <aside className="w-56 shrink-0 border-r pr-6">
+    <aside className="w-full shrink-0 border-b pb-6 md:w-56 md:border-b-0 md:border-r md:pb-0 md:pr-6">
       <div className="mb-6">
         <div className="text-xs text-muted-foreground">Signed in as</div>
         <div className="truncate font-medium">{userName}</div>
