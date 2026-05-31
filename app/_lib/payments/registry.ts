@@ -13,7 +13,7 @@ export function isOnlinePaymentMethod(value: string): value is OnlinePaymentMeth
 export function checkoutPaymentOptions(): CheckoutPaymentOption[] {
   const options: CheckoutPaymentOption[] = [
     { id: "COD", name: "Cash on Delivery", description: "Pay when you receive your order", icon: "💵" },
-    { id: "PAYHERE", name: "PayHere", description: "Pay via PayHere gateway", icon: "💳" },
+    { id: "PAYHERE", name: "Credit / Debit Card", description: "Visa, Mastercard & more — secured by PayHere", icon: "💳" },
   ];
 
   if (envFlag("KOKO_ENABLED")) {

@@ -22,6 +22,7 @@ import {
   readPaymentInitiationResponse,
   submitPaymentCheckoutForm,
 } from "./payhere-client";
+import { PaymentMethodIcon } from "@/app/_components/shared/payment-method-icon";
 
 type CheckoutUser = { name: string; email: string } | null;
 
@@ -88,8 +89,8 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
         </header>
         <main className="flex-1 flex items-center justify-center px-4 py-20">
           <div className="text-center max-w-md">
-            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <ShoppingBag className="h-8 w-8 text-green-600" />
+            <div className="mx-auto w-16 h-16 bg-brand/10 rounded-full flex items-center justify-center mb-4">
+              <ShoppingBag className="h-8 w-8 text-brand" />
             </div>
             <h1 className="text-2xl font-bold mb-2">Order Confirmed!</h1>
             <p className="text-muted-foreground mb-2">Thank you for your order.</p>
@@ -444,13 +445,20 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
                           }}
                           className="h-4 w-4"
                         />
-                        <span className="text-2xl">{option.icon}</span>
+                        <span className="flex h-8 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-card">
+                          <PaymentMethodIcon method={option.id} />
+                        </span>
                         <div className="flex-1">
                           <span className="font-medium">{option.name}</span>
                           <span className="block text-sm text-muted-foreground">
                             {option.description}
                           </span>
                         </div>
+                        {(option.id === "KOKO" || option.id === "MINTPAY") && (
+                          <span className="ml-auto shrink-0 rounded-md border border-brand/30 bg-brand/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-brand">
+                            Pay in 3
+                          </span>
+                        )}
                       </label>
                     ))}
                   </div>
@@ -494,7 +502,7 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
                   </div>
 
                   {subtotal >= FREE_DELIVERY_THRESHOLD && (
-                    <p className="mt-2 text-sm text-green-600 font-medium">
+                    <p className="mt-2 text-sm text-brand font-medium">
                       You qualify for free delivery!
                     </p>
                   )}

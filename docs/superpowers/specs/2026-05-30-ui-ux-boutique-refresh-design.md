@@ -48,8 +48,12 @@ Confirmed after inspecting the Prisma schema and test setup:
 - **Colour swatches are CUT.** `Product` has `sizes` but **no colour/variant data**. Swatches
   are removed from the card and product page (the "don't fake them" rule). Revisit only if a
   colour-variant data model is added later.
-- **Size already persists.** `OrderItem.size` exists and the cart/checkout already show it;
-  the size selector is a **UI addition + enforcement** on the product page, not a migration.
+- **Size selection already EXISTS** (correction). The rendered buy box `BuyBoxClient`
+  already has an inline size picker, a size-chart link, and add-to-cart enforcement
+  (`requiresSize`). The earlier mockup critique ("no size selector") was based on the
+  **unused legacy `buy-box.tsx`**, not the live `BuyBoxClient`. So Plan 03 does **not** add a
+  size selector — it polishes the existing buy box (StockIndicator, InstallmentNote, quantity
+  stepper, trust row, sticky). `OrderItem.size` persists and is already wired.
 - **Alternate mobile is IN SCOPE now** as a real change: new nullable `Order.customerPhoneAlt`
   column (Prisma migration) + checkout form/action wiring + courier/email/admin surfaces.
 - **Email becomes optional** at checkout (kept *recommended* in copy).

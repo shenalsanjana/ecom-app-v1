@@ -4,6 +4,7 @@ import { SessionProvider } from "next-auth/react";
 import { CartProvider } from "@/app/_lib/cart-context";
 import { WishlistProvider } from "@/app/_lib/wishlist-context";
 import { WhatsAppFloatButton } from "@/app/_components/whatsapp-float-button";
+import { AnnouncementBar } from "@/app/_components/shared/announcement-bar";
 import "./globals.css";
 
 const inter = Inter({
@@ -61,6 +62,7 @@ export default function RootLayout({
       className={`${inter.variable} ${fraunces.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <AnnouncementBar />
         <SessionProvider>
           <WishlistProvider>
             <CartProvider>{children}</CartProvider>

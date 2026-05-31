@@ -3,14 +3,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Heart, Star, Loader2 } from "lucide-react";
+import { Heart, Star, Loader2, Truck, RotateCcw, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AddToCartButton } from "@/app/_components/cart/add-to-cart-button";
 import { SizeChartDialog } from "@/app/_components/product/size-chart-dialog";
+import { StockIndicator } from "@/app/_components/shared/stock-indicator";
+import { InstallmentNote } from "@/app/_components/shared/installment-note";
 import { useCart } from "@/app/_lib/cart-context";
 import { useWishlist } from "@/app/_lib/wishlist-context";
 import { formatPrice } from "@/app/_lib/format";
+import { FREE_DELIVERY_THRESHOLD } from "@/app/_lib/checkout-config";
 
 type Props = {
   productId: string;
@@ -26,28 +29,6 @@ type Props = {
 
 function discountPct(price: number, original: number): number {
   return Math.round(((original - price) / original) * 100);
-}
-
-function StockChip({ stock }: { stock: number }) {
-  if (stock === 0) {
-    return (
-      <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-800 dark:bg-red-950 dark:text-red-300">
-        Out of stock
-      </span>
-    );
-  }
-  if (stock <= 5) {
-    return (
-      <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-        Only {stock} left
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-      In stock
-    </span>
-  );
 }
 
 export function BuyBoxClient({
@@ -117,7 +98,7 @@ export function BuyBoxClient({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 lg:sticky lg:top-24 lg:self-start">
       <h1 className="font-heading text-2xl font-medium tracking-tight sm:text-3xl">{name}</h1>
 
       <a
@@ -147,8 +128,9 @@ export function BuyBoxClient({
           </>
         )}
       </div>
+      <InstallmentNote total={price} />
 
-      <div><StockChip stock={stock} /></div>
+      <div><StockIndicator stock={stock} /></div>
 
       {/* Size Selection */}
       {sizeList.length > 0 && (
@@ -187,22 +169,32 @@ export function BuyBoxClient({
 
       {inStock && (
         <div className="flex items-center gap-3">
-          <label htmlFor="qty" className="text-sm font-medium">Quantity</label>
-          <select
-            id="qty"
-            name="qty"
-            value={quantity}
-            onChange={(e) => setQuantity(Number(e.target.value))}
-            className="h-9 rounded-md border bg-background px-2 text-sm"
-          >
-            {Array.from({ length: qtyMax }).map((_, i) => (
-              <option key={i + 1} value={i + 1}>{i + 1}</option>
-            ))}
-          </select>
-          {inCartQty > 0 && (
-            <span className="text-sm text-muted-foreground">
-              ({inCartQty} in cart)
+          <span className="text-sm font-medium">Quantity</span>
+          <div className="inline-flex items-center rounded-md border border-border">
+            <button
+              type="button"
+              onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+              disabled={quantity <= 1}
+              aria-label="Decrease quantity"
+              className="px-3 py-2 text-sm transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
+            >
+              −
+            </button>
+            <span className="min-w-[2.5rem] border-x border-border px-2 py-2 text-center text-sm tabular-nums">
+              {quantity}
             </span>
+            <button
+              type="button"
+              onClick={() => setQuantity((q) => Math.min(qtyMax, q + 1))}
+              disabled={quantity >= qtyMax}
+              aria-label="Increase quantity"
+              className="px-3 py-2 text-sm transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
+            >
+              +
+            </button>
+          </div>
+          {inCartQty > 0 && (
+            <span className="text-sm text-muted-foreground">({inCartQty} in cart)</span>
           )}
         </div>
       )}
@@ -242,6 +234,18 @@ export function BuyBoxClient({
           {wishlisted ? "Wishlisted" : "Wishlist"}
         </Button>
       </div>
+
+      <ul className="flex flex-wrap gap-x-5 gap-y-2 border-t border-border pt-4 text-xs text-muted-foreground">
+        <li className="flex items-center gap-1.5">
+          <Truck className="h-4 w-4" aria-hidden /> Free shipping over {formatPrice(FREE_DELIVERY_THRESHOLD)}
+        </li>
+        <li className="flex items-center gap-1.5">
+          <RotateCcw className="h-4 w-4" aria-hidden /> Free 14-day returns
+        </li>
+        <li className="flex items-center gap-1.5">
+          <ShieldCheck className="h-4 w-4" aria-hidden /> Secure checkout
+        </li>
+      </ul>
     </div>
   );
 }

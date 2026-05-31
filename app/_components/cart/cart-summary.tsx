@@ -8,6 +8,8 @@ import { Separator } from "@/components/ui/separator";
 import { formatPrice } from "@/app/_lib/format";
 import { calculateDelivery } from "@/app/_lib/checkout-config";
 import { FreeShippingProgress } from "@/app/_components/cart/free-shipping-progress";
+import { InstallmentNote } from "@/app/_components/shared/installment-note";
+import { PaymentMethodIcon } from "@/app/_components/shared/payment-method-icon";
 
 export function CartSummary() {
   const { subtotal, totalItems } = useCart();
@@ -43,6 +45,8 @@ export function CartSummary() {
         <span className="font-heading">{formatPrice(total)}</span>
       </div>
 
+      <InstallmentNote total={total} className="mt-3 text-center" />
+
       <div className="mt-4 flex gap-4 text-xs text-muted-foreground justify-center">
         <Link href="/refund-policy" className="hover:text-foreground underline underline-offset-2">Refund Policy</Link>
         <Link href="/privacy-policy" className="hover:text-foreground underline underline-offset-2">Privacy Policy</Link>
@@ -54,6 +58,14 @@ export function CartSummary() {
           Proceed to checkout
         </Button>
       </Link>
+
+      <div className="mt-4 flex items-center justify-center gap-4">
+        {(["KOKO", "MINTPAY", "PAYHERE", "COD"] as const).map((m) => (
+          <span key={m} className="flex h-6 items-center" aria-hidden>
+            <PaymentMethodIcon method={m} />
+          </span>
+        ))}
+      </div>
 
       <p className="mt-3 text-center text-xs text-muted-foreground">
         Delivery calculated at checkout

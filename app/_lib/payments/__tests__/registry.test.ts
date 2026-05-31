@@ -37,6 +37,12 @@ describe("payment registry", () => {
       "MINTPAY",
     ]);
   });
+
+  it("labels the PayHere option as a customer-friendly card option", () => {
+    const card = checkoutPaymentOptions().find((o) => o.id === "PAYHERE");
+    expect(card?.name).toBe("Credit / Debit Card");
+    expect(card?.description).toMatch(/secured by PayHere/i);
+  });
 });
 
 describe("assertPaymentMethod", () => {

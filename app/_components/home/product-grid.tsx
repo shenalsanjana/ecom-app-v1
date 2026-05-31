@@ -7,8 +7,11 @@ export async function ProductGrid() {
     <section className="border-b">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="mb-8 flex items-end justify-between">
-          <h2 className="text-2xl font-semibold tracking-tight">Featured products</h2>
-          <a href="#" className="text-sm font-medium text-muted-foreground hover:text-foreground">
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-brand">Editor's picks</p>
+            <h2 className="font-heading text-2xl font-semibold tracking-tight">Featured products</h2>
+          </div>
+          <a href="/categories" className="border-b border-border pb-0.5 text-sm font-medium text-foreground hover:border-foreground">
             View all
           </a>
         </div>
@@ -24,6 +27,7 @@ export async function ProductGrid() {
               rating={p.rating}
               reviewCount={p.reviewCount}
               sizes={p.sizes}
+              category={p.category}
               fromPath="/"
             />
           ))}

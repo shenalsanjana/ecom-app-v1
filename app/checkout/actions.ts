@@ -27,7 +27,7 @@ export type CheckoutResult =
 
 const PAYMENT_METHOD_DISPLAY: Record<PaymentMethod, string> = {
   COD: "Cash on Delivery",
-  PAYHERE: "PayHere",
+  PAYHERE: "Credit / Debit Card",
   KOKO: "Koko",
   MINTPAY: "Mintpay",
 };
