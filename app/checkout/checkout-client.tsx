@@ -22,6 +22,7 @@ import {
   readPaymentInitiationResponse,
   submitPaymentCheckoutForm,
 } from "./payhere-client";
+import { PaymentMethodIcon } from "@/app/_components/shared/payment-method-icon";
 
 type CheckoutUser = { name: string; email: string } | null;
 
@@ -444,13 +445,20 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
                           }}
                           className="h-4 w-4"
                         />
-                        <span className="text-2xl">{option.icon}</span>
+                        <span className="flex h-8 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-card">
+                          <PaymentMethodIcon method={option.id} />
+                        </span>
                         <div className="flex-1">
                           <span className="font-medium">{option.name}</span>
                           <span className="block text-sm text-muted-foreground">
                             {option.description}
                           </span>
                         </div>
+                        {(option.id === "KOKO" || option.id === "MINTPAY") && (
+                          <span className="ml-auto shrink-0 rounded-md border border-brand/30 bg-brand/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-brand">
+                            Pay in 3
+                          </span>
+                        )}
                       </label>
                     ))}
                   </div>
