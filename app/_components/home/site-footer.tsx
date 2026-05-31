@@ -1,4 +1,5 @@
 import type { SVGProps } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
 import { getCategories } from "@/app/_lib/products";
@@ -106,9 +107,18 @@ export async function SiteFooter() {
               </Link>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} Dressing Bear. All rights reserved.
-          </p>
+          <div className="flex items-center gap-2.5">
+            <Image
+              src="/logo.png"
+              alt=""
+              width={64}
+              height={64}
+              className="h-7 w-7 object-contain"
+            />
+            <p className="text-xs text-muted-foreground">
+              &copy; {new Date().getFullYear()} Dressing Bear. All rights reserved.
+            </p>
+          </div>
         </div>
       </div>
     </footer>

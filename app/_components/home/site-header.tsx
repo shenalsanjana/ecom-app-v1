@@ -1,5 +1,6 @@
 // app/_components/home/site-header.tsx
 import Link from "next/link";
+import Image from "next/image";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { WishlistIcon } from "@/app/_components/header/wishlist-icon";
@@ -17,7 +18,17 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
-        <Link href="/" className="font-heading text-xl font-semibold tracking-tight text-foreground">Dressing Bear</Link>
+        <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="Dressing Bear — home">
+          <Image
+            src="/logo.png"
+            alt=""
+            width={80}
+            height={80}
+            priority
+            className="h-9 w-9 object-contain"
+          />
+          <span className="font-heading text-xl font-semibold tracking-tight text-foreground">Dressing Bear</span>
+        </Link>
         <nav className="hidden items-center gap-5 text-sm md:flex">
           {NAV_LINKS.map((l) => (
             <Link
