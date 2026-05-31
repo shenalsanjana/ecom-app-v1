@@ -41,9 +41,11 @@ function pickGalleryImage(productId: string, index: number): string {
 }
 
 const REVIEW_AUTHORS = [
-  "Alex M.", "Jordan K.", "Priya R.", "Sam T.", "Mei L.",
-  "Diego A.", "Chris P.", "Hana O.", "Tom W.", "Rosa G.",
-  "Liam B.", "Yuki S.",
+  "Nethmi Perera", "Sanuli Fernando", "Tharushi Silva", "Senuri Jayawardena",
+  "Dinuli Perera", "Oneli Fernando", "Yehani Silva", "Shenaya Wijesinghe",
+  "Kavindi Perera", "Methmi Fernando", "Thevini Silva", "Sayuni Jayasinghe",
+  "Himashi Bandara", "Rashmi Perera", "Dinethmi Fernando", "Vihangi Silva",
+  "Lithumi Perera", "Senuji Fernando", "Amaaya Silva",
 ];
 
 const REVIEW_TITLES = [
@@ -87,21 +89,11 @@ function pick<T>(arr: T[], rng: () => number): T {
   return arr[Math.floor(rng() * arr.length)];
 }
 
-function buildDescription(name: string, category: string): string {
-  return [
-    `# ${name}`,
-    "",
-    `A standout pick in our ${category} lineup. Designed to feel good in everyday use without compromising on quality.`,
-    "",
-    "## Why you'll like it",
-    "",
-    "- Built to last — chosen materials, careful construction",
-    "- Easy to live with — minimal fuss, comfortable in real-world use",
-    "- Backed by hundreds of happy customers",
-    "",
-    "Whether you're upgrading or trying it for the first time, you're in good hands.",
-  ].join("\n");
-}
+// Short, consistent default description for the T-shirt catalog (rendered as
+// markdown on the product page). Product-agnostic so every item reads the same.
+const DEFAULT_DESCRIPTION = `Premium 220 GSM T-Shirt made with a comfortable 65% cotton and 35% polyester blend. Designed for everyday wear with a soft feel, durable fabric, and a clean modern fit. The material is breathable, long-lasting, and perfect for casual outfits, streetwear, or high-quality DTF printed designs.
+
+**Wash Care:** Wash inside out with cold or normal water. Use hand wash or gentle machine wash. Do not bleach, tumble dry, or iron directly on the print. Dry in shade to maintain fabric quality and print durability.`;
 
 function stockFor(productId: string): number {
   const rng = rngFromId(productId + ":stock");
@@ -138,7 +130,7 @@ async function main() {
   // Products (image resolved from public/products/<id>/, description, stock, sizes)
   for (const p of all) {
     const image = pickProductMain(p.id);
-    const description = buildDescription(p.name, p.category);
+    const description = DEFAULT_DESCRIPTION;
     const stock = stockFor(p.id);
 
     await prisma.product.upsert({
