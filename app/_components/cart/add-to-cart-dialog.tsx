@@ -42,8 +42,8 @@ export function AddToCartDialog({
   const [added, setAdded] = useState(false);
 
   const hasSizes = sizeList.length > 0;
-  // Size is optional for Add to cart — customers may pick one, but it never blocks.
-  const canAdd = true;
+  // Size is required for Add to cart when the product offers sizes.
+  const canAdd = !hasSizes || !!selectedSize;
 
   function handleAdd() {
     if (!canAdd) return;
@@ -89,7 +89,7 @@ export function AddToCartDialog({
           <DialogTitle>{name}</DialogTitle>
           <DialogDescription>
             {formatPrice(price)}
-            {hasSizes ? " — choose your size (optional)" : ""}
+            {hasSizes ? " — choose your size" : ""}
           </DialogDescription>
         </DialogHeader>
         {hasSizes && (
@@ -114,6 +114,9 @@ export function AddToCartDialog({
               );
             })}
           </div>
+        )}
+        {hasSizes && !selectedSize && (
+          <p className="text-sm text-muted-foreground">Select a size to continue.</p>
         )}
         <DialogFooter className="mt-2">
           <DialogClose

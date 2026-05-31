@@ -86,7 +86,19 @@ export function BuyBoxClient({
   const existingItem = items.find((i) => i.key === cartKey);
   const inCartQty = existingItem ? existingItem.quantity : 0;
 
+  function nudgeSizePicker() {
+    const el = document.getElementById("size-picker");
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.setAttribute("data-attention", "true");
+    setTimeout(() => el.removeAttribute("data-attention"), 2000);
+  }
+
   function handleBuyNow() {
+    if (sizeList.length > 0 && !selectedSize) {
+      nudgeSizePicker();
+      return;
+    }
     setIsBuying(true);
     addItem({ productId, name, price, image, size: selectedSize || null }, quantity);
     router.push("/checkout");
@@ -202,7 +214,7 @@ export function BuyBoxClient({
           image={image}
           size={selectedSize || null}
           quantity={quantity}
-          requiresSize={false}
+          requiresSize={true}
           disabled={!inStock}
           className="flex-1"
         />

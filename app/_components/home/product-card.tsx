@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { AddToCartDialog } from "@/app/_components/cart/add-to-cart-dialog";
 import { WishlistHeart } from "@/app/_components/wishlist/wishlist-heart";
@@ -92,7 +93,7 @@ export function ProductCard({
           )}
         </div>
       </CardContent>
-      <CardFooter className="p-4 pt-0">
+      <CardFooter className="flex gap-2 p-4 pt-0">
         <AddToCartDialog
           productId={id}
           name={name}
@@ -100,8 +101,18 @@ export function ProductCard({
           image={image}
           sizes={sizes}
           triggerVariant="default"
-          triggerClassName="w-full"
+          triggerClassName="flex-1 min-w-0 whitespace-nowrap"
         />
+        <Link
+          href={href}
+          className={buttonVariants({
+            size: "sm",
+            variant: "outline",
+            className: "flex-1 min-w-0 whitespace-nowrap",
+          })}
+        >
+          Buy it now
+        </Link>
       </CardFooter>
     </Card>
   );
