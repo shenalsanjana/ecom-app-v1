@@ -9,6 +9,7 @@ import { ArrowLeft, ShoppingBag, Truck, CreditCard, User, FileText, Loader2 } fr
 import { useCart } from "@/app/_lib/cart-context";
 import { processOrder, type PaymentMethod } from "./actions";
 import { ProfileMenu } from "@/app/_components/header/profile-menu";
+import { InstallmentNote } from "@/app/_components/shared/installment-note";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -500,6 +501,8 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
                     <span>Total</span>
                     <span>{formatPrice(total)}</span>
                   </div>
+
+                  <InstallmentNote total={total} className="mt-3 text-center" />
 
                   {subtotal >= FREE_DELIVERY_THRESHOLD && (
                     <p className="mt-2 text-sm text-brand font-medium">
