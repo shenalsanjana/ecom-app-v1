@@ -89,8 +89,8 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
         </header>
         <main className="flex-1 flex items-center justify-center px-4 py-20">
           <div className="text-center max-w-md">
-            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <ShoppingBag className="h-8 w-8 text-green-600" />
+            <div className="mx-auto w-16 h-16 bg-brand/10 rounded-full flex items-center justify-center mb-4">
+              <ShoppingBag className="h-8 w-8 text-brand" />
             </div>
             <h1 className="text-2xl font-bold mb-2">Order Confirmed!</h1>
             <p className="text-muted-foreground mb-2">Thank you for your order.</p>
@@ -502,7 +502,7 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
                   </div>
 
                   {subtotal >= FREE_DELIVERY_THRESHOLD && (
-                    <p className="mt-2 text-sm text-green-600 font-medium">
+                    <p className="mt-2 text-sm text-brand font-medium">
                       You qualify for free delivery!
                     </p>
                   )}
