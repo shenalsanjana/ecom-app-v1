@@ -60,7 +60,9 @@ export function CartSummary() {
       </Link>
 
       <div className="mt-4 flex items-center justify-center gap-4">
-        {(["KOKO", "MINTPAY", "PAYHERE", "COD"] as const).map((m) => (
+        {(["KOKO", "MINTPAY", "PAYHERE", "COD"] as const)
+          .filter((m) => m !== "KOKO" || process.env.NEXT_PUBLIC_KOKO_ENABLED === "true")
+          .map((m) => (
           <span key={m} className="flex h-6 items-center" aria-hidden>
             <PaymentMethodIcon method={m} />
           </span>

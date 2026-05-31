@@ -17,7 +17,7 @@ export default function SearchError({
 
   return (
     <main className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-4 py-20 text-center">
-      <h1 className="font-heading text-3xl font-medium">Search hit a snag</h1>
+      <h1 className="font-heading text-3xl font-semibold">Search hit a snag</h1>
       <p className="mt-3 text-sm text-muted-foreground">
         Try the search again, or browse the catalog instead.
       </p>

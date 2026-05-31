@@ -99,7 +99,7 @@ export function BuyBoxClient({
 
   return (
     <div className="space-y-5 lg:sticky lg:top-24 lg:self-start">
-      <h1 className="font-heading text-2xl font-medium tracking-tight sm:text-3xl">{name}</h1>
+      <h1 className="font-heading text-2xl font-semibold tracking-tight sm:text-3xl">{name}</h1>
 
       <a
         href="#reviews"
