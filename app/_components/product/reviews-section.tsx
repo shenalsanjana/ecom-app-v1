@@ -49,7 +49,7 @@ export function ReviewsSection({
 
   return (
     <section id="reviews" aria-labelledby="reviews-heading" className="space-y-6">
-      <h2 id="reviews-heading" className="font-heading text-xl font-medium tracking-tight">
+      <h2 id="reviews-heading" className="font-heading text-xl font-semibold tracking-tight">
         Customer reviews
       </h2>
 

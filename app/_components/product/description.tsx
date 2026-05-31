@@ -5,7 +5,7 @@ type Props = { markdown: string };
 export function Description({ markdown }: Props) {
   return (
     <section aria-labelledby="description-heading" className="space-y-4">
-      <h2 id="description-heading" className="font-heading text-xl font-medium tracking-tight">
+      <h2 id="description-heading" className="font-heading text-xl font-semibold tracking-tight">
         About this product
       </h2>
       <div className="prose prose-sm max-w-none dark:prose-invert

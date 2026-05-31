@@ -8,7 +8,7 @@ export default function ProductNotFound() {
     <>
       <SiteHeader />
       <main className="mx-auto flex min-h-[60vh] max-w-2xl flex-col items-center justify-center px-4 py-20 text-center">
-        <h1 className="font-heading text-4xl font-medium tracking-tight">Product not found</h1>
+        <h1 className="font-heading text-4xl font-semibold tracking-tight">Product not found</h1>
         <p className="mt-4 text-muted-foreground">
           The product you&apos;re looking for is no longer available, or the link is broken.
         </p>

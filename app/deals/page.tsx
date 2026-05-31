@@ -79,7 +79,7 @@ export default async function DealsPage({ searchParams }: DealsPageProps) {
             <span className="inline-block rounded-full bg-brand px-3 py-1 text-xs font-bold uppercase tracking-wider text-brand-foreground">
               Limited Time
             </span>
-            <h1 className="mt-4 font-heading text-4xl font-medium tracking-tight text-foreground sm:text-5xl">
+            <h1 className="mt-4 font-heading text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
               Deals of the Day
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">

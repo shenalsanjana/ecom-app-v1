@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Inter, Fraunces } from "next/font/google";
+import { Geist_Mono, Poppins } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { CartProvider } from "@/app/_lib/cart-context";
 import { WishlistProvider } from "@/app/_lib/wishlist-context";
@@ -7,16 +7,13 @@ import { WhatsAppFloatButton } from "@/app/_components/whatsapp-float-button";
 import { AnnouncementBar } from "@/app/_components/shared/announcement-bar";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
+// Poppins is the single brand typeface: Regular (body), Medium (buttons),
+// SemiBold/Bold (headings & banners). Poppins isn't a variable font on Google
+// Fonts, so the weights we use must be declared explicitly.
+const poppins = Poppins({
+  variable: "--font-poppins",
   subsets: ["latin"],
-  display: "swap",
-});
-
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  subsets: ["latin"],
-  axes: ["opsz"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
@@ -59,7 +56,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${fraunces.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${poppins.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <AnnouncementBar />
