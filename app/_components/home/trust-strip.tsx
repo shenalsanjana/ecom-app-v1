@@ -6,7 +6,7 @@ const BENEFITS: Benefit[] = [
   {
     icon: Truck,
     title: "Free Shipping",
-    description: "On all orders over Rs. 10,000 island-wide.",
+    description: "On all orders over Rs. 5,000 island-wide.",
   },
   {
     icon: RotateCcw,

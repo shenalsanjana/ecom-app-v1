@@ -207,7 +207,7 @@ export function BuyBoxClient({
           image={image}
           size={selectedSize || null}
           quantity={quantity}
-          requiresSize={requiresSize}
+          requiresSize={false}
           disabled={!inStock}
           className="flex-1"
         />

@@ -41,8 +41,9 @@ export function AddToCartDialog({
   const [selectedSize, setSelectedSize] = useState<string>("");
   const [added, setAdded] = useState(false);
 
-  const requiresSize = sizeList.length > 0;
-  const canAdd = !requiresSize || selectedSize !== "";
+  const hasSizes = sizeList.length > 0;
+  // Size is optional for Add to cart — customers may pick one, but it never blocks.
+  const canAdd = true;
 
   function handleAdd() {
     if (!canAdd) return;
@@ -88,10 +89,10 @@ export function AddToCartDialog({
           <DialogTitle>{name}</DialogTitle>
           <DialogDescription>
             {formatPrice(price)}
-            {requiresSize ? " — choose your size" : ""}
+            {hasSizes ? " — choose your size (optional)" : ""}
           </DialogDescription>
         </DialogHeader>
-        {requiresSize && (
+        {hasSizes && (
           <div className="flex flex-wrap gap-2">
             {sizeList.map((size) => {
               const selected = selectedSize === size;

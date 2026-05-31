@@ -5,7 +5,7 @@ import { installmentAmount, INSTALMENT_COUNT } from "@/app/_lib/installments";
 
 type Props = { total: number; className?: string };
 
-// "3 × LKR X or 6% Cashback with [Mintpay]"
+// "or pay in 3 × LKR X or 6% Cashback with [Mintpay]"
 export function InstallmentNote({ total, className }: Props) {
   if (total <= 0) return null;
   const per = installmentAmount(total);
@@ -13,7 +13,7 @@ export function InstallmentNote({ total, className }: Props) {
 
   return (
     <p className={"text-sm text-muted-foreground " + (className ?? "")}>
-      {INSTALMENT_COUNT} ×{" "}
+      or pay in {INSTALMENT_COUNT} ×{" "}
       <span className="font-medium text-foreground">{formatPrice(per)}</span> or{" "}
       <span className="font-medium text-foreground">6% Cashback</span> with{" "}
       <Image
