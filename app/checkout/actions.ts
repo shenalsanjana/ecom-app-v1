@@ -183,7 +183,8 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
   const total = subtotal + shippingCost;
   const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-  // Validate: products that offer size variants require a size selection.
+  // Validate: a provided size must be one the product actually offers. Size
+  // itself is optional (it's optional at add-to-cart), so a missing size is OK.
   const productIds = Array.from(new Set(items.map((i) => i.productId)));
   const dbProducts = await prisma.product.findMany({
     where: { id: { in: productIds } },
@@ -200,16 +201,13 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
-    if (allowedSizes.length > 0) {
-      if (!item.size) {
-        return { success: false, error: `Please select a size for "${item.name}"` };
-      }
-      if (!allowedSizes.includes(item.size)) {
-        return {
-          success: false,
-          error: `Size "${item.size}" is not available for "${item.name}"`,
-        };
-      }
+    // Size is optional at add-to-cart, so it's optional at checkout too. Only
+    // reject a size that was provided but isn't offered for the product.
+    if (allowedSizes.length > 0 && item.size && !allowedSizes.includes(item.size)) {
+      return {
+        success: false,
+        error: `Size "${item.size}" is not available for "${item.name}"`,
+      };
     }
   }
 

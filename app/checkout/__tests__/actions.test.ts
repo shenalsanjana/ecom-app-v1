@@ -159,6 +159,29 @@ describe("processOrder — never throws downstream failures back to the customer
   });
 });
 
+describe("processOrder — size is optional", () => {
+  it("accepts a sized product checked out without a size", async () => {
+    const result = await processOrder({
+      ...baseInput,
+      items: [{ productId: "P1", name: "T-Shirt", price: 1200, quantity: 2, size: null }],
+      paymentMethod: "COD",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("still rejects a size the product does not offer", async () => {
+    const result = await processOrder({
+      ...baseInput,
+      items: [{ productId: "P1", name: "T-Shirt", price: 1200, quantity: 2, size: "XXL" }],
+      paymentMethod: "COD",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/not available/i);
+    }
+  });
+});
+
 describe("processOrder — customer name requirement", () => {
   it("rejects logged-in checkout when session.user.name is empty", async () => {
     vi.mocked(auth).mockResolvedValueOnce({

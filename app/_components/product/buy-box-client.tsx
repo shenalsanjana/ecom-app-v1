@@ -81,17 +81,12 @@ export function BuyBoxClient({
   const inStock = stock > 0;
   const qtyMax = Math.min(stock, 10);
 
-  const requiresSize = sizeList.length > 0;
-  const sizeMissing = requiresSize && !selectedSize;
-
   // Match cart line by composite key (productId + size).
   const cartKey = selectedSize ? `${productId}::${selectedSize}` : productId;
   const existingItem = items.find((i) => i.key === cartKey);
   const inCartQty = existingItem ? existingItem.quantity : 0;
 
   function handleBuyNow() {
-    if (sizeMissing) return;
-
     setIsBuying(true);
     addItem({ productId, name, price, image, size: selectedSize || null }, quantity);
     router.push("/checkout");
@@ -214,7 +209,7 @@ export function BuyBoxClient({
         {inStock && (
           <Button
             onClick={handleBuyNow}
-            disabled={isBuying || sizeMissing}
+            disabled={isBuying}
             variant="outline"
             className="flex-1"
           >
