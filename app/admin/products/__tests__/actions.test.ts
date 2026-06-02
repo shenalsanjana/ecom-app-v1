@@ -42,6 +42,11 @@ describe("updateStock", () => {
     expect(res).toEqual({ success: false, error: "Stock must be 0 or more" });
     expect(productUpdate).not.toHaveBeenCalled();
   });
+  it("rejects a non-integer stock", async () => {
+    const res = await updateStock("cat-white", 1.5);
+    expect(res).toEqual({ success: false, error: "Stock must be 0 or more" });
+    expect(productUpdate).not.toHaveBeenCalled();
+  });
   it("sets stock", async () => {
     productUpdate.mockResolvedValueOnce({});
     const res = await updateStock("cat-white", 12);
@@ -138,6 +143,15 @@ describe("updateProduct", () => {
     expect(updArg.data.id).toBeUndefined(); // slug/id never updated
     expect(imageDeleteMany).toHaveBeenCalledWith({ where: { productId: "cat-white" } });
     expect(imageCreateMany).toHaveBeenCalledWith({ data: [{ productId: "cat-white", url: "/g/1.jpg", sortOrder: 0 }] });
+    expect(res).toEqual({ success: true });
+  });
+  it("clears the gallery (deleteMany, no createMany) when gallery is empty", async () => {
+    productFindUnique.mockResolvedValueOnce({ id: "cat-white" });
+    productUpdate.mockResolvedValueOnce({});
+    imageDeleteMany.mockResolvedValueOnce({ count: 2 });
+    const res = await updateProduct("cat-white", { ...NEW_INPUT, gallery: [] });
+    expect(imageDeleteMany).toHaveBeenCalledWith({ where: { productId: "cat-white" } });
+    expect(imageCreateMany).not.toHaveBeenCalled();
     expect(res).toEqual({ success: true });
   });
 });

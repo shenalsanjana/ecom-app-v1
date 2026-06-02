@@ -4,6 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/app/_lib/prisma";
 import { requireAdmin } from "@/app/_lib/admin-auth";
+import { slugify, uniqueSlug, serializeSizes } from "@/app/_lib/admin-products";
 
 export type ActionResult =
   | { success: true; slug?: string; name?: string }
@@ -49,8 +50,6 @@ export async function unarchiveProduct(id: string): Promise<ActionResult> {
   return { success: true };
 }
 
-import { slugify, uniqueSlug } from "@/app/_lib/admin-products";
-
 const CategorySchema = z.object({
   name: z.string().trim().min(1),
   image: z.string().trim().min(1),
@@ -65,18 +64,17 @@ export async function createCategory(input: { name: string; image: string }): Pr
     slugify(parsed.data.name),
     async (s) => (await prisma.category.findUnique({ where: { slug: s } })) !== null,
   );
+  let created;
   try {
-    const created = await prisma.category.create({
+    created = await prisma.category.create({
       data: { slug, name: parsed.data.name, image: parsed.data.image },
     });
-    revalidateTag("catalog", "max");
-    return { success: true, slug: created.slug, name: created.name };
   } catch {
     return { success: false, error: "Could not create category." };
   }
+  revalidate();
+  return { success: true, slug: created.slug, name: created.name };
 }
-
-import { parseSizes, serializeSizes } from "@/app/_lib/admin-products";
 
 const ProductInputSchema = z.object({
   name: z.string().trim().min(1),
