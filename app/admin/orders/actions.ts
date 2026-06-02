@@ -177,3 +177,72 @@ export async function editItems(orderId: string, changes: ItemChange[]): Promise
     ? { success: true, warning: "Order was paid — any price difference must be settled manually." }
     : { success: true };
 }
+
+import { bookCourierAndNotify } from "@/app/checkout/book-courier";
+import { sendOrderConfirmationEmail, type OrderDetails } from "@/app/_lib/mailer";
+
+type DbOrderWithItems = {
+  id: string; guestName: string | null; guestEmail: string | null; customerPhone: string;
+  shippingLine1: string; shippingLine2: string | null; shippingCity: string; shippingCountry: string;
+  subtotal: number; shippingCost: number; total: number;
+  paymentMethod: string; paymentMethodDisplay: string; paymentStatus: string | null;
+  webNumber: string | null; rbNumber: string | null; notes: string | null; trackingCode: string | null;
+  user: { name: string | null; email: string | null } | null;
+  items: { name: string; size: string | null; price: number; quantity: number }[];
+};
+
+function toOrderDetails(order: DbOrderWithItems): OrderDetails {
+  return {
+    orderId: order.id,
+    customerName: order.user?.name ?? order.guestName ?? "Customer",
+    customerEmail: order.user?.email ?? order.guestEmail ?? "",
+    customerPhone: order.customerPhone,
+    items: order.items.map((i) => ({ name: i.name, size: i.size, price: i.price, quantity: i.quantity })),
+    subtotal: order.subtotal,
+    shipping: order.shippingCost,
+    total: order.total,
+    shippingAddress: {
+      line1: order.shippingLine1, line2: order.shippingLine2 ?? undefined,
+      city: order.shippingCity, country: order.shippingCountry,
+    },
+    paymentMethod: order.paymentMethod as OrderDetails["paymentMethod"],
+    paymentMethodDisplay: order.paymentMethodDisplay,
+    notes: order.notes ?? undefined,
+    webNumber: order.webNumber,
+    rbNumber: order.rbNumber,
+    paymentStatus: order.paymentStatus,
+    trackingCode: order.trackingCode ?? undefined,
+  };
+}
+
+const ORDER_INCLUDE = {
+  user: { select: { name: true, email: true } },
+  items: { select: { name: true, size: true, price: true, quantity: true } },
+} as const;
+
+export async function bookCourier(orderId: string): Promise<ActionResult> {
+  await requireAdmin();
+  if (process.env.ROYAL_EXPRESS_ENABLED !== "true") {
+    return { success: false, error: "Courier integration is disabled (ROYAL_EXPRESS_ENABLED)." };
+  }
+  const order = await prisma.order.findUnique({ where: { id: orderId }, include: ORDER_INCLUDE });
+  if (!order) return { success: false, error: "Order not found" };
+  if (order.status !== "CONFIRMED" || order.courierBookedAt) {
+    return { success: false, error: "Only confirmed, un-booked orders can be dispatched" };
+  }
+  const waybill = await bookCourierAndNotify({ order: toOrderDetails(order as unknown as DbOrderWithItems) });
+  revalidate(orderId);
+  return waybill
+    ? { success: true, warning: `Booked — waybill ${waybill}.` }
+    : { success: false, error: "Courier booking failed — check Curfox / retry." };
+}
+
+export async function resendConfirmationEmail(orderId: string): Promise<ActionResult> {
+  await requireAdmin();
+  const order = await prisma.order.findUnique({ where: { id: orderId }, include: ORDER_INCLUDE });
+  if (!order) return { success: false, error: "Order not found" };
+  const details = toOrderDetails(order as unknown as DbOrderWithItems);
+  if (!details.customerEmail) return { success: false, error: "No customer email on this order" };
+  await sendOrderConfirmationEmail(details);
+  return { success: true, warning: details.trackingCode ? undefined : "Sent without a tracking code (not dispatched yet)." };
+}

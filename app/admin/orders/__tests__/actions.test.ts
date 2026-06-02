@@ -11,6 +11,12 @@ const { orderFindUnique, orderUpdate, noteCreate, productUpdateMany, txn } = vi.
 
 vi.mock("@/app/_lib/admin-auth", () => ({ requireAdmin }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+
+const { bookCourierAndNotify } = vi.hoisted(() => ({ bookCourierAndNotify: vi.fn() }));
+vi.mock("@/app/checkout/book-courier", () => ({ bookCourierAndNotify }));
+const { sendOrderConfirmationEmail } = vi.hoisted(() => ({ sendOrderConfirmationEmail: vi.fn() }));
+vi.mock("@/app/_lib/mailer", () => ({ sendOrderConfirmationEmail }));
+
 vi.mock("@/app/_lib/prisma", () => {
   const client = {
     order: { findUnique: orderFindUnique, update: orderUpdate },
@@ -24,6 +30,7 @@ vi.mock("@/app/_lib/prisma", () => {
 import { addNote, markCodCollected } from "../actions";
 
 beforeEach(() => {
+  process.env.ROYAL_EXPRESS_ENABLED = "true";
   requireAdmin.mockReset().mockResolvedValue({ user: { email: "admin@x.test" } });
   orderFindUnique.mockReset();
   orderUpdate.mockReset();
@@ -38,6 +45,8 @@ beforeEach(() => {
     };
     return fn(client);
   });
+  bookCourierAndNotify.mockReset();
+  sendOrderConfirmationEmail.mockReset();
 });
 
 describe("addNote", () => {
@@ -188,5 +197,65 @@ describe("editAddress", () => {
       }),
     });
     expect(res).toEqual({ success: true });
+  });
+});
+
+import { bookCourier, resendConfirmationEmail } from "../actions";
+
+const FULL_ORDER = {
+  id: "o1", status: "CONFIRMED", courierBookedAt: null,
+  guestName: "Nimali", guestEmail: "n@x.test", customerPhone: "0771234567",
+  shippingLine1: "1 Rd", shippingLine2: null, shippingCity: "Colombo", shippingCountry: "Sri Lanka",
+  subtotal: 6500, shippingCost: 0, total: 6500,
+  paymentMethod: "KOKO", paymentMethodDisplay: "Koko", paymentStatus: "PAID",
+  webNumber: "DB-1", rbNumber: null, notes: null, trackingCode: null,
+  user: null,
+  items: [{ name: "Dress", size: "M", price: 6500, quantity: 1 }],
+};
+
+describe("bookCourier", () => {
+  it("rejects when not CONFIRMED", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...FULL_ORDER, status: "PENDING" });
+    const res = await bookCourier("o1");
+    expect(res).toEqual({ success: false, error: "Only confirmed, un-booked orders can be dispatched" });
+  });
+
+  it("rejects when already booked", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...FULL_ORDER, courierBookedAt: new Date() });
+    const res = await bookCourier("o1");
+    expect(res).toEqual({ success: false, error: "Only confirmed, un-booked orders can be dispatched" });
+  });
+
+  it("books via bookCourierAndNotify and reports the waybill", async () => {
+    orderFindUnique.mockResolvedValueOnce(FULL_ORDER);
+    bookCourierAndNotify.mockResolvedValueOnce("CF-88213");
+    const res = await bookCourier("o1");
+    expect(bookCourierAndNotify).toHaveBeenCalledTimes(1);
+    expect(res).toEqual({ success: true, warning: "Booked — waybill CF-88213." });
+  });
+
+  it("returns an error when Curfox booking did not yield a waybill", async () => {
+    orderFindUnique.mockResolvedValueOnce(FULL_ORDER);
+    bookCourierAndNotify.mockResolvedValueOnce(undefined);
+    const res = await bookCourier("o1");
+    expect(res).toEqual({ success: false, error: "Courier booking failed — check Curfox / retry." });
+  });
+});
+
+describe("resendConfirmationEmail", () => {
+  it("re-sends with the tracking code when dispatched", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...FULL_ORDER, trackingCode: "CF-88213" });
+    sendOrderConfirmationEmail.mockResolvedValueOnce(undefined);
+    const res = await resendConfirmationEmail("o1");
+    const arg = sendOrderConfirmationEmail.mock.calls[0][0];
+    expect(arg.trackingCode).toBe("CF-88213");
+    expect(arg.customerEmail).toBe("n@x.test");
+    expect(res).toEqual({ success: true, warning: undefined });
+  });
+
+  it("fails when there is no customer email", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...FULL_ORDER, guestEmail: null, user: null });
+    const res = await resendConfirmationEmail("o1");
+    expect(res).toEqual({ success: false, error: "No customer email on this order" });
   });
 });
