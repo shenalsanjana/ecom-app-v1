@@ -77,3 +77,45 @@ export function buildProductWhere(params: ProductListParams): Prisma.ProductWher
 
   return where;
 }
+
+import { prisma } from "@/app/_lib/prisma";
+
+export const PAGE_SIZE = 25;
+
+export async function listProducts(
+  params: ProductListParams & { page?: number; pageSize?: number },
+) {
+  const where = buildProductWhere(params);
+  const pageSize = Math.min(params.pageSize ?? PAGE_SIZE, 200);
+  const page = Math.max(1, params.page ?? 1);
+
+  const [rows, total] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      orderBy: { name: "asc" },
+      take: pageSize,
+      skip: (page - 1) * pageSize,
+      include: {
+        category: { select: { name: true } },
+        _count: { select: { images: true } },
+      },
+    }),
+    prisma.product.count({ where }),
+  ]);
+
+  return { rows, total };
+}
+
+export async function getProduct(id: string) {
+  return prisma.product.findUnique({
+    where: { id },
+    include: {
+      category: true,
+      images: { orderBy: { sortOrder: "asc" } },
+    },
+  });
+}
+
+export async function listCategories() {
+  return prisma.category.findMany({ orderBy: { name: "asc" } });
+}
