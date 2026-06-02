@@ -132,3 +132,42 @@ export function canEdit(order: { status: string }): boolean {
 export function canCancel(order: { status: string }): boolean {
   return canEdit(order);
 }
+
+import { prisma } from "@/app/_lib/prisma";
+
+export const PAGE_SIZE = 25;
+
+export async function listOrders(
+  params: ListParams & { page?: number; pageSize?: number },
+) {
+  const where = buildOrderWhere(params);
+  const pageSize = params.pageSize ?? PAGE_SIZE;
+  const page = Math.max(1, params.page ?? 1);
+
+  const [rows, total] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: pageSize,
+      skip: (page - 1) * pageSize,
+      include: {
+        user: { select: { name: true, email: true } },
+        _count: { select: { items: true } },
+      },
+    }),
+    prisma.order.count({ where }),
+  ]);
+
+  return { rows, total };
+}
+
+export async function getOrderDetail(id: string) {
+  return prisma.order.findUnique({
+    where: { id },
+    include: {
+      user: { select: { name: true, email: true } },
+      items: { include: { product: { select: { sizes: true } } } },
+      notesLog: { orderBy: { createdAt: "desc" } },
+    },
+  });
+}
