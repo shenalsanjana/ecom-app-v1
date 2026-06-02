@@ -25,7 +25,7 @@ export function CategorySelect({
 
   return (
     <div>
-      <select className="w-full rounded border px-2 py-1.5 text-sm" value={value}
+      <select className="w-full rounded border px-2 py-1.5 text-sm" value={adding ? "__new__" : value}
         onChange={(e) => { if (e.target.value === "__new__") setAdding(true); else onChange(e.target.value); }}>
         <option value="" disabled>Select a category…</option>
         {cats.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}

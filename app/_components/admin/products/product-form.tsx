@@ -23,8 +23,15 @@ export function ProductForm({ mode, categories, initial }: { mode: "create" | "e
   const [pending, start] = useTransition();
   const set = <K extends keyof Initial>(k: K, v: Initial[K]) => setF((p) => ({ ...p, [k]: v }));
 
+  const [customSize, setCustomSize] = useState("");
   const sizes = parseSizes(f.sizesCsv);
   const toggleSize = (s: string) => set("sizesCsv", serializeSizes(sizes.includes(s) ? sizes.filter((x) => x !== s) : [...sizes, s]));
+  const addCustomSize = () => {
+    const s = customSize.trim();
+    if (!s || sizes.includes(s)) { setCustomSize(""); return; }
+    set("sizesCsv", serializeSizes([...sizes, s]));
+    setCustomSize("");
+  };
 
   function submit() {
     const input = {
@@ -45,6 +52,9 @@ export function ProductForm({ mode, categories, initial }: { mode: "create" | "e
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-bold">{mode === "create" ? "New product" : `Edit · ${f.name}`}</h1>
         <span className="ml-auto flex gap-2">
+          {mode === "edit" && (
+            <a href={`/products/${f.id}`} target="_blank" rel="noopener noreferrer" className="rounded-md border px-3 py-1.5 text-sm">View on storefront ↗</a>
+          )}
           {mode === "edit" && (
             <button disabled={pending} onClick={() => start(async () => { const r = f.archived ? await unarchiveProduct(f.id!) : await archiveProduct(f.id!); if (r.success) { set("archived", !f.archived); router.refresh(); } else alert(r.error); })}
               className="rounded-md border border-destructive px-3 py-1.5 text-sm text-destructive">{f.archived ? "Unarchive" : "Archive"}</button>
@@ -79,6 +89,20 @@ export function ProductForm({ mode, categories, initial }: { mode: "create" | "e
                 <button key={s} type="button" onClick={() => toggleSize(s)}
                   className={"rounded-full px-3 py-1 text-xs " + (sizes.includes(s) ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground")}>{s}</button>
               ))}
+              {sizes.filter((s) => !STD_SIZES.includes(s)).map((s) => (
+                <button key={s} type="button" onClick={() => toggleSize(s)}
+                  className="rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground">{s} ✕</button>
+              ))}
+            </div>
+            <div className="mt-2 flex gap-2">
+              <input
+                value={customSize}
+                onChange={(e) => setCustomSize(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomSize(); } }}
+                placeholder="+ add custom"
+                className="rounded border px-2 py-1 text-xs w-28"
+              />
+              <button type="button" onClick={addCustomSize} className="rounded border px-2 py-1 text-xs">Add</button>
             </div>
           </div>
           <div className="rounded-lg border p-4">

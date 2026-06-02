@@ -1,3 +1,6 @@
+export const PRODUCT_TABS = ["active", "low-stock", "archived", "all"] as const;
+export type ProductTab = (typeof PRODUCT_TABS)[number];
+
 export function slugify(name: string): string {
   return name
     .toLowerCase()

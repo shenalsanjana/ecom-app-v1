@@ -1,13 +1,13 @@
 "use client";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { PRODUCT_TABS, type ProductTab } from "@/app/_lib/admin-products";
+import { PRODUCT_TABS, type ProductTab } from "@/app/_lib/product-helpers";
 
 const TAB_LABEL: Record<ProductTab, string> = {
   active: "Active", "low-stock": "Low stock", archived: "Archived", all: "All",
 };
 
-export function ProductsToolbar({ categories }: { categories: { slug: string; name: string }[] }) {
+export function ProductsToolbar({ categories, counts }: { categories: { slug: string; name: string }[]; counts: Record<ProductTab, number> }) {
   const router = useRouter();
   const sp = useSearchParams();
   const activeTab = (sp.get("tab") as ProductTab) || "active";
@@ -37,7 +37,7 @@ export function ProductsToolbar({ categories }: { categories: { slug: string; na
         {PRODUCT_TABS.map((t) => (
           <button key={t} onClick={() => setParam("tab", t === "active" ? "" : t)}
             className={(activeTab === t ? "bg-primary text-primary-foreground " : "bg-secondary text-muted-foreground ") + "rounded-full px-3 py-1 text-xs font-medium"}>
-            {TAB_LABEL[t]}
+            {TAB_LABEL[t]} <span className="opacity-70">{counts[t]}</span>
           </button>
         ))}
       </div>

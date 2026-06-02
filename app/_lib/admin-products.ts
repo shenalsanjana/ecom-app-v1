@@ -2,11 +2,10 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/app/_lib/prisma";
 
 export { slugify, uniqueSlug, parseSizes, serializeSizes } from "@/app/_lib/product-helpers";
+import { PRODUCT_TABS, type ProductTab } from "@/app/_lib/product-helpers";
+export { PRODUCT_TABS, type ProductTab };
 
 export const LOW_STOCK_THRESHOLD = 5;
-
-export const PRODUCT_TABS = ["active", "low-stock", "archived", "all"] as const;
-export type ProductTab = (typeof PRODUCT_TABS)[number];
 
 export type ProductListParams = {
   tab?: ProductTab;
