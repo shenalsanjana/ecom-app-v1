@@ -52,3 +52,28 @@ export async function advanceStatus(orderId: string, to: string): Promise<Action
   revalidate(orderId);
   return { success: true };
 }
+
+const PAID = new Set(["PAID", "COD_COLLECTED"]);
+
+export async function cancelOrder(orderId: string): Promise<ActionResult> {
+  await requireAdmin();
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { items: { select: { productId: true, quantity: true } } },
+  });
+  if (!order) return { success: false, error: "Order not found" };
+  if (order.status === "CANCELLED") return { success: false, error: "Order is already cancelled" };
+  if (order.status === "DELIVERED") return { success: false, error: "Delivered orders cannot be cancelled" };
+
+  await prisma.$transaction(async (tx) => {
+    for (const it of order.items) {
+      await tx.product.updateMany({ where: { id: it.productId }, data: { stock: { increment: it.quantity } } });
+    }
+    await tx.order.update({ where: { id: orderId }, data: { status: "CANCELLED" } });
+  });
+
+  revalidate(orderId);
+  return PAID.has(order.paymentStatus ?? "")
+    ? { success: true, warning: "Order was paid — refund must be handled manually." }
+    : { success: true };
+}

@@ -1,20 +1,25 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const { requireAdmin } = vi.hoisted(() => ({ requireAdmin: vi.fn() }));
-const { orderFindUnique, orderUpdate, noteCreate } = vi.hoisted(() => ({
+const { orderFindUnique, orderUpdate, noteCreate, productUpdateMany, txn } = vi.hoisted(() => ({
   orderFindUnique: vi.fn(),
   orderUpdate: vi.fn(),
   noteCreate: vi.fn(),
+  productUpdateMany: vi.fn(),
+  txn: vi.fn(),
 }));
 
 vi.mock("@/app/_lib/admin-auth", () => ({ requireAdmin }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("@/app/_lib/prisma", () => ({
-  prisma: {
+vi.mock("@/app/_lib/prisma", () => {
+  const client = {
     order: { findUnique: orderFindUnique, update: orderUpdate },
     orderNote: { create: noteCreate },
-  },
-}));
+    product: { updateMany: productUpdateMany },
+    orderItem: { update: vi.fn(), delete: vi.fn() },
+  };
+  return { prisma: { ...client, $transaction: txn.mockImplementation(async (fn: any) => fn(client)) } };
+});
 
 import { addNote, markCodCollected } from "../actions";
 
@@ -23,6 +28,16 @@ beforeEach(() => {
   orderFindUnique.mockReset();
   orderUpdate.mockReset();
   noteCreate.mockReset();
+  productUpdateMany.mockReset();
+  txn.mockReset().mockImplementation(async (fn: any) => {
+    const client = {
+      order: { findUnique: orderFindUnique, update: orderUpdate },
+      orderNote: { create: noteCreate },
+      product: { updateMany: productUpdateMany },
+      orderItem: { update: vi.fn(), delete: vi.fn() },
+    };
+    return fn(client);
+  });
 });
 
 describe("addNote", () => {
@@ -76,5 +91,34 @@ describe("advanceStatus", () => {
     const res = await advanceStatus("o1", "CONFIRMED");
     expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CONFIRMED" } });
     expect(res).toEqual({ success: true });
+  });
+});
+
+import { cancelOrder } from "../actions";
+
+describe("cancelOrder", () => {
+  it("is idempotent — rejects an already-cancelled order", async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "CANCELLED", items: [] });
+    const res = await cancelOrder("o1");
+    expect(res).toEqual({ success: false, error: "Order is already cancelled" });
+  });
+
+  it("rejects cancelling a delivered order", async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "DELIVERED", items: [] });
+    const res = await cancelOrder("o1");
+    expect(res).toEqual({ success: false, error: "Delivered orders cannot be cancelled" });
+  });
+
+  it("restores stock and warns when the order was paid", async () => {
+    orderFindUnique.mockResolvedValueOnce({
+      id: "o1", status: "CONFIRMED", paymentStatus: "PAID",
+      items: [{ productId: "p1", quantity: 2 }],
+    });
+    const res = await cancelOrder("o1");
+    expect(productUpdateMany).toHaveBeenCalledWith({
+      where: { id: "p1" }, data: { stock: { increment: 2 } },
+    });
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CANCELLED" } });
+    expect(res).toEqual({ success: true, warning: "Order was paid — refund must be handled manually." });
   });
 });
