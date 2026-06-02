@@ -7,7 +7,8 @@
 // freshness wins over micro-latency on a low-traffic admin route.
 import { prisma } from "@/app/_lib/prisma";
 import { startOfTodaySLT } from "@/app/_lib/time";
-import { LOW_STOCK_THRESHOLD } from "@/app/_lib/admin-products";
+
+const LOW_STOCK_THRESHOLD = 5;
 
 export type DashboardKpis = {
   pendingDispatch: number;
