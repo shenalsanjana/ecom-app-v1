@@ -25,9 +25,13 @@ export async function addNote(orderId: string, body: string): Promise<ActionResu
   const parsed = NoteSchema.safeParse(body);
   if (!parsed.success) return { success: false, error: "Note cannot be empty" };
 
-  await prisma.orderNote.create({
-    data: { orderId, authorEmail: session.user.email ?? "admin", body: parsed.data },
-  });
+  try {
+    await prisma.orderNote.create({
+      data: { orderId, authorEmail: session.user.email ?? "admin", body: parsed.data },
+    });
+  } catch {
+    return { success: false, error: "Something went wrong. Please try again." };
+  }
   revalidate(orderId);
   return { success: true };
 }
