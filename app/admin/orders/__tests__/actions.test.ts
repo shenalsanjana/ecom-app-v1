@@ -28,7 +28,7 @@ vi.mock("@/app/_lib/prisma", () => {
     product: { updateMany: productUpdateMany },
     orderItem: { update: orderItemUpdate, delete: orderItemDelete },
   };
-  return { prisma: { ...client, $transaction: txn.mockImplementation(async (fn: any) => fn(client)) } };
+  return { prisma: { ...client, $transaction: txn.mockImplementation(async (fn: (c: unknown) => unknown) => fn(client)) } };
 });
 
 import { addNote, markCodCollected } from "../actions";
@@ -42,7 +42,7 @@ beforeEach(() => {
   productUpdateMany.mockReset();
   orderItemUpdate.mockReset();
   orderItemDelete.mockReset();
-  txn.mockReset().mockImplementation(async (fn: any) => {
+  txn.mockReset().mockImplementation(async (fn: (c: unknown) => unknown) => {
     const client = {
       order: { findUnique: orderFindUnique, update: orderUpdate },
       orderNote: { create: noteCreate },

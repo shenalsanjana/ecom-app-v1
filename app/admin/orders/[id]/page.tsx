@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getOrderDetail, nextStatuses } from "@/app/_lib/admin-orders";
 import { formatPrice } from "@/app/_lib/format";
@@ -19,7 +20,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
   return (
     <section>
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <a href="/admin/orders" className="text-sm text-muted-foreground">‹ Orders</a>
+        <Link href="/admin/orders" className="text-sm text-muted-foreground">‹ Orders</Link>
         <h1 className="text-xl font-bold">{order.webNumber ?? order.id}</h1>
         <span className="rounded-full bg-secondary px-2 py-0.5 text-xs">{order.status}</span>
         <span className="rounded-full bg-secondary px-2 py-0.5 text-xs">{paymentStatusLabel(order.paymentStatus) ?? "—"} · {order.paymentMethod}</span>
