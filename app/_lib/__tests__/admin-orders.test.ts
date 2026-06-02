@@ -98,3 +98,22 @@ describe("applyItemChanges", () => {
     expect(() => applyItemChanges(ITEMS, [{ id: "i1", quantity: 0 }])).toThrow();
   });
 });
+
+import { nextStatuses, canEdit, canCancel } from "../admin-orders";
+
+describe("status transitions", () => {
+  it("allows PENDING→CONFIRMED and CONFIRMED→DELIVERED", () => {
+    expect(nextStatuses("PENDING")).toEqual(["CONFIRMED"]);
+    expect(nextStatuses("CONFIRMED")).toEqual(["DELIVERED"]);
+  });
+  it("has no transitions from terminal states", () => {
+    expect(nextStatuses("DELIVERED")).toEqual([]);
+    expect(nextStatuses("CANCELLED")).toEqual([]);
+  });
+  it("canEdit/canCancel only for non-terminal orders", () => {
+    expect(canEdit({ status: "CONFIRMED" })).toBe(true);
+    expect(canCancel({ status: "PENDING" })).toBe(true);
+    expect(canEdit({ status: "DELIVERED" })).toBe(false);
+    expect(canCancel({ status: "CANCELLED" })).toBe(false);
+  });
+});

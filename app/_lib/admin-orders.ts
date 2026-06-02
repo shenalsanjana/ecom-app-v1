@@ -113,3 +113,22 @@ export function applyItemChanges(
   for (const k of Object.keys(deltas)) if (deltas[k] === 0) delete deltas[k];
   return { nextItems: [...byId.values()], stockDeltas: deltas };
 }
+
+const TRANSITIONS: Record<string, string[]> = {
+  PENDING: ["CONFIRMED"],
+  CONFIRMED: ["DELIVERED"],
+  DELIVERED: [],
+  CANCELLED: [],
+};
+
+export function nextStatuses(current: string): string[] {
+  return TRANSITIONS[current] ?? [];
+}
+
+export function canEdit(order: { status: string }): boolean {
+  return order.status !== "DELIVERED" && order.status !== "CANCELLED";
+}
+
+export function canCancel(order: { status: string }): boolean {
+  return canEdit(order);
+}
