@@ -65,3 +65,19 @@ describe("archive/unarchive", () => {
     expect(res).toEqual({ success: true });
   });
 });
+
+import { createCategory } from "../actions";
+
+describe("createCategory", () => {
+  it("rejects empty name or image", async () => {
+    expect(await createCategory({ name: "  ", image: "/x.jpg" })).toEqual({ success: false, error: "Name and image are required" });
+    expect(await createCategory({ name: "Hats", image: "" })).toEqual({ success: false, error: "Name and image are required" });
+  });
+  it("slugifies, ensures uniqueness, creates, and returns the slug", async () => {
+    categoryFindUnique.mockResolvedValueOnce({ slug: "hats" }).mockResolvedValueOnce(null); // 'hats' taken, 'hats-2' free
+    categoryCreate.mockResolvedValueOnce({ slug: "hats-2", name: "Hats" });
+    const res = await createCategory({ name: "Hats", image: "/hats.jpg" });
+    expect(categoryCreate).toHaveBeenCalledWith({ data: { slug: "hats-2", name: "Hats", image: "/hats.jpg" } });
+    expect(res).toEqual({ success: true, slug: "hats-2", name: "Hats" });
+  });
+});

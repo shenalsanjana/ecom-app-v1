@@ -48,3 +48,30 @@ export async function unarchiveProduct(id: string): Promise<ActionResult> {
   revalidate(id);
   return { success: true };
 }
+
+import { slugify, uniqueSlug } from "@/app/_lib/admin-products";
+
+const CategorySchema = z.object({
+  name: z.string().trim().min(1),
+  image: z.string().trim().min(1),
+});
+
+export async function createCategory(input: { name: string; image: string }): Promise<ActionResult> {
+  await requireAdmin();
+  const parsed = CategorySchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Name and image are required" };
+
+  const slug = await uniqueSlug(
+    slugify(parsed.data.name),
+    async (s) => (await prisma.category.findUnique({ where: { slug: s } })) !== null,
+  );
+  try {
+    const created = await prisma.category.create({
+      data: { slug, name: parsed.data.name, image: parsed.data.image },
+    });
+    revalidateTag("catalog");
+    return { success: true, slug: created.slug, name: created.name };
+  } catch {
+    return { success: false, error: "Could not create category." };
+  }
+}
