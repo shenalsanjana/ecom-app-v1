@@ -13,7 +13,9 @@ export default async function WishlistPage() {
   if (!session?.user?.id) redirect("/login?callbackUrl=/wishlist");
 
   const items = await prisma.wishlistItem.findMany({
-    where: { userId: session.user.id },
+    // Exclude archived products so they drop off the storefront wishlist too
+    // (a relation-include reader that the products.ts archived filter missed).
+    where: { userId: session.user.id, product: { archived: false } },
     include: { product: true },
     orderBy: { createdAt: "desc" },
   });

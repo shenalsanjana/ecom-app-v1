@@ -77,7 +77,7 @@ export const getCategories = unstable_cache(
 export const getFeaturedProducts = unstable_cache(
   async (limit = 8): Promise<ProductView[]> => {
     const rows = await prisma.product.findMany({
-      where: { id: { startsWith: "p" } },
+      where: { archived: false, id: { startsWith: "p" } },
       orderBy: { id: "asc" },
       take: limit,
       select: {
@@ -94,7 +94,7 @@ export const getFeaturedProducts = unstable_cache(
 export const getDealsProducts = unstable_cache(
   async (limit = 4): Promise<ProductView[]> => {
     const rows = await prisma.product.findMany({
-      where: { originalPrice: { not: null } },
+      where: { archived: false, originalPrice: { not: null } },
       orderBy: { id: "asc" },
       take: limit,
       select: {
@@ -111,7 +111,7 @@ export const getDealsProducts = unstable_cache(
 export const getProductById = unstable_cache(
   async (id: string): Promise<ProductView | null> => {
     const row = await prisma.product.findUnique({
-      where: { id },
+      where: { id, archived: false },
       select: {
         id: true, name: true, price: true, originalPrice: true,
         image: true, categorySlug: true, sizes: true,
@@ -135,7 +135,7 @@ export type ProductDetail = {
 export const getProductDetail = unstable_cache(
   async (id: string): Promise<ProductDetail | null> => {
     const product = await prisma.product.findUnique({
-      where: { id },
+      where: { id, archived: false },
       include: {
         category: true,
         images: { orderBy: { sortOrder: "asc" } },
@@ -150,7 +150,7 @@ export const getProductDetail = unstable_cache(
         _count: { _all: true },
       }),
       prisma.product.findMany({
-        where: { categorySlug: product.categorySlug, id: { not: id } },
+        where: { archived: false, categorySlug: product.categorySlug, id: { not: id } },
         take: 4,
         orderBy: { id: "asc" },
         select: {
@@ -243,7 +243,7 @@ export async function getProducts(opts: GetProductsOptions = {}): Promise<Produc
     inStockOnly = false,
   } = opts;
 
-  const where: Prisma.ProductWhereInput = {};
+  const where: Prisma.ProductWhereInput = { archived: false };
 
   // Category filter
   if (categorySlug) {
@@ -321,6 +321,7 @@ export async function searchProducts(query: string, limit = 20): Promise<Product
   const searchTerm = query.trim();
   const rows = await prisma.product.findMany({
     where: {
+      archived: false,
       OR: [
         { name: { contains: searchTerm } },
         { description: { contains: searchTerm } },

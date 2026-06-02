@@ -56,6 +56,7 @@ model Product {
   stock         Int      @default(0)
   categorySlug  String
   sizes         String   @default("S,M,L,XL") // Comma-separated sizes available
+  archived      Boolean  @default(false)
 
   category      Category       @relation(fields: [categorySlug], references: [slug])
   wishlistItems WishlistItem[]
@@ -64,6 +65,7 @@ model Product {
   orderItems    OrderItem[]
 
   @@index([categorySlug])
+  @@index([archived])
 }
 
 model ProductImage {
