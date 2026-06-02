@@ -1,7 +1,7 @@
 export type ProviderMode = "test" | "live";
 
 function providerMode(value: string | undefined): ProviderMode {
-  return value === "live" ? "live" : "test";
+  return value?.trim().toLowerCase() === "live" ? "live" : "test";
 }
 
 function requiredEnv(name: string): string {

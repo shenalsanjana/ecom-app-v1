@@ -41,6 +41,17 @@ describe("payment provider config", () => {
     );
   });
 
+  it("treats Koko mode as live regardless of casing or surrounding whitespace", () => {
+    process.env.KOKO_MODE = "LIVE ";
+    process.env.KOKO_MERCHANT_ID = "merchant";
+    process.env.KOKO_API_KEY = "api-key";
+    process.env.KOKO_PRIVATE_KEY = "private-key";
+
+    expect(getKokoConfig().orderCreateUrl).toBe(
+      "https://prodapi.paykoko.com/api/merchants/orderCreate",
+    );
+  });
+
   it("defaults Mintpay to dev URLs", () => {
     process.env.MINTPAY_MERCHANT_ID = "mp0001";
     process.env.MINTPAY_MERCHANT_SECRET = "secret";
