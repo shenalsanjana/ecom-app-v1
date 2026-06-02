@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/app/_lib/prisma";
 import { requireAdmin } from "@/app/_lib/admin-auth";
 import { countAdmins } from "@/app/_lib/admin-customers";
+import { issuePasswordReset } from "@/app/_lib/password-reset";
 
 export type ActionResult = { success: true } | { success: false; error: string };
 
@@ -33,5 +34,18 @@ export async function changeRole(userId: string, role: Role): Promise<ActionResu
     return { success: false, error: "Something went wrong. Please try again." };
   }
   revalidate(userId);
+  return { success: true };
+}
+
+export async function sendPasswordReset(userId: string): Promise<ActionResult> {
+  await requireAdmin();
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true } });
+  if (!user) return { success: false, error: "User not found" };
+
+  try {
+    await issuePasswordReset(user);
+  } catch {
+    return { success: false, error: "Couldn't send the reset email." };
+  }
   return { success: true };
 }
