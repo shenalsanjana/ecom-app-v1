@@ -77,3 +77,68 @@ export async function cancelOrder(orderId: string): Promise<ActionResult> {
     ? { success: true, warning: "Order was paid — refund must be handled manually." }
     : { success: true };
 }
+
+import {
+  applyItemChanges, recomputeTotals, canEdit, type ItemChange,
+} from "@/app/_lib/admin-orders";
+
+export async function editItems(orderId: string, changes: ItemChange[]): Promise<ActionResult> {
+  await requireAdmin();
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { items: true },
+  });
+  if (!order) return { success: false, error: "Order not found" };
+  if (!canEdit(order)) return { success: false, error: "This order can no longer be edited" };
+
+  let next;
+  try {
+    next = applyItemChanges(
+      order.items.map((i) => ({ id: i.id, productId: i.productId, name: i.name, size: i.size, price: i.price, quantity: i.quantity })),
+      changes,
+    );
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Invalid change" };
+  }
+
+  const totals = recomputeTotals(next.nextItems, order.shippingCity);
+  const nameByProduct = new Map(order.items.map((i) => [i.productId, i.name]));
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      for (const [productId, delta] of Object.entries(next.stockDeltas)) {
+        if (delta > 0) {
+          await tx.product.updateMany({ where: { id: productId }, data: { stock: { increment: delta } } });
+        } else if (delta < 0) {
+          const dec = -delta;
+          const r = await tx.product.updateMany({
+            where: { id: productId, stock: { gte: dec } },
+            data: { stock: { decrement: dec } },
+          });
+          if (r.count === 0) throw new Error(`Insufficient stock for "${nameByProduct.get(productId) ?? productId}"`);
+        }
+      }
+
+      const keptIds = new Set(next.nextItems.map((i) => i.id));
+      for (const original of order.items) {
+        if (!keptIds.has(original.id)) {
+          await tx.orderItem.delete({ where: { id: original.id } });
+        }
+      }
+      for (const item of next.nextItems) {
+        await tx.orderItem.update({ where: { id: item.id }, data: { quantity: item.quantity, size: item.size } });
+      }
+      await tx.order.update({
+        where: { id: orderId },
+        data: { subtotal: totals.subtotal, shippingCost: totals.shippingCost, total: totals.total },
+      });
+    });
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Edit failed" };
+  }
+
+  revalidate(orderId);
+  return PAID.has(order.paymentStatus ?? "")
+    ? { success: true, warning: "Order was paid — any price difference must be settled manually." }
+    : { success: true };
+}
