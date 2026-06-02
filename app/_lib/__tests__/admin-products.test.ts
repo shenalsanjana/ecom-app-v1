@@ -1,11 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { slugify, uniqueSlug, parseSizes, serializeSizes } from "../admin-products";
-import { buildProductWhere } from "../admin-products";
+import { slugify, uniqueSlug, parseSizes, serializeSizes, buildProductWhere } from "../admin-products";
 
 describe("slugify", () => {
   it("lowercases, hyphenates, and trims", () => {
     expect(slugify("Oversize Cat Tee — White")).toBe("oversize-cat-tee-white");
     expect(slugify("  Hello,  World!  ")).toBe("hello-world");
+  });
+  it("returns an empty string for all-punctuation/empty input (caller must guard)", () => {
+    expect(slugify("")).toBe("");
+    expect(slugify("---")).toBe("");
   });
 });
 

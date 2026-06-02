@@ -37,6 +37,15 @@ describe("listProducts", () => {
     expect(arg.include._count.select.images).toBe(true);
     expect(res).toEqual({ rows: [{ id: "cat-white" }], total: 42 });
   });
+
+  it("clamps pageSize to 200 and floors page at 1 (skip 0)", async () => {
+    productFindMany.mockResolvedValueOnce([]);
+    productCount.mockResolvedValueOnce(0);
+    await listProducts({ tab: "all", page: 0, pageSize: 300 });
+    const arg = productFindMany.mock.calls[0][0];
+    expect(arg.take).toBe(200);
+    expect(arg.skip).toBe(0);
+  });
 });
 
 describe("getProduct", () => {

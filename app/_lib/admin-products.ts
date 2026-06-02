@@ -1,3 +1,6 @@
+import type { Prisma } from "@prisma/client";
+import { prisma } from "@/app/_lib/prisma";
+
 export function slugify(name: string): string {
   return name
     .toLowerCase()
@@ -33,8 +36,6 @@ export function parseSizes(csv: string): string[] {
 export function serializeSizes(list: string[]): string {
   return parseSizes(list.join(",")).join(",");
 }
-
-import type { Prisma } from "@prisma/client";
 
 export const LOW_STOCK_THRESHOLD = 5;
 
@@ -77,8 +78,6 @@ export function buildProductWhere(params: ProductListParams): Prisma.ProductWher
 
   return where;
 }
-
-import { prisma } from "@/app/_lib/prisma";
 
 export const PAGE_SIZE = 25;
 
