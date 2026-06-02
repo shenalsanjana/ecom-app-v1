@@ -1,21 +1,23 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { userFindMany, userCount, orderGroupBy } = vi.hoisted(() => ({
-  userFindMany: vi.fn(),
-  userCount: vi.fn(),
-  orderGroupBy: vi.fn(),
+const { userFindMany, userCount, userFindUnique, orderGroupBy, orderAggregate } = vi.hoisted(() => ({
+  userFindMany: vi.fn(), userCount: vi.fn(), userFindUnique: vi.fn(),
+  orderGroupBy: vi.fn(), orderAggregate: vi.fn(),
 }));
-
 vi.mock("@/app/_lib/prisma", () => ({
-  prisma: { user: { findMany: userFindMany, count: userCount }, order: { groupBy: orderGroupBy } },
+  prisma: {
+    user: { findMany: userFindMany, count: userCount, findUnique: userFindUnique },
+    order: { groupBy: orderGroupBy, aggregate: orderAggregate },
+  },
 }));
 
-import { listCustomers } from "../admin-customers";
+import { listCustomers, getCustomer } from "../admin-customers";
 
 beforeEach(() => {
   userFindMany.mockReset();
   userCount.mockReset();
   orderGroupBy.mockReset();
+  userFindUnique.mockReset(); orderAggregate.mockReset();
 });
 
 describe("listCustomers", () => {
@@ -46,5 +48,38 @@ describe("listCustomers", () => {
     expect(res.total).toBe(2);
     expect(res.rows[0]).toMatchObject({ id: "u1", orderCount: 7, totalSpent: 48300 });
     expect(res.rows[1]).toMatchObject({ id: "u2", orderCount: 0, totalSpent: 0 });
+  });
+});
+
+describe("getCustomer", () => {
+  it("returns null when the user does not exist", async () => {
+    userFindUnique.mockResolvedValueOnce(null);
+    expect(await getCustomer("nope")).toBeNull();
+  });
+
+  it("returns user (no passwordHash) + addresses + recent orders + wishlist count + stats", async () => {
+    userFindUnique.mockResolvedValueOnce({
+      id: "u1", name: "Nimali", email: "n@x.test", role: "CUSTOMER", createdAt: new Date(),
+      addresses: [{ id: "a1" }], orders: [{ id: "o1" }], _count: { wishlist: 3 },
+    });
+    orderAggregate.mockResolvedValueOnce({ _count: { _all: 7 }, _sum: { total: 48300 }, _max: { createdAt: new Date("2026-06-02") } });
+
+    const res = await getCustomer("u1");
+
+    const uArg = userFindUnique.mock.calls[0][0];
+    expect(uArg.where).toEqual({ id: "u1" });
+    expect(uArg.select.passwordHash).toBeUndefined();
+    expect(uArg.select.orders.take).toBe(10);
+    expect(uArg.select.orders.orderBy).toEqual({ createdAt: "desc" });
+    expect(uArg.select._count.select.wishlist).toBe(true);
+
+    const aArg = orderAggregate.mock.calls[0][0];
+    expect(aArg.where).toEqual({ userId: "u1", status: { not: "CANCELLED" } });
+
+    expect(res).toMatchObject({
+      id: "u1", wishlistCount: 3,
+      stats: { orderCount: 7, totalSpent: 48300 },
+    });
+    expect(res!.stats.lastOrderAt).toEqual(new Date("2026-06-02"));
   });
 });

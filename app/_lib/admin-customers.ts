@@ -79,3 +79,38 @@ export async function listCustomers(
 
   return { rows, total };
 }
+
+export async function getCustomer(id: string) {
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: {
+      id: true, name: true, email: true, role: true, createdAt: true,
+      addresses: { orderBy: { isDefault: "desc" } },
+      orders: {
+        take: 10,
+        orderBy: { createdAt: "desc" },
+        select: { id: true, webNumber: true, total: true, status: true, paymentStatus: true, createdAt: true },
+      },
+      _count: { select: { wishlist: true } },
+    },
+  });
+  if (!user) return null;
+
+  const agg = await prisma.order.aggregate({
+    where: { userId: id, status: { not: "CANCELLED" } },
+    _count: { _all: true },
+    _sum: { total: true },
+    _max: { createdAt: true },
+  });
+
+  const { _count, ...rest } = user;
+  return {
+    ...rest,
+    wishlistCount: _count.wishlist,
+    stats: {
+      orderCount: agg._count._all,
+      totalSpent: agg._sum.total ?? 0,
+      lastOrderAt: agg._max.createdAt ?? null,
+    },
+  };
+}
