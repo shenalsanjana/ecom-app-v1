@@ -8,6 +8,10 @@ const { orderFindUnique, orderUpdate, noteCreate, productUpdateMany, txn } = vi.
   productUpdateMany: vi.fn(),
   txn: vi.fn(),
 }));
+const { orderItemUpdate, orderItemDelete } = vi.hoisted(() => ({
+  orderItemUpdate: vi.fn(),
+  orderItemDelete: vi.fn(),
+}));
 
 vi.mock("@/app/_lib/admin-auth", () => ({ requireAdmin }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -22,7 +26,7 @@ vi.mock("@/app/_lib/prisma", () => {
     order: { findUnique: orderFindUnique, update: orderUpdate },
     orderNote: { create: noteCreate },
     product: { updateMany: productUpdateMany },
-    orderItem: { update: vi.fn(), delete: vi.fn() },
+    orderItem: { update: orderItemUpdate, delete: orderItemDelete },
   };
   return { prisma: { ...client, $transaction: txn.mockImplementation(async (fn: any) => fn(client)) } };
 });
@@ -36,12 +40,14 @@ beforeEach(() => {
   orderUpdate.mockReset();
   noteCreate.mockReset();
   productUpdateMany.mockReset();
+  orderItemUpdate.mockReset();
+  orderItemDelete.mockReset();
   txn.mockReset().mockImplementation(async (fn: any) => {
     const client = {
       order: { findUnique: orderFindUnique, update: orderUpdate },
       orderNote: { create: noteCreate },
       product: { updateMany: productUpdateMany },
-      orderItem: { update: vi.fn(), delete: vi.fn() },
+      orderItem: { update: orderItemUpdate, delete: orderItemDelete },
     };
     return fn(client);
   });
@@ -152,13 +158,34 @@ describe("editItems", () => {
     orderFindUnique.mockResolvedValueOnce(ORDER);
     productUpdateMany.mockResolvedValue({ count: 1 });
     orderUpdate.mockResolvedValueOnce({});
+    orderItemUpdate.mockResolvedValueOnce({});
     const res = await editItems("o1", [{ id: "i1", quantity: 1 }]);
     // restore 1 unit of p1
     expect(productUpdateMany).toHaveBeenCalledWith({ where: { id: "p1" }, data: { stock: { increment: 1 } } });
+    // item updated to new quantity
+    expect(orderItemUpdate).toHaveBeenCalledWith({ where: { id: "i1" }, data: { quantity: 1, size: "M" } });
     // subtotal 2000 (qty 2→1), Colombo, below the 5000 free-shipping threshold → 350 shipping
     expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "o1" },
       data: expect.objectContaining({ subtotal: 2000, shippingCost: 350, total: 2350 }),
+    }));
+    expect(res).toEqual({ success: true });
+  });
+
+  it("remove path: deletes item, restores stock, recomputes totals to zero subtotal", async () => {
+    orderFindUnique.mockResolvedValueOnce(ORDER);
+    productUpdateMany.mockResolvedValue({ count: 1 });
+    orderUpdate.mockResolvedValueOnce({});
+    orderItemDelete.mockResolvedValueOnce({});
+    const res = await editItems("o1", [{ id: "i1", remove: true }]);
+    // restore 2 units of p1
+    expect(productUpdateMany).toHaveBeenCalledWith({ where: { id: "p1" }, data: { stock: { increment: 2 } } });
+    // item deleted
+    expect(orderItemDelete).toHaveBeenCalledWith({ where: { id: "i1" } });
+    // totals recomputed for empty item set: subtotal 0
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "o1" },
+      data: expect.objectContaining({ subtotal: 0 }),
     }));
     expect(res).toEqual({ success: true });
   });
@@ -168,6 +195,7 @@ describe("editItems", () => {
     productUpdateMany.mockResolvedValueOnce({ count: 0 }); // decrement guard fails
     const res = await editItems("o1", [{ id: "i1", quantity: 5 }]);
     expect(res).toEqual({ success: false, error: "Insufficient stock for \"Dress\"" });
+    expect(orderUpdate).not.toHaveBeenCalled();
   });
 });
 
@@ -257,5 +285,12 @@ describe("resendConfirmationEmail", () => {
     orderFindUnique.mockResolvedValueOnce({ ...FULL_ORDER, guestEmail: null, user: null });
     const res = await resendConfirmationEmail("o1");
     expect(res).toEqual({ success: false, error: "No customer email on this order" });
+  });
+
+  it("warns when sent without a tracking code (not dispatched yet)", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...FULL_ORDER, trackingCode: null });
+    sendOrderConfirmationEmail.mockResolvedValueOnce(undefined);
+    const res = await resendConfirmationEmail("o1");
+    expect(res).toEqual({ success: true, warning: "Sent without a tracking code (not dispatched yet)." });
   });
 });

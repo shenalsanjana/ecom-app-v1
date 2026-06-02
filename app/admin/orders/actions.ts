@@ -2,8 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/app/_lib/prisma";
 import { requireAdmin } from "@/app/_lib/admin-auth";
+import { nextStatuses, applyItemChanges, recomputeTotals, canEdit, type ItemChange } from "@/app/_lib/admin-orders";
+import { bookCourierAndNotify } from "@/app/checkout/book-courier";
+import { sendOrderConfirmationEmail, type OrderDetails } from "@/app/_lib/mailer";
 
 export type ActionResult =
   | { success: true; warning?: string }
@@ -34,12 +38,14 @@ export async function markCodCollected(orderId: string): Promise<ActionResult> {
   if (!order || order.paymentMethod !== "COD" || order.paymentStatus !== "COD_PENDING") {
     return { success: false, error: "Not a COD order awaiting collection" };
   }
-  await prisma.order.update({ where: { id: orderId }, data: { paymentStatus: "COD_COLLECTED" } });
+  try {
+    await prisma.order.update({ where: { id: orderId }, data: { paymentStatus: "COD_COLLECTED" } });
+  } catch {
+    return { success: false, error: "Something went wrong. Please try again." };
+  }
   revalidate(orderId);
   return { success: true };
 }
-
-import { nextStatuses } from "@/app/_lib/admin-orders";
 
 export async function advanceStatus(orderId: string, to: string): Promise<ActionResult> {
   await requireAdmin();
@@ -48,7 +54,11 @@ export async function advanceStatus(orderId: string, to: string): Promise<Action
   if (!nextStatuses(order.status).includes(to)) {
     return { success: false, error: `Cannot move order from ${order.status} to ${to}` };
   }
-  await prisma.order.update({ where: { id: orderId }, data: { status: to } });
+  try {
+    await prisma.order.update({ where: { id: orderId }, data: { status: to } });
+  } catch {
+    return { success: false, error: "Something went wrong. Please try again." };
+  }
   revalidate(orderId);
   return { success: true };
 }
@@ -65,22 +75,22 @@ export async function cancelOrder(orderId: string): Promise<ActionResult> {
   if (order.status === "CANCELLED") return { success: false, error: "Order is already cancelled" };
   if (order.status === "DELIVERED") return { success: false, error: "Delivered orders cannot be cancelled" };
 
-  await prisma.$transaction(async (tx) => {
-    for (const it of order.items) {
-      await tx.product.updateMany({ where: { id: it.productId }, data: { stock: { increment: it.quantity } } });
-    }
-    await tx.order.update({ where: { id: orderId }, data: { status: "CANCELLED" } });
-  });
+  try {
+    await prisma.$transaction(async (tx) => {
+      for (const it of order.items) {
+        await tx.product.updateMany({ where: { id: it.productId }, data: { stock: { increment: it.quantity } } });
+      }
+      await tx.order.update({ where: { id: orderId }, data: { status: "CANCELLED" } });
+    });
+  } catch {
+    return { success: false, error: "Something went wrong. Please try again." };
+  }
 
   revalidate(orderId);
   return PAID.has(order.paymentStatus ?? "")
     ? { success: true, warning: "Order was paid — refund must be handled manually." }
     : { success: true };
 }
-
-import {
-  applyItemChanges, recomputeTotals, canEdit, type ItemChange,
-} from "@/app/_lib/admin-orders";
 
 const AddressSchema = z.object({
   line1: z.string().trim().min(1),
@@ -102,17 +112,21 @@ export async function editAddress(
   if (order.courierBookedAt) return { success: false, error: "Address already sent to Curfox — cancel/rebook there." };
 
   const totals = recomputeTotals(order.items, parsed.data.city);
-  await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      shippingLine1: parsed.data.line1,
-      shippingLine2: parsed.data.line2 || null,
-      shippingCity: parsed.data.city,
-      shippingCountry: parsed.data.country,
-      shippingCost: totals.shippingCost,
-      total: totals.total,
-    },
-  });
+  try {
+    await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        shippingLine1: parsed.data.line1,
+        shippingLine2: parsed.data.line2 || null,
+        shippingCity: parsed.data.city,
+        shippingCountry: parsed.data.country,
+        shippingCost: totals.shippingCost,
+        total: totals.total,
+      },
+    });
+  } catch {
+    return { success: false, error: "Something went wrong. Please try again." };
+  }
   revalidate(orderId);
   return { success: true };
 }
@@ -178,20 +192,14 @@ export async function editItems(orderId: string, changes: ItemChange[]): Promise
     : { success: true };
 }
 
-import { bookCourierAndNotify } from "@/app/checkout/book-courier";
-import { sendOrderConfirmationEmail, type OrderDetails } from "@/app/_lib/mailer";
+const ORDER_INCLUDE = {
+  user: { select: { name: true, email: true } },
+  items: { select: { name: true, size: true, price: true, quantity: true } },
+} satisfies Prisma.OrderInclude;
 
-type DbOrderWithItems = {
-  id: string; guestName: string | null; guestEmail: string | null; customerPhone: string;
-  shippingLine1: string; shippingLine2: string | null; shippingCity: string; shippingCountry: string;
-  subtotal: number; shippingCost: number; total: number;
-  paymentMethod: string; paymentMethodDisplay: string; paymentStatus: string | null;
-  webNumber: string | null; rbNumber: string | null; notes: string | null; trackingCode: string | null;
-  user: { name: string | null; email: string | null } | null;
-  items: { name: string; size: string | null; price: number; quantity: number }[];
-};
+type DbOrderForDetails = Prisma.OrderGetPayload<{ include: typeof ORDER_INCLUDE }>;
 
-function toOrderDetails(order: DbOrderWithItems): OrderDetails {
+function toOrderDetails(order: DbOrderForDetails): OrderDetails {
   return {
     orderId: order.id,
     customerName: order.user?.name ?? order.guestName ?? "Customer",
@@ -215,11 +223,6 @@ function toOrderDetails(order: DbOrderWithItems): OrderDetails {
   };
 }
 
-const ORDER_INCLUDE = {
-  user: { select: { name: true, email: true } },
-  items: { select: { name: true, size: true, price: true, quantity: true } },
-} as const;
-
 export async function bookCourier(orderId: string): Promise<ActionResult> {
   await requireAdmin();
   if (process.env.ROYAL_EXPRESS_ENABLED !== "true") {
@@ -230,7 +233,7 @@ export async function bookCourier(orderId: string): Promise<ActionResult> {
   if (order.status !== "CONFIRMED" || order.courierBookedAt) {
     return { success: false, error: "Only confirmed, un-booked orders can be dispatched" };
   }
-  const waybill = await bookCourierAndNotify({ order: toOrderDetails(order as unknown as DbOrderWithItems) });
+  const waybill = await bookCourierAndNotify({ order: toOrderDetails(order) });
   revalidate(orderId);
   return waybill
     ? { success: true, warning: `Booked — waybill ${waybill}.` }
@@ -241,7 +244,7 @@ export async function resendConfirmationEmail(orderId: string): Promise<ActionRe
   await requireAdmin();
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: ORDER_INCLUDE });
   if (!order) return { success: false, error: "Order not found" };
-  const details = toOrderDetails(order as unknown as DbOrderWithItems);
+  const details = toOrderDetails(order);
   if (!details.customerEmail) return { success: false, error: "No customer email on this order" };
   await sendOrderConfirmationEmail(details);
   return { success: true, warning: details.trackingCode ? undefined : "Sent without a tracking code (not dispatched yet)." };
