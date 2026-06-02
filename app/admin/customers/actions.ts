@@ -24,6 +24,9 @@ export async function changeRole(userId: string, role: Role): Promise<ActionResu
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return { success: false, error: "User not found" };
 
+  // Best-effort last-admin guard. The count + update aren't transactional, so a
+  // simultaneous demotion of the last two admins could in theory slip through;
+  // negligible at this scale (1–2 admins) and recoverable via the admin CLI.
   if (role === "CUSTOMER" && user.role === "ADMIN" && (await countAdmins()) <= 1) {
     return { success: false, error: "Can't demote the last admin" };
   }
