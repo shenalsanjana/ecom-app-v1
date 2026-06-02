@@ -49,6 +49,21 @@ describe("listCustomers", () => {
     expect(res.rows[0]).toMatchObject({ id: "u1", orderCount: 7, totalSpent: 48300 });
     expect(res.rows[1]).toMatchObject({ id: "u2", orderCount: 0, totalSpent: 0 });
   });
+
+  it("skips the aggregate query and returns empty when no users match", async () => {
+    userFindMany.mockResolvedValueOnce([]);
+    userCount.mockResolvedValueOnce(0);
+    const res = await listCustomers({ role: "customers", page: 1 });
+    expect(orderGroupBy).not.toHaveBeenCalled();
+    expect(res).toEqual({ rows: [], total: 0 });
+  });
+
+  it("computes skip from page (page 3, size 10 → skip 20)", async () => {
+    userFindMany.mockResolvedValueOnce([]);
+    userCount.mockResolvedValueOnce(0);
+    await listCustomers({ role: "customers", page: 3, pageSize: 10 });
+    expect(userFindMany.mock.calls[0][0].skip).toBe(20);
+  });
 });
 
 describe("getCustomer", () => {
@@ -81,5 +96,16 @@ describe("getCustomer", () => {
       stats: { orderCount: 7, totalSpent: 48300 },
     });
     expect(res!.stats.lastOrderAt).toEqual(new Date("2026-06-02"));
+  });
+
+  it("returns zero stats when the customer has no non-cancelled orders", async () => {
+    userFindUnique.mockResolvedValueOnce({
+      id: "u3", name: "New", email: "new@x.test", role: "CUSTOMER", createdAt: new Date(),
+      addresses: [], orders: [], _count: { wishlist: 0 },
+    });
+    orderAggregate.mockResolvedValueOnce({ _count: { _all: 0 }, _sum: { total: null }, _max: { createdAt: null } });
+    const res = await getCustomer("u3");
+    expect(res!.stats).toEqual({ orderCount: 0, totalSpent: 0, lastOrderAt: null });
+    expect(res!.wishlistCount).toBe(0);
   });
 });
