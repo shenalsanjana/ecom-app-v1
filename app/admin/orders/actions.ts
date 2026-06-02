@@ -82,6 +82,41 @@ import {
   applyItemChanges, recomputeTotals, canEdit, type ItemChange,
 } from "@/app/_lib/admin-orders";
 
+const AddressSchema = z.object({
+  line1: z.string().trim().min(1),
+  line2: z.string().trim().optional().default(""),
+  city: z.string().trim().min(1),
+  country: z.string().trim().min(1),
+});
+
+export async function editAddress(
+  orderId: string,
+  address: { line1: string; line2?: string; city: string; country: string },
+): Promise<ActionResult> {
+  await requireAdmin();
+  const parsed = AddressSchema.safeParse(address);
+  if (!parsed.success) return { success: false, error: "Invalid address" };
+
+  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
+  if (!order) return { success: false, error: "Order not found" };
+  if (order.courierBookedAt) return { success: false, error: "Address already sent to Curfox — cancel/rebook there." };
+
+  const totals = recomputeTotals(order.items, parsed.data.city);
+  await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      shippingLine1: parsed.data.line1,
+      shippingLine2: parsed.data.line2 || null,
+      shippingCity: parsed.data.city,
+      shippingCountry: parsed.data.country,
+      shippingCost: totals.shippingCost,
+      total: totals.total,
+    },
+  });
+  revalidate(orderId);
+  return { success: true };
+}
+
 export async function editItems(orderId: string, changes: ItemChange[]): Promise<ActionResult> {
   await requireAdmin();
   const order = await prisma.order.findUnique({

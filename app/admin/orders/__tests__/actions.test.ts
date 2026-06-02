@@ -161,3 +161,32 @@ describe("editItems", () => {
     expect(res).toEqual({ success: false, error: "Insufficient stock for \"Dress\"" });
   });
 });
+
+import { editAddress } from "../actions";
+
+const ADDR = { line1: "1 New Rd", line2: "", city: "Kandy", country: "Sri Lanka" };
+
+describe("editAddress", () => {
+  it("is blocked once the courier is booked", async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "CONFIRMED", courierBookedAt: new Date(), items: [] });
+    const res = await editAddress("o1", ADDR);
+    expect(res).toEqual({ success: false, error: "Address already sent to Curfox — cancel/rebook there." });
+  });
+
+  it("updates fields and recomputes shipping for the new city", async () => {
+    orderFindUnique.mockResolvedValueOnce({
+      id: "o1", status: "CONFIRMED", courierBookedAt: null,
+      items: [{ price: 1000, quantity: 1 }],
+    });
+    orderUpdate.mockResolvedValueOnce({});
+    const res = await editAddress("o1", ADDR);
+    expect(orderUpdate).toHaveBeenCalledWith({
+      where: { id: "o1" },
+      data: expect.objectContaining({
+        shippingLine1: "1 New Rd", shippingCity: "Kandy", shippingCountry: "Sri Lanka",
+        shippingCost: 450, total: 1450,
+      }),
+    });
+    expect(res).toEqual({ success: true });
+  });
+});
