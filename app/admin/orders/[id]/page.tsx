@@ -58,6 +58,15 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
             <AddressEditor orderId={order.id} locked={!!order.courierBookedAt}
               address={{ line1: order.shippingLine1, line2: order.shippingLine2, city: order.shippingCity, country: order.shippingCountry }} />
           </div>
+          <div className="rounded-lg border p-4"><h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Payment</h4>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span>{order.paymentMethod}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span>{paymentStatusLabel(order.paymentStatus) ?? "—"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Web #</span><span>{order.webNumber ?? "—"}</span></div>
+              {order.rbNumber && <div className="flex justify-between"><span className="text-muted-foreground">RB #</span><span>{order.rbNumber}</span></div>}
+              <div className="flex justify-between"><span className="text-muted-foreground">Waybill</span><span>{order.courierWaybillNumber ?? "— (after dispatch)"}</span></div>
+            </div>
+          </div>
         </div>
       </div>
     </section>

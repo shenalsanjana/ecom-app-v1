@@ -41,6 +41,18 @@ export function OrderItemsEditor({ orderId, items, editable }: { orderId: string
             <span>{it.name}{it.size ? ` · ${it.size}` : ""}</span>
             {editing ? (
               <span className="flex items-center gap-2">
+                {(() => {
+                  const sizeOptions = it.sizes ? it.sizes.split(",").map((s) => s.trim()).filter(Boolean) : [];
+                  return sizeOptions.length > 0 ? (
+                    <select
+                      value={it.size ?? ""}
+                      className="rounded border px-1 text-sm"
+                      onChange={(e) => setDraft((d) => d.map((x) => x.id === it.id ? { ...x, size: e.target.value || null } : x))}
+                    >
+                      {sizeOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  ) : null;
+                })()}
                 <input type="number" min={1} value={it.quantity} className="w-14 rounded border px-1"
                   onChange={(e) => setDraft((d) => d.map((x) => x.id === it.id ? { ...x, quantity: Number(e.target.value) } : x))} />
                 <button className="text-destructive" onClick={() => setDraft((d) => d.filter((x) => x.id !== it.id))}>✕</button>

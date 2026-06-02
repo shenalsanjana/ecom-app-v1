@@ -246,6 +246,10 @@ export async function resendConfirmationEmail(orderId: string): Promise<ActionRe
   if (!order) return { success: false, error: "Order not found" };
   const details = toOrderDetails(order);
   if (!details.customerEmail) return { success: false, error: "No customer email on this order" };
-  await sendOrderConfirmationEmail(details);
+  try {
+    await sendOrderConfirmationEmail(details);
+  } catch {
+    return { success: false, error: "Failed to send email — check mailer config." };
+  }
   return { success: true, warning: details.trackingCode ? undefined : "Sent without a tracking code (not dispatched yet)." };
 }

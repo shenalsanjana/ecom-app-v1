@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatPrice } from "@/app/_lib/format";
 import { paymentStatusLabel } from "@/app/_lib/order-status";
+import { Badge } from "@/components/ui/badge";
 import { DispatchButton } from "./dispatch-button";
 
 type Row = {
@@ -32,8 +33,11 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
             <td className="p-2">{o.user?.name ?? o.guestName ?? "—"}<br /><span className="text-muted-foreground">{o.customerPhone}</span></td>
             <td className="p-2">{o._count.items}</td>
             <td className="p-2 font-medium">{formatPrice(o.total)}</td>
-            <td className="p-2">{paymentStatusLabel(o.paymentStatus) ?? "—"}<br /><span className="text-muted-foreground">{o.paymentMethod}</span></td>
-            <td className="p-2">{o.status}</td>
+            <td className="p-2">
+              <Badge variant="secondary">{paymentStatusLabel(o.paymentStatus) ?? "—"}</Badge>
+              <br /><span className="text-muted-foreground">{o.paymentMethod}</span>
+            </td>
+            <td className="p-2"><Badge variant="outline">{o.status}</Badge></td>
             <td className="p-2">
               {o.status === "CONFIRMED" && !o.courierBookedAt
                 ? <DispatchButton orderId={o.id} />

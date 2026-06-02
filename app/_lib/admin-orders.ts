@@ -11,6 +11,7 @@ export type ListParams = {
   q?: string;
   status?: string;
   payment?: string;
+  sort?: "newest" | "oldest";
 };
 
 export function buildOrderWhere(params: ListParams): Prisma.OrderWhereInput {
@@ -148,11 +149,12 @@ export async function listOrders(
   const where = buildOrderWhere(params);
   const pageSize = Math.min(params.pageSize ?? PAGE_SIZE, 200);
   const page = Math.max(1, params.page ?? 1);
+  const orderBy = { createdAt: params.sort === "oldest" ? "asc" : "desc" } as const;
 
   const [rows, total] = await Promise.all([
     prisma.order.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy,
       take: pageSize,
       skip: (page - 1) * pageSize,
       include: {
