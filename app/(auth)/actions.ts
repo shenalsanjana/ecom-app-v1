@@ -3,11 +3,11 @@
 
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
-import { randomBytes, createHash } from "crypto";
+import { createHash } from "crypto";
 import { AuthError } from "next-auth";
 import { signIn } from "@/app/_lib/auth";
 import { prisma } from "@/app/_lib/prisma";
-import { sendPasswordResetEmail } from "@/app/_lib/mailer";
+import { issuePasswordReset } from "@/app/_lib/password-reset";
 import {
   SignupSchema,
   LoginSchema,
@@ -136,19 +136,10 @@ export async function requestResetAction(_prev: ActionState, formData: FormData)
 
   const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
   if (user) {
-    const rawToken = randomBytes(32).toString("hex");
-    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
-
-    await prisma.passwordResetToken.create({
-      data: { userId: user.id, tokenHash, expiresAt },
-    });
-
-    const resetUrl = `${process.env.APP_URL ?? "http://localhost:3000"}/reset-password?token=${rawToken}`;
     try {
-      await sendPasswordResetEmail(user.email, resetUrl);
+      await issuePasswordReset(user);
     } catch (e) {
-      console.error("[forgot-password] mail send failed:", e);
+      console.error("[forgot-password] issuePasswordReset failed:", e);
     }
   }
 
