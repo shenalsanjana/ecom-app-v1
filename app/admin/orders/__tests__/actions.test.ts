@@ -59,3 +59,22 @@ describe("markCodCollected", () => {
     expect(res).toEqual({ success: true });
   });
 });
+
+import { advanceStatus } from "../actions";
+
+describe("advanceStatus", () => {
+  it("rejects an illegal transition", async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "PENDING" });
+    const res = await advanceStatus("o1", "DELIVERED");
+    expect(res).toEqual({ success: false, error: "Cannot move order from PENDING to DELIVERED" });
+    expect(orderUpdate).not.toHaveBeenCalled();
+  });
+
+  it("allows PENDING→CONFIRMED", async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "PENDING" });
+    orderUpdate.mockResolvedValueOnce({});
+    const res = await advanceStatus("o1", "CONFIRMED");
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CONFIRMED" } });
+    expect(res).toEqual({ success: true });
+  });
+});

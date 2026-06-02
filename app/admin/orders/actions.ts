@@ -38,3 +38,17 @@ export async function markCodCollected(orderId: string): Promise<ActionResult> {
   revalidate(orderId);
   return { success: true };
 }
+
+import { nextStatuses } from "@/app/_lib/admin-orders";
+
+export async function advanceStatus(orderId: string, to: string): Promise<ActionResult> {
+  await requireAdmin();
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) return { success: false, error: "Order not found" };
+  if (!nextStatuses(order.status).includes(to)) {
+    return { success: false, error: `Cannot move order from ${order.status} to ${to}` };
+  }
+  await prisma.order.update({ where: { id: orderId }, data: { status: to } });
+  revalidate(orderId);
+  return { success: true };
+}
