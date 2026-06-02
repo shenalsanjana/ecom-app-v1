@@ -48,3 +48,15 @@ export function buildOrderWhere(params: ListParams): Prisma.OrderWhereInput {
 
   return where;
 }
+
+import { calculateDelivery } from "@/app/_lib/checkout-config";
+import { zoneForCity } from "@/app/_lib/delivery-zones";
+
+export function recomputeTotals(
+  items: { price: number; quantity: number }[],
+  city: string,
+): { subtotal: number; shippingCost: number; total: number } {
+  const subtotal = items.reduce((s, it) => s + it.price * it.quantity, 0);
+  const shippingCost = calculateDelivery(subtotal, zoneForCity(city));
+  return { subtotal, shippingCost, total: subtotal + shippingCost };
+}
