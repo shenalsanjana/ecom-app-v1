@@ -963,7 +963,7 @@ describe("editItems", () => {
   const ORDER = {
     id: "o1", status: "CONFIRMED", paymentStatus: "PENDING", shippingCity: "Colombo",
     items: [
-      { id: "i1", productId: "p1", name: "Dress", size: "M", price: 6500, quantity: 2 },
+      { id: "i1", productId: "p1", name: "Dress", size: "M", price: 2000, quantity: 2 },
     ],
   };
 
@@ -980,10 +980,10 @@ describe("editItems", () => {
     const res = await editItems("o1", [{ id: "i1", quantity: 1 }]);
     // restore 1 unit of p1
     expect(productUpdateMany).toHaveBeenCalledWith({ where: { id: "p1" }, data: { stock: { increment: 1 } } });
-    // subtotal 6500, Colombo, below threshold → 350 shipping
+    // subtotal 2000 (qty 2→1), Colombo, below the 5000 free-shipping threshold → 350 shipping
     expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "o1" },
-      data: expect.objectContaining({ subtotal: 6500, shippingCost: 350, total: 6850 }),
+      data: expect.objectContaining({ subtotal: 2000, shippingCost: 350, total: 2350 }),
     }));
     expect(res).toEqual({ success: true });
   });

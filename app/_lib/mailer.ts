@@ -3,6 +3,7 @@ import nodemailer from "nodemailer";
 import { formatPrice } from "@/app/_lib/format";
 import { paymentStatusLabel } from "@/app/_lib/order-status";
 import { orderReference } from "@/app/_lib/order-reference";
+import { CURFOX_PORTAL_URL } from "@/app/_lib/curfox-portal";
 
 function escapeHtml(s: string): string {
   return s
@@ -394,7 +395,7 @@ export async function sendDispatchNotificationEmail(params: {
   // rendering, the dispatch email links to the portal where the merchant
   // prints the waybill in one click. If a pdfBuffer is provided by a future
   // renderer it is still attached.
-  const portalUrl = "https://royalexpress.merchant.curfox.com/all-orders";
+  const portalUrl = CURFOX_PORTAL_URL;
 
   const paymentLabel = paymentStatusLabel(order.paymentStatus);
 

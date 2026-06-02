@@ -141,9 +141,13 @@ model Order {
 
   user                  User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
   items                 OrderItem[]
+  notesLog              OrderNote[]
 
   @@index([userId])
   @@index([createdAt])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([status, courierBookedAt])
 }
 
 model OrderItem {
@@ -160,6 +164,18 @@ model OrderItem {
 
   @@index([orderId])
   @@index([productId])
+}
+
+model OrderNote {
+  id          String   @id @default(cuid())
+  orderId     String
+  authorEmail String
+  body        String
+  createdAt   DateTime @default(now())
+
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
 }
 
 model PasswordResetToken {
