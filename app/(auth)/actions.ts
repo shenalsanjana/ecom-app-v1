@@ -139,7 +139,7 @@ export async function requestResetAction(_prev: ActionState, formData: FormData)
     try {
       await issuePasswordReset(user);
     } catch (e) {
-      console.error("[forgot-password] reset issue failed:", e);
+      console.error("[forgot-password] issuePasswordReset failed:", e);
     }
   }
 

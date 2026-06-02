@@ -12,10 +12,16 @@ export async function issuePasswordReset(user: { id: string; email: string }): P
   const tokenHash = createHash("sha256").update(rawToken).digest("hex");
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
-  await prisma.passwordResetToken.create({
+  const tokenRow = await prisma.passwordResetToken.create({
     data: { userId: user.id, tokenHash, expiresAt },
   });
 
   const resetUrl = `${process.env.APP_URL ?? "http://localhost:3000"}/reset-password?token=${rawToken}`;
-  await sendPasswordResetEmail(user.email, resetUrl);
+  try {
+    await sendPasswordResetEmail(user.email, resetUrl);
+  } catch (e) {
+    // Don't leave a dangling, unusable token if the email never went out.
+    await prisma.passwordResetToken.delete({ where: { id: tokenRow.id } }).catch(() => {});
+    throw e;
+  }
 }

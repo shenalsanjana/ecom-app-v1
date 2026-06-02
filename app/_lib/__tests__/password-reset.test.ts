@@ -1,16 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { tokenCreate } = vi.hoisted(() => ({ tokenCreate: vi.fn() }));
+const { tokenCreate, tokenDelete } = vi.hoisted(() => ({ tokenCreate: vi.fn(), tokenDelete: vi.fn() }));
 const { sendPasswordResetEmail } = vi.hoisted(() => ({ sendPasswordResetEmail: vi.fn() }));
 
-vi.mock("@/app/_lib/prisma", () => ({ prisma: { passwordResetToken: { create: tokenCreate } } }));
+vi.mock("@/app/_lib/prisma", () => ({ prisma: { passwordResetToken: { create: tokenCreate, delete: tokenDelete } } }));
 vi.mock("@/app/_lib/mailer", () => ({ sendPasswordResetEmail }));
 
 import { issuePasswordReset } from "../password-reset";
 import { createHash } from "crypto";
 
 beforeEach(() => {
-  tokenCreate.mockReset().mockResolvedValue({});
+  tokenCreate.mockReset().mockResolvedValue({ id: "tok1" });
+  tokenDelete.mockReset().mockResolvedValue({});
   sendPasswordResetEmail.mockReset().mockResolvedValue(undefined);
   process.env.APP_URL = "https://shop.test";
 });
@@ -32,5 +33,18 @@ describe("issuePasswordReset", () => {
     // the emailed raw token hashes to the stored tokenHash
     const rawToken = url.split("token=")[1];
     expect(createHash("sha256").update(rawToken).digest("hex")).toBe(data.tokenHash);
+  });
+
+  it("falls back to localhost when APP_URL is unset", async () => {
+    delete process.env.APP_URL;
+    await issuePasswordReset({ id: "u1", email: "a@b.test" });
+    const url = sendPasswordResetEmail.mock.calls[0][1];
+    expect(url).toMatch(/^http:\/\/localhost:3000\/reset-password\?token=[a-f0-9]{64}$/);
+  });
+
+  it("deletes the dangling token and rethrows when the email send fails", async () => {
+    sendPasswordResetEmail.mockRejectedValueOnce(new Error("smtp down"));
+    await expect(issuePasswordReset({ id: "u1", email: "a@b.test" })).rejects.toThrow("smtp down");
+    expect(tokenDelete).toHaveBeenCalledWith({ where: { id: "tok1" } });
   });
 });
