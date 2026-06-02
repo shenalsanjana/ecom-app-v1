@@ -60,3 +60,56 @@ export function recomputeTotals(
   const shippingCost = calculateDelivery(subtotal, zoneForCity(city));
   return { subtotal, shippingCost, total: subtotal + shippingCost };
 }
+
+export type OrderItemRow = {
+  id: string;
+  productId: string;
+  name: string;
+  size: string | null;
+  price: number;
+  quantity: number;
+};
+
+export type ItemChange = {
+  id: string;
+  quantity?: number;
+  size?: string | null;
+  remove?: boolean;
+};
+
+/**
+ * Applies edit-mode changes to the order's items. Returns the next item set and
+ * per-product stock deltas: positive = restore to stock, negative = decrement.
+ */
+export function applyItemChanges(
+  current: OrderItemRow[],
+  changes: ItemChange[],
+): { nextItems: OrderItemRow[]; stockDeltas: Record<string, number> } {
+  const byId = new Map(current.map((i) => [i.id, { ...i }]));
+  const deltas: Record<string, number> = {};
+  const addDelta = (productId: string, d: number) => {
+    if (d === 0) return;
+    deltas[productId] = (deltas[productId] ?? 0) + d;
+  };
+
+  for (const change of changes) {
+    const item = byId.get(change.id);
+    if (!item) throw new Error(`Unknown order item: ${change.id}`);
+
+    if (change.remove) {
+      addDelta(item.productId, item.quantity); // restore all
+      byId.delete(change.id);
+      continue;
+    }
+    if (change.size !== undefined) item.size = change.size;
+    if (change.quantity !== undefined) {
+      if (change.quantity <= 0) throw new Error("Quantity must be positive; remove the item instead");
+      addDelta(item.productId, item.quantity - change.quantity); // old - new
+      item.quantity = change.quantity;
+    }
+  }
+
+  // prune zero deltas
+  for (const k of Object.keys(deltas)) if (deltas[k] === 0) delete deltas[k];
+  return { nextItems: [...byId.values()], stockDeltas: deltas };
+}
