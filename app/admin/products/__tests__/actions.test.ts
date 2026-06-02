@@ -117,3 +117,27 @@ describe("createProduct", () => {
     expect(res).toEqual({ success: true, slug: "cat-white" });
   });
 });
+
+import { updateProduct } from "../actions";
+
+describe("updateProduct", () => {
+  it("rejects when the product does not exist", async () => {
+    productFindUnique.mockResolvedValueOnce(null);
+    const res = await updateProduct("nope", { ...NEW_INPUT });
+    expect(res).toEqual({ success: false, error: "Product not found" });
+  });
+  it("updates scalars, never changes slug, and replaces the gallery", async () => {
+    productFindUnique.mockResolvedValueOnce({ id: "cat-white" });
+    productUpdate.mockResolvedValueOnce({});
+    imageDeleteMany.mockResolvedValueOnce({ count: 2 });
+    imageCreateMany.mockResolvedValueOnce({ count: 1 });
+    const res = await updateProduct("cat-white", { ...NEW_INPUT, name: "Cat White v2", gallery: ["/g/1.jpg"] });
+    const updArg = productUpdate.mock.calls[0][0];
+    expect(updArg.where).toEqual({ id: "cat-white" });
+    expect(updArg.data.name).toBe("Cat White v2");
+    expect(updArg.data.id).toBeUndefined(); // slug/id never updated
+    expect(imageDeleteMany).toHaveBeenCalledWith({ where: { productId: "cat-white" } });
+    expect(imageCreateMany).toHaveBeenCalledWith({ data: [{ productId: "cat-white", url: "/g/1.jpg", sortOrder: 0 }] });
+    expect(res).toEqual({ success: true });
+  });
+});

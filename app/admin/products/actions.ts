@@ -125,3 +125,37 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
   revalidate(slug);
   return { success: true, slug };
 }
+
+export async function updateProduct(id: string, input: ProductInput): Promise<ActionResult> {
+  await requireAdmin();
+  const parsed = ProductInputSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Please complete all required fields." };
+  const d = parsed.data;
+
+  const existing = await prisma.product.findUnique({ where: { id } });
+  if (!existing) return { success: false, error: "Product not found" };
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.product.update({
+        where: { id },
+        data: {
+          name: d.name, categorySlug: d.categorySlug,
+          price: d.price, originalPrice: d.originalPrice ?? null, stock: d.stock,
+          sizes: serializeSizes(d.sizes), description: d.description, image: d.image,
+          // id/slug intentionally NOT updated
+        },
+      });
+      await tx.productImage.deleteMany({ where: { productId: id } });
+      if (d.gallery.length > 0) {
+        await tx.productImage.createMany({
+          data: d.gallery.map((url, i) => ({ productId: id, url, sortOrder: i })),
+        });
+      }
+    });
+  } catch {
+    return { success: false, error: "Could not save product (check the category exists)." };
+  }
+  revalidate(id);
+  return { success: true };
+}
