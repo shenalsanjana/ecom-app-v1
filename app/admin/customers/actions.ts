@@ -21,7 +21,7 @@ export async function changeRole(userId: string, role: Role): Promise<ActionResu
   if (!ROLES.includes(role)) return { success: false, error: "Invalid role" };
   if (userId === session.user.id) return { success: false, error: "You can't change your own role" };
 
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
   if (!user) return { success: false, error: "User not found" };
 
   // Best-effort last-admin guard. The count + update aren't transactional, so a
