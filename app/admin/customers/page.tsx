@@ -24,7 +24,8 @@ export default async function AdminCustomersPage({
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hrefFor = (p: number) => {
-    const next = new URLSearchParams(sp as Record<string, string>);
+    const next = new URLSearchParams();
+    for (const [k, v] of Object.entries(sp)) if (v !== undefined) next.set(k, v);
     next.set("page", String(p));
     return `/admin/customers?${next.toString()}`;
   };
