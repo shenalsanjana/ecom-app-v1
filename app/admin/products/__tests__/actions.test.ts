@@ -81,3 +81,39 @@ describe("createCategory", () => {
     expect(res).toEqual({ success: true, slug: "hats-2", name: "Hats" });
   });
 });
+
+import { createProduct } from "../actions";
+
+const NEW_INPUT = {
+  name: "Cat White", slug: "cat-white", categorySlug: "cat",
+  price: 2190, originalPrice: null, stock: 10,
+  sizes: ["S", "M", "L"], description: "Soft tee", image: "/products/cat-white/main.jpg",
+  gallery: ["/products/cat-white/2.jpg", "/products/cat-white/3.jpg"],
+};
+
+describe("createProduct", () => {
+  it("rejects empty name / non-positive price / empty image", async () => {
+    expect((await createProduct({ ...NEW_INPUT, name: " " })).success).toBe(false);
+    expect((await createProduct({ ...NEW_INPUT, price: 0 })).success).toBe(false);
+    expect((await createProduct({ ...NEW_INPUT, image: "" })).success).toBe(false);
+  });
+  it("generates a unique slug and creates product + ordered gallery", async () => {
+    productFindUnique.mockResolvedValueOnce(null); // slug free
+    productCreate.mockResolvedValueOnce({ id: "cat-white" });
+    imageCreateMany.mockResolvedValueOnce({ count: 2 });
+    const res = await createProduct(NEW_INPUT);
+    const createArg = productCreate.mock.calls[0][0];
+    expect(createArg.data).toMatchObject({
+      id: "cat-white", name: "Cat White", categorySlug: "cat",
+      price: 2190, originalPrice: null, stock: 10, sizes: "S,M,L",
+      description: "Soft tee", image: "/products/cat-white/main.jpg", archived: false,
+    });
+    expect(imageCreateMany).toHaveBeenCalledWith({
+      data: [
+        { productId: "cat-white", url: "/products/cat-white/2.jpg", sortOrder: 0 },
+        { productId: "cat-white", url: "/products/cat-white/3.jpg", sortOrder: 1 },
+      ],
+    });
+    expect(res).toEqual({ success: true, slug: "cat-white" });
+  });
+});

@@ -75,3 +75,53 @@ export async function createCategory(input: { name: string; image: string }): Pr
     return { success: false, error: "Could not create category." };
   }
 }
+
+import { parseSizes, serializeSizes } from "@/app/_lib/admin-products";
+
+const ProductInputSchema = z.object({
+  name: z.string().trim().min(1),
+  slug: z.string().trim().optional(),
+  categorySlug: z.string().trim().min(1),
+  price: z.number().positive(),
+  originalPrice: z.number().positive().nullable().optional(),
+  stock: z.number().int().min(0),
+  sizes: z.array(z.string()),
+  description: z.string().trim().min(1),
+  image: z.string().trim().min(1),
+  gallery: z.array(z.string().trim().min(1)),
+});
+export type ProductInput = z.infer<typeof ProductInputSchema>;
+
+export async function createProduct(input: ProductInput): Promise<ActionResult> {
+  await requireAdmin();
+  const parsed = ProductInputSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Please complete all required fields." };
+  const d = parsed.data;
+
+  const slug = await uniqueSlug(
+    slugify(d.slug || d.name),
+    async (s) => (await prisma.product.findUnique({ where: { id: s } })) !== null,
+  );
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.product.create({
+        data: {
+          id: slug, name: d.name, categorySlug: d.categorySlug,
+          price: d.price, originalPrice: d.originalPrice ?? null, stock: d.stock,
+          sizes: serializeSizes(d.sizes), description: d.description, image: d.image,
+          archived: false,
+        },
+      });
+      if (d.gallery.length > 0) {
+        await tx.productImage.createMany({
+          data: d.gallery.map((url, i) => ({ productId: slug, url, sortOrder: i })),
+        });
+      }
+    });
+  } catch {
+    return { success: false, error: "Could not create product (check the category exists)." };
+  }
+  revalidate(slug);
+  return { success: true, slug };
+}
