@@ -5,24 +5,52 @@ import { installmentAmount, INSTALMENT_COUNT } from "@/app/_lib/installments";
 
 type Props = { total: number; className?: string };
 
-// "or pay in 3 × LKR X or 6% Cashback with [Mintpay]"
+const mintpayLogo = (
+  <Image
+    src="/payment/mintpay_name.png"
+    alt="Mintpay"
+    width={1200}
+    height={628}
+    className="ml-0.5 inline-block h-6 w-auto rounded-[3px] align-middle"
+  />
+);
+
+const kokoLogo = (
+  <Image
+    src="/payment/koko.jpg"
+    alt="Koko"
+    width={52}
+    height={24}
+    className="ml-0.5 inline-block h-6 w-auto rounded-[3px] align-middle"
+  />
+);
+
+// When Koko is enabled (NEXT_PUBLIC_KOKO_ENABLED):
+//   "or pay in 3 × LKR X with [Koko] & [Mintpay] — or 6% Cashback with [Mintpay]"
+// Both providers split into the same interest-free 3 × LKR X (display-only);
+// only Mintpay offers the 6% cashback, so Koko is never shown with cashback.
+// When Koko is disabled, falls back to the Mintpay-only note.
 export function InstallmentNote({ total, className }: Props) {
   if (total <= 0) return null;
   const per = installmentAmount(total);
   if (per <= 0) return null;
 
+  const kokoEnabled = process.env.NEXT_PUBLIC_KOKO_ENABLED === "true";
+  const amount = <span className="font-medium text-foreground">{formatPrice(per)}</span>;
+  const cashback = <span className="font-medium text-foreground">6% Cashback</span>;
+
+  if (kokoEnabled) {
+    return (
+      <p className={"text-sm text-muted-foreground " + (className ?? "")}>
+        or pay in {INSTALMENT_COUNT} × {amount} with {kokoLogo} &amp; {mintpayLogo} — or{" "}
+        {cashback} with {mintpayLogo}
+      </p>
+    );
+  }
+
   return (
     <p className={"text-sm text-muted-foreground " + (className ?? "")}>
-      or pay in {INSTALMENT_COUNT} ×{" "}
-      <span className="font-medium text-foreground">{formatPrice(per)}</span> or{" "}
-      <span className="font-medium text-foreground">6% Cashback</span> with{" "}
-      <Image
-        src="/payment/mintpay_name.png"
-        alt="Mintpay"
-        width={1200}
-        height={628}
-        className="ml-0.5 inline-block h-6 w-auto rounded-[3px] align-middle"
-      />
+      or pay in {INSTALMENT_COUNT} × {amount} or {cashback} with {mintpayLogo}
     </p>
   );
 }
