@@ -1,4 +1,7 @@
 import type { Prisma } from "@prisma/client";
+import { calculateDelivery } from "@/app/_lib/checkout-config";
+import { zoneForCity } from "@/app/_lib/delivery-zones";
+import { prisma } from "@/app/_lib/prisma";
 
 export const ORDER_TABS = ["all", "needs-dispatch", "pending-cod", "delivered", "cancelled"] as const;
 export type OrderTab = (typeof ORDER_TABS)[number];
@@ -30,7 +33,13 @@ export function buildOrderWhere(params: ListParams): Prisma.OrderWhereInput {
     // "all" / undefined → no preset
   }
 
-  if (params.status) where.status = params.status;
+  // Explicit filters override the tab preset. When status is overridden we also
+  // drop the needs-dispatch courierBookedAt:null constraint, which would
+  // otherwise leak into an incoherent query (e.g. status=PENDING + not-booked).
+  if (params.status) {
+    where.status = params.status;
+    delete where.courierBookedAt;
+  }
   if (params.payment) where.paymentStatus = params.payment;
 
   const q = params.q?.trim();
@@ -48,9 +57,6 @@ export function buildOrderWhere(params: ListParams): Prisma.OrderWhereInput {
 
   return where;
 }
-
-import { calculateDelivery } from "@/app/_lib/checkout-config";
-import { zoneForCity } from "@/app/_lib/delivery-zones";
 
 export function recomputeTotals(
   items: { price: number; quantity: number }[],
@@ -129,11 +135,10 @@ export function canEdit(order: { status: string }): boolean {
   return order.status !== "DELIVERED" && order.status !== "CANCELLED";
 }
 
+/** Identical to canEdit today; kept separate in case cancellation rules diverge. */
 export function canCancel(order: { status: string }): boolean {
   return canEdit(order);
 }
-
-import { prisma } from "@/app/_lib/prisma";
 
 export const PAGE_SIZE = 25;
 
@@ -141,7 +146,7 @@ export async function listOrders(
   params: ListParams & { page?: number; pageSize?: number },
 ) {
   const where = buildOrderWhere(params);
-  const pageSize = params.pageSize ?? PAGE_SIZE;
+  const pageSize = Math.min(params.pageSize ?? PAGE_SIZE, 200);
   const page = Math.max(1, params.page ?? 1);
 
   const [rows, total] = await Promise.all([

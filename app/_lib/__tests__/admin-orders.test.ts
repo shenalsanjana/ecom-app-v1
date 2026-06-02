@@ -42,6 +42,12 @@ describe("buildOrderWhere", () => {
     expect(where.status).toBe("PENDING");
     expect(where.paymentStatus).toBe("PAID");
   });
+
+  it("drops the needs-dispatch courierBookedAt constraint when status is overridden", () => {
+    const where = buildOrderWhere({ tab: "needs-dispatch", status: "PENDING" });
+    expect(where.status).toBe("PENDING");
+    expect(where.courierBookedAt).toBeUndefined();
+  });
 });
 
 import { recomputeTotals } from "../admin-orders";
@@ -65,37 +71,37 @@ describe("recomputeTotals", () => {
 
 import { applyItemChanges } from "../admin-orders";
 
-const ITEMS = [
+const makeItems = () => [
   { id: "i1", productId: "p1", name: "Dress", size: "M", price: 6500, quantity: 1 },
   { id: "i2", productId: "p2", name: "Scarf", size: null, price: 2000, quantity: 2 },
 ];
 
 describe("applyItemChanges", () => {
   it("decreasing quantity restores stock (positive delta)", () => {
-    const { nextItems, stockDeltas } = applyItemChanges(ITEMS, [{ id: "i2", quantity: 1 }]);
+    const { nextItems, stockDeltas } = applyItemChanges(makeItems(), [{ id: "i2", quantity: 1 }]);
     expect(nextItems.find((i) => i.id === "i2")!.quantity).toBe(1);
     expect(stockDeltas).toEqual({ p2: 1 });
   });
 
   it("increasing quantity decrements stock (negative delta)", () => {
-    const { stockDeltas } = applyItemChanges(ITEMS, [{ id: "i1", quantity: 3 }]);
+    const { stockDeltas } = applyItemChanges(makeItems(), [{ id: "i1", quantity: 3 }]);
     expect(stockDeltas).toEqual({ p1: -2 });
   });
 
   it("removing an item restores its full quantity and drops it", () => {
-    const { nextItems, stockDeltas } = applyItemChanges(ITEMS, [{ id: "i2", remove: true }]);
+    const { nextItems, stockDeltas } = applyItemChanges(makeItems(), [{ id: "i2", remove: true }]);
     expect(nextItems.map((i) => i.id)).toEqual(["i1"]);
     expect(stockDeltas).toEqual({ p2: 2 });
   });
 
   it("changes size without affecting stock", () => {
-    const { nextItems, stockDeltas } = applyItemChanges(ITEMS, [{ id: "i1", size: "L" }]);
+    const { nextItems, stockDeltas } = applyItemChanges(makeItems(), [{ id: "i1", size: "L" }]);
     expect(nextItems.find((i) => i.id === "i1")!.size).toBe("L");
     expect(stockDeltas).toEqual({});
   });
 
   it("rejects reducing quantity to zero (use remove instead)", () => {
-    expect(() => applyItemChanges(ITEMS, [{ id: "i1", quantity: 0 }])).toThrow();
+    expect(() => applyItemChanges(makeItems(), [{ id: "i1", quantity: 0 }])).toThrow();
   });
 });
 
