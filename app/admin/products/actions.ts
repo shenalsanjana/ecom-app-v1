@@ -12,7 +12,7 @@ export type ActionResult =
 function revalidate(id?: string) {
   revalidatePath("/admin/products");
   if (id) revalidatePath(`/admin/products/${id}/edit`);
-  revalidateTag("catalog"); // bust the storefront unstable_cache readers
+  revalidateTag("catalog", "max"); // bust the storefront unstable_cache readers
 }
 
 export async function updateStock(id: string, stock: number): Promise<ActionResult> {
@@ -69,7 +69,7 @@ export async function createCategory(input: { name: string; image: string }): Pr
     const created = await prisma.category.create({
       data: { slug, name: parsed.data.name, image: parsed.data.image },
     });
-    revalidateTag("catalog");
+    revalidateTag("catalog", "max");
     return { success: true, slug: created.slug, name: created.name };
   } catch {
     return { success: false, error: "Could not create category." };
