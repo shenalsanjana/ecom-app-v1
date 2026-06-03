@@ -50,20 +50,20 @@ test.describe("Spec #1: admin route protection", () => {
   });
 
   test.describe("admin", () => {
-    test("login with no callbackUrl lands on /admin", async ({ page }) => {
-      // Use callbackUrl=/about to sidestep the cookie-propagation race that
-      // makes waitForURL("/admin") time out.  Once the session cookie is in
-      // the jar we navigate directly to /admin and assert access is granted.
-      await page.goto("/login?callbackUrl=/about");
+    test("login with no callbackUrl redirects straight to /admin", async ({ page }) => {
+      // Regression guard: an admin logging in with no callbackUrl must be
+      // pushed directly to /admin by the client redirect effect. This used to
+      // hang on /login ("Signing in…") because update() re-rendered the page in
+      // a loop and router.refresh() aborted the in-flight push to the slower,
+      // auth-gated /admin route. See app/(auth)/login/page.tsx.
+      await page.goto("/login");
       await page.fill("#email", ADMIN.email);
       await page.fill("#password", ADMIN.password);
       await Promise.all([
-        page.waitForURL("/about"),
+        page.waitForURL("**/admin", { timeout: 15_000 }),
         page.click('button[type="submit"]'),
       ]);
-      // Session cookie is now reliably set; admin should reach /admin.
-      await page.goto("/admin");
-      await expect(page).toHaveURL("/admin");
+      await expect(page).toHaveURL(/\/admin$/);
     });
 
     test("login with callbackUrl=/about honours the callback", async ({ page }) => {

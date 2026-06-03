@@ -1,7 +1,7 @@
 // app/(auth)/login/page.tsx
 "use client";
 
-import { useActionState, use, useEffect } from "react";
+import { useActionState, use, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -36,18 +36,25 @@ function LoginInner({
   const { update } = useSession();
   const target = state?.redirectTo;
 
+  // Redirect exactly once after a successful login. update() refreshes the
+  // client SessionProvider so navbar consumers reflect the new login, but it
+  // also mutates session context — which re-renders this component and changes
+  // the `update` identity, re-firing this effect. The ref guard makes the body
+  // run a single time so we don't loop. We deliberately do NOT call
+  // router.refresh() here: it re-fetches the current (/login) RSC tree and
+  // aborts the in-flight push to a slower, auth-gated target like /admin.
+  const didRedirect = useRef(false);
   useEffect(() => {
-    if (!target) return;
-    let cancelled = false;
+    if (!target || didRedirect.current) return;
+    didRedirect.current = true;
     (async () => {
-      await update();
-      if (cancelled) return;
-      router.refresh();
+      try {
+        await update();
+      } catch {
+        // A failed session refresh must not strand the user on "Signing in…".
+      }
       router.push(target);
     })();
-    return () => {
-      cancelled = true;
-    };
   }, [target, router, update]);
 
   const busy = pending || !!target;
