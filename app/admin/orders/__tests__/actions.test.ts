@@ -118,6 +118,14 @@ describe("advanceStatus", () => {
     expect(orderUpdate).not.toHaveBeenCalled();
   });
 
+  it("confirms an unpaid online order when allowUnpaid is set", async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "PENDING", paymentMethod: "KOKO", paymentStatus: "PENDING" });
+    orderUpdate.mockResolvedValueOnce({});
+    const res = await advanceStatus("o1", "CONFIRMED", { allowUnpaid: true });
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CONFIRMED" } });
+    expect(res).toEqual({ success: true });
+  });
+
   it("allows confirming a COD order awaiting collection", async () => {
     orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "PENDING", paymentMethod: "COD", paymentStatus: "COD_PENDING" });
     orderUpdate.mockResolvedValueOnce({});

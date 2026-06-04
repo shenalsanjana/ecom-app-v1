@@ -60,14 +60,18 @@ export async function markCodCollected(orderId: string): Promise<ActionResult> {
   return { success: true };
 }
 
-export async function advanceStatus(orderId: string, to: string): Promise<ActionResult> {
+export async function advanceStatus(
+  orderId: string,
+  to: string,
+  opts?: { allowUnpaid?: boolean },
+): Promise<ActionResult> {
   await requireAdmin();
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return { success: false, error: "Order not found" };
   if (!nextStatuses(order.status).includes(to)) {
     return { success: false, error: `Cannot move order from ${order.status} to ${to}` };
   }
-  if (to === "CONFIRMED" && !canConfirm(order)) {
+  if (to === "CONFIRMED" && !canConfirm(order) && !opts?.allowUnpaid) {
     return { success: false, error: "Awaiting payment — confirm online orders only after payment." };
   }
   try {
