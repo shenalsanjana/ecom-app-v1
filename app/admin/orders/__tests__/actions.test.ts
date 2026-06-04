@@ -344,6 +344,23 @@ describe("bulkConfirm", () => {
       { id: "o3", ok: false, error: "Already confirmed" },
     ]);
   });
+
+  it("confirms unpaid online orders when allowUnpaid is set", async () => {
+    orderFindUnique
+      .mockResolvedValueOnce({ id: "o1", status: "PENDING", paymentMethod: "KOKO", paymentStatus: "PENDING" })
+      .mockResolvedValueOnce({ id: "o2", status: "PENDING", paymentMethod: "MINTPAY", paymentStatus: null });
+    orderUpdate.mockResolvedValue({});
+
+    const res = await bulkConfirm(["o1", "o2"], { allowUnpaid: true });
+
+    expect(orderUpdate).toHaveBeenCalledTimes(2);
+    expect(res.okCount).toBe(2);
+    expect(res.skippedCount).toBe(0);
+    expect(res.results).toEqual([
+      { id: "o1", ok: true },
+      { id: "o2", ok: true },
+    ]);
+  });
 });
 
 describe("bulkDispatch", () => {

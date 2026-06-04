@@ -274,7 +274,7 @@ export async function resendConfirmationEmail(orderId: string): Promise<ActionRe
   return { success: true, warning: details.trackingCode ? undefined : "Sent without a tracking code (not dispatched yet)." };
 }
 
-export async function bulkConfirm(ids: string[]): Promise<BulkResult> {
+export async function bulkConfirm(ids: string[], opts?: { allowUnpaid?: boolean }): Promise<BulkResult> {
   await requireAdmin();
   const results: BulkItemResult[] = [];
   for (const id of ids) {
@@ -284,7 +284,7 @@ export async function bulkConfirm(ids: string[]): Promise<BulkResult> {
       results.push({ id, ok: false, error: order.status === "CONFIRMED" ? "Already confirmed" : `Cannot confirm (${order.status})` });
       continue;
     }
-    if (!canConfirm(order)) { results.push({ id, ok: false, error: "Awaiting payment" }); continue; }
+    if (!canConfirm(order) && !opts?.allowUnpaid) { results.push({ id, ok: false, error: "Awaiting payment" }); continue; }
     try {
       await prisma.order.update({ where: { id }, data: { status: "CONFIRMED" } });
       results.push({ id, ok: true });
