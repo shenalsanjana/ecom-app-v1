@@ -88,7 +88,11 @@ export function AddToCartDialog({
         <ShoppingCart className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
         <span className="truncate">Add to cart</span>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        className={`max-h-[90dvh] overflow-y-auto transition-[max-width] duration-(--duration-fast) ${
+          showChart ? "sm:max-w-2xl" : "sm:max-w-md"
+        }`}
+      >
         <DialogHeader>
           <DialogTitle>{name}</DialogTitle>
           <div className="flex items-center justify-between gap-2">
@@ -135,7 +139,7 @@ export function AddToCartDialog({
         )}
         {hasSizes && showChart && (
           <div id="add-to-cart-size-chart">
-            <SizeChartContent className="relative h-64 w-full overflow-hidden rounded-md" />
+            <SizeChartContent className="relative aspect-square w-full overflow-hidden rounded-md" />
           </div>
         )}
         {hasSizes && !selectedSize && (
