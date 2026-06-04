@@ -1,6 +1,5 @@
 import { type OrderItem, type Prisma } from "@prisma/client";
 import { prisma } from "@/app/_lib/prisma";
-import { bookCourierAndNotify } from "@/app/checkout/book-courier";
 import {
   logMailerError,
   sendAdminFailureAlertEmail,
@@ -71,23 +70,6 @@ export async function finalizePaidPayment(orderId: string, expectedMethod: strin
   try {
     const items = await prisma.orderItem.findMany({ where: { orderId } });
     const details = paidDetails(updated, items);
-
-    if (process.env.ROYAL_EXPRESS_ENABLED === "true") {
-      try {
-        await bookCourierAndNotify({ order: details });
-      } catch (err) {
-        try {
-          await sendAdminFailureAlertEmail({
-            orderId,
-            step: "orchestrate-courier",
-            reason: err instanceof Error ? err.message : "unknown",
-            order: details,
-          });
-        } catch {
-          /* webhook response must not fail because alert delivery failed */
-        }
-      }
-    }
 
     // NOTE: emailSent is a best-effort dedup hint for the mailer; the atomic
     // claim (updateMany above) is the real idempotency gate — do not remove the
