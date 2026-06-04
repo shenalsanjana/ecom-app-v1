@@ -177,3 +177,36 @@ The seed creates 12 realistic oversize t-shirt products with:
 - **Styling:** Tailwind CSS + shadcn/ui
 - **Email:** Nodemailer
 - **Delivery:** RoyalExpress API
+
+## Deployment & Migrations
+
+The Vercel build command is intentionally minimal:
+
+```
+prisma generate && next build
+```
+
+Database work is **not** part of the build, so a paused or unreachable database
+no longer fails a frontend deploy.
+
+- **Migrations** apply automatically via the `.github/workflows/migrate.yml`
+  GitHub Action on every push to `main` that touches `prisma/`. It runs
+  `prisma migrate deploy` using the `DATABASE_URL` GitHub Actions secret. You
+  can also trigger it manually (workflow_dispatch) or run `npm run db:deploy`
+  locally against the target database.
+- **Seeding** is no longer run on every deploy (Postgres persists the catalog).
+  Run it deliberately when you need to (re)load demo/catalog data:
+  `npm run db:seed`.
+- **Admin user** is ensured manually with `npm run admin:ensure`.
+
+### Required GitHub secret
+
+The migrate workflow needs a repository secret named `DATABASE_URL` containing
+the database connection string. Set it under **Settings → Secrets and variables
+→ Actions**. Keep this value out of `vercel.json` and any committed file.
+
+Use the **direct** Postgres connection string (the same value the old build used
+for `migrate deploy`) — not a pooled / Accelerate `prisma+postgres://…` URL.
+`prisma migrate deploy` requires a direct connection. Set this secret (and
+resume the database if it is paused) **before** merging the workflow, since the
+merge commit triggers the workflow's first run.

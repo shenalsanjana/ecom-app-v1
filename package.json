@@ -16,6 +16,7 @@
     "admin:ensure": "tsx scripts/ensure-admin.ts",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset --force"
   },

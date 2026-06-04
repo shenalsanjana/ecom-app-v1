@@ -1,0 +1,35 @@
+name: DB Migrate
+
+# Apply Prisma migrations whenever main changes. This used to run inside the
+# Vercel build command; it was moved out so a paused/unreachable database no
+# longer fails an otherwise-fine frontend deploy.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "prisma/migrations/**"
+      - "prisma/schema.prisma"
+      - ".github/workflows/migrate.yml"
+  workflow_dispatch: {}
+
+# Never run two migration jobs against the same database at once.
+concurrency:
+  group: db-migrate-main
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # One-time baseline-drift fix preserved verbatim from the old Vercel build
+      # command. Safe to delete once a clean `migrate deploy` is confirmed.
+      - run: npx prisma migrate resolve --applied 20260527000000_add_user_role || true
+      - run: npx prisma migrate deploy
