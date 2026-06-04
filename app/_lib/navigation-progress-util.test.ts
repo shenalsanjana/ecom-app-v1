@@ -27,4 +27,12 @@ describe("shouldStartProgress", () => {
   it("treats a same-path change of query string as navigation", () => {
     expect(shouldStartProgress("/search", "/search?q=tee", "")).toBe(true);
   });
+
+  it("returns false for a same-path hash link (would never settle)", () => {
+    expect(shouldStartProgress("/products/p1", "/products/p1#reviews", "")).toBe(false);
+  });
+
+  it("still navigates for a different path that carries a hash", () => {
+    expect(shouldStartProgress("/products/p1", "/products/p2#reviews", "")).toBe(true);
+  });
 });

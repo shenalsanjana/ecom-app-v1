@@ -10,7 +10,11 @@ export function shouldStartProgress(
   if (/^(https?:)?\/\//i.test(href)) return false;
   if (/^(mailto:|tel:|sms:|#)/i.test(href)) return false;
   if (!href.startsWith("/")) return false;
+  // Strip any in-page hash: a "/path#section" click while already on "/path"
+  // does not change pathname or search, so the bar would never complete.
+  const hrefNoHash = href.split("#")[0];
+  if (hrefNoHash === "") return false;
   // Compare destination (path + query) against the current location.
   const current = `${currentPath}${currentSearch}`;
-  return href !== current && href !== currentPath;
+  return hrefNoHash !== current && hrefNoHash !== currentPath;
 }

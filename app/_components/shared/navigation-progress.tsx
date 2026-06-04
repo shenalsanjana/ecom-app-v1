@@ -18,16 +18,28 @@ export function NavigationProgress() {
       if (e.defaultPrevented || e.button !== 0) return;
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const anchor = (e.target as HTMLElement | null)?.closest("a");
-      if (!anchor || anchor.target === "_blank") return;
+      if (!anchor || anchor.target === "_blank" || anchor.hasAttribute("download")) return;
       const href = anchor.getAttribute("href");
       if (!shouldStartProgress(window.location.pathname, href, window.location.search)) {
         return;
       }
+      // Drop any timers still pending from a prior click so they can't reset
+      // a fresh navigation mid-flight.
+      timers.current.forEach(clearTimeout);
+      timers.current = [];
       setActive(true);
       setWidth(10);
       // Ease toward 90% while we wait for the new route to commit.
       timers.current.push(setTimeout(() => setWidth(60), 100));
       timers.current.push(setTimeout(() => setWidth(85), 350));
+      // Safety net: if the route never settles (canceled/blocked navigation),
+      // reset so the bar can't get stuck visible.
+      timers.current.push(
+        setTimeout(() => {
+          setActive(false);
+          setWidth(0);
+        }, 5000),
+      );
     }
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
@@ -36,6 +48,9 @@ export function NavigationProgress() {
   // Complete the bar whenever the route (path or query) settles.
   useEffect(() => {
     if (!active) return;
+    // Route settled — drop the pending easing/safety timers and finish.
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
     setWidth(100);
     const done = setTimeout(() => {
       setActive(false);
