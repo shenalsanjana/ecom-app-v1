@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import Link from "next/link";
 import { formatPrice } from "@/app/_lib/format";
 import { paymentStatusLabel } from "@/app/_lib/order-status";
@@ -33,14 +34,32 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
   const allSelected = rows.every((r) => selected.has(r.id));
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.id)));
 
-  const runBulk = (fn: (ids: string[]) => Promise<BulkResult>, verb: string) =>
+  const report = (r: BulkResult, verb: string) => {
+    const msg = `${r.okCount} ${verb}, ${r.skippedCount} skipped`;
+    if (r.okCount > 0) toast.success(msg);
+    else toast.error(msg);
+    setSelected(new Set());
+    router.refresh();
+  };
+
+  const confirmSelected = () =>
     start(async () => {
       const ids = [...selected];
       if (ids.length === 0) return;
-      const r = await fn(ids);
-      alert(`${r.okCount} ${verb}, ${r.skippedCount} skipped.`);
-      setSelected(new Set());
-      router.refresh();
+      const unpaid = rows.filter((o) => selected.has(o.id) && o.paymentMethod !== "COD" && o.paymentStatus !== "PAID");
+      if (unpaid.length > 0) {
+        if (!window.confirm(`${unpaid.length} of these aren't paid yet. Confirm anyway?`)) return;
+        report(await bulkConfirm(ids, { allowUnpaid: true }), "confirmed");
+      } else {
+        report(await bulkConfirm(ids), "confirmed");
+      }
+    });
+
+  const dispatchSelected = () =>
+    start(async () => {
+      const ids = [...selected];
+      if (ids.length === 0) return;
+      report(await bulkDispatch(ids), "dispatched");
     });
 
   return (
@@ -48,9 +67,9 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
       {selected.size > 0 && (
         <div className="sticky top-0 z-10 mb-2 flex items-center gap-3 rounded-md border bg-secondary/60 px-3 py-2 text-sm">
           <span>{selected.size} selected</span>
-          <button disabled={pending} onClick={() => runBulk(bulkConfirm, "confirmed")}
+          <button disabled={pending} onClick={confirmSelected}
             className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50">Confirm selected</button>
-          <button disabled={pending} onClick={() => runBulk(bulkDispatch, "dispatched")}
+          <button disabled={pending} onClick={dispatchSelected}
             className="rounded-md border px-3 py-1 text-xs disabled:opacity-50">Dispatch selected</button>
           <button onClick={() => setSelected(new Set())} className="ml-auto text-xs text-muted-foreground">Clear</button>
         </div>
