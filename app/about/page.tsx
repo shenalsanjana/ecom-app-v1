@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 
@@ -60,9 +61,9 @@ export default function AboutPage() {
                   dressingbear@gmail.com
                 </a>{" "}
                 or call +94 740545536. You can also use our{" "}
-                <a href="/contact" className="text-primary hover:underline">
+                <Link href="/contact" className="text-primary hover:underline">
                   contact form
-                </a>
+                </Link>
                 .
               </p>
             </section>
