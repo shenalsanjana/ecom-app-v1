@@ -6,6 +6,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/app/_lib/prisma";
 import { requireAdmin } from "@/app/_lib/admin-auth";
 import { nextStatuses, applyItemChanges, recomputeTotals, canEdit, type ItemChange } from "@/app/_lib/admin-orders";
+import { getDeliveryConfig } from "@/app/_lib/store-settings";
 import { bookCourierAndNotify } from "@/app/checkout/book-courier";
 import { sendOrderConfirmationEmail, type OrderDetails } from "@/app/_lib/mailer";
 
@@ -115,7 +116,7 @@ export async function editAddress(
   if (!order) return { success: false, error: "Order not found" };
   if (order.courierBookedAt) return { success: false, error: "Address already sent to Curfox — cancel/rebook there." };
 
-  const totals = recomputeTotals(order.items, parsed.data.city);
+  const totals = recomputeTotals(order.items, parsed.data.city, await getDeliveryConfig());
   try {
     await prisma.order.update({
       where: { id: orderId },
@@ -154,7 +155,7 @@ export async function editItems(orderId: string, changes: ItemChange[]): Promise
     return { success: false, error: e instanceof Error ? e.message : "Invalid change" };
   }
 
-  const totals = recomputeTotals(next.nextItems, order.shippingCity);
+  const totals = recomputeTotals(next.nextItems, order.shippingCity, await getDeliveryConfig());
   const nameByProduct = new Map(order.items.map((i) => [i.productId, i.name]));
 
   try {

@@ -31,6 +31,9 @@ vi.mock("@/app/_lib/prisma", () => ({
     ),
   },
 }));
+vi.mock("@/app/_lib/store-settings", () => ({
+  getDeliveryConfig: vi.fn().mockResolvedValue({ colombo: 350, other: 450, freeThreshold: 5000 }),
+}));
 vi.mock("@/app/checkout/book-courier", () => ({
   bookCourierAndNotify: vi.fn(async () => undefined),
 }));

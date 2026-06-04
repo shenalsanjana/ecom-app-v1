@@ -14,6 +14,7 @@ import {
 } from "@/app/_lib/mailer";
 import { prisma } from "@/app/_lib/prisma";
 import { calculateDelivery } from "@/app/_lib/checkout-config";
+import { getDeliveryConfig } from "@/app/_lib/store-settings";
 import { zoneForCity } from "@/app/_lib/delivery-zones";
 import { initialPaymentStatus } from "@/app/_lib/order-status";
 import { nextWebNumber } from "@/app/_lib/web-number";
@@ -179,7 +180,8 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
   }
 
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const shippingCost = calculateDelivery(subtotal, zoneForCity(shippingAddress.city));
+  const deliveryConfig = await getDeliveryConfig();
+  const shippingCost = calculateDelivery(subtotal, zoneForCity(shippingAddress.city), deliveryConfig);
   const total = subtotal + shippingCost;
   const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
