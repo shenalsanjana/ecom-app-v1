@@ -86,12 +86,20 @@ primitives (`@/components/ui/skeleton` `Skeleton`, and
 `@/app/_components/shared/product-grid-skeleton` `ProductGridSkeleton`) and
 mirrors its real page's layout so the skeleton→content swap does not shift.
 
+**Inheritance note (refined during planning):** a `loading.tsx` covers its
+segment *and every nested route without its own*. The genuinely-uncovered
+routes are the customer ones below. The admin detail/form/settings pages already
+*inherit* `app/admin/loading.tsx` (dashboard-shaped) — they are not missing a
+boundary; they receive **shape-correct overrides** so the dashboard skeleton
+stops flashing on forms/detail pages.
+
 Routes to add:
-- Customer: `app/products/[id]/loading.tsx`, `app/categories/loading.tsx`,
-  `app/account/loading.tsx`, `app/account/security/loading.tsx`,
-  `app/account/addresses/loading.tsx`
-- Admin: `app/admin/orders/[id]/loading.tsx`,
-  `app/admin/products/new/loading.tsx`,
+- Customer (first-time boundaries): `app/products/[id]/loading.tsx`,
+  `app/categories/loading.tsx`, and a single `app/account/loading.tsx` that
+  covers `/account`, `/account/security`, and `/account/addresses`
+  (`/account/orders` already overrides it).
+- Admin (shape-correct overrides of the inherited skeleton):
+  `app/admin/orders/[id]/loading.tsx`, `app/admin/products/new/loading.tsx`,
   `app/admin/products/[id]/edit/loading.tsx`,
   `app/admin/customers/[id]/loading.tsx`, `app/admin/settings/loading.tsx`
 
@@ -131,6 +139,13 @@ Eliminates full-page reloads (white flash + root-layout re-fetch).
 - Gate the verbose module-load and per-call `console.log` statements in
   `app/_lib/auth.ts` and `app/_lib/auth.config.ts` behind a non-production
   check (or remove the ones that are pure noise). Keep genuine error logging.
+
+### Component 5 — Role-gated Admin entry link (added during planning)
+Show an "Admin panel" link (to `/admin`) in the customer header's profile
+dropdown (`app/_components/header/profile-menu.tsx`), visible **only** when
+`session.user.role === "ADMIN"`. Gives admins a one-click path into the admin
+area instead of typing the URL. `session.user.role` is typed via
+`app/_lib/auth-types.d.ts`.
 
 ## Testing & Verification
 - `npm run build` must pass (CLAUDE.md §2 validation gate).
