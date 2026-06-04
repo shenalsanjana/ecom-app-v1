@@ -130,6 +130,7 @@ describe("canConfirm", () => {
   it("allows COD orders regardless of payment status", () => {
     expect(canConfirm({ paymentMethod: "COD", paymentStatus: "COD_PENDING" })).toBe(true);
     expect(canConfirm({ paymentMethod: "COD", paymentStatus: "COD_COLLECTED" })).toBe(true);
+    expect(canConfirm({ paymentMethod: "COD", paymentStatus: null })).toBe(true);
   });
 
   it("allows online orders only once paid", () => {
