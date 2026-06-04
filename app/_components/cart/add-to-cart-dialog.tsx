@@ -60,6 +60,7 @@ export function AddToCartDialog({
       setOpen(false);
       setSelectedSize("");
       setAdded(false);
+      setShowChart(false);
     }, 900);
   }
 
