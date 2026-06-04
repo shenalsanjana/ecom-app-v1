@@ -1,15 +1,14 @@
 "use client";
 
-import Image from "next/image";
 import { Ruler } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { SizeChartContent } from "@/app/_components/product/size-chart-content";
 
 export function SizeChartDialog() {
   return (
@@ -21,19 +20,8 @@ export function SizeChartDialog() {
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Oversize T-shirt size chart</DialogTitle>
-          <DialogDescription>
-            Measurements in inches, ±0.5&quot; tolerance. Unisex sizing.
-          </DialogDescription>
         </DialogHeader>
-        <div className="relative aspect-square w-full overflow-hidden rounded-md">
-          <Image
-            src="/size-charts/oversize.jpg"
-            alt="Oversize t-shirt size chart"
-            fill
-            sizes="(min-width: 640px) 42rem, 100vw"
-            className="object-contain"
-          />
-        </div>
+        <SizeChartContent />
       </DialogContent>
     </Dialog>
   );
