@@ -123,3 +123,23 @@ describe("status transitions", () => {
     expect(canCancel({ status: "CANCELLED" })).toBe(false);
   });
 });
+
+import { canConfirm } from "../admin-orders";
+
+describe("canConfirm", () => {
+  it("allows COD orders regardless of payment status", () => {
+    expect(canConfirm({ paymentMethod: "COD", paymentStatus: "COD_PENDING" })).toBe(true);
+    expect(canConfirm({ paymentMethod: "COD", paymentStatus: "COD_COLLECTED" })).toBe(true);
+  });
+
+  it("allows online orders only once paid", () => {
+    expect(canConfirm({ paymentMethod: "KOKO", paymentStatus: "PAID" })).toBe(true);
+    expect(canConfirm({ paymentMethod: "PAYHERE", paymentStatus: "PAID" })).toBe(true);
+  });
+
+  it("blocks unpaid online orders", () => {
+    expect(canConfirm({ paymentMethod: "KOKO", paymentStatus: "PENDING" })).toBe(false);
+    expect(canConfirm({ paymentMethod: "MINTPAY", paymentStatus: null })).toBe(false);
+    expect(canConfirm({ paymentMethod: "PAYHERE", paymentStatus: "PAYMENT_FAILED" })).toBe(false);
+  });
+});
