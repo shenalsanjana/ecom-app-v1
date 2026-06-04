@@ -103,8 +103,23 @@ describe("advanceStatus", () => {
     expect(orderUpdate).not.toHaveBeenCalled();
   });
 
-  it("allows PENDING→CONFIRMED", async () => {
-    orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "PENDING" });
+  it("allows PENDING→CONFIRMED for a paid order", async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "PENDING", paymentMethod: "KOKO", paymentStatus: "PAID" });
+    orderUpdate.mockResolvedValueOnce({});
+    const res = await advanceStatus("o1", "CONFIRMED");
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CONFIRMED" } });
+    expect(res).toEqual({ success: true });
+  });
+
+  it("blocks confirming an unpaid online order", async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "PENDING", paymentMethod: "KOKO", paymentStatus: "PENDING" });
+    const res = await advanceStatus("o1", "CONFIRMED");
+    expect(res).toEqual({ success: false, error: "Awaiting payment — confirm online orders only after payment." });
+    expect(orderUpdate).not.toHaveBeenCalled();
+  });
+
+  it("allows confirming a COD order awaiting collection", async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "PENDING", paymentMethod: "COD", paymentStatus: "COD_PENDING" });
     orderUpdate.mockResolvedValueOnce({});
     const res = await advanceStatus("o1", "CONFIRMED");
     expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CONFIRMED" } });

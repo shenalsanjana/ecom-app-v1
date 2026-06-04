@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/app/_lib/prisma";
 import { requireAdmin } from "@/app/_lib/admin-auth";
-import { nextStatuses, applyItemChanges, recomputeTotals, canEdit, type ItemChange } from "@/app/_lib/admin-orders";
+import { nextStatuses, applyItemChanges, recomputeTotals, canEdit, canConfirm, type ItemChange } from "@/app/_lib/admin-orders";
 import { getDeliveryConfig } from "@/app/_lib/store-settings";
 import { bookCourierAndNotify } from "@/app/checkout/book-courier";
 import { sendOrderConfirmationEmail, type OrderDetails } from "@/app/_lib/mailer";
@@ -58,6 +58,9 @@ export async function advanceStatus(orderId: string, to: string): Promise<Action
   if (!order) return { success: false, error: "Order not found" };
   if (!nextStatuses(order.status).includes(to)) {
     return { success: false, error: `Cannot move order from ${order.status} to ${to}` };
+  }
+  if (to === "CONFIRMED" && !canConfirm(order)) {
+    return { success: false, error: "Awaiting payment — confirm online orders only after payment." };
   }
   try {
     await prisma.order.update({ where: { id: orderId }, data: { status: to } });
