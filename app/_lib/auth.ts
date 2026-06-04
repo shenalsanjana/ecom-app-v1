@@ -6,25 +6,29 @@ import { prisma } from "@/app/_lib/prisma";
 import { LoginSchema } from "@/app/_lib/validation";
 import { authConfig } from "@/app/_lib/auth.config";
 
-console.log("[Auth]: auth.ts module loading...");
+const devLog = (...args: unknown[]) => {
+  if (process.env.NODE_ENV !== "production") console.log(...args);
+};
+
+devLog("[Auth]: auth.ts module loading...");
 const authSecret = process.env.AUTH_SECRET;
 
 if (!authSecret) {
   console.warn("[Auth]: CRITICAL: AUTH_SECRET is not set in environment!");
 } else {
-  console.log(`[Auth]: AUTH_SECRET is set (length: ${authSecret.length})`);
+  devLog(`[Auth]: AUTH_SECRET is set (length: ${authSecret.length})`);
   if (authSecret.startsWith('"')) {
     console.warn("[Auth]: WARNING: AUTH_SECRET starts with a quote!");
   }
 }
 
-console.log(`[Auth]: bcrypt available: ${typeof bcrypt.compare === "function"}`);
+devLog(`[Auth]: bcrypt available: ${typeof bcrypt.compare === "function"}`);
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
   secret: authSecret,
   trustHost: true,
-  debug: true, // Force debug mode on to see full NextAuth logs in production console
+  debug: process.env.NODE_ENV !== "production",
   logger: {
     error: (error) => {
       console.error(`[NextAuth Error]:`, error);
@@ -50,7 +54,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return null;
           }
 
-          console.log(`[Auth]: Attempting login for ${parsed.data.email}`);
+          devLog(`[Auth]: Attempting login for ${parsed.data.email}`);
           const user = await prisma.user.findUnique({
             where: { email: parsed.data.email },
           });
@@ -60,7 +64,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return null;
           }
 
-          console.log(`[Auth]: User found, comparing passwords...`);
+          devLog(`[Auth]: User found, comparing passwords...`);
           const ok = await bcrypt.compare(parsed.data.password, user.passwordHash);
           
           if (!ok) {
@@ -68,7 +72,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return null;
           }
 
-          console.log(`[Auth]: Login success for ${parsed.data.email} (${user.id})`);
+          devLog(`[Auth]: Login success for ${parsed.data.email} (${user.id})`);
           return {
             id: user.id,
             name: user.name,
@@ -85,4 +89,4 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
 });
 
-console.log("[Auth]: handlers and auth initialized.");
+devLog("[Auth]: handlers and auth initialized.");

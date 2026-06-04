@@ -28,7 +28,9 @@ export const authConfig = {
   },
 } satisfies NextAuthConfig;
 
-console.log("[Auth Config]: Shared config loaded. Secret set:", !!process.env.AUTH_SECRET);
-if (process.env.AUTH_SECRET?.startsWith('"')) {
-  console.warn("[Auth Config]: WARNING: AUTH_SECRET starts with a quote. Check environment variables.");
+if (process.env.NODE_ENV !== "production") {
+  console.log("[Auth Config]: Shared config loaded. Secret set:", !!process.env.AUTH_SECRET);
+  if (process.env.AUTH_SECRET?.startsWith('"')) {
+    console.warn("[Auth Config]: WARNING: AUTH_SECRET starts with a quote. Check environment variables.");
+  }
 }

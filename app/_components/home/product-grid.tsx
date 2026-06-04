@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ProductCard } from "@/app/_components/home/product-card";
 import { getFeaturedProducts } from "@/app/_lib/products";
 
@@ -11,9 +12,9 @@ export async function ProductGrid() {
             <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-brand">Editor's picks</p>
             <h2 className="font-heading text-2xl font-semibold tracking-tight">Featured products</h2>
           </div>
-          <a href="/categories" className="border-b border-border pb-0.5 text-sm font-medium text-foreground hover:border-foreground">
+          <Link href="/categories" className="border-b border-border pb-0.5 text-sm font-medium text-foreground hover:border-foreground">
             View all
-          </a>
+          </Link>
         </div>
         <div className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3 lg:grid-cols-4">
           {products.map((p) => (
