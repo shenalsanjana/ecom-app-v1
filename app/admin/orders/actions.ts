@@ -289,6 +289,7 @@ export async function bulkConfirm(ids: string[]): Promise<BulkResult> {
     }
   }
   revalidatePath("/admin/orders");
+  for (const r of results) if (r.ok) revalidatePath(`/admin/orders/${r.id}`);
   return summarize(results);
 }
 
@@ -313,5 +314,6 @@ export async function bulkDispatch(ids: string[]): Promise<BulkResult> {
     }
   }
   revalidatePath("/admin/orders");
+  for (const r of results) if (r.ok) revalidatePath(`/admin/orders/${r.id}`);
   return summarize(results);
 }
