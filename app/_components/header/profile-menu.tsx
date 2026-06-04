@@ -26,7 +26,11 @@ export function ProfileMenu() {
 
   const user =
     status === "authenticated" && session?.user
-      ? { name: session.user.name ?? "", email: session.user.email ?? "" }
+      ? {
+          name: session.user.name ?? "",
+          email: session.user.email ?? "",
+          isAdmin: session.user.role === "ADMIN",
+        }
       : null;
 
   function handleLogout() {
@@ -73,6 +77,14 @@ export function ProfileMenu() {
             <DropdownMenuItem render={<Link href="/account/addresses" />}>
               Saved addresses
             </DropdownMenuItem>
+            {user.isAdmin && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem render={<Link href="/admin" />}>
+                  Admin panel
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={(e) => {
