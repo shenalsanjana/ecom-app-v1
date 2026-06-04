@@ -18,7 +18,6 @@ import { getDeliveryConfig } from "@/app/_lib/store-settings";
 import { zoneForCity } from "@/app/_lib/delivery-zones";
 import { initialPaymentStatus } from "@/app/_lib/order-status";
 import { nextWebNumber } from "@/app/_lib/web-number";
-import { bookCourierAndNotify } from "./book-courier";
 
 export type PaymentMethod = "COD" | "PAYHERE" | "KOKO" | "MINTPAY";
 
@@ -74,17 +73,11 @@ export type ProcessOrderInput = z.infer<typeof ProcessOrderSchema>;
  */
 async function orchestrateCourierBooking(orderId: string, details: OrderDetails): Promise<string | undefined> {
   try {
-    const royalEnabled = process.env.ROYAL_EXPRESS_ENABLED === "true";
-
     if (details.paymentMethod === "COD") {
-      if (royalEnabled) {
-        // Synchronous booking with non-blocking failure
-        return await bookCourierAndNotify({ order: details });
-      } else {
-        console.log("[checkout] ROYAL_EXPRESS_ENABLED=false — skipping Curfox booking", {
-          orderId,
-        });
-      }
+      // COD orders are no longer auto-booked at checkout — the admin dispatches
+      // them manually from the orders list (manual lifecycle). The confirmation
+      // email is still sent by the caller, now without a tracking code.
+      console.log("[checkout] COD order awaiting manual dispatch", { orderId });
     } else {
       // Prepaid flow: send pending notification to brand
       console.log("[checkout] Skipped courier automation: awaiting payment confirmation", {

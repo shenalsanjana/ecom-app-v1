@@ -74,11 +74,11 @@ beforeEach(() => {
 });
 
 describe("processOrder — COD path", () => {
-  it("calls bookCourierAndNotify and sends customer confirmation; returns success", async () => {
+  it("does not book the courier at checkout; still sends customer confirmation; returns success", async () => {
     process.env.ROYAL_EXPRESS_ENABLED = "true";
     const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
     expect(result.success).toBe(true);
-    expect(bookCourierAndNotify).toHaveBeenCalledOnce();
+    expect(bookCourierAndNotify).not.toHaveBeenCalled();
     expect(sendOrderConfirmationEmail).toHaveBeenCalledOnce();
     expect(sendPendingPrepaidNotificationEmail).not.toHaveBeenCalled();
   });
@@ -148,13 +148,6 @@ describe("processOrder — prepaid paths", () => {
 });
 
 describe("processOrder — never throws downstream failures back to the customer", () => {
-  it("returns success even if bookCourierAndNotify somehow throws", async () => {
-    process.env.ROYAL_EXPRESS_ENABLED = "true";
-    vi.mocked(bookCourierAndNotify).mockRejectedValueOnce(new Error("contract broken"));
-    const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
-    expect(result.success).toBe(true);
-  });
-
   it("returns success even if customer-confirmation email fails", async () => {
     vi.mocked(sendOrderConfirmationEmail).mockRejectedValueOnce(new Error("smtp down"));
     const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
