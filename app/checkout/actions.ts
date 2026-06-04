@@ -66,10 +66,12 @@ const ProcessOrderSchema = z.object({
 export type ProcessOrderInput = z.infer<typeof ProcessOrderSchema>;
 
 /**
- * Internal helper to book courier and notify the brand/customer.
- * Handles both COD (Curfox booking) and Prepaid (deferred) flows.
- * Never throws — failures are logged and alerts sent to admin.
- * Returns the waybillNumber if booked.
+ * Internal helper for post-create side effects. No order is auto-booked at
+ * checkout under the manual lifecycle: COD orders just log and await manual
+ * dispatch; prepaid orders send a pending-payment notification to the brand.
+ * Never throws — failures are logged and alerts sent to admin. Always resolves
+ * undefined (no tracking code is produced at checkout anymore); the return type
+ * is retained for the caller's existing trackingCode plumbing.
  */
 async function orchestrateCourierBooking(orderId: string, details: OrderDetails): Promise<string | undefined> {
   try {
