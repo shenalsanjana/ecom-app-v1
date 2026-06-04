@@ -13,7 +13,7 @@ import { InstallmentNote } from "@/app/_components/shared/installment-note";
 import { useCart } from "@/app/_lib/cart-context";
 import { useWishlist } from "@/app/_lib/wishlist-context";
 import { formatPrice } from "@/app/_lib/format";
-import { FREE_DELIVERY_THRESHOLD } from "@/app/_lib/checkout-config";
+import { useDeliveryConfig } from "@/app/_components/delivery/delivery-config-provider";
 
 type Props = {
   productId: string;
@@ -37,6 +37,7 @@ export function BuyBoxClient({
 }: Props) {
   const router = useRouter();
   const { addItem, items } = useCart();
+  const { freeThreshold: FREE_DELIVERY_THRESHOLD } = useDeliveryConfig();
   const { has: isWishlisted, toggle: toggleWishlist } = useWishlist();
   const wishlisted = isWishlisted(productId);
   const [quantity, setQuantity] = useState(1);

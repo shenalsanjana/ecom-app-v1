@@ -7,14 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { formatPrice } from "@/app/_lib/format";
 import { calculateDelivery } from "@/app/_lib/checkout-config";
+import { useDeliveryConfig } from "@/app/_components/delivery/delivery-config-provider";
 import { FreeShippingProgress } from "@/app/_components/cart/free-shipping-progress";
 import { InstallmentNote } from "@/app/_components/shared/installment-note";
 import { PaymentMethodIcon } from "@/app/_components/shared/payment-method-icon";
 
 export function CartSummary() {
   const { subtotal, totalItems } = useCart();
+  const deliveryConfig = useDeliveryConfig();
 
-  const shipping = calculateDelivery(subtotal, "COLOMBO");
+  const shipping = calculateDelivery(subtotal, "COLOMBO", deliveryConfig);
   const total = subtotal + shipping;
 
   return (
