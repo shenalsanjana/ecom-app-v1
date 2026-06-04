@@ -204,3 +204,9 @@ no longer fails a frontend deploy.
 The migrate workflow needs a repository secret named `DATABASE_URL` containing
 the database connection string. Set it under **Settings → Secrets and variables
 → Actions**. Keep this value out of `vercel.json` and any committed file.
+
+Use the **direct** Postgres connection string (the same value the old build used
+for `migrate deploy`) — not a pooled / Accelerate `prisma+postgres://…` URL.
+`prisma migrate deploy` requires a direct connection. Set this secret (and
+resume the database if it is paused) **before** merging the workflow, since the
+merge commit triggers the workflow's first run.
