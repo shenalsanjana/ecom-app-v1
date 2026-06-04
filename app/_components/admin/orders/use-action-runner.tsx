@@ -22,8 +22,12 @@ export function useActionRunner() {
       setRunningLabel(label);
       try {
         const r = await fn();
-        if (r.success) toast.success(r.warning ?? "Done");
-        else toast.error(r.error ?? "Action failed");
+        if (r.success) {
+          if (r.warning) toast.warning(r.warning);
+          else toast.success("Done");
+        } else {
+          toast.error(r.error ?? "Action failed");
+        }
       } catch {
         // The server action call itself failed (e.g. network error) rather than
         // returning a structured result — surface it instead of failing silently.
