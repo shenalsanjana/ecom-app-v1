@@ -24,8 +24,12 @@ export function useActionRunner() {
         const r = await fn();
         if (r.success) toast.success(r.warning ?? "Done");
         else toast.error(r.error ?? "Action failed");
-        router.refresh();
+      } catch {
+        // The server action call itself failed (e.g. network error) rather than
+        // returning a structured result — surface it instead of failing silently.
+        toast.error("Action failed");
       } finally {
+        router.refresh();
         setRunningLabel(null);
       }
     });
