@@ -28,8 +28,8 @@ export function RowActions(p: Props) {
 
   // Online orders (non-COD) must be PAID before they can be confirmed.
   const unpaidOnline = p.paymentMethod !== "COD" && p.paymentStatus !== "PAID";
-  const showCodCollected = p.paymentMethod === "COD" && p.paymentStatus === "COD_PENDING";
   const terminal = p.status === "DELIVERED" || p.status === "CANCELLED";
+  const showCodCollected = !terminal && p.paymentMethod === "COD" && p.paymentStatus === "COD_PENDING";
 
   // Secondary (⋯ menu) actions for this row's state.
   const menu: { label: string; run: () => void }[] = [];
