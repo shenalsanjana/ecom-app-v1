@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ShoppingCart, Check } from "lucide-react";
+import { ShoppingCart, Check, Ruler } from "lucide-react";
 import {
   Dialog,
   DialogClose,
@@ -13,6 +13,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { SizeChartContent } from "@/app/_components/product/size-chart-content";
 import { useCart } from "@/app/_lib/cart-context";
 import { formatPrice } from "@/app/_lib/format";
 
@@ -40,6 +41,7 @@ export function AddToCartDialog({
   const [open, setOpen] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string>("");
   const [added, setAdded] = useState(false);
+  const [showChart, setShowChart] = useState(false);
 
   const hasSizes = sizeList.length > 0;
   // Size is required for Add to cart when the product offers sizes.
@@ -68,6 +70,7 @@ export function AddToCartDialog({
     if (!next) {
       setSelectedSize("");
       setAdded(false);
+      setShowChart(false);
     }
   }
 
@@ -87,10 +90,24 @@ export function AddToCartDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{name}</DialogTitle>
-          <DialogDescription>
-            {formatPrice(price)}
-            {hasSizes ? " — choose your size" : ""}
-          </DialogDescription>
+          <div className="flex items-center justify-between gap-2">
+            <DialogDescription>
+              {formatPrice(price)}
+              {hasSizes ? " — choose your size" : ""}
+            </DialogDescription>
+            {hasSizes && (
+              <button
+                type="button"
+                onClick={() => setShowChart((v) => !v)}
+                aria-expanded={showChart}
+                aria-controls="add-to-cart-size-chart"
+                className="inline-flex shrink-0 items-center gap-1 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                <Ruler className="h-3.5 w-3.5" aria-hidden />
+                {showChart ? "Hide chart" : "Size Chart"}
+              </button>
+            )}
+          </div>
         </DialogHeader>
         {hasSizes && (
           <div className="flex flex-wrap gap-2">
@@ -113,6 +130,11 @@ export function AddToCartDialog({
                 </button>
               );
             })}
+          </div>
+        )}
+        {hasSizes && showChart && (
+          <div id="add-to-cart-size-chart">
+            <SizeChartContent className="relative h-64 w-full overflow-hidden rounded-md" />
           </div>
         )}
         {hasSizes && !selectedSize && (
