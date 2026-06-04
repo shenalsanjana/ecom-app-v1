@@ -5,6 +5,8 @@ import { CartProvider } from "@/app/_lib/cart-context";
 import { WishlistProvider } from "@/app/_lib/wishlist-context";
 import { WhatsAppFloatButton } from "@/app/_components/whatsapp-float-button";
 import { AnnouncementBar } from "@/app/_components/shared/announcement-bar";
+import { DeliveryConfigProvider } from "@/app/_components/delivery/delivery-config-provider";
+import { getDeliveryConfig } from "@/app/_lib/store-settings";
 import "./globals.css";
 
 // Poppins is the single brand typeface: Regular (body), Medium (buttons),
@@ -48,23 +50,27 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const deliveryConfig = await getDeliveryConfig();
+
   return (
     <html
       lang="en"
       className={`${poppins.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <AnnouncementBar />
-        <SessionProvider>
-          <WishlistProvider>
-            <CartProvider>{children}</CartProvider>
-          </WishlistProvider>
-        </SessionProvider>
+        <AnnouncementBar freeThreshold={deliveryConfig.freeThreshold} />
+        <DeliveryConfigProvider value={deliveryConfig}>
+          <SessionProvider>
+            <WishlistProvider>
+              <CartProvider>{children}</CartProvider>
+            </WishlistProvider>
+          </SessionProvider>
+        </DeliveryConfigProvider>
         <WhatsAppFloatButton />
       </body>
     </html>

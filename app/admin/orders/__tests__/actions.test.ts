@@ -15,6 +15,9 @@ const { orderItemUpdate, orderItemDelete } = vi.hoisted(() => ({
 
 vi.mock("@/app/_lib/admin-auth", () => ({ requireAdmin }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/app/_lib/store-settings", () => ({
+  getDeliveryConfig: vi.fn().mockResolvedValue({ colombo: 350, other: 450, freeThreshold: 5000 }),
+}));
 
 const { bookCourierAndNotify } = vi.hoisted(() => ({ bookCourierAndNotify: vi.fn() }));
 vi.mock("@/app/checkout/book-courier", () => ({ bookCourierAndNotify }));

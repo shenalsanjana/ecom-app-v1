@@ -6,7 +6,24 @@ export const COLOMBO_DELIVERY_COST = 350;
 export const OTHER_DELIVERY_COST = 450;
 export const FREE_DELIVERY_THRESHOLD = 5000;
 
-export function calculateDelivery(subtotal: number, zone: DeliveryZone): number {
-  if (subtotal >= FREE_DELIVERY_THRESHOLD) return 0;
-  return zone === "COLOMBO" ? COLOMBO_DELIVERY_COST : OTHER_DELIVERY_COST;
+export type DeliveryConfig = {
+  colombo: number;
+  other: number;
+  freeThreshold: number;
+};
+
+// Seed/fallback. Live values come from StoreSettings via getDeliveryConfig().
+export const DEFAULT_DELIVERY_CONFIG: DeliveryConfig = {
+  colombo: COLOMBO_DELIVERY_COST,
+  other: OTHER_DELIVERY_COST,
+  freeThreshold: FREE_DELIVERY_THRESHOLD,
+};
+
+export function calculateDelivery(
+  subtotal: number,
+  zone: DeliveryZone,
+  config: DeliveryConfig = DEFAULT_DELIVERY_CONFIG,
+): number {
+  if (subtotal >= config.freeThreshold) return 0;
+  return zone === "COLOMBO" ? config.colombo : config.other;
 }

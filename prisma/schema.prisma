@@ -202,3 +202,17 @@ model CurfoxCity {
 
   @@index([name])
 }
+
+/// Singleton row (id is always "singleton") holding admin-editable store
+/// settings. Seeded lazily from app/_lib/store-settings.ts defaults on first read.
+model StoreSettings {
+  id                    String   @id @default("singleton")
+  storeName             String
+  supportEmail          String
+  supportPhone          String
+  businessAddress       String
+  colomboDeliveryCost   Int
+  otherDeliveryCost     Int
+  freeDeliveryThreshold Int
+  updatedAt             DateTime @updatedAt
+}

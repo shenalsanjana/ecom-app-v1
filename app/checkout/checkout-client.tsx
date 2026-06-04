@@ -16,7 +16,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { formatPrice } from "@/app/_lib/format";
-import { calculateDelivery, FREE_DELIVERY_THRESHOLD } from "@/app/_lib/checkout-config";
+import { calculateDelivery } from "@/app/_lib/checkout-config";
+import { useDeliveryConfig } from "@/app/_components/delivery/delivery-config-provider";
 import { DELIVERY_CITIES, zoneForCity } from "@/app/_lib/delivery-zones";
 import {
   paymentErrorMessage,
@@ -73,8 +74,10 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
 
   const [notes, setNotes] = useState("");
 
+  const deliveryConfig = useDeliveryConfig();
+  const { freeThreshold: FREE_DELIVERY_THRESHOLD } = deliveryConfig;
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const shipping = calculateDelivery(subtotal, zoneForCity(address.city ?? ""));
+  const shipping = calculateDelivery(subtotal, zoneForCity(address.city ?? ""), deliveryConfig);
   const total = subtotal + shipping;
 
   if (orderId) {

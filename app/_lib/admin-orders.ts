@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import { calculateDelivery } from "@/app/_lib/checkout-config";
+import { calculateDelivery, DEFAULT_DELIVERY_CONFIG, type DeliveryConfig } from "@/app/_lib/checkout-config";
 import { zoneForCity } from "@/app/_lib/delivery-zones";
 import { prisma } from "@/app/_lib/prisma";
 
@@ -62,9 +62,10 @@ export function buildOrderWhere(params: ListParams): Prisma.OrderWhereInput {
 export function recomputeTotals(
   items: { price: number; quantity: number }[],
   city: string,
+  config: DeliveryConfig = DEFAULT_DELIVERY_CONFIG,
 ): { subtotal: number; shippingCost: number; total: number } {
   const subtotal = items.reduce((s, it) => s + it.price * it.quantity, 0);
-  const shippingCost = calculateDelivery(subtotal, zoneForCity(city));
+  const shippingCost = calculateDelivery(subtotal, zoneForCity(city), config);
   return { subtotal, shippingCost, total: subtotal + shippingCost };
 }
 

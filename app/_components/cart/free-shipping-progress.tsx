@@ -2,7 +2,7 @@
 
 import { Truck } from "lucide-react";
 import { formatPrice } from "@/app/_lib/format";
-import { FREE_DELIVERY_THRESHOLD } from "@/app/_lib/checkout-config";
+import { useDeliveryConfig } from "@/app/_components/delivery/delivery-config-provider";
 
 type Props = { subtotal: number };
 
@@ -12,6 +12,8 @@ type Props = { subtotal: number };
 const NEAR_THRESHOLD_FRACTION = 0.8;
 
 export function FreeShippingProgress({ subtotal }: Props) {
+  const { freeThreshold: FREE_DELIVERY_THRESHOLD } = useDeliveryConfig();
+
   // Empty cart — no progress bar (a 0% strip would feel like a bug).
   if (subtotal <= 0) return null;
 
