@@ -4,7 +4,9 @@ import { SessionProvider } from "next-auth/react";
 import { CartProvider } from "@/app/_lib/cart-context";
 import { WishlistProvider } from "@/app/_lib/wishlist-context";
 import { WhatsAppFloatButton } from "@/app/_components/whatsapp-float-button";
+import { Suspense } from "react";
 import { AnnouncementBar } from "@/app/_components/shared/announcement-bar";
+import { NavigationProgress } from "@/app/_components/shared/navigation-progress";
 import { DeliveryConfigProvider } from "@/app/_components/delivery/delivery-config-provider";
 import { getDeliveryConfig } from "@/app/_lib/store-settings";
 import "./globals.css";
@@ -63,6 +65,9 @@ export default async function RootLayout({
       className={`${poppins.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <Suspense fallback={null}>
+          <NavigationProgress />
+        </Suspense>
         <AnnouncementBar freeThreshold={deliveryConfig.freeThreshold} />
         <DeliveryConfigProvider value={deliveryConfig}>
           <SessionProvider>
