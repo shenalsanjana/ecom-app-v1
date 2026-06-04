@@ -103,8 +103,23 @@ describe("advanceStatus", () => {
     expect(orderUpdate).not.toHaveBeenCalled();
   });
 
-  it("allows PENDING→CONFIRMED", async () => {
-    orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "PENDING" });
+  it("allows PENDING→CONFIRMED for a paid order", async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "PENDING", paymentMethod: "KOKO", paymentStatus: "PAID" });
+    orderUpdate.mockResolvedValueOnce({});
+    const res = await advanceStatus("o1", "CONFIRMED");
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CONFIRMED" } });
+    expect(res).toEqual({ success: true });
+  });
+
+  it("blocks confirming an unpaid online order", async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "PENDING", paymentMethod: "KOKO", paymentStatus: "PENDING" });
+    const res = await advanceStatus("o1", "CONFIRMED");
+    expect(res).toEqual({ success: false, error: "Awaiting payment — confirm online orders only after payment." });
+    expect(orderUpdate).not.toHaveBeenCalled();
+  });
+
+  it("allows confirming a COD order awaiting collection", async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "PENDING", paymentMethod: "COD", paymentStatus: "COD_PENDING" });
     orderUpdate.mockResolvedValueOnce({});
     const res = await advanceStatus("o1", "CONFIRMED");
     expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CONFIRMED" } });
@@ -295,5 +310,59 @@ describe("resendConfirmationEmail", () => {
     sendOrderConfirmationEmail.mockResolvedValueOnce(undefined);
     const res = await resendConfirmationEmail("o1");
     expect(res).toEqual({ success: true, warning: "Sent without a tracking code (not dispatched yet)." });
+  });
+});
+
+import { bulkConfirm, bulkDispatch } from "../actions";
+
+describe("bulkConfirm", () => {
+  it("confirms eligible orders and skips ineligible ones with a summary", async () => {
+    // o1: PENDING paid online → confirm; o2: PENDING unpaid online → skip; o3: already CONFIRMED → skip
+    orderFindUnique
+      .mockResolvedValueOnce({ id: "o1", status: "PENDING", paymentMethod: "KOKO", paymentStatus: "PAID" })
+      .mockResolvedValueOnce({ id: "o2", status: "PENDING", paymentMethod: "KOKO", paymentStatus: "PENDING" })
+      .mockResolvedValueOnce({ id: "o3", status: "CONFIRMED", paymentMethod: "COD", paymentStatus: "COD_PENDING" });
+    orderUpdate.mockResolvedValue({});
+
+    const res = await bulkConfirm(["o1", "o2", "o3"]);
+
+    expect(orderUpdate).toHaveBeenCalledTimes(1);
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CONFIRMED" } });
+    expect(res.okCount).toBe(1);
+    expect(res.skippedCount).toBe(2);
+    expect(res.results).toEqual([
+      { id: "o1", ok: true },
+      { id: "o2", ok: false, error: "Awaiting payment" },
+      { id: "o3", ok: false, error: "Already confirmed" },
+    ]);
+  });
+});
+
+describe("bulkDispatch", () => {
+  it("dispatches confirmed un-booked orders and skips the rest", async () => {
+    process.env.ROYAL_EXPRESS_ENABLED = "true";
+    // o1: CONFIRMED not booked → book; o2: still PENDING → skip
+    orderFindUnique
+      .mockResolvedValueOnce({ ...FULL_ORDER, id: "o1", status: "CONFIRMED", courierBookedAt: null })
+      .mockResolvedValueOnce({ ...FULL_ORDER, id: "o2", status: "PENDING", courierBookedAt: null });
+    bookCourierAndNotify.mockResolvedValueOnce("CF-1");
+
+    const res = await bulkDispatch(["o1", "o2"]);
+
+    expect(bookCourierAndNotify).toHaveBeenCalledTimes(1);
+    expect(res.okCount).toBe(1);
+    expect(res.skippedCount).toBe(1);
+    expect(res.results).toEqual([
+      { id: "o1", ok: true },
+      { id: "o2", ok: false, error: "Not dispatchable" },
+    ]);
+  });
+
+  it("returns all-skipped when the courier integration is disabled", async () => {
+    process.env.ROYAL_EXPRESS_ENABLED = "false";
+    const res = await bulkDispatch(["o1", "o2"]);
+    expect(res.okCount).toBe(0);
+    expect(res.skippedCount).toBe(2);
+    expect(bookCourierAndNotify).not.toHaveBeenCalled();
   });
 });

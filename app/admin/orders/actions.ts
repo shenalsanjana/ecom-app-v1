@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/app/_lib/prisma";
 import { requireAdmin } from "@/app/_lib/admin-auth";
-import { nextStatuses, applyItemChanges, recomputeTotals, canEdit, type ItemChange } from "@/app/_lib/admin-orders";
+import { nextStatuses, applyItemChanges, recomputeTotals, canEdit, canConfirm, type ItemChange } from "@/app/_lib/admin-orders";
 import { getDeliveryConfig } from "@/app/_lib/store-settings";
 import { bookCourierAndNotify } from "@/app/checkout/book-courier";
 import { sendOrderConfirmationEmail, type OrderDetails } from "@/app/_lib/mailer";
@@ -13,6 +13,14 @@ import { sendOrderConfirmationEmail, type OrderDetails } from "@/app/_lib/mailer
 export type ActionResult =
   | { success: true; warning?: string }
   | { success: false; error: string };
+
+export type BulkItemResult = { id: string; ok: boolean; error?: string };
+export type BulkResult = { results: BulkItemResult[]; okCount: number; skippedCount: number };
+
+function summarize(results: BulkItemResult[]): BulkResult {
+  const okCount = results.filter((r) => r.ok).length;
+  return { results, okCount, skippedCount: results.length - okCount };
+}
 
 function revalidate(orderId: string) {
   revalidatePath("/admin/orders");
@@ -58,6 +66,9 @@ export async function advanceStatus(orderId: string, to: string): Promise<Action
   if (!order) return { success: false, error: "Order not found" };
   if (!nextStatuses(order.status).includes(to)) {
     return { success: false, error: `Cannot move order from ${order.status} to ${to}` };
+  }
+  if (to === "CONFIRMED" && !canConfirm(order)) {
+    return { success: false, error: "Awaiting payment — confirm online orders only after payment." };
   }
   try {
     await prisma.order.update({ where: { id: orderId }, data: { status: to } });
@@ -257,4 +268,52 @@ export async function resendConfirmationEmail(orderId: string): Promise<ActionRe
     return { success: false, error: "Failed to send email — check mailer config." };
   }
   return { success: true, warning: details.trackingCode ? undefined : "Sent without a tracking code (not dispatched yet)." };
+}
+
+export async function bulkConfirm(ids: string[]): Promise<BulkResult> {
+  await requireAdmin();
+  const results: BulkItemResult[] = [];
+  for (const id of ids) {
+    const order = await prisma.order.findUnique({ where: { id } });
+    if (!order) { results.push({ id, ok: false, error: "Not found" }); continue; }
+    if (order.status !== "PENDING") {
+      results.push({ id, ok: false, error: order.status === "CONFIRMED" ? "Already confirmed" : `Cannot confirm (${order.status})` });
+      continue;
+    }
+    if (!canConfirm(order)) { results.push({ id, ok: false, error: "Awaiting payment" }); continue; }
+    try {
+      await prisma.order.update({ where: { id }, data: { status: "CONFIRMED" } });
+      results.push({ id, ok: true });
+    } catch {
+      results.push({ id, ok: false, error: "Update failed" });
+    }
+  }
+  revalidatePath("/admin/orders");
+  for (const r of results) if (r.ok) revalidatePath(`/admin/orders/${r.id}`);
+  return summarize(results);
+}
+
+export async function bulkDispatch(ids: string[]): Promise<BulkResult> {
+  await requireAdmin();
+  if (process.env.ROYAL_EXPRESS_ENABLED !== "true") {
+    return summarize(ids.map((id) => ({ id, ok: false, error: "Courier disabled" })));
+  }
+  const results: BulkItemResult[] = [];
+  for (const id of ids) {
+    const order = await prisma.order.findUnique({ where: { id }, include: ORDER_INCLUDE });
+    if (!order) { results.push({ id, ok: false, error: "Not found" }); continue; }
+    if (order.status !== "CONFIRMED" || order.courierBookedAt) {
+      results.push({ id, ok: false, error: "Not dispatchable" });
+      continue;
+    }
+    try {
+      const waybill = await bookCourierAndNotify({ order: toOrderDetails(order) });
+      results.push(waybill ? { id, ok: true } : { id, ok: false, error: "Booking failed" });
+    } catch {
+      results.push({ id, ok: false, error: "Booking failed" });
+    }
+  }
+  revalidatePath("/admin/orders");
+  for (const r of results) if (r.ok) revalidatePath(`/admin/orders/${r.id}`);
+  return summarize(results);
 }

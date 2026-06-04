@@ -125,26 +125,14 @@ describe("order finalization", () => {
     expect(productUpdate).not.toHaveBeenCalled();
   });
 
-  it("books courier when RoyalExpress is enabled", async () => {
+  it("never books the courier on payment, even when RoyalExpress is enabled", async () => {
     process.env.ROYAL_EXPRESS_ENABLED = "true";
 
     const result = await finalizePaidPayment("ORD-1", "KOKO");
 
-    expect(bookCourierAndNotify).toHaveBeenCalledOnce();
-    expect(result).toEqual({ status: "success" });
-
-    process.env.ROYAL_EXPRESS_ENABLED = "false";
-  });
-
-  it("alerts admin and still succeeds when courier booking throws", async () => {
-    process.env.ROYAL_EXPRESS_ENABLED = "true";
-    bookCourierAndNotify.mockRejectedValueOnce(new Error("curfox down"));
-
-    const result = await finalizePaidPayment("ORD-1", "KOKO");
-
-    expect(sendAdminFailureAlertEmail).toHaveBeenCalledOnce();
-    expect(result).toEqual({ status: "success" });
+    expect(bookCourierAndNotify).not.toHaveBeenCalled();
     expect(sendOrderConfirmationEmail).toHaveBeenCalledOnce();
+    expect(result).toEqual({ status: "success" });
 
     process.env.ROYAL_EXPRESS_ENABLED = "false";
   });

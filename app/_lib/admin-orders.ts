@@ -142,6 +142,14 @@ export function canCancel(order: { status: string }): boolean {
   return canEdit(order);
 }
 
+/**
+ * Payment guardrail for confirming/dispatching. COD is exempt (COD_PENDING is its
+ * normal pre-delivery state); online orders must be PAID before they can ship.
+ */
+export function canConfirm(order: { paymentMethod: string; paymentStatus: string | null }): boolean {
+  return order.paymentMethod === "COD" || order.paymentStatus === "PAID";
+}
+
 export const PAGE_SIZE = 25;
 
 export async function listOrders(
