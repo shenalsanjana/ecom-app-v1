@@ -118,6 +118,14 @@ describe("advanceStatus", () => {
     expect(orderUpdate).not.toHaveBeenCalled();
   });
 
+  it("confirms an unpaid online order when allowUnpaid is set", async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "PENDING", paymentMethod: "KOKO", paymentStatus: "PENDING" });
+    orderUpdate.mockResolvedValueOnce({});
+    const res = await advanceStatus("o1", "CONFIRMED", { allowUnpaid: true });
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CONFIRMED" } });
+    expect(res).toEqual({ success: true });
+  });
+
   it("allows confirming a COD order awaiting collection", async () => {
     orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "PENDING", paymentMethod: "COD", paymentStatus: "COD_PENDING" });
     orderUpdate.mockResolvedValueOnce({});
@@ -334,6 +342,23 @@ describe("bulkConfirm", () => {
       { id: "o1", ok: true },
       { id: "o2", ok: false, error: "Awaiting payment" },
       { id: "o3", ok: false, error: "Already confirmed" },
+    ]);
+  });
+
+  it("confirms unpaid online orders when allowUnpaid is set", async () => {
+    orderFindUnique
+      .mockResolvedValueOnce({ id: "o1", status: "PENDING", paymentMethod: "KOKO", paymentStatus: "PENDING" })
+      .mockResolvedValueOnce({ id: "o2", status: "PENDING", paymentMethod: "MINTPAY", paymentStatus: null });
+    orderUpdate.mockResolvedValue({});
+
+    const res = await bulkConfirm(["o1", "o2"], { allowUnpaid: true });
+
+    expect(orderUpdate).toHaveBeenCalledTimes(2);
+    expect(res.okCount).toBe(2);
+    expect(res.skippedCount).toBe(0);
+    expect(res.results).toEqual([
+      { id: "o1", ok: true },
+      { id: "o2", ok: true },
     ]);
   });
 });
