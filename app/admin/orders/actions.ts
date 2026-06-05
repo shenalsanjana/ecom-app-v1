@@ -355,3 +355,37 @@ export async function bulkCancel(ids: string[]): Promise<BulkResult> {
   for (const r of results) if (r.ok) revalidatePath(`/admin/orders/${r.id}`);
   return summarize(results);
 }
+
+export async function deleteOrder(orderId: string): Promise<ActionResult> {
+  await requireAdmin();
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) return { success: false, error: "Order not found" };
+  if (order.status !== "CANCELLED") return { success: false, error: "Only cancelled orders can be deleted" };
+  // Pure record removal: items & notes cascade-delete (schema onDelete: Cascade).
+  // Do NOT restore stock here — cancellation already did.
+  try {
+    await prisma.order.delete({ where: { id: orderId } });
+  } catch {
+    return { success: false, error: "Something went wrong. Please try again." };
+  }
+  revalidatePath("/admin/orders");
+  return { success: true };
+}
+
+export async function bulkDelete(ids: string[]): Promise<BulkResult> {
+  await requireAdmin();
+  const results: BulkItemResult[] = [];
+  for (const id of ids) {
+    const order = await prisma.order.findUnique({ where: { id } });
+    if (!order) { results.push({ id, ok: false, error: "Not found" }); continue; }
+    if (order.status !== "CANCELLED") { results.push({ id, ok: false, error: "Not cancelled" }); continue; }
+    try {
+      await prisma.order.delete({ where: { id } });
+      results.push({ id, ok: true });
+    } catch {
+      results.push({ id, ok: false, error: "Delete failed" });
+    }
+  }
+  revalidatePath("/admin/orders");
+  return summarize(results);
+}
