@@ -450,6 +450,7 @@ describe("bulkDelete", () => {
     const res = await bulkDelete(["o1", "o2"]);
     expect(orderDelete).toHaveBeenCalledTimes(1);
     expect(orderDelete).toHaveBeenCalledWith({ where: { id: "o1" } });
+    expect(productUpdateMany).not.toHaveBeenCalled(); // delete must never restore stock
     expect(res.okCount).toBe(1);
     expect(res.skippedCount).toBe(1);
     expect(res.results).toEqual([
