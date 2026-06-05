@@ -11,7 +11,7 @@ const mintpayLogo = (
     alt="Mintpay"
     width={1200}
     height={628}
-    className="ml-0.5 inline-block h-6 w-auto rounded-[3px] align-middle"
+    className="ml-0.5 inline-block h-8 w-auto rounded-[3px] align-middle"
   />
 );
 
@@ -21,7 +21,7 @@ const kokoLogo = (
     alt="Koko"
     width={52}
     height={24}
-    className="ml-0.5 inline-block h-6 w-auto rounded-[3px] align-middle"
+    className="ml-0.5 inline-block h-8 w-auto rounded-[3px] align-middle"
   />
 );
 
