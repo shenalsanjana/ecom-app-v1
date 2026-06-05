@@ -177,6 +177,19 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
     }
   }
 
+  // Abort a redirect that's in progress (or hung) and return the user to the
+  // checkout form. window.stop() cancels a top-level navigation that has been
+  // submitted but not yet committed (e.g. the gateway is slow to respond). The
+  // DB order already exists, so "Retry payment" can re-initiate without creating
+  // a duplicate.
+  function cancelRedirect() {
+    if (typeof window !== "undefined" && typeof window.stop === "function") {
+      window.stop();
+    }
+    setRedirectingProvider(null);
+    setIsSubmitting(false);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -238,6 +251,17 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
             <p className="text-sm text-muted-foreground">
               Please don&apos;t close or refresh this page. You&apos;ll be taken to secure checkout in a moment.
             </p>
+            {/* Escape hatch: the gateway's own hosted page may not offer a way
+                back to our site, and a slow/hung handoff can otherwise trap the
+                user on this overlay. Aborting the in-flight navigation returns
+                them to checkout with the order still saved (retryable). */}
+            <button
+              type="button"
+              onClick={cancelRedirect}
+              className="mt-6 text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            >
+              Cancel and return to checkout
+            </button>
           </div>
         </div>
       )}
