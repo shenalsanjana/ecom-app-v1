@@ -13,6 +13,10 @@ describe("buildOrderWhere", () => {
     });
   });
 
+  it("maps 'pending' to status PENDING", () => {
+    expect(buildOrderWhere({ tab: "pending" })).toEqual({ status: "PENDING" });
+  });
+
   it("maps 'pending-cod' to paymentStatus COD_PENDING", () => {
     expect(buildOrderWhere({ tab: "pending-cod" })).toEqual({
       paymentStatus: "COD_PENDING",
@@ -37,16 +41,9 @@ describe("buildOrderWhere", () => {
     ]);
   });
 
-  it("merges explicit status/payment filters over the tab preset", () => {
-    const where = buildOrderWhere({ tab: "all", status: "PENDING", payment: "PAID" });
-    expect(where.status).toBe("PENDING");
+  it("merges an explicit payment filter over the tab preset", () => {
+    const where = buildOrderWhere({ tab: "all", payment: "PAID" });
     expect(where.paymentStatus).toBe("PAID");
-  });
-
-  it("drops the needs-dispatch courierBookedAt constraint when status is overridden", () => {
-    const where = buildOrderWhere({ tab: "needs-dispatch", status: "PENDING" });
-    expect(where.status).toBe("PENDING");
-    expect(where.courierBookedAt).toBeUndefined();
   });
 });
 
