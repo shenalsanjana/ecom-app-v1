@@ -7,7 +7,7 @@ import { formatPrice } from "@/app/_lib/format";
 import { paymentStatusLabel } from "@/app/_lib/order-status";
 import { Badge } from "@/components/ui/badge";
 import { RowActions } from "./row-actions";
-import { bulkConfirm, bulkDispatch, type BulkResult } from "@/app/admin/orders/actions";
+import { bulkConfirm, bulkDispatch, bulkCancel, bulkDelete, type BulkResult } from "@/app/admin/orders/actions";
 
 type Row = {
   id: string; webNumber: string | null; createdAt: Date; customerPhone: string;
@@ -62,6 +62,32 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
       report(await bulkDispatch(ids), "dispatched");
     });
 
+  const PAID_STATUSES = new Set(["PAID", "COD_COLLECTED"]);
+
+  const cancelSelected = () =>
+    start(async () => {
+      const ids = [...selected];
+      if (ids.length === 0) return;
+      if (!window.confirm(`Cancel ${ids.length} order(s) and restore their stock?`)) return;
+      const paidCount = rows.filter((o) => selected.has(o.id) && PAID_STATUSES.has(o.paymentStatus ?? "")).length;
+      const r = await bulkCancel(ids);
+      report(r, "cancelled");
+      if (r.okCount > 0 && paidCount > 0) {
+        toast.warning(`${paidCount} were paid — handle refunds manually.`);
+      }
+    });
+
+  const selectedRows = rows.filter((o) => selected.has(o.id));
+  const allCancelled = selectedRows.length > 0 && selectedRows.every((o) => o.status === "CANCELLED");
+
+  const deleteSelected = () =>
+    start(async () => {
+      const ids = [...selected];
+      if (ids.length === 0) return;
+      if (!window.confirm(`Permanently delete ${ids.length} cancelled order(s)? This cannot be undone.`)) return;
+      report(await bulkDelete(ids), "deleted");
+    });
+
   return (
     <div>
       {selected.size > 0 && (
@@ -71,6 +97,12 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
             className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50">Confirm selected</button>
           <button disabled={pending} onClick={dispatchSelected}
             className="rounded-md border px-3 py-1 text-xs disabled:opacity-50">Dispatch selected</button>
+          <button disabled={pending} onClick={cancelSelected}
+            className="rounded-md border border-destructive px-3 py-1 text-xs text-destructive disabled:opacity-50">Cancel selected</button>
+          {allCancelled && (
+            <button disabled={pending} onClick={deleteSelected}
+              className="rounded-md bg-destructive px-3 py-1 text-xs font-semibold text-destructive-foreground disabled:opacity-50">Delete selected</button>
+          )}
           <button onClick={() => setSelected(new Set())} className="ml-auto text-xs text-muted-foreground">Clear</button>
         </div>
       )}
