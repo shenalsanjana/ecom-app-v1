@@ -26,9 +26,9 @@ const kokoLogo = (
 );
 
 // When Koko is enabled (NEXT_PUBLIC_KOKO_ENABLED):
-//   "or pay in 3 × LKR X with [Koko] & [Mintpay] — or 6% Cashback with [Mintpay]"
+//   "or pay in 3 × LKR X with [Koko] & [Mintpay] — or 8% Cashback with [Mintpay]"
 // Both providers split into the same interest-free 3 × LKR X (display-only);
-// only Mintpay offers the 6% cashback, so Koko is never shown with cashback.
+// only Mintpay offers the 8% cashback, so Koko is never shown with cashback.
 // When Koko is disabled, falls back to the Mintpay-only note.
 export function InstallmentNote({ total, className }: Props) {
   if (total <= 0) return null;
@@ -37,7 +37,7 @@ export function InstallmentNote({ total, className }: Props) {
 
   const kokoEnabled = process.env.NEXT_PUBLIC_KOKO_ENABLED === "true";
   const amount = <span className="font-medium text-foreground">{formatPrice(per)}</span>;
-  const cashback = <span className="font-medium text-foreground">6% Cashback</span>;
+  const cashback = <span className="font-medium text-foreground">8% Cashback</span>;
 
   if (kokoEnabled) {
     return (
