@@ -3,8 +3,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ORDER_TABS, type OrderTab } from "@/app/_lib/admin-orders";
 
 const TAB_LABEL: Record<OrderTab, string> = {
-  all: "All", "needs-dispatch": "Needs dispatch", "pending-cod": "Pending COD",
-  delivered: "Delivered", cancelled: "Cancelled",
+  all: "All", pending: "Pending", "needs-dispatch": "Needs dispatch",
+  "pending-cod": "Pending COD", delivered: "Delivered", cancelled: "Cancelled",
 };
 
 export function OrdersToolbar({ counts }: { counts: Record<OrderTab, number> }) {
@@ -30,18 +30,6 @@ export function OrdersToolbar({ counts }: { counts: Record<OrderTab, number> }) 
         onKeyDown={(e) => { if (e.key === "Enter") setParam("q", (e.target as HTMLInputElement).value); }}
       />
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <select
-          value={sp.get("status") ?? ""}
-          onChange={(e) => setParam("status", e.target.value)}
-          className={selectCls}
-          aria-label="Filter by status"
-        >
-          <option value="">All statuses</option>
-          <option value="PENDING">Pending</option>
-          <option value="CONFIRMED">Confirmed</option>
-          <option value="DELIVERED">Delivered</option>
-          <option value="CANCELLED">Cancelled</option>
-        </select>
         <select
           value={sp.get("payment") ?? ""}
           onChange={(e) => setParam("payment", e.target.value)}
