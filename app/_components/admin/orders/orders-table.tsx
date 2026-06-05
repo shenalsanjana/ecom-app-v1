@@ -17,6 +17,8 @@ type Row = {
   _count: { items: number };
 };
 
+const PAID_STATUSES = new Set(["PAID", "COD_COLLECTED"]);
+
 export function OrdersTable({ rows }: { rows: Row[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -62,18 +64,19 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
       report(await bulkDispatch(ids), "dispatched");
     });
 
-  const PAID_STATUSES = new Set(["PAID", "COD_COLLECTED"]);
-
   const cancelSelected = () =>
     start(async () => {
       const ids = [...selected];
       if (ids.length === 0) return;
       if (!window.confirm(`Cancel ${ids.length} order(s) and restore their stock?`)) return;
-      const paidCount = rows.filter((o) => selected.has(o.id) && PAID_STATUSES.has(o.paymentStatus ?? "")).length;
+      const paidIds = new Set(
+        rows.filter((o) => PAID_STATUSES.has(o.paymentStatus ?? "")).map((o) => o.id),
+      );
       const r = await bulkCancel(ids);
       report(r, "cancelled");
-      if (r.okCount > 0 && paidCount > 0) {
-        toast.warning(`${paidCount} were paid — handle refunds manually.`);
+      const paidCancelled = r.results.filter((res) => res.ok && paidIds.has(res.id)).length;
+      if (paidCancelled > 0) {
+        toast.warning(`${paidCancelled} were paid — handle refunds manually.`);
       }
     });
 
@@ -97,10 +100,10 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
             className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50">Confirm selected</button>
           <button disabled={pending} onClick={dispatchSelected}
             className="rounded-md border px-3 py-1 text-xs disabled:opacity-50">Dispatch selected</button>
-          <button disabled={pending} onClick={cancelSelected}
+          <button disabled={pending} onClick={cancelSelected} aria-label="Cancel selected orders"
             className="rounded-md border border-destructive px-3 py-1 text-xs text-destructive disabled:opacity-50">Cancel selected</button>
           {allCancelled && (
-            <button disabled={pending} onClick={deleteSelected}
+            <button disabled={pending} onClick={deleteSelected} aria-label="Permanently delete selected orders"
               className="rounded-md bg-destructive px-3 py-1 text-xs font-semibold text-destructive-foreground disabled:opacity-50">Delete selected</button>
           )}
           <button onClick={() => setSelected(new Set())} className="ml-auto text-xs text-muted-foreground">Clear</button>
