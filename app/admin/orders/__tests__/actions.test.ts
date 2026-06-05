@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const { requireAdmin } = vi.hoisted(() => ({ requireAdmin: vi.fn() }));
-const { orderFindUnique, orderUpdate, noteCreate, productUpdateMany, txn } = vi.hoisted(() => ({
+const { orderFindUnique, orderUpdate, orderDelete, noteCreate, productUpdateMany, txn } = vi.hoisted(() => ({
   orderFindUnique: vi.fn(),
   orderUpdate: vi.fn(),
+  orderDelete: vi.fn(),
   noteCreate: vi.fn(),
   productUpdateMany: vi.fn(),
   txn: vi.fn(),
@@ -26,7 +27,7 @@ vi.mock("@/app/_lib/mailer", () => ({ sendOrderConfirmationEmail }));
 
 vi.mock("@/app/_lib/prisma", () => {
   const client = {
-    order: { findUnique: orderFindUnique, update: orderUpdate },
+    order: { findUnique: orderFindUnique, update: orderUpdate, delete: orderDelete },
     orderNote: { create: noteCreate },
     product: { updateMany: productUpdateMany },
     orderItem: { update: orderItemUpdate, delete: orderItemDelete },
@@ -41,13 +42,14 @@ beforeEach(() => {
   requireAdmin.mockReset().mockResolvedValue({ user: { email: "admin@x.test" } });
   orderFindUnique.mockReset();
   orderUpdate.mockReset();
+  orderDelete.mockReset();
   noteCreate.mockReset();
   productUpdateMany.mockReset();
   orderItemUpdate.mockReset();
   orderItemDelete.mockReset();
   txn.mockReset().mockImplementation(async (fn: (c: unknown) => unknown) => {
     const client = {
-      order: { findUnique: orderFindUnique, update: orderUpdate },
+      order: { findUnique: orderFindUnique, update: orderUpdate, delete: orderDelete },
       orderNote: { create: noteCreate },
       product: { updateMany: productUpdateMany },
       orderItem: { update: orderItemUpdate, delete: orderItemDelete },
@@ -322,6 +324,7 @@ describe("resendConfirmationEmail", () => {
 });
 
 import { bulkConfirm, bulkDispatch } from "../actions";
+import { bulkCancel } from "../actions";
 
 describe("bulkConfirm", () => {
   it("confirms eligible orders and skips ineligible ones with a summary", async () => {
@@ -389,5 +392,70 @@ describe("bulkDispatch", () => {
     expect(res.okCount).toBe(0);
     expect(res.skippedCount).toBe(2);
     expect(bookCourierAndNotify).not.toHaveBeenCalled();
+  });
+});
+
+describe("bulkCancel", () => {
+  it("cancels eligible orders, restores stock, and skips terminal ones", async () => {
+    // o1: CONFIRMED → cancel + restore; o2: already CANCELLED → skip; o3: DELIVERED → skip
+    orderFindUnique
+      .mockResolvedValueOnce({ id: "o1", status: "CONFIRMED", paymentStatus: "PENDING", items: [{ productId: "p1", quantity: 2 }] })
+      .mockResolvedValueOnce({ id: "o2", status: "CANCELLED", paymentStatus: "PENDING", items: [] })
+      .mockResolvedValueOnce({ id: "o3", status: "DELIVERED", paymentStatus: "PAID", items: [{ productId: "p9", quantity: 1 }] });
+    orderUpdate.mockResolvedValue({});
+    productUpdateMany.mockResolvedValue({ count: 1 });
+
+    const res = await bulkCancel(["o1", "o2", "o3"]);
+
+    expect(productUpdateMany).toHaveBeenCalledTimes(1);
+    expect(productUpdateMany).toHaveBeenCalledWith({ where: { id: "p1" }, data: { stock: { increment: 2 } } });
+    expect(orderUpdate).toHaveBeenCalledTimes(1);
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CANCELLED" } });
+    expect(res.okCount).toBe(1);
+    expect(res.skippedCount).toBe(2);
+    expect(res.results).toEqual([
+      { id: "o1", ok: true },
+      { id: "o2", ok: false, error: "Already cancelled" },
+      { id: "o3", ok: false, error: "Cannot cancel (DELIVERED)" },
+    ]);
+  });
+});
+
+import { deleteOrder, bulkDelete } from "../actions";
+
+describe("deleteOrder", () => {
+  it("deletes a cancelled order without touching stock", async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "CANCELLED" });
+    orderDelete.mockResolvedValueOnce({});
+    const res = await deleteOrder("o1");
+    expect(orderDelete).toHaveBeenCalledWith({ where: { id: "o1" } });
+    expect(productUpdateMany).not.toHaveBeenCalled();
+    expect(res).toEqual({ success: true });
+  });
+
+  it("rejects deleting a non-cancelled order", async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "CONFIRMED" });
+    const res = await deleteOrder("o1");
+    expect(res).toEqual({ success: false, error: "Only cancelled orders can be deleted" });
+    expect(orderDelete).not.toHaveBeenCalled();
+  });
+});
+
+describe("bulkDelete", () => {
+  it("deletes cancelled orders and skips the rest", async () => {
+    orderFindUnique
+      .mockResolvedValueOnce({ id: "o1", status: "CANCELLED" })
+      .mockResolvedValueOnce({ id: "o2", status: "DELIVERED" });
+    orderDelete.mockResolvedValue({});
+    const res = await bulkDelete(["o1", "o2"]);
+    expect(orderDelete).toHaveBeenCalledTimes(1);
+    expect(orderDelete).toHaveBeenCalledWith({ where: { id: "o1" } });
+    expect(productUpdateMany).not.toHaveBeenCalled(); // delete must never restore stock
+    expect(res.okCount).toBe(1);
+    expect(res.skippedCount).toBe(1);
+    expect(res.results).toEqual([
+      { id: "o1", ok: true },
+      { id: "o2", ok: false, error: "Not cancelled" },
+    ]);
   });
 });

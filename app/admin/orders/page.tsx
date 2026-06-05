@@ -14,7 +14,6 @@ export default async function AdminOrdersPage({
   const { rows, total } = await listOrders({
     tab,
     q: sp.q,
-    status: sp.status,
     payment: sp.payment,
     sort: sp.sort as "newest" | "oldest" | undefined,
     page,

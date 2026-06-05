@@ -3,13 +3,12 @@ import { calculateDelivery, DEFAULT_DELIVERY_CONFIG, type DeliveryConfig } from 
 import { zoneForCity } from "@/app/_lib/delivery-zones";
 import { prisma } from "@/app/_lib/prisma";
 
-export const ORDER_TABS = ["all", "needs-dispatch", "pending-cod", "delivered", "cancelled"] as const;
+export const ORDER_TABS = ["all", "pending", "needs-dispatch", "pending-cod", "delivered", "cancelled"] as const;
 export type OrderTab = (typeof ORDER_TABS)[number];
 
 export type ListParams = {
   tab?: OrderTab;
   q?: string;
-  status?: string;
   payment?: string;
   sort?: "newest" | "oldest";
 };
@@ -18,6 +17,9 @@ export function buildOrderWhere(params: ListParams): Prisma.OrderWhereInput {
   const where: Prisma.OrderWhereInput = {};
 
   switch (params.tab) {
+    case "pending":
+      where.status = "PENDING";
+      break;
     case "needs-dispatch":
       where.status = "CONFIRMED";
       where.courierBookedAt = null;
@@ -34,13 +36,6 @@ export function buildOrderWhere(params: ListParams): Prisma.OrderWhereInput {
     // "all" / undefined → no preset
   }
 
-  // Explicit filters override the tab preset. When status is overridden we also
-  // drop the needs-dispatch courierBookedAt:null constraint, which would
-  // otherwise leak into an incoherent query (e.g. status=PENDING + not-booked).
-  if (params.status) {
-    where.status = params.status;
-    delete where.courierBookedAt;
-  }
   if (params.payment) where.paymentStatus = params.payment;
 
   const q = params.q?.trim();

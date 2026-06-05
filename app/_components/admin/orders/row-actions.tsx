@@ -1,5 +1,5 @@
 "use client";
-import { advanceStatus, bookCourier, cancelOrder, markCodCollected } from "@/app/admin/orders/actions";
+import { advanceStatus, bookCourier, cancelOrder, deleteOrder, markCodCollected } from "@/app/admin/orders/actions";
 import { useActionRunner, Spinner } from "./use-action-runner";
 
 type Props = {
@@ -68,6 +68,16 @@ export function RowActions(p: Props) {
         </button>
       )}
       {terminal && <span className="text-muted-foreground">{p.waybill ?? "—"}</span>}
+      {p.status === "CANCELLED" && (
+        <button
+          disabled={pending}
+          onClick={() => run("delete", () => deleteOrder(p.orderId), "Permanently delete this cancelled order? This cannot be undone.")}
+          className="inline-flex items-center gap-1 rounded-md border border-destructive px-2 py-1 text-xs text-destructive disabled:opacity-50"
+          aria-label="Permanently delete this cancelled order"
+        >
+          {runningLabel === "delete" && <Spinner />} Delete
+        </button>
+      )}
 
       {menu.length > 0 && (
         <details className="relative">
