@@ -332,3 +332,26 @@ export async function bulkDispatch(ids: string[]): Promise<BulkResult> {
   for (const r of results) if (r.ok) revalidatePath(`/admin/orders/${r.id}`);
   return summarize(results);
 }
+
+export async function bulkCancel(ids: string[]): Promise<BulkResult> {
+  await requireAdmin();
+  const results: BulkItemResult[] = [];
+  for (const id of ids) {
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: { items: { select: { productId: true, quantity: true } } },
+    });
+    if (!order) { results.push({ id, ok: false, error: "Not found" }); continue; }
+    if (order.status === "CANCELLED") { results.push({ id, ok: false, error: "Already cancelled" }); continue; }
+    if (order.status === "DELIVERED") { results.push({ id, ok: false, error: "Cannot cancel (DELIVERED)" }); continue; }
+    try {
+      await prisma.$transaction((tx) => cancelOrderTx(tx, id, order.items));
+      results.push({ id, ok: true });
+    } catch {
+      results.push({ id, ok: false, error: "Cancel failed" });
+    }
+  }
+  revalidatePath("/admin/orders");
+  for (const r of results) if (r.ok) revalidatePath(`/admin/orders/${r.id}`);
+  return summarize(results);
+}

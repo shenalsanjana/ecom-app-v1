@@ -322,6 +322,7 @@ describe("resendConfirmationEmail", () => {
 });
 
 import { bulkConfirm, bulkDispatch } from "../actions";
+import { bulkCancel } from "../actions";
 
 describe("bulkConfirm", () => {
   it("confirms eligible orders and skips ineligible ones with a summary", async () => {
@@ -389,5 +390,31 @@ describe("bulkDispatch", () => {
     expect(res.okCount).toBe(0);
     expect(res.skippedCount).toBe(2);
     expect(bookCourierAndNotify).not.toHaveBeenCalled();
+  });
+});
+
+describe("bulkCancel", () => {
+  it("cancels eligible orders, restores stock, and skips terminal ones", async () => {
+    // o1: CONFIRMED → cancel + restore; o2: already CANCELLED → skip; o3: DELIVERED → skip
+    orderFindUnique
+      .mockResolvedValueOnce({ id: "o1", status: "CONFIRMED", paymentStatus: "PENDING", items: [{ productId: "p1", quantity: 2 }] })
+      .mockResolvedValueOnce({ id: "o2", status: "CANCELLED", paymentStatus: "PENDING", items: [] })
+      .mockResolvedValueOnce({ id: "o3", status: "DELIVERED", paymentStatus: "PAID", items: [{ productId: "p9", quantity: 1 }] });
+    orderUpdate.mockResolvedValue({});
+    productUpdateMany.mockResolvedValue({ count: 1 });
+
+    const res = await bulkCancel(["o1", "o2", "o3"]);
+
+    expect(productUpdateMany).toHaveBeenCalledTimes(1);
+    expect(productUpdateMany).toHaveBeenCalledWith({ where: { id: "p1" }, data: { stock: { increment: 2 } } });
+    expect(orderUpdate).toHaveBeenCalledTimes(1);
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CANCELLED" } });
+    expect(res.okCount).toBe(1);
+    expect(res.skippedCount).toBe(2);
+    expect(res.results).toEqual([
+      { id: "o1", ok: true },
+      { id: "o2", ok: false, error: "Already cancelled" },
+      { id: "o3", ok: false, error: "Cannot cancel (DELIVERED)" },
+    ]);
   });
 });
