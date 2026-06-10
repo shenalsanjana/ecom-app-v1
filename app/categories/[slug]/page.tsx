@@ -69,7 +69,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
               <span className="mx-2 text-muted-foreground">/</span>
               <span className="text-foreground">{category.name}</span>
             </nav>
-            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{category.name}</h1>
+            <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">{category.name}</h1>
             <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
               {allProducts.length} product{allProducts.length !== 1 ? "s" : ""} in the {category.name} collection.
             </p>

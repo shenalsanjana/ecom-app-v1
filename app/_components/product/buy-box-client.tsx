@@ -207,40 +207,44 @@ export function BuyBoxClient({
         </div>
       )}
 
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <AddToCartButton
-          productId={productId}
-          name={name}
-          price={price}
-          image={image}
-          size={selectedSize || null}
-          quantity={quantity}
-          requiresSize={true}
-          disabled={!inStock}
-          className="flex-1"
-        />
+      <div className="space-y-2">
+        {/* Primary row: Add to Cart is the single dominant CTA; wishlist is a
+            quiet icon button, not a third competing button. */}
+        <div className="flex items-stretch gap-2">
+          <AddToCartButton
+            productId={productId}
+            name={name}
+            price={price}
+            image={image}
+            size={selectedSize || null}
+            quantity={quantity}
+            requiresSize={true}
+            disabled={!inStock}
+            className="h-12 flex-1"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-12 w-12"
+            aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
+            aria-pressed={wishlisted}
+            onClick={() => toggleWishlist(productId, fromPath)}
+          >
+            <Heart className={"h-5 w-5 " + (wishlisted ? "fill-current text-brand" : "")} />
+          </Button>
+        </div>
         {inStock && (
           <Button
             onClick={handleBuyNow}
             disabled={isBuying}
             variant="outline"
-            className="flex-1"
+            className="h-12 w-full"
           >
             {isBuying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Buy Now
           </Button>
         )}
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full sm:w-auto"
-          aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
-          aria-pressed={wishlisted}
-          onClick={() => toggleWishlist(productId, fromPath)}
-        >
-          <Heart className={"mr-2 h-4 w-4 " + (wishlisted ? "fill-current text-brand" : "")} />
-          {wishlisted ? "Wishlisted" : "Wishlist"}
-        </Button>
       </div>
 
       <ul className="flex flex-wrap gap-x-5 gap-y-2 border-t border-border pt-4 text-xs text-muted-foreground">
@@ -254,6 +258,48 @@ export function BuyBoxClient({
           <ShieldCheck className="h-4 w-4" aria-hidden /> Secure checkout
         </li>
       </ul>
+
+      {/* Sticky mobile purchase bar — keeps Add to Cart reachable without
+          scrolling back up on small screens. Hidden on lg where the buy box
+          is already sticky. When a size is required but unselected, tapping
+          scrolls to and flashes the size picker instead of dead-ending on a
+          disabled button. */}
+      {inStock && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 px-4 py-3 backdrop-blur lg:hidden">
+          <div className="mx-auto flex max-w-7xl items-center gap-3">
+            <div className="min-w-0 shrink">
+              <p className="truncate text-sm font-medium">{name}</p>
+              <p
+                className={
+                  "font-heading text-base font-semibold " +
+                  (onSale ? "text-brand" : "")
+                }
+              >
+                {formatPrice(price)}
+              </p>
+            </div>
+            <div className="ml-auto shrink-0">
+              {sizeList.length > 0 && !selectedSize ? (
+                <Button className="h-12 px-6" onClick={nudgeSizePicker}>
+                  Add to cart
+                </Button>
+              ) : (
+                <AddToCartButton
+                  productId={productId}
+                  name={name}
+                  price={price}
+                  image={image}
+                  size={selectedSize || null}
+                  quantity={quantity}
+                  requiresSize={true}
+                  disabled={!inStock}
+                  className="h-12 px-6"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

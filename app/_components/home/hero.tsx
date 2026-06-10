@@ -19,24 +19,24 @@ export function Hero() {
         <div className="relative mx-auto flex min-h-[420px] max-w-7xl items-end px-4 py-10 sm:px-6 md:min-h-[560px] md:py-14 lg:min-h-[640px] lg:px-8">
           <div className="max-w-xl space-y-6 text-white drop-shadow-md">
             <p className="text-xs font-medium uppercase tracking-[0.22em] text-white/80">
-              Spring Collection 2026
+              Oversize. Heavyweight. Unmistakably you.
             </p>
             <h1 className="font-heading text-4xl font-semibold leading-tight tracking-tight md:text-5xl lg:text-6xl">
-              Everyday essentials, curated for you.
+              Unleash your inner bear.
             </h1>
             <p className="text-lg text-white/90">
-              Discover hand-picked products from independent makers and trusted brands —
-              shipped fast, returned freely.
+              Premium oversize tees, cut for the drape that fits how you actually
+              wear it. Delivered island-wide — Cash on Delivery, or Pay in 3.
             </p>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <Link href="/categories" className={buttonVariants({ size: "lg" })}>
-                Shop now <ArrowRight className="ml-2 h-4 w-4" />
+                Shop the collection <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
               <Link
-                href="/categories"
+                href="/deals"
                 className="inline-flex items-center gap-2 border-b border-white/70 pb-1 text-sm font-medium text-white transition-colors hover:border-white"
               >
-                Browse categories <ArrowRight className="h-4 w-4" />
+                View deals <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </div>

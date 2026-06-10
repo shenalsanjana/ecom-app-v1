@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ProductCard } from "@/app/_components/home/product-card";
 import { getDealsProducts } from "@/app/_lib/products";
 
@@ -11,9 +12,9 @@ export async function DealsSection() {
             <h2 className="font-heading text-2xl font-semibold tracking-tight">Deals of the day</h2>
             <p className="mt-1 text-sm text-muted-foreground">Limited-time savings on everyday picks.</p>
           </div>
-          <a href="#" className="text-sm font-medium text-muted-foreground transition-colors duration-(--duration-fast) hover:text-brand">
+          <Link href="/deals" className="text-sm font-medium text-muted-foreground transition-colors duration-(--duration-fast) hover:text-brand">
             See all deals
-          </a>
+          </Link>
         </div>
         <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
           {products.map((p) => (

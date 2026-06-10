@@ -6,7 +6,7 @@ export async function CategoryStrip() {
   const categories = await getCategories();
   return (
     <section className="border-b">
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <h2 className="font-heading mb-8 text-2xl font-semibold tracking-tight">Shop by category</h2>
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           {categories.map((c) => (

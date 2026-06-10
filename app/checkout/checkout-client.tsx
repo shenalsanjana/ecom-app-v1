@@ -9,6 +9,7 @@ import { ArrowLeft, ShoppingBag, Truck, CreditCard, User, FileText, Loader2 } fr
 import { useCart } from "@/app/_lib/cart-context";
 import { processOrder, type PaymentMethod } from "./actions";
 import { ProfileMenu } from "@/app/_components/header/profile-menu";
+import { BrandMark } from "@/app/_components/shared/brand-mark";
 import { InstallmentNote } from "@/app/_components/shared/installment-note";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,7 +86,7 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
       <>
         <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur">
           <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
-            <Link href="/" className="text-lg font-semibold tracking-tight">Dressing Bear</Link>
+            <BrandMark />
             <div className="ml-auto">
               <ProfileMenu />
             </div>
@@ -96,9 +97,9 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
             <div className="mx-auto w-16 h-16 bg-brand/10 rounded-full flex items-center justify-center mb-4">
               <ShoppingBag className="h-8 w-8 text-brand" />
             </div>
-            <h1 className="text-2xl font-bold mb-2">Order Confirmed!</h1>
+            <h1 className="font-heading text-2xl font-semibold tracking-tight mb-2">Order Confirmed!</h1>
             <p className="text-muted-foreground mb-2">Thank you for your order.</p>
-            <p className="text-lg font-semibold mb-6">Order: {orderReference ?? orderId}</p>
+            <p className="font-heading text-lg font-semibold mb-6">Order: {orderReference ?? orderId}</p>
             <p className="text-sm text-muted-foreground mb-6">
               {paymentMethod === "COD"
                 ? "Your items will be delivered with Cash on Delivery."
@@ -119,7 +120,7 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
       <>
         <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur">
           <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
-            <Link href="/" className="text-lg font-semibold tracking-tight">Dressing Bear</Link>
+            <BrandMark />
             <div className="ml-auto">
               <ProfileMenu />
             </div>
@@ -128,7 +129,7 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
         <main className="flex-1 flex items-center justify-center px-4 py-20">
           <div className="text-center max-w-md">
             <ShoppingBag className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h1 className="text-xl font-semibold mb-2">Your cart is empty</h1>
+            <h1 className="font-heading text-xl font-semibold tracking-tight mb-2">Your cart is empty</h1>
             <p className="text-muted-foreground mb-6">Add some items to checkout.</p>
             <Link
               href="/"
@@ -274,16 +275,14 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
             <ArrowLeft className="h-4 w-4" />
             Back to cart
           </Link>
-          <Link href="/" className="text-lg font-semibold tracking-tight ml-auto">
-            Dressing Bear
-          </Link>
+          <BrandMark className="ml-auto" />
           <ProfileMenu />
         </div>
       </header>
 
       <main className="flex-1">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <h1 className="text-2xl font-bold mb-8">Checkout</h1>
+          <h1 className="font-heading text-2xl font-semibold tracking-tight mb-8">Checkout</h1>
 
           <form onSubmit={handleSubmit}>
             <div className="grid gap-8 lg:grid-cols-2">
@@ -292,7 +291,7 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
                   <div className="rounded-lg border p-6">
                     <div className="flex items-center gap-3 mb-4">
                       <User className="h-5 w-5 text-muted-foreground" />
-                      <h2 className="text-lg font-semibold">Your Details</h2>
+                      <h2 className="font-heading text-lg font-semibold">Your Details</h2>
                     </div>
                     <p className="mb-4 text-sm text-muted-foreground">
                       Checking out as a guest.{" "}
@@ -340,7 +339,7 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
                 <div className="rounded-lg border p-6">
                   <div className="flex items-center gap-3 mb-4">
                     <Truck className="h-5 w-5 text-muted-foreground" />
-                    <h2 className="text-lg font-semibold">Delivery Address</h2>
+                    <h2 className="font-heading text-lg font-semibold">Delivery Address</h2>
                   </div>
 
                   <div className="space-y-4">
@@ -426,7 +425,7 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
                 <div className="rounded-lg border p-6">
                   <div className="flex items-center gap-3 mb-4">
                     <FileText className="h-5 w-5 text-muted-foreground" aria-hidden />
-                    <Label htmlFor="notes" className="text-lg font-semibold">
+                    <Label htmlFor="notes" className="font-heading text-lg font-semibold">
                       Delivery notes
                     </Label>
                     <span className="text-xs text-muted-foreground">Optional</span>
@@ -448,7 +447,7 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
                 <div className="rounded-lg border p-6">
                   <div className="flex items-center gap-3 mb-4">
                     <CreditCard className="h-5 w-5 text-muted-foreground" />
-                    <h2 className="text-lg font-semibold">Payment Method</h2>
+                    <h2 className="font-heading text-lg font-semibold">Payment Method</h2>
                   </div>
 
                   <div className="space-y-3">
@@ -495,7 +494,7 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
 
               <div>
                 <div className="rounded-lg border p-6 sticky top-24">
-                  <h2 className="text-lg font-semibold mb-4">Order Summary</h2>
+                  <h2 className="font-heading text-lg font-semibold mb-4">Order Summary</h2>
 
                   <div className="space-y-3 text-sm">
                     {items.map((item) => (

@@ -98,7 +98,7 @@ export default async function ProductPage({
           </div>
         </section>
 
-        <div className="mx-auto max-w-7xl space-y-12 px-4 pb-16 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl space-y-12 px-4 pb-28 sm:px-6 lg:pb-16 lg:px-8">
           <Description markdown={detail.product.description} />
           <ReviewsSection
             productId={detail.product.id}

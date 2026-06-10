@@ -28,7 +28,7 @@ const BENEFITS: Benefit[] = [
 export function TrustStrip() {
   return (
     <section className="border-b bg-muted/40">
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <ul className="grid grid-cols-2 gap-8 lg:grid-cols-4">
           {BENEFITS.map(({ icon: Icon, title, description }) => (
             <li key={title} className="flex flex-col items-center text-center">
