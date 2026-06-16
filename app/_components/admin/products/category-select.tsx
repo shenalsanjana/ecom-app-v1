@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { createCategory } from "@/app/admin/products/actions";
+import { ImageInput } from "./image-input";
 
 type Cat = { slug: string; name: string };
 
@@ -34,10 +35,13 @@ export function CategorySelect({
       {adding && (
         <div className="mt-2 space-y-2 rounded border p-2">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Category name" className="w-full rounded border px-2 py-1 text-sm" />
-          <input value={image} onChange={(e) => setImage(e.target.value)} placeholder="Image URL / path" className="w-full rounded border px-2 py-1 text-sm" />
-          <div className="flex gap-2">
-            <button type="button" disabled={pending || !name.trim() || !image.trim()} onClick={add} className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground">Create</button>
+          <ImageInput value={image} onChange={setImage} preview placeholder="Image URL / path — or upload →" />
+          <div className="flex items-center gap-2">
+            <button type="button" disabled={pending || !name.trim() || !image.trim()} onClick={add} className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">{pending ? "Creating…" : "Create"}</button>
             <button type="button" onClick={() => setAdding(false)} className="rounded border px-2 py-1 text-xs">Cancel</button>
+            {!name.trim() || !image.trim() ? (
+              <span className="text-xs text-muted-foreground">Name and image are both required</span>
+            ) : null}
           </div>
         </div>
       )}

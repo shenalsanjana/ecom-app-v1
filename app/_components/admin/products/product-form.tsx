@@ -1,11 +1,11 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { createProduct, updateProduct, archiveProduct, unarchiveProduct } from "@/app/admin/products/actions";
 import { slugify, parseSizes, serializeSizes } from "@/app/_lib/product-helpers";
 import { CategorySelect } from "./category-select";
 import { GalleryEditor } from "./gallery-editor";
+import { ImageInput } from "./image-input";
 
 type Cat = { slug: string; name: string };
 type Initial = {
@@ -113,9 +113,8 @@ export function ProductForm({ mode, categories, initial }: { mode: "create" | "e
 
         <div className="space-y-4">
           <div className="rounded-lg border p-4">
-            <label className="text-xs text-muted-foreground">Main image (URL / path)</label>
-            <input value={f.image} onChange={(e) => set("image", e.target.value)} className="mt-1 w-full rounded border px-2 py-1.5 text-sm" />
-            {f.image ? <Image src={f.image} alt="" width={240} height={160} className="mt-2 h-32 w-full rounded object-cover" /> : null}
+            <label className="mb-1 block text-xs text-muted-foreground">Main image (URL / path or upload)</label>
+            <ImageInput value={f.image} onChange={(v) => set("image", v)} preview />
           </div>
           <div className="rounded-lg border p-4">
             <label className="mb-2 block text-xs text-muted-foreground">Gallery</label>

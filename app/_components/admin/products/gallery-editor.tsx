@@ -1,4 +1,5 @@
 "use client";
+import { UploadButton } from "./upload-button";
 
 export function GalleryEditor({ urls, onChange }: { urls: string[]; onChange: (u: string[]) => void }) {
   const set = (i: number, v: string) => onChange(urls.map((u, j) => (j === i ? v : u)));
@@ -20,7 +21,10 @@ export function GalleryEditor({ urls, onChange }: { urls: string[]; onChange: (u
           <button type="button" onClick={() => remove(i)} className="px-1 text-destructive">✕</button>
         </div>
       ))}
-      <button type="button" onClick={() => onChange([...urls, ""])} className="rounded border px-3 py-1 text-sm">＋ Add gallery image</button>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => onChange([...urls, ""])} className="rounded border px-3 py-1 text-sm">＋ Add gallery image</button>
+        <UploadButton label="⤴ Upload from device" onUploaded={(url) => onChange([...urls, url])} className="rounded border px-3 py-1 text-sm disabled:opacity-50" />
+      </div>
     </div>
   );
 }
