@@ -42,4 +42,11 @@ describe("zoneForCity", () => {
     expect(zoneForCity("Atlantis")).toBe<DeliveryZone>("OTHER");
     expect(zoneForCity("")).toBe<DeliveryZone>("OTHER");
   });
+
+  it("prices the Curfox catalogue spelling 'Mount Lavinia' as COLOMBO (no drift vs combobox)", () => {
+    // The checkout combobox emits catalogue spellings; both the catalogue
+    // spelling and the legacy "Mt. Lavinia" must price COLOMBO.
+    expect(zoneForCity("Mount Lavinia")).toBe<DeliveryZone>("COLOMBO");
+    expect(zoneForCity("Mt. Lavinia")).toBe<DeliveryZone>("COLOMBO");
+  });
 });

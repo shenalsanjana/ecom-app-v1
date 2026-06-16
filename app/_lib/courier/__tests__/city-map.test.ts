@@ -2,9 +2,19 @@ import { describe, it, expect } from "vitest";
 import { getDistrictForCity } from "../city-map";
 
 describe("getDistrictForCity", () => {
-  it("returns the seeded state for an exact city match", () => {
+  it("returns the catalogue district for an exact city match", () => {
     expect(getDistrictForCity("Kotte", "")).toBe("Colombo");
-    expect(getDistrictForCity("Kandy", "")).toBe("Kandy");
+    expect(getDistrictForCity("Dehiwala", "")).toBe("Colombo");
+    expect(getDistrictForCity("Galle", "")).toBe("Galle");
+  });
+
+  it("returns the district for an alias spelling (Mt. Lavinia -> Mount Lavinia)", () => {
+    expect(getDistrictForCity("Mt. Lavinia", "")).toBe("Colombo");
+  });
+
+  it("returns empty string for a district Royal Express does not service (Kandy)", () => {
+    // Kandy is absent from the live Curfox catalogue; treat as unroutable.
+    expect(getDistrictForCity("Kandy", "")).toBe("");
   });
 
   it("resolves bare 'Colombo' via prefix match to the 'Colombo' district", () => {

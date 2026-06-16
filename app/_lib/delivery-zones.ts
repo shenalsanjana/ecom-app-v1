@@ -17,6 +17,9 @@ export const DELIVERY_CITIES: ReadonlyArray<DeliveryCity> = [
   // ---- Colombo zone ----
   { name: "Colombo", zone: "COLOMBO" },
   { name: "Dehiwala", zone: "COLOMBO" },
+  // "Mount Lavinia" is the Curfox catalogue spelling the checkout combobox now
+  // emits; "Mt. Lavinia" is kept so legacy saved addresses still price COLOMBO.
+  { name: "Mount Lavinia", zone: "COLOMBO" },
   { name: "Mt. Lavinia", zone: "COLOMBO" },
   { name: "Nugegoda", zone: "COLOMBO" },
   { name: "Maharagama", zone: "COLOMBO" },

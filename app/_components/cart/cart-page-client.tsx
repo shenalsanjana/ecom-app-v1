@@ -1,6 +1,7 @@
 // app/_components/cart/cart-page-client.tsx
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { ShoppingCart } from "lucide-react";
 import { CartItemRow } from "@/app/_components/cart/cart-item";
@@ -8,9 +9,20 @@ import { CartSummary } from "@/app/_components/cart/cart-summary";
 import { useCart } from "@/app/_lib/cart-context";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 export function CartPageClient() {
   const { items, clearCart } = useCart();
+  const [clearOpen, setClearOpen] = useState(false);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
@@ -45,17 +57,40 @@ export function CartPageClient() {
               <Link href="/" className={buttonVariants({ variant: "outline" })}>
                 Continue shopping
               </Link>
-              <Button
-                variant="ghost"
-                className="text-muted-foreground hover:text-destructive"
-                onClick={() => {
-                  if (confirm("Clear all items from cart?")) {
-                    clearCart();
+              <Dialog open={clearOpen} onOpenChange={setClearOpen}>
+                <DialogTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      className="text-muted-foreground hover:text-destructive"
+                    />
                   }
-                }}
-              >
-                Clear cart
-              </Button>
+                >
+                  Clear cart
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Clear your cart?</DialogTitle>
+                    <DialogDescription>
+                      This removes all items from your cart. You can&apos;t undo this.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <DialogClose render={<Button variant="outline" />}>
+                      Keep items
+                    </DialogClose>
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        clearCart();
+                        setClearOpen(false);
+                      }}
+                    >
+                      Clear cart
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
 

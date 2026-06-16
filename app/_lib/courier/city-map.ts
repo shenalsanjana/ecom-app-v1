@@ -1,5 +1,6 @@
 // app/_lib/courier/city-map.ts
 import { prisma as defaultPrisma } from "@/app/_lib/prisma";
+import { findCatalogueCity, normalizeCityName } from "./catalogue";
 
 type PrismaLike = typeof defaultPrisma;
 let prismaImpl: PrismaLike = defaultPrisma;
@@ -11,20 +12,24 @@ export const __test_only_setPrisma = (p: PrismaLike): void => {
 /**
  * Cities and their Curfox IDs confirmed via API probing.
  */
+// NOTE: this is a small legacy fallback only. The authoritative serviceable-
+// city data now lives in ./catalogue (curfox-cities.json) and is consulted
+// first by resolveCurfoxCity. Stale entries previously here — "Ampara" (id 78)
+// and "Kandy" (id 1148) — were removed: neither exists in the live Curfox
+// catalogue (Royal Express does not service those districts), so sending their
+// old hardcoded ids produced Curfox-rejected payloads.
 export const KNOWN_CURFOX_CITIES: ReadonlyArray<{
   name: string;
   id: number | null;
   state?: string;
   defaultWarehouseId?: number | null;
 }> = [
-  { name: "Ampara", id: 78, state: "Ampara", defaultWarehouseId: 2 },
   { name: "Colombo 08", id: 1788, state: "Colombo", defaultWarehouseId: 61 },
   { name: "Dankotuwa", id: 2649, state: "Puttalam", defaultWarehouseId: 49 },
   { name: "Dekatana", id: 2684, state: "Gampaha", defaultWarehouseId: 80 },
   { name: "Dunkannawa", id: 2651, state: "Puttalam", defaultWarehouseId: 49 },
   { name: "Induruwa", id: 20, state: "Galle", defaultWarehouseId: 1 },
   { name: "Kadawatha", id: 972, state: "Gampaha", defaultWarehouseId: 21 },
-  { name: "Kandy", id: 1148, state: "Kandy", defaultWarehouseId: 25 },
   { name: "Kottawa", id: 1519, state: "Colombo", defaultWarehouseId: 53 },
   { name: "Kotte", id: 1500, state: "Colombo", defaultWarehouseId: 78 },
   { name: "Kurunegala", id: 1649, state: "Kurunegala", defaultWarehouseId: 30 },
@@ -65,6 +70,11 @@ export function canonicalizeCurfoxCityName(cityName: string): string {
 
 export function getDistrictForCity(cityName: string, region: string): string {
     const trimmed = cityName.trim();
+
+    // Authoritative live catalogue first (alias-aware).
+    const cat = findCatalogueCity(trimmed);
+    if (cat?.district) return cat.district;
+
     const hit = KNOWN_LOOKUP.get(trimmed.toLowerCase());
     if (hit?.state) return hit.state;
 
@@ -95,10 +105,15 @@ export async function resolveCurfoxCity(
 ): Promise<{ destinationCityId: number; destinationWarehouseId: number | null } | null> {
   const trimmed = cityName.trim();
   if (!trimmed) return null;
-  
-  // Try DB first
+
+  // Apply the canonical-name alias (e.g. "Mt. Lavinia" -> "Mount Lavinia")
+  // before every lookup so a legacy/customer spelling still resolves.
+  const canonical = normalizeCityName(trimmed);
+
+  // Try DB first — lets an admin override the committed catalogue without a
+  // code deploy. The seeder populates this table from the same catalogue.
   const row = await prismaImpl.curfoxCity.findFirst({
-    where: { name: { equals: trimmed, mode: "insensitive" } },
+    where: { name: { equals: canonical, mode: "insensitive" } },
   });
   if (row) {
     return {
@@ -106,16 +121,27 @@ export async function resolveCurfoxCity(
       destinationWarehouseId: row.defaultWarehouseId,
     };
   }
-  
-  // Fallback to hardcoded list
-  const hit = KNOWN_LOOKUP.get(trimmed.toLowerCase());
+
+  // Authoritative committed catalogue (curfox-cities.json). This is the
+  // primary source now and covers every serviceable city, so the DB no
+  // longer needs to be seeded for bookings to resolve.
+  const cat = findCatalogueCity(trimmed);
+  if (cat) {
+    return {
+      destinationCityId: cat.id,
+      destinationWarehouseId: cat.warehouseId ?? null,
+    };
+  }
+
+  // Legacy hardcoded fallback (kept as a last-resort backstop).
+  const hit = KNOWN_LOOKUP.get(canonical);
   if (hit && hit.id) {
       return {
           destinationCityId: hit.id,
           destinationWarehouseId: hit.defaultWarehouseId ?? null
       };
   }
-  
+
   return null;
 }
 
