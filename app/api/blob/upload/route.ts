@@ -47,7 +47,11 @@ export async function POST(request: Request): Promise<NextResponse> {
           addRandomSuffix: true, // avoid filename collisions
         };
       },
-      onUploadCompleted: async () => {},
+      // No onUploadCompleted: it is optional, we don't need a server-side
+      // completion event (the client gets the blob URL from upload()'s return
+      // value), and omitting it means NO callbackUrl is embedded in the client
+      // token — so Vercel Blob finalizes the upload without a server-to-server
+      // callback that could fail.
     });
 
     return NextResponse.json(jsonResponse);
