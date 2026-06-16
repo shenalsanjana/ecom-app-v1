@@ -3,7 +3,7 @@
 // Blob. It accepts a multipart file and writes it into /public/uploads, which
 // `next dev` serves at /uploads/<name>. It is hard-disabled in production
 // because Vercel's runtime filesystem is read-only — production uploads go
-// through /api/admin/upload (Blob client-upload) instead.
+// through /api/blob/upload (Blob client-upload) instead.
 import { NextResponse } from "next/server";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";

@@ -8,7 +8,7 @@ async function uploadOne(file: File): Promise<string> {
   if (process.env.NODE_ENV === "production") {
     const blob = await upload(file.name, file, {
       access: "public",
-      handleUploadUrl: "/api/admin/upload",
+      handleUploadUrl: "/api/blob/upload",
     });
     return blob.url;
   }

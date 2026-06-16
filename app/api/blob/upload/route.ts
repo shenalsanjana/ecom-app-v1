@@ -1,11 +1,15 @@
-// app/api/admin/upload/route.ts
-// Admin-only image upload endpoint using Vercel Blob's client-upload flow.
-// The browser calls this route to mint a short-lived token, then uploads the
-// file directly to Blob storage — this bypasses Vercel's 4.5MB request-body
-// limit that a server-side relay would hit on real photos.
+// app/api/blob/upload/route.ts
+// Admin image upload using Vercel Blob's client-upload flow (browser → Blob
+// direct, bypassing Vercel's 4.5MB request-body limit).
 //
-// Defense in depth: proxy.ts already blocks /api/admin/* for non-admins at the
-// edge; requireAdminApi() re-checks here in case the matcher is ever changed.
+// NOTE ON PATH: this route is intentionally NOT under /api/admin/*. handleUpload
+// derives the embedded onUploadCompleted callbackUrl from the incoming request
+// path, and Vercel Blob calls that URL server-to-server (with no session cookie)
+// to finalize the upload. Under /api/admin/* the proxy.ts middleware 401s that
+// cookieless callback, which fails finalization with a 400. Token generation is
+// still admin-gated via requireAdminApi() in onBeforeGenerateToken (that call
+// carries the admin's cookie), and the finalize callback is signature-verified
+// by handleUpload — so moving off the admin matcher loses nothing security-wise.
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/app/_lib/admin-auth";
@@ -30,9 +34,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       body,
       request,
       onBeforeGenerateToken: async () => {
+        // Gate token generation. The browser's generate-token call carries the
+        // admin session cookie; the later finalize callback does not (and only
+        // triggers onUploadCompleted, which is signature-verified).
         const guard = await requireAdminApi();
         if (guard instanceof Response) {
-          // Abort token generation for non-admins.
           throw new Error("Not authorized to upload images");
         }
         return {
@@ -41,9 +47,6 @@ export async function POST(request: Request): Promise<NextResponse> {
           addRandomSuffix: true, // avoid filename collisions
         };
       },
-      // Fires server-side after the upload completes. In local dev Vercel
-      // cannot reach localhost, so this is skipped — the client still gets the
-      // blob URL from the upload() return value, which is all we persist.
       onUploadCompleted: async () => {},
     });
 
