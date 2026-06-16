@@ -19,7 +19,8 @@ import { Separator } from "@/components/ui/separator";
 import { formatPrice } from "@/app/_lib/format";
 import { calculateDelivery } from "@/app/_lib/checkout-config";
 import { useDeliveryConfig } from "@/app/_components/delivery/delivery-config-provider";
-import { DELIVERY_CITIES, zoneForCity } from "@/app/_lib/delivery-zones";
+import { zoneForCity } from "@/app/_lib/delivery-zones";
+import { CityCombobox, type CityGroup } from "@/components/ui/city-combobox";
 import {
   paymentErrorMessage,
   readPaymentInitiationResponse,
@@ -32,6 +33,7 @@ type CheckoutUser = { name: string; email: string } | null;
 type Props = {
   user: CheckoutUser;
   paymentOptions: { id: PaymentMethod; name: string; description: string; icon: string }[];
+  cityGroups: CityGroup[];
 };
 
 function generateIdempotencyKey(): string {
@@ -41,7 +43,7 @@ function generateIdempotencyKey(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export function CheckoutClient({ user, paymentOptions }: Props) {
+export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
   const router = useRouter();
   const { items, clearCart } = useCart();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -389,23 +391,14 @@ export function CheckoutClient({ user, paymentOptions }: Props) {
                       <label htmlFor="city" className="block text-sm font-medium mb-1">
                         City *
                       </label>
-                      <select
+                      <CityCombobox
                         id="city"
                         name="city"
                         required
                         value={address.city ?? ""}
-                        onChange={(e) => setAddress({ ...address, city: e.target.value })}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <option value="" disabled>
-                          Select a city
-                        </option>
-                        {DELIVERY_CITIES.map((c) => (
-                          <option key={c.name} value={c.name}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(city) => setAddress({ ...address, city })}
+                        groups={cityGroups}
+                      />
                     </div>
                     <div>
                       <label htmlFor="country" className="block text-sm font-medium mb-1">
