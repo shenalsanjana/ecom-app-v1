@@ -18,7 +18,7 @@ type Props = {
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
-  /** Max options rendered at once; keeps the DOM light over a ~2k-city list. */
+  /** Max options rendered at once. Defaults to Infinity (render all, scrollable). */
   limit?: number;
 };
 
@@ -37,7 +37,9 @@ export function CityCombobox({
   placeholder = "Search your city…",
   required,
   disabled,
-  limit = 80,
+  // Render the whole catalogue by default so customers can scroll/browse all
+  // cities; typing still narrows. Pass a number to cap for perf if needed.
+  limit = Infinity,
 }: Props) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
