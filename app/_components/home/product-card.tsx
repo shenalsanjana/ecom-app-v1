@@ -60,7 +60,7 @@ export function ProductCard({
             src={image}
             alt={name}
             fill
-            sizes="(min-width:1024px) 25vw, 50vw"
+            sizes="(min-width:1024px) 33vw, (min-width:640px) 50vw, 100vw"
             className="object-cover transition-transform duration-(--duration-slow) ease-(--ease-out) group-hover:scale-105"
           />
         </Link>

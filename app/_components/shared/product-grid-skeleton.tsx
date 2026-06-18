@@ -4,7 +4,7 @@ type Props = {
 
 export function ProductGridSkeleton({ count = 8 }: Props) {
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className="motion-safe:animate-pulse">
           <div className="aspect-square w-full rounded-2xl bg-muted" />

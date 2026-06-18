@@ -118,7 +118,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
                   <p className="text-lg text-muted-foreground">No products available in this category.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {paginatedProducts.map((product) => (
                     <ProductCard key={product.id} id={product.id} name={product.name} price={product.price} originalPrice={product.originalPrice}
                       image={product.image} rating={product.rating} reviewCount={product.reviewCount} sizes={product.sizes} fromPath={`/categories/${slug}`} />
