@@ -101,6 +101,7 @@ export function ProductCard({
           sizes={sizes}
           triggerVariant="default"
           triggerClassName="w-full min-w-0 whitespace-nowrap"
+          showBuyNow
         />
       </CardFooter>
     </Card>
