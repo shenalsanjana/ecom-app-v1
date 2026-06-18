@@ -25,8 +25,6 @@ type Props = {
   sizes: string;
   triggerVariant?: "outline" | "default";
   triggerClassName?: string;
-  /** Render a secondary "Buy it now" button alongside the Add to cart trigger. */
-  showBuyNow?: boolean;
 };
 
 export function AddToCartDialog({
@@ -37,7 +35,6 @@ export function AddToCartDialog({
   sizes,
   triggerVariant = "outline",
   triggerClassName = "flex-1 min-w-0 whitespace-nowrap",
-  showBuyNow = false,
 }: Props) {
   const sizeList = sizes ? sizes.split(",").map((s) => s.trim()).filter(Boolean) : [];
   const { addItem } = useCart();
@@ -88,59 +85,19 @@ export function AddToCartDialog({
     }
   }
 
-  const addToCartTrigger = (
-    <DialogTrigger
-      className={buttonVariants({
-        size: "sm",
-        variant: triggerVariant,
-        className: triggerClassName,
-      })}
-      aria-label="Add to cart"
-    >
-      <ShoppingCart className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
-      <span className="truncate">Add to cart</span>
-    </DialogTrigger>
-  );
-
-  // When the product has sizes, Buy it now must route through size selection,
-  // so it opens the same dialog (whose footer Buy now completes the checkout).
-  // A size-less product can skip the dialog and go straight to checkout.
-  const buyNowTrigger = hasSizes ? (
-    <DialogTrigger
-      className={buttonVariants({
-        size: "sm",
-        variant: "outline",
-        className: triggerClassName,
-      })}
-      aria-label="Buy it now"
-    >
-      <Zap className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
-      <span className="truncate">Buy it now</span>
-    </DialogTrigger>
-  ) : (
-    <Button
-      type="button"
-      size="sm"
-      variant="outline"
-      className={triggerClassName}
-      onClick={handleBuyNow}
-      aria-label="Buy it now"
-    >
-      <Zap className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
-      <span className="truncate">Buy it now</span>
-    </Button>
-  );
-
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      {showBuyNow ? (
-        <div className="flex w-full flex-col gap-2">
-          {addToCartTrigger}
-          {buyNowTrigger}
-        </div>
-      ) : (
-        addToCartTrigger
-      )}
+      <DialogTrigger
+        className={buttonVariants({
+          size: "sm",
+          variant: triggerVariant,
+          className: triggerClassName,
+        })}
+        aria-label="Add to cart"
+      >
+        <ShoppingCart className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
+        <span className="truncate">Add to cart</span>
+      </DialogTrigger>
       <DialogContent
         className={`max-h-[90dvh] overflow-y-auto transition-[max-width] duration-(--duration-fast) ${
           showChart ? "sm:max-w-2xl" : "sm:max-w-md"

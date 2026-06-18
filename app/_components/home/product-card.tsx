@@ -1,8 +1,9 @@
 // app/_components/home/product-card.tsx
 import Image from "next/image";
 import Link from "next/link";
-import { Star } from "lucide-react";
+import { Star, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { AddToCartDialog } from "@/app/_components/cart/add-to-cart-dialog";
 import { WishlistHeart } from "@/app/_components/wishlist/wishlist-heart";
@@ -93,16 +94,32 @@ export function ProductCard({
         </div>
       </CardContent>
       <CardFooter className="p-4 pt-0">
-        <AddToCartDialog
-          productId={id}
-          name={name}
-          price={price}
-          image={image}
-          sizes={sizes}
-          triggerVariant="default"
-          triggerClassName="w-full min-w-0 whitespace-nowrap"
-          showBuyNow
-        />
+        <div className="flex w-full flex-col gap-2">
+          <AddToCartDialog
+            productId={id}
+            name={name}
+            price={price}
+            image={image}
+            sizes={sizes}
+            triggerVariant="default"
+            triggerClassName="w-full min-w-0 whitespace-nowrap"
+          />
+          {/* Buy it now skips the card-level size dialog and sends the shopper to
+              the product page, where size is the mandatory input. The
+              ?action=buy-now intent scrolls to and flashes the size picker. */}
+          <Link
+            href={`${href}?action=buy-now`}
+            aria-label={`Buy ${name} now`}
+            className={buttonVariants({
+              size: "sm",
+              variant: "outline",
+              className: "w-full min-w-0 whitespace-nowrap",
+            })}
+          >
+            <Zap className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
+            <span className="truncate">Buy it now</span>
+          </Link>
+        </div>
       </CardFooter>
     </Card>
   );
