@@ -109,6 +109,10 @@ describe("status transitions", () => {
     expect(nextStatuses("PENDING")).toEqual(["CONFIRMED"]);
     expect(nextStatuses("CONFIRMED")).toEqual(["DELIVERED"]);
   });
+  it("dispatched orders can be marked delivered, and DISPATCHED is not a plain-advance target", () => {
+    expect(nextStatuses("DISPATCHED")).toEqual(["DELIVERED"]);
+    expect(nextStatuses("CONFIRMED")).not.toContain("DISPATCHED");
+  });
   it("has no transitions from terminal states", () => {
     expect(nextStatuses("DELIVERED")).toEqual([]);
     expect(nextStatuses("CANCELLED")).toEqual([]);

@@ -6,11 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatPrice } from "@/app/_lib/format";
 import { paymentStatusLabel } from "@/app/_lib/order-status";
+import { DELIVERY_COMPANY_NAME } from "@/app/_lib/carrier";
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "Pending",
   CONFIRMED: "Confirmed",
-  SHIPPED: "Shipped",
+  DISPATCHED: "Dispatched",
   DELIVERED: "Delivered",
   CANCELLED: "Cancelled",
 };
@@ -69,7 +70,7 @@ export default async function OrdersPage() {
                     </div>
                     {o.trackingCode && (
                       <div className="text-xs text-muted-foreground mt-1">
-                        Tracking: {o.trackingCode}
+                        {o.deliveryCompany ?? DELIVERY_COMPANY_NAME} · Tracking: {o.trackingCode}
                       </div>
                     )}
                   </div>

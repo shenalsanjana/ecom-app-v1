@@ -10,10 +10,12 @@ import {
 } from "@/app/_lib/courier/city-map";
 import {
   sendDispatchNotificationEmail,
+  sendCustomerDispatchEmail,
   sendAdminFailureAlertEmail,
   logMailerError,
 } from "@/app/_lib/mailer";
 import type { OrderDetails } from "@/app/_lib/mailer";
+import { DELIVERY_COMPANY_NAME } from "@/app/_lib/carrier";
 import { orderReference } from "@/app/_lib/order-reference";
 
 const MERCHANT_BUSINESS_ID = (): number =>
@@ -75,6 +77,34 @@ async function tryDispatchEmail(
       })
       .catch((err) => {
         console.error("[checkout] dispatchEmailSentAt update failed:", err);
+      });
+  } catch (err) {
+    logMailerError(
+      "dispatch",
+      { orderId: order.orderId, webNumber: order.webNumber, rbNumber: order.rbNumber },
+      err,
+    );
+  }
+}
+
+/**
+ * Sends the customer-facing dispatch email (Royal Express + tracking number)
+ * once the order is booked, then stamps customerDispatchEmailSentAt. Never
+ * throws — a send/DB failure is logged but must not undo the dispatch.
+ */
+async function trySendCustomerDispatchEmail(
+  order: OrderDetails,
+  waybillNumber: string,
+): Promise<void> {
+  try {
+    await sendCustomerDispatchEmail({ ...order, trackingCode: waybillNumber });
+    await prisma.order
+      .update({
+        where: { id: order.orderId },
+        data: { customerDispatchEmailSentAt: new Date() },
+      })
+      .catch((err) => {
+        console.error("[checkout] customerDispatchEmailSentAt update failed:", err);
       });
   } catch (err) {
     logMailerError(
@@ -183,6 +213,8 @@ export async function bookCourierAndNotify(params: {
         courierWaybillNumber: waybillNumber,
         courierBookedAt: new Date(),
         trackingCode: waybillNumber,
+        status: "DISPATCHED",
+        deliveryCompany: DELIVERY_COMPANY_NAME,
         royalExpressSubmitted: true,
         courierLastError: null,
         courierLastErrorAt: null,
@@ -209,6 +241,7 @@ export async function bookCourierAndNotify(params: {
   // the portal so the merchant prints from there. (See docs/spec/admin-email-overhaul.md
   // for the broader rationale and the previously-attempted PDF probe history.)
   await tryDispatchEmail(order, waybillNumber, undefined);
+  await trySendCustomerDispatchEmail(order, waybillNumber);
 
   return waybillNumber;
 }

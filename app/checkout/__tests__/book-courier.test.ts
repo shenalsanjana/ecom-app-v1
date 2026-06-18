@@ -18,6 +18,7 @@ vi.mock("@/app/_lib/courier/curfox-client", () => ({
 }));
 vi.mock("@/app/_lib/mailer", () => ({
   sendDispatchNotificationEmail: vi.fn(),
+  sendCustomerDispatchEmail: vi.fn(),
   sendAdminFailureAlertEmail: vi.fn(),
   logMailerError: vi.fn(),
 }));
@@ -39,6 +40,7 @@ import {
 } from "@/app/_lib/courier/curfox-client";
 import {
   sendDispatchNotificationEmail,
+  sendCustomerDispatchEmail,
   sendAdminFailureAlertEmail,
 } from "@/app/_lib/mailer";
 import { prisma } from "@/app/_lib/prisma";
@@ -66,6 +68,7 @@ const ORDER: OrderDetails = {
 beforeEach(() => {
   vi.mocked(createCurfoxOrder).mockReset();
   vi.mocked(sendDispatchNotificationEmail).mockReset();
+  vi.mocked(sendCustomerDispatchEmail).mockReset();
   vi.mocked(sendAdminFailureAlertEmail).mockReset();
   vi.mocked(prisma.order.update).mockReset();
   vi.mocked(prisma.order.update).mockResolvedValue({} as never);
@@ -97,6 +100,26 @@ describe("bookCourierAndNotify — happy path", () => {
 
     expect(prisma.order.update).toHaveBeenCalled();
     expect(sendAdminFailureAlertEmail).not.toHaveBeenCalled();
+  });
+
+  it("flips status to DISPATCHED with Royal Express and emails the customer once", async () => {
+    vi.mocked(createCurfoxOrder).mockResolvedValueOnce("RA03870247");
+    vi.mocked(sendDispatchNotificationEmail).mockResolvedValueOnce(undefined);
+    vi.mocked(sendCustomerDispatchEmail).mockResolvedValueOnce(undefined);
+
+    await bookCourierAndNotify({ order: ORDER });
+
+    const persist = vi
+      .mocked(prisma.order.update)
+      .mock.calls.find((c) => (c[0] as { data: Record<string, unknown> }).data.courierWaybillNumber);
+    expect(persist).toBeDefined();
+    const data = (persist![0] as { data: Record<string, unknown> }).data;
+    expect(data.status).toBe("DISPATCHED");
+    expect(data.deliveryCompany).toBe("Royal Express");
+
+    expect(sendCustomerDispatchEmail).toHaveBeenCalledOnce();
+    expect(vi.mocked(sendCustomerDispatchEmail).mock.calls[0][0].trackingCode).toBe("RA03870247");
+    expect(vi.mocked(sendCustomerDispatchEmail).mock.calls[0][0].customerEmail).toBe("jane@example.com");
   });
 });
 

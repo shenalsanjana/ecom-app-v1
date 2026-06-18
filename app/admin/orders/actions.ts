@@ -8,7 +8,8 @@ import { requireAdmin } from "@/app/_lib/admin-auth";
 import { nextStatuses, applyItemChanges, recomputeTotals, canEdit, canConfirm, type ItemChange } from "@/app/_lib/admin-orders";
 import { getDeliveryConfig } from "@/app/_lib/store-settings";
 import { bookCourierAndNotify } from "@/app/checkout/book-courier";
-import { sendOrderConfirmationEmail, type OrderDetails } from "@/app/_lib/mailer";
+import { sendOrderConfirmationEmail, sendCustomerDispatchEmail, logMailerError, type OrderDetails } from "@/app/_lib/mailer";
+import { DELIVERY_COMPANY_NAME } from "@/app/_lib/carrier";
 
 export type ActionResult =
   | { success: true; warning?: string }
@@ -28,6 +29,7 @@ function revalidate(orderId: string) {
 }
 
 const NoteSchema = z.string().trim().min(1).max(500);
+const TrackingSchema = z.string().trim().min(1).max(64);
 
 export async function addNote(orderId: string, body: string): Promise<ActionResult> {
   const session = await requireAdmin();
@@ -269,6 +271,68 @@ export async function bookCourier(orderId: string): Promise<ActionResult> {
   return waybill
     ? { success: true, warning: `Booked — waybill ${waybill}.` }
     : { success: false, error: "Courier booking failed — check Curfox / retry." };
+}
+
+/**
+ * Manual dispatch fallback used when Curfox is disabled or its booking failed.
+ * Saves an admin-entered tracking number, flips the order to DISPATCHED with
+ * Royal Express as the carrier, and emails the customer once. Does not call Curfox.
+ */
+export async function dispatchManually(orderId: string, trackingNumber: string): Promise<ActionResult> {
+  await requireAdmin();
+  const parsed = TrackingSchema.safeParse(trackingNumber);
+  if (!parsed.success) return { success: false, error: "Enter a valid tracking number" };
+
+  const order = await prisma.order.findUnique({ where: { id: orderId }, include: ORDER_INCLUDE });
+  if (!order) return { success: false, error: "Order not found" };
+  if (order.status !== "CONFIRMED") {
+    return { success: false, error: "Only confirmed orders can be dispatched" };
+  }
+
+  try {
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { trackingCode: parsed.data, status: "DISPATCHED", deliveryCompany: DELIVERY_COMPANY_NAME },
+    });
+  } catch {
+    return { success: false, error: "Something went wrong. Please try again." };
+  }
+
+  // Email the customer once. A send failure must not undo the dispatch.
+  try {
+    await sendCustomerDispatchEmail({ ...toOrderDetails(order), trackingCode: parsed.data });
+    await prisma.order.update({ where: { id: orderId }, data: { customerDispatchEmailSentAt: new Date() } });
+  } catch (err) {
+    logMailerError("dispatch", { orderId, webNumber: order.webNumber, rbNumber: order.rbNumber }, err);
+  }
+
+  revalidate(orderId);
+  return { success: true, warning: `Dispatched — tracking ${parsed.data}.` };
+}
+
+/**
+ * Updates the tracking number on an already-dispatched order. Never re-sends the
+ * customer dispatch email (req: no duplicate dispatch emails).
+ */
+export async function updateTrackingNumber(orderId: string, trackingNumber: string): Promise<ActionResult> {
+  await requireAdmin();
+  const parsed = TrackingSchema.safeParse(trackingNumber);
+  if (!parsed.success) return { success: false, error: "Enter a valid tracking number" };
+
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) return { success: false, error: "Order not found" };
+  if (order.status !== "DISPATCHED") {
+    return { success: false, error: "Tracking number can only be updated on a dispatched order" };
+  }
+
+  try {
+    await prisma.order.update({ where: { id: orderId }, data: { trackingCode: parsed.data } });
+  } catch {
+    return { success: false, error: "Something went wrong. Please try again." };
+  }
+
+  revalidate(orderId);
+  return { success: true };
 }
 
 export async function resendConfirmationEmail(orderId: string): Promise<ActionResult> {

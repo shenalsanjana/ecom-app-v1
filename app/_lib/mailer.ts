@@ -4,6 +4,7 @@ import { formatPrice } from "@/app/_lib/format";
 import { paymentStatusLabel } from "@/app/_lib/order-status";
 import { orderReference } from "@/app/_lib/order-reference";
 import { CURFOX_PORTAL_URL } from "@/app/_lib/curfox-portal";
+import { DELIVERY_COMPANY_NAME } from "@/app/_lib/carrier";
 
 function escapeHtml(s: string): string {
   return s
@@ -150,7 +151,7 @@ Order: ${orderReference(order)}
 Customer: ${order.customerName}
 Email: ${order.customerEmail}${order.customerPhone ? `\nPhone: ${order.customerPhone}` : ""}
 Payment Method: ${paymentDisplay}
-${paymentLabel ? `Payment Status: ${paymentLabel}\n` : ""}${order.trackingCode ? `Tracking Code: ${order.trackingCode}\n` : ""}
+${paymentLabel ? `Payment Status: ${paymentLabel}\n` : ""}${order.trackingCode ? `Tracking (${DELIVERY_COMPANY_NAME}): ${order.trackingCode}\n` : ""}
 
 Items:
 ${itemsListText}
@@ -199,7 +200,7 @@ ${BRAND_NAME}
     ${order.customerPhone ? `<p><strong>Phone:</strong> ${escapeHtml(order.customerPhone)}</p>` : ""}
     <p><strong>Payment Method:</strong> ${escapeHtml(paymentDisplay)}</p>
     ${paymentLabel ? `<p><strong>Payment Status:</strong> ${escapeHtml(paymentLabel)}</p>` : ""}
-    ${order.trackingCode ? `<p><strong>Tracking Code:</strong> ${escapeHtml(order.trackingCode)}</p>` : ""}
+    ${order.trackingCode ? `<p><strong>Tracking (${escapeHtml(DELIVERY_COMPANY_NAME)}):</strong> ${escapeHtml(order.trackingCode)}</p>` : ""}
 
     <div class="items">
       <h3 style="margin-top: 0;">Items</h3>
@@ -498,6 +499,86 @@ Dressing Bear · automated dispatch
     attachments: pdfBuffer
       ? [{ filename: "delivery-note.pdf", content: pdfBuffer }]
       : undefined,
+  });
+}
+
+/**
+ * Customer-facing dispatch notification. Sent once, after the order is marked
+ * DISPATCHED with a tracking number. Tells the customer their order shipped
+ * with Royal Express and how to track it. Never references the internal courier
+ * platform (Curfox) and carries no merchant portal link.
+ */
+export async function sendCustomerDispatchEmail(order: OrderDetails): Promise<void> {
+  const transport = getTransport();
+  const brandEmail = requireBrandEmail();
+  const from = requireFrom();
+  const ref = orderReference(order);
+  const tracking = order.trackingCode ?? "";
+
+  const text = `Hi ${order.customerName},
+
+Good news — your order has been dispatched and is on its way with ${DELIVERY_COMPANY_NAME}.
+
+Order:            ${ref}
+Tracking number:  ${tracking}
+Delivery company: ${DELIVERY_COMPANY_NAME}
+
+You can track your parcel with ${DELIVERY_COMPANY_NAME} using the tracking number above.
+
+Need help? Contact us at ${CONTACT_NUMBER} or ${brandEmail}.
+
+---
+${BRAND_NAME}
+`.trim();
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    .panel { border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 15px 0; }
+    .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eee; }
+    .row:last-child { border-bottom: none; }
+    .label { color: #666; }
+    .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 14px; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 style="margin: 0; color: #2c3e50;">${escapeHtml(BRAND_NAME)}</h1>
+      <h2 style="margin: 10px 0 0 0; color: #27ae60;">Your order has been dispatched</h2>
+    </div>
+
+    <p>Hi ${escapeHtml(order.customerName)}, good news — your order has been dispatched and is on its way with <strong>${escapeHtml(DELIVERY_COMPANY_NAME)}</strong>.</p>
+
+    <div class="panel">
+      <div class="row"><span class="label">Order</span><span>${escapeHtml(ref)}</span></div>
+      <div class="row"><span class="label">Tracking number</span><span><strong>${escapeHtml(tracking)}</strong></span></div>
+      <div class="row"><span class="label">Delivery company</span><span>${escapeHtml(DELIVERY_COMPANY_NAME)}</span></div>
+    </div>
+
+    <p>You can track your parcel with ${escapeHtml(DELIVERY_COMPANY_NAME)} using the tracking number above.</p>
+
+    <div class="footer">
+      <p>Need help? Contact us at <strong>${escapeHtml(CONTACT_NUMBER)}</strong> or <a href="mailto:${encodeURIComponent(brandEmail)}">${escapeHtml(brandEmail)}</a>.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  await transport.sendMail({
+    from,
+    to: order.customerEmail,
+    bcc: brandEmail,
+    replyTo: brandReplyTo(),
+    subject: `Your order ${ref} has been dispatched — ${BRAND_NAME}`,
+    text,
+    html,
   });
 }
 

@@ -22,8 +22,12 @@ vi.mock("@/app/_lib/store-settings", () => ({
 
 const { bookCourierAndNotify } = vi.hoisted(() => ({ bookCourierAndNotify: vi.fn() }));
 vi.mock("@/app/checkout/book-courier", () => ({ bookCourierAndNotify }));
-const { sendOrderConfirmationEmail } = vi.hoisted(() => ({ sendOrderConfirmationEmail: vi.fn() }));
-vi.mock("@/app/_lib/mailer", () => ({ sendOrderConfirmationEmail }));
+const { sendOrderConfirmationEmail, sendCustomerDispatchEmail, logMailerError } = vi.hoisted(() => ({
+  sendOrderConfirmationEmail: vi.fn(),
+  sendCustomerDispatchEmail: vi.fn(),
+  logMailerError: vi.fn(),
+}));
+vi.mock("@/app/_lib/mailer", () => ({ sendOrderConfirmationEmail, sendCustomerDispatchEmail, logMailerError }));
 
 vi.mock("@/app/_lib/prisma", () => {
   const client = {
@@ -58,6 +62,8 @@ beforeEach(() => {
   });
   bookCourierAndNotify.mockReset();
   sendOrderConfirmationEmail.mockReset();
+  sendCustomerDispatchEmail.mockReset();
+  logMailerError.mockReset();
 });
 
 describe("addNote", () => {
@@ -295,6 +301,74 @@ describe("bookCourier", () => {
     bookCourierAndNotify.mockResolvedValueOnce(undefined);
     const res = await bookCourier("o1");
     expect(res).toEqual({ success: false, error: "Courier booking failed — check Curfox / retry." });
+  });
+});
+
+import { dispatchManually, updateTrackingNumber } from "../actions";
+
+describe("dispatchManually", () => {
+  it("rejects a blank tracking number", async () => {
+    const res = await dispatchManually("o1", "   ");
+    expect(res).toEqual({ success: false, error: "Enter a valid tracking number" });
+    expect(orderUpdate).not.toHaveBeenCalled();
+  });
+
+  it("rejects an order that is not CONFIRMED", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...FULL_ORDER, status: "DISPATCHED" });
+    const res = await dispatchManually("o1", "RX-123");
+    expect(res).toEqual({ success: false, error: "Only confirmed orders can be dispatched" });
+    expect(orderUpdate).not.toHaveBeenCalled();
+  });
+
+  it("sets DISPATCHED + Royal Express + tracking and emails the customer once", async () => {
+    orderFindUnique.mockResolvedValueOnce(FULL_ORDER);
+    orderUpdate.mockResolvedValue({});
+    sendCustomerDispatchEmail.mockResolvedValueOnce(undefined);
+
+    const res = await dispatchManually("o1", "  RX-123  ");
+
+    expect(orderUpdate).toHaveBeenCalledWith({
+      where: { id: "o1" },
+      data: { trackingCode: "RX-123", status: "DISPATCHED", deliveryCompany: "Royal Express" },
+    });
+    expect(sendCustomerDispatchEmail).toHaveBeenCalledTimes(1);
+    expect(sendCustomerDispatchEmail.mock.calls[0][0].trackingCode).toBe("RX-123");
+    expect(orderUpdate).toHaveBeenCalledWith({
+      where: { id: "o1" },
+      data: { customerDispatchEmailSentAt: expect.any(Date) },
+    });
+    expect(res).toEqual({ success: true, warning: "Dispatched — tracking RX-123." });
+  });
+
+  it("still reports success (and does not throw) when the email send fails", async () => {
+    orderFindUnique.mockResolvedValueOnce(FULL_ORDER);
+    orderUpdate.mockResolvedValue({});
+    sendCustomerDispatchEmail.mockRejectedValueOnce(new Error("SMTP down"));
+
+    const res = await dispatchManually("o1", "RX-9");
+
+    expect(logMailerError).toHaveBeenCalledTimes(1);
+    expect(res).toEqual({ success: true, warning: "Dispatched — tracking RX-9." });
+  });
+});
+
+describe("updateTrackingNumber", () => {
+  it("updates trackingCode on a dispatched order without emailing", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...FULL_ORDER, status: "DISPATCHED" });
+    orderUpdate.mockResolvedValueOnce({});
+
+    const res = await updateTrackingNumber("o1", "RX-NEW");
+
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { trackingCode: "RX-NEW" } });
+    expect(sendCustomerDispatchEmail).not.toHaveBeenCalled();
+    expect(res).toEqual({ success: true });
+  });
+
+  it("rejects updating a non-dispatched order", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...FULL_ORDER, status: "CONFIRMED" });
+    const res = await updateTrackingNumber("o1", "RX-NEW");
+    expect(res).toEqual({ success: false, error: "Tracking number can only be updated on a dispatched order" });
+    expect(orderUpdate).not.toHaveBeenCalled();
   });
 });
 

@@ -8,6 +8,7 @@ import { OrderItemsEditor } from "@/app/_components/admin/orders/order-items-edi
 import { AddressEditor } from "@/app/_components/admin/orders/address-editor";
 import { OrderNotes } from "@/app/_components/admin/orders/order-notes";
 import { PrintLabelLink } from "@/app/_components/admin/orders/print-label-link";
+import { TrackingEditor } from "@/app/_components/admin/orders/tracking-editor";
 
 export default async function AdminOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -16,6 +17,8 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
 
   const canEditOrder = order.status !== "DELIVERED" && order.status !== "CANCELLED";
   const next = nextStatuses(order.status)[0] ?? null;
+  const curfoxEnabled = process.env.ROYAL_EXPRESS_ENABLED === "true";
+  const showManualDispatch = order.status === "CONFIRMED" && (!curfoxEnabled || !!order.courierLastError);
 
   return (
     <section>
@@ -49,7 +52,18 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         <div className="space-y-4">
           <div className="rounded-lg border p-4"><h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Status &amp; dispatch</h4>
             <OrderActions orderId={order.id} status={order.status} paymentMethod={order.paymentMethod}
-              paymentStatus={order.paymentStatus} courierBooked={!!order.courierBookedAt} nextStatus={next} />
+              paymentStatus={order.paymentStatus} courierBooked={!!order.courierBookedAt} nextStatus={next}
+              curfoxEnabled={curfoxEnabled} />
+            {showManualDispatch && (
+              <div className="mt-3 border-t pt-3">
+                <TrackingEditor orderId={order.id} mode="dispatch" trackingCode={order.trackingCode} />
+              </div>
+            )}
+            {order.status === "DISPATCHED" && (
+              <div className="mt-3 border-t pt-3">
+                <TrackingEditor orderId={order.id} mode="edit" trackingCode={order.trackingCode} />
+              </div>
+            )}
           </div>
           <div className="rounded-lg border p-4"><h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Customer</h4>
             <div className="text-sm">{order.user?.name ?? order.guestName}<br />
