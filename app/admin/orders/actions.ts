@@ -8,7 +8,7 @@ import { requireAdmin } from "@/app/_lib/admin-auth";
 import { nextStatuses, applyItemChanges, recomputeTotals, canEdit, canConfirm, type ItemChange } from "@/app/_lib/admin-orders";
 import { getDeliveryConfig } from "@/app/_lib/store-settings";
 import { bookCourierAndNotify } from "@/app/checkout/book-courier";
-import { sendOrderConfirmationEmail, sendCustomerDispatchEmail, logMailerError, type OrderDetails } from "@/app/_lib/mailer";
+import { sendOrderConfirmationEmail, sendCustomerDispatchEmail, sendCustomerCancellationEmail, logMailerError, type OrderDetails } from "@/app/_lib/mailer";
 import { DELIVERY_COMPANY_NAME } from "@/app/_lib/carrier";
 
 export type ActionResult =
@@ -107,7 +107,7 @@ export async function cancelOrder(orderId: string): Promise<ActionResult> {
   await requireAdmin();
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: { items: { select: { productId: true, quantity: true } } },
+    include: CANCEL_INCLUDE,
   });
   if (!order) return { success: false, error: "Order not found" };
   if (order.status === "CANCELLED") return { success: false, error: "Order is already cancelled" };
@@ -118,6 +118,8 @@ export async function cancelOrder(orderId: string): Promise<ActionResult> {
   } catch {
     return { success: false, error: "Something went wrong. Please try again." };
   }
+
+  await trySendCancellationEmail(toOrderDetails(order));
 
   revalidate(orderId);
   return PAID.has(order.paymentStatus ?? "")
@@ -254,6 +256,29 @@ function toOrderDetails(order: DbOrderForDetails): OrderDetails {
     paymentStatus: order.paymentStatus,
     trackingCode: order.trackingCode ?? undefined,
   };
+}
+
+// Like ORDER_INCLUDE but also pulls each item's productId, which the
+// stock-restore in cancelOrderTx needs. The extra field is harmless to
+// toOrderDetails (which ignores it).
+const CANCEL_INCLUDE = {
+  user: { select: { name: true, email: true } },
+  items: { select: { productId: true, name: true, size: true, price: true, quantity: true } },
+} satisfies Prisma.OrderInclude;
+
+/** Best-effort customer cancellation email — never throws; a send failure is
+ *  logged but must not fail the cancellation. */
+async function trySendCancellationEmail(details: OrderDetails): Promise<void> {
+  if (!details.customerEmail) return;
+  try {
+    await sendCustomerCancellationEmail(details);
+  } catch (err) {
+    logMailerError(
+      "cancellation",
+      { orderId: details.orderId, webNumber: details.webNumber, rbNumber: details.rbNumber },
+      err,
+    );
+  }
 }
 
 export async function bookCourier(orderId: string): Promise<ActionResult> {
@@ -403,17 +428,19 @@ export async function bulkCancel(ids: string[]): Promise<BulkResult> {
   for (const id of ids) {
     const order = await prisma.order.findUnique({
       where: { id },
-      include: { items: { select: { productId: true, quantity: true } } },
+      include: CANCEL_INCLUDE,
     });
     if (!order) { results.push({ id, ok: false, error: "Not found" }); continue; }
     if (order.status === "CANCELLED") { results.push({ id, ok: false, error: "Already cancelled" }); continue; }
     if (order.status === "DELIVERED") { results.push({ id, ok: false, error: "Cannot cancel (DELIVERED)" }); continue; }
     try {
       await prisma.$transaction((tx) => cancelOrderTx(tx, id, order.items));
-      results.push({ id, ok: true });
     } catch {
       results.push({ id, ok: false, error: "Cancel failed" });
+      continue;
     }
+    results.push({ id, ok: true });
+    await trySendCancellationEmail(toOrderDetails(order));
   }
   revalidatePath("/admin/orders");
   for (const r of results) if (r.ok) revalidatePath(`/admin/orders/${r.id}`);

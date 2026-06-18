@@ -156,6 +156,42 @@ describe("sendCustomerDispatchEmail", () => {
     expect(opts.html).not.toMatch(/curfox/i);
     expect(opts.html).not.toContain("curfox.com");
   });
+
+  it("renders the order/tracking/delivery details in a table (not flexbox) so email clients read them clearly", async () => {
+    await sendCustomerDispatchEmail({ ...SAMPLE_ORDER, trackingCode: "RA03870247" });
+    const opts = sendMailSpy.mock.calls[0][0];
+    // Email clients (Gmail) don't render flexbox; the details must be a table.
+    expect(opts.html).toContain("<table");
+    expect(opts.html).not.toContain("display: flex");
+    expect(opts.html).toContain("Tracking number");
+    expect(opts.html).toContain("Delivery company");
+  });
+});
+
+import { sendCustomerCancellationEmail } from "../mailer";
+
+describe("sendCustomerCancellationEmail", () => {
+  it("emails the customer that the order was cancelled; no payment-taken note for COD pending", async () => {
+    await sendCustomerCancellationEmail(SAMPLE_ORDER); // COD_PENDING → not paid
+
+    expect(sendMailSpy).toHaveBeenCalledTimes(1);
+    const opts = sendMailSpy.mock.calls[0][0];
+    expect(opts.to).toBe("jane@example.com");
+    expect(opts.bcc).toBe("dressingbear@gmail.com");
+    expect(opts.subject).toContain("WEB0042");
+    expect(opts.subject.toLowerCase()).toContain("cancelled");
+    expect(opts.text).toContain("WEB0042");
+    expect(opts.text.toLowerCase()).toContain("cancelled");
+    expect(opts.text).toContain("No payment was taken");
+    expect(opts.text).not.toContain("will be refunded");
+  });
+
+  it("mentions a refund when the order had been paid", async () => {
+    await sendCustomerCancellationEmail({ ...SAMPLE_ORDER, paymentStatus: "PAID" });
+    const opts = sendMailSpy.mock.calls[0][0];
+    expect(opts.text).toContain("will be refunded");
+    expect(opts.text).not.toContain("No payment was taken");
+  });
 });
 
 describe("sendPendingPrepaidNotificationEmail", () => {

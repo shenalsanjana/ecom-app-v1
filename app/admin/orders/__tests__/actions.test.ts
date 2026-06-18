@@ -22,12 +22,13 @@ vi.mock("@/app/_lib/store-settings", () => ({
 
 const { bookCourierAndNotify } = vi.hoisted(() => ({ bookCourierAndNotify: vi.fn() }));
 vi.mock("@/app/checkout/book-courier", () => ({ bookCourierAndNotify }));
-const { sendOrderConfirmationEmail, sendCustomerDispatchEmail, logMailerError } = vi.hoisted(() => ({
+const { sendOrderConfirmationEmail, sendCustomerDispatchEmail, sendCustomerCancellationEmail, logMailerError } = vi.hoisted(() => ({
   sendOrderConfirmationEmail: vi.fn(),
   sendCustomerDispatchEmail: vi.fn(),
+  sendCustomerCancellationEmail: vi.fn(),
   logMailerError: vi.fn(),
 }));
-vi.mock("@/app/_lib/mailer", () => ({ sendOrderConfirmationEmail, sendCustomerDispatchEmail, logMailerError }));
+vi.mock("@/app/_lib/mailer", () => ({ sendOrderConfirmationEmail, sendCustomerDispatchEmail, sendCustomerCancellationEmail, logMailerError }));
 
 vi.mock("@/app/_lib/prisma", () => {
   const client = {
@@ -63,6 +64,7 @@ beforeEach(() => {
   bookCourierAndNotify.mockReset();
   sendOrderConfirmationEmail.mockReset();
   sendCustomerDispatchEmail.mockReset();
+  sendCustomerCancellationEmail.mockReset();
   logMailerError.mockReset();
 });
 
@@ -169,6 +171,29 @@ describe("cancelOrder", () => {
     });
     expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CANCELLED" } });
     expect(res).toEqual({ success: true, warning: "Order was paid — refund must be handled manually." });
+  });
+
+  it("emails the customer that their order was cancelled", async () => {
+    orderFindUnique.mockResolvedValueOnce({
+      id: "o1", status: "CONFIRMED", paymentStatus: "COD_PENDING",
+      guestName: "Nimali", guestEmail: "n@x.test", user: null,
+      webNumber: "WEB1", rbNumber: null, trackingCode: null,
+      items: [{ productId: "p1", name: "Dress", size: "M", price: 1000, quantity: 1 }],
+    });
+    const res = await cancelOrder("o1");
+    expect(sendCustomerCancellationEmail).toHaveBeenCalledTimes(1);
+    expect(sendCustomerCancellationEmail.mock.calls[0][0].customerEmail).toBe("n@x.test");
+    expect(res).toEqual({ success: true });
+  });
+
+  it("does not email when the order has no customer email", async () => {
+    orderFindUnique.mockResolvedValueOnce({
+      id: "o1", status: "CONFIRMED", paymentStatus: "COD_PENDING",
+      guestName: null, guestEmail: null, user: null,
+      items: [{ productId: "p1", name: "Dress", size: "M", price: 1000, quantity: 1 }],
+    });
+    await cancelOrder("o1");
+    expect(sendCustomerCancellationEmail).not.toHaveBeenCalled();
   });
 });
 

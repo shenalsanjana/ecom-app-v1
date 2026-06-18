@@ -356,6 +356,7 @@ export function logMailerError(
   template:
     | "order-confirmation"
     | "dispatch"
+    | "cancellation"
     | "pending-prepaid"
     | "admin-failure-alert"
     | "contact"
@@ -539,10 +540,11 @@ ${BRAND_NAME}
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
     .header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-    .panel { border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 15px 0; }
-    .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eee; }
-    .row:last-child { border-bottom: none; }
-    .label { color: #666; }
+    .details { width: 100%; border-collapse: collapse; border: 1px solid #ddd; border-radius: 8px; margin: 15px 0; }
+    .details td { padding: 10px 14px; border-bottom: 1px solid #eee; }
+    .details tr:last-child td { border-bottom: none; }
+    .details .k { color: #666; }
+    .details .v { text-align: right; font-weight: bold; }
     .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 14px; color: #666; }
   </style>
 </head>
@@ -555,11 +557,20 @@ ${BRAND_NAME}
 
     <p>Hi ${escapeHtml(order.customerName)}, good news — your order has been dispatched and is on its way with <strong>${escapeHtml(DELIVERY_COMPANY_NAME)}</strong>.</p>
 
-    <div class="panel">
-      <div class="row"><span class="label">Order</span><span>${escapeHtml(ref)}</span></div>
-      <div class="row"><span class="label">Tracking number</span><span><strong>${escapeHtml(tracking)}</strong></span></div>
-      <div class="row"><span class="label">Delivery company</span><span>${escapeHtml(DELIVERY_COMPANY_NAME)}</span></div>
-    </div>
+    <table role="presentation" cellpadding="0" cellspacing="0" class="details" style="width:100%;border-collapse:collapse;border:1px solid #ddd;margin:15px 0;">
+      <tr>
+        <td class="k" style="padding:10px 14px;color:#666;border-bottom:1px solid #eee;">Order</td>
+        <td class="v" style="padding:10px 14px;text-align:right;font-weight:bold;border-bottom:1px solid #eee;">${escapeHtml(ref)}</td>
+      </tr>
+      <tr>
+        <td class="k" style="padding:10px 14px;color:#666;border-bottom:1px solid #eee;">Tracking number</td>
+        <td class="v" style="padding:10px 14px;text-align:right;font-weight:bold;border-bottom:1px solid #eee;">${escapeHtml(tracking)}</td>
+      </tr>
+      <tr>
+        <td class="k" style="padding:10px 14px;color:#666;">Delivery company</td>
+        <td class="v" style="padding:10px 14px;text-align:right;font-weight:bold;">${escapeHtml(DELIVERY_COMPANY_NAME)}</td>
+      </tr>
+    </table>
 
     <p>You can track your parcel with ${escapeHtml(DELIVERY_COMPANY_NAME)} using the tracking number above.</p>
 
@@ -577,6 +588,74 @@ ${BRAND_NAME}
     bcc: brandEmail,
     replyTo: brandReplyTo(),
     subject: `Your order ${ref} has been dispatched — ${BRAND_NAME}`,
+    text,
+    html,
+  });
+}
+
+/**
+ * Customer-facing cancellation notification. Sent once, after an order is
+ * cancelled by the admin. States the order was cancelled and whether a refund
+ * applies (only when payment had actually been taken).
+ */
+export async function sendCustomerCancellationEmail(order: OrderDetails): Promise<void> {
+  const transport = getTransport();
+  const brandEmail = requireBrandEmail();
+  const from = requireFrom();
+  const ref = orderReference(order);
+  const wasPaid = order.paymentStatus === "PAID" || order.paymentStatus === "COD_COLLECTED";
+  const refundLine = wasPaid
+    ? "Any payment you made for this order will be refunded — we'll process it shortly."
+    : "No payment was taken for this order, so there's nothing further you need to do.";
+
+  const text = `Hi ${order.customerName},
+
+Your order ${ref} has been cancelled.
+
+${refundLine}
+
+If you didn't request this or have any questions, contact us at ${CONTACT_NUMBER} or ${brandEmail}.
+
+---
+${BRAND_NAME}
+`.trim();
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 14px; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 style="margin: 0; color: #2c3e50;">${escapeHtml(BRAND_NAME)}</h1>
+      <h2 style="margin: 10px 0 0 0; color: #c0392b;">Your order has been cancelled</h2>
+    </div>
+
+    <p>Hi ${escapeHtml(order.customerName)}, your order <strong>${escapeHtml(ref)}</strong> has been cancelled.</p>
+
+    <p>${escapeHtml(refundLine)}</p>
+
+    <div class="footer">
+      <p>If you didn't request this or have any questions, contact us at <strong>${escapeHtml(CONTACT_NUMBER)}</strong> or <a href="mailto:${encodeURIComponent(brandEmail)}">${escapeHtml(brandEmail)}</a>.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  await transport.sendMail({
+    from,
+    to: order.customerEmail,
+    bcc: brandEmail,
+    replyTo: brandReplyTo(),
+    subject: `Your order ${ref} has been cancelled — ${BRAND_NAME}`,
     text,
     html,
   });
