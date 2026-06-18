@@ -29,16 +29,20 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
 
   const [categories, allProducts] = await Promise.all([
     getCategories(),
-    getProducts({
-      categorySlug: selectedCategory || undefined,
-      sortBy,
-    }),
+    // Always fetch the full catalog (never category-filtered) so the sidebar
+    // counts represent the original totals and never change when a category is
+    // selected. Selecting a category only narrows the displayed list below.
+    getProducts({ sortBy }),
   ]);
 
+  const displayProducts = selectedCategory
+    ? allProducts.filter((p) => p.category === selectedCategory)
+    : allProducts;
+
   const ITEMS_PER_PAGE = 12;
-  const totalPages = Math.ceil(allProducts.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(displayProducts.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedProducts = allProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const paginatedProducts = displayProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   const buildCategoryLink = (catSlug: string) => `/categories?category=${catSlug}${sortBy !== "newest" ? `&sort=${sortBy}` : ""}`;
   const buildPageLink = (page: number) => {
@@ -62,7 +66,7 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
             {selectedCategory
-              ? `Browse our collection of ${allProducts.length} ${selectedCategory
+              ? `Browse our collection of ${displayProducts.length} ${selectedCategory
                   .split("-")
                   .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
                   .join(" ")} items`
@@ -90,7 +94,7 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
                     }`}
                   >
                     <span className="flex items-center justify-between">
-                      <span>All Categories</span>
+                      <span>All</span>
                       <span className="rounded-full bg-primary-foreground/20 px-2 py-0.5 text-xs font-normal">
                         {allProducts.length}
                       </span>
@@ -147,7 +151,7 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
           <div className="lg:col-span-3">
             <div className="mb-6 flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                Showing {paginatedProducts.length} of {allProducts.length} products
+                Showing {paginatedProducts.length} of {displayProducts.length} products
               </p>
             </div>
 
