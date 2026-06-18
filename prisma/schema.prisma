@@ -135,6 +135,8 @@ model Order {
   courierLastErrorAt    DateTime?
   dispatchPdfFetchedAt  DateTime?
   dispatchEmailSentAt   DateTime?
+  customerDispatchEmailSentAt DateTime?
+  deliveryCompany             String?
   adminAlertSentAt      DateTime?
   idempotencyKey        String?  @unique
   notes                 String?
