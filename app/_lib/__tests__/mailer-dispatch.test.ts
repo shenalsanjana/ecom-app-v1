@@ -131,6 +131,33 @@ describe("sendDispatchNotificationEmail", () => {
   });
 });
 
+import { sendCustomerDispatchEmail } from "../mailer";
+
+describe("sendCustomerDispatchEmail", () => {
+  it("emails the customer with order ref, tracking number and Royal Express; never Curfox", async () => {
+    await sendCustomerDispatchEmail({ ...SAMPLE_ORDER, trackingCode: "RA03870247" });
+
+    expect(sendMailSpy).toHaveBeenCalledTimes(1);
+    const opts = sendMailSpy.mock.calls[0][0];
+    // Goes to the customer (not the brand inbox), bcc the brand for a record.
+    expect(opts.to).toBe("jane@example.com");
+    expect(opts.bcc).toBe("dressingbear@gmail.com");
+    expect(opts.subject).toContain("WEB0042");
+    expect(opts.subject.toLowerCase()).toContain("dispatched");
+    // Required content
+    expect(opts.text).toContain("WEB0042");          // order number
+    expect(opts.text).toContain("RA03870247");        // tracking number
+    expect(opts.text).toContain("Royal Express");     // delivery company
+    expect(opts.text.toLowerCase()).toContain("dispatched");
+    expect(opts.html).toContain("Royal Express");
+    expect(opts.html).toContain("RA03870247");
+    // Must never leak the internal courier platform to the customer
+    expect(opts.text).not.toMatch(/curfox/i);
+    expect(opts.html).not.toMatch(/curfox/i);
+    expect(opts.html).not.toContain("curfox.com");
+  });
+});
+
 describe("sendPendingPrepaidNotificationEmail", () => {
   it("uses [Awaiting Payment] subject prefix with RB number and never attaches a PDF", async () => {
     await sendPendingPrepaidNotificationEmail({
