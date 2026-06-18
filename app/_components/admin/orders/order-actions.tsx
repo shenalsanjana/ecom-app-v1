@@ -6,7 +6,7 @@ import { useActionRunner, Spinner } from "./use-action-runner";
 
 type Props = {
   orderId: string; status: string; paymentMethod: string; paymentStatus: string | null;
-  courierBooked: boolean; nextStatus: string | null;
+  courierBooked: boolean; nextStatus: string | null; curfoxEnabled: boolean;
 };
 
 export function OrderActions(p: Props) {
@@ -25,7 +25,7 @@ export function OrderActions(p: Props) {
 
   return (
     <div className="space-y-2">
-      {p.status === "CONFIRMED" && !p.courierBooked && (
+      {p.status === "CONFIRMED" && !p.courierBooked && p.curfoxEnabled && (
         <button disabled={pending} onClick={() => run("dispatch", () => bookCourier(p.orderId))}
           className="flex w-full items-center justify-center gap-1 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
           {runningLabel === "dispatch" && <Spinner />} 📦 Book courier (Curfox)

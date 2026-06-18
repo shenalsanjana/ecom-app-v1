@@ -58,7 +58,7 @@ export function RowActions(p: Props) {
           {runningLabel === "dispatch" && <Spinner />} Dispatch
         </button>
       )}
-      {p.status === "CONFIRMED" && p.courierBooked && (
+      {p.status === "DISPATCHED" && (
         <button
           disabled={pending}
           onClick={() => run("deliver", () => advanceStatus(p.orderId, "DELIVERED"))}
