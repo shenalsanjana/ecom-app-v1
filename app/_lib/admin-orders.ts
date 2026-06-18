@@ -120,6 +120,7 @@ export function applyItemChanges(
 const TRANSITIONS: Record<string, string[]> = {
   PENDING: ["CONFIRMED"],
   CONFIRMED: ["DELIVERED"],
+  DISPATCHED: ["DELIVERED"],
   DELIVERED: [],
   CANCELLED: [],
 };
