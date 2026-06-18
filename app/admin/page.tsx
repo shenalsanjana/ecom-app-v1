@@ -11,8 +11,8 @@ export default async function AdminDashboardPage() {
     <section>
       <h1 className="mb-6 text-2xl font-semibold tracking-tight">Dashboard</h1>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <KpiTile variant="hero" label="Orders to confirm" value={kpis.ordersToConfirm} />
-        <KpiTile variant="hero" label="Orders to dispatch" value={kpis.ordersToDispatch} />
+        <KpiTile variant="hero" label="Orders to confirm" value={kpis.ordersToConfirm} href="/admin/orders?tab=pending" />
+        <KpiTile variant="hero" label="Orders to dispatch" value={kpis.ordersToDispatch} href="/admin/orders?tab=needs-dispatch" />
       </div>
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <KpiTile label="Today's orders" value={kpis.todaysOrders} />
