@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ShoppingCart, Check, Ruler } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ShoppingCart, Check, Ruler, Zap } from "lucide-react";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -38,6 +38,7 @@ export function AddToCartDialog({
 }: Props) {
   const sizeList = sizes ? sizes.split(",").map((s) => s.trim()).filter(Boolean) : [];
   const { addItem } = useCart();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string>("");
   const [added, setAdded] = useState(false);
@@ -62,6 +63,15 @@ export function AddToCartDialog({
       setAdded(false);
       setShowChart(false);
     }, 900);
+  }
+
+  function handleBuyNow() {
+    if (!canAdd) return;
+    addItem(
+      { productId, name, price, image, size: selectedSize || null },
+      1,
+    );
+    router.push("/checkout");
   }
 
   // If the user opens, picks a size, then closes without adding, reset state
@@ -146,11 +156,14 @@ export function AddToCartDialog({
           <p className="text-sm text-muted-foreground">Select a size to continue.</p>
         )}
         <DialogFooter className="mt-2">
-          <DialogClose
-            className={buttonVariants({ variant: "outline" })}
+          <Button
+            variant="outline"
+            onClick={handleBuyNow}
+            disabled={!canAdd || added}
           >
-            Cancel
-          </DialogClose>
+            <Zap className="mr-1.5 h-4 w-4" aria-hidden />
+            Buy now
+          </Button>
           <Button onClick={handleAdd} disabled={!canAdd || added}>
             {added ? (
               <>
