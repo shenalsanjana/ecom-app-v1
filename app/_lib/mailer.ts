@@ -151,7 +151,7 @@ Order: ${orderReference(order)}
 Customer: ${order.customerName}
 Email: ${order.customerEmail}${order.customerPhone ? `\nPhone: ${order.customerPhone}` : ""}
 Payment Method: ${paymentDisplay}
-${paymentLabel ? `Payment Status: ${paymentLabel}\n` : ""}${order.trackingCode ? `Tracking Code: ${order.trackingCode}\n` : ""}
+${paymentLabel ? `Payment Status: ${paymentLabel}\n` : ""}${order.trackingCode ? `Tracking (${DELIVERY_COMPANY_NAME}): ${order.trackingCode}\n` : ""}
 
 Items:
 ${itemsListText}
@@ -200,7 +200,7 @@ ${BRAND_NAME}
     ${order.customerPhone ? `<p><strong>Phone:</strong> ${escapeHtml(order.customerPhone)}</p>` : ""}
     <p><strong>Payment Method:</strong> ${escapeHtml(paymentDisplay)}</p>
     ${paymentLabel ? `<p><strong>Payment Status:</strong> ${escapeHtml(paymentLabel)}</p>` : ""}
-    ${order.trackingCode ? `<p><strong>Tracking Code:</strong> ${escapeHtml(order.trackingCode)}</p>` : ""}
+    ${order.trackingCode ? `<p><strong>Tracking (${escapeHtml(DELIVERY_COMPANY_NAME)}):</strong> ${escapeHtml(order.trackingCode)}</p>` : ""}
 
     <div class="items">
       <h3 style="margin-top: 0;">Items</h3>
