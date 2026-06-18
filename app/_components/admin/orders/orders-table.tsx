@@ -82,6 +82,11 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
 
   const selectedRows = rows.filter((o) => selected.has(o.id));
   const allCancelled = selectedRows.length > 0 && selectedRows.every((o) => o.status === "CANCELLED");
+  // A bulk action is only offered (enabled) when at least one selected order is
+  // eligible for it; otherwise the button is greyed out (standard disabled state).
+  const canConfirmAny = selectedRows.some((o) => o.status === "PENDING");
+  const canDispatchAny = selectedRows.some((o) => o.status === "CONFIRMED" && !o.courierBookedAt);
+  const canCancelAny = selectedRows.some((o) => o.status !== "DELIVERED" && o.status !== "CANCELLED");
 
   const deleteSelected = () =>
     start(async () => {
@@ -96,11 +101,14 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
       {selected.size > 0 && (
         <div className="sticky top-0 z-10 mb-2 flex items-center gap-3 rounded-md border bg-secondary/60 px-3 py-2 text-sm">
           <span>{selected.size} selected</span>
-          <button disabled={pending} onClick={confirmSelected}
+          <button disabled={pending || !canConfirmAny} onClick={confirmSelected}
+            title={canConfirmAny ? undefined : "No selected order is awaiting confirmation"}
             className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50">Confirm selected</button>
-          <button disabled={pending} onClick={dispatchSelected}
+          <button disabled={pending || !canDispatchAny} onClick={dispatchSelected}
+            title={canDispatchAny ? undefined : "No selected order is confirmed and awaiting dispatch"}
             className="rounded-md border px-3 py-1 text-xs disabled:opacity-50">Dispatch selected</button>
-          <button disabled={pending} onClick={cancelSelected} aria-label="Cancel selected orders"
+          <button disabled={pending || !canCancelAny} onClick={cancelSelected} aria-label="Cancel selected orders"
+            title={canCancelAny ? undefined : "Selected orders are delivered or cancelled"}
             className="rounded-md border border-destructive px-3 py-1 text-xs text-destructive disabled:opacity-50">Cancel selected</button>
           {allCancelled && (
             <button disabled={pending} onClick={deleteSelected} aria-label="Permanently delete selected orders"

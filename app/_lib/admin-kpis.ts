@@ -11,18 +11,18 @@ import { startOfTodaySLT } from "@/app/_lib/time";
 const LOW_STOCK_THRESHOLD = 5;
 
 export type DashboardKpis = {
-  pendingDispatch: number;
+  ordersToConfirm: number;
+  ordersToDispatch: number;
   todaysOrders: number;
-  pendingCod: number;
   lowStock: number;
 };
 
 export async function getDashboardKpis(): Promise<DashboardKpis> {
-  const [pendingDispatch, todaysOrders, pendingCod, lowStock] = await Promise.all([
+  const [ordersToConfirm, ordersToDispatch, todaysOrders, lowStock] = await Promise.all([
+    prisma.order.count({ where: { status: "PENDING" } }),
     prisma.order.count({ where: { status: "CONFIRMED", courierBookedAt: null } }),
     prisma.order.count({ where: { createdAt: { gte: startOfTodaySLT() } } }),
-    prisma.order.count({ where: { paymentStatus: "COD_PENDING" } }),
     prisma.product.count({ where: { stock: { lte: LOW_STOCK_THRESHOLD } } }),
   ]);
-  return { pendingDispatch, todaysOrders, pendingCod, lowStock };
+  return { ordersToConfirm, ordersToDispatch, todaysOrders, lowStock };
 }

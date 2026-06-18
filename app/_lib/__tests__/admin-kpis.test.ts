@@ -25,40 +25,38 @@ beforeEach(() => {
 });
 
 describe("getDashboardKpis", () => {
-  it("queries pending dispatch with status=CONFIRMED and courierBookedAt=null", async () => {
-    orderCount.mockResolvedValueOnce(7).mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+  it("queries orders-to-confirm with status=PENDING", async () => {
+    orderCount.mockResolvedValueOnce(5).mockResolvedValueOnce(0).mockResolvedValueOnce(0);
     productCount.mockResolvedValueOnce(0);
 
     const result = await getDashboardKpis();
 
-    expect(orderCount).toHaveBeenNthCalledWith(1, {
-      where: { status: "CONFIRMED", courierBookedAt: null },
-    });
-    expect(result.pendingDispatch).toBe(7);
+    expect(orderCount).toHaveBeenNthCalledWith(1, { where: { status: "PENDING" } });
+    expect(result.ordersToConfirm).toBe(5);
   });
 
-  it("queries today's orders using startOfTodaySLT as the gte boundary", async () => {
-    orderCount.mockResolvedValueOnce(0).mockResolvedValueOnce(12).mockResolvedValueOnce(0);
+  it("queries orders-to-dispatch with status=CONFIRMED and courierBookedAt=null", async () => {
+    orderCount.mockResolvedValueOnce(0).mockResolvedValueOnce(7).mockResolvedValueOnce(0);
     productCount.mockResolvedValueOnce(0);
 
     const result = await getDashboardKpis();
 
     expect(orderCount).toHaveBeenNthCalledWith(2, {
-      where: { createdAt: { gte: FROZEN_TODAY } },
+      where: { status: "CONFIRMED", courierBookedAt: null },
     });
-    expect(result.todaysOrders).toBe(12);
+    expect(result.ordersToDispatch).toBe(7);
   });
 
-  it("queries pending COD with paymentStatus=COD_PENDING", async () => {
-    orderCount.mockResolvedValueOnce(0).mockResolvedValueOnce(0).mockResolvedValueOnce(4);
+  it("queries today's orders using startOfTodaySLT as the gte boundary", async () => {
+    orderCount.mockResolvedValueOnce(0).mockResolvedValueOnce(0).mockResolvedValueOnce(12);
     productCount.mockResolvedValueOnce(0);
 
     const result = await getDashboardKpis();
 
     expect(orderCount).toHaveBeenNthCalledWith(3, {
-      where: { paymentStatus: "COD_PENDING" },
+      where: { createdAt: { gte: FROZEN_TODAY } },
     });
-    expect(result.pendingCod).toBe(4);
+    expect(result.todaysOrders).toBe(12);
   });
 
   it("queries low-stock with stock<=5 threshold", async () => {
@@ -74,15 +72,15 @@ describe("getDashboardKpis", () => {
   });
 
   it("returns all four KPIs in the expected shape", async () => {
-    orderCount.mockResolvedValueOnce(7).mockResolvedValueOnce(12).mockResolvedValueOnce(4);
+    orderCount.mockResolvedValueOnce(5).mockResolvedValueOnce(7).mockResolvedValueOnce(12);
     productCount.mockResolvedValueOnce(2);
 
     const result = await getDashboardKpis();
 
     expect(result).toEqual({
-      pendingDispatch: 7,
+      ordersToConfirm: 5,
+      ordersToDispatch: 7,
       todaysOrders: 12,
-      pendingCod: 4,
       lowStock: 2,
     });
   });
