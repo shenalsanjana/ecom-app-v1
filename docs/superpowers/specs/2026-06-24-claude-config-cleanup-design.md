@@ -86,21 +86,25 @@ Severity reflects **how badly the current state misleads an agent** (high / medi
   `provider = "postgresql"` only; a postgresql schema cannot use a `file:` SQLite URL. State Prisma
   + PostgreSQL. Keep the (correct) `nodejs`-runtime-for-Prisma-routes guidance.
 
-**Light-polish additions (lean; one line each; pointer-to-README where detail exists)**
+**Light-polish additions (lean — must NOT duplicate README, which owns domain/ops detail)**
 
-- §2 Validation: add `npm run test` (Vitest) and `npm run test:e2e` (Playwright) alongside the
-  existing `npm run build`.
-- §3: migrations are decoupled from the build — `prisma migrate deploy` runs via the GitHub Action
-  `.github/workflows/migrate.yml` on pushes to `main` that touch `prisma/` (needs a direct
-  `DATABASE_URL` secret). Pointer to README's deployment section is acceptable.
-- §3: Windows/PowerShell DB invocation note (`$env:DATABASE_URL="…"; npm run db:push`) — pointer to
-  README §3 is acceptable.
-- §3: brief domain notes — **Payments:** PayHere (webhook-driven) + Koko + MintPay
-  (`app/_lib/payments/`, routes under `app/api/payhere/` and `app/api/payments/`).
-  **Shipping:** Curfox courier API (carrier brand "Royal Express"); serviceable cities seeded via
-  `npm run curfox:seed`.
-- One-line admin bootstrap pointer: `npm run admin:ensure` (idempotent default) / `npm run
-  admin:create` (specific user) — see README.
+> Guardrail: README is the single owner of domain/ops facts (and an explicit non-edit target here,
+> §3/§8). Copying payment/courier/migration/admin specifics inline into CLAUDE.md would re-create
+> the exact doc-duplication drift this change exists to kill, and would bloat the file against
+> Approach A. So those collapse to **one pointer**, not inline content.
+
+- **§2 Validation (inline — this is the workflow-level gate, not domain detail):** add
+  `npm run test` (Vitest) and `npm run test:e2e` (Playwright) alongside the existing `npm run build`.
+- **§3 (a single "see README" pointer, NOT inline copies):** one line directing agents to README
+  for the domain/ops specifics README already documents — the decoupled migration flow
+  (`.github/workflows/migrate.yml`), Windows/PowerShell DB invocation (`$env:DATABASE_URL="…"; …`),
+  payment providers (PayHere / Koko / MintPay), the Curfox / "Royal Express" courier integration,
+  and admin bootstrap (`npm run admin:ensure` / `npm run admin:create`).
+
+Note: the §3 Database **provider** correction (drop "SQLite", state PostgreSQL) stays **inline** —
+it is an accuracy fix to an existing CLAUDE.md claim, and the pointer must not aim agents at
+README's *uncorrected* SQLite wording (that is the §8 follow-up). The pointer covers
+migration/deploy/payments/courier/admin only.
 
 **Verified accurate — keep untouched:** §2 Branching, the `openspec/COMMIT_PROCESS.md` pointer,
 §3 Framework (Next.js 16), §3 Auth (NextAuth v5), §4 documentation pointers, the `openspec/archive/`
@@ -196,6 +200,14 @@ This makes the CLAUDE.md §1 and `docs/commands/openspec.md` references resolve.
 
 ## 7. Validation / Acceptance Criteria
 
+**Implementation logistics:** this touches ~8 files including a full `git-spec` rewrite — i.e.
+substantial work — so per CLAUDE.md §2 it runs on a short-lived `feat/*` branch off `main`
+(e.g. `feat/claude-config-cleanup`), merged with `--no-ff`, rather than direct-to-main. (The
+*spec doc* commit going straight to `main` was fine — it is the multi-file implementation that
+warrants a branch.) Confirm with the user before planning.
+
+**Acceptance criteria:**
+
 - `npm run build` passes (no source changed, but confirms nothing in config breaks tooling).
 - Every path referenced by CLAUDE.md and `.claude/` either exists or is created by this change
   (no dangling `openspec/changes/` reference; `openspec/changes/` now exists).
@@ -223,3 +235,7 @@ is **not** edited here; these are noted for a separate follow-up change.
   reduces the number of parallel copies from three to effectively one-and-a-pointer, lowering future
   drift risk.
 - This change is documentation/config only; no runtime behavior changes.
+- **Marketplace assumption:** promoting `@claude-plugins-official` plugins into the committed
+  `settings.json` assumes that marketplace is available to anyone who clones. If a clone lacks it
+  cached, the enable entries are expected to no-op rather than error (unverified — low risk for a
+  solo / primary-maintainer repo).
