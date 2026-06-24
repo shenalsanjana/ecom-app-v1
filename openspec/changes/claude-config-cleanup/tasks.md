@@ -19,4 +19,4 @@
 
 ## 5. Coherence
 
-- [ ] 5.1 Coherence pass — README + `.env.local.example` + `STUB_READINESS_STATUS.md` mutually consistent; update tracker (plan Task 11)
+- [x] 5.1 Coherence pass — README + `.env.local.example` + `STUB_READINESS_STATUS.md` mutually consistent; update tracker (plan Task 11)
