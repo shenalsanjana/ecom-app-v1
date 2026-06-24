@@ -108,7 +108,7 @@ providers: [
 ```
 
 - **Conditional registration:** if `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` are absent (local dev, CI without creds), the provider simply isn't added and the UI hides the button — nothing breaks.
-- **`allowDangerousEmailAccountLinking: true`** is intentional and safe *here* because (a) we have no `Account` table so NextAuth's default cross-provider guard doesn't apply the same way, and (b) we additionally gate on `email_verified` in the `signIn` callback. Linking by a Google-verified email to an existing row is the explicit requirement. This decision is documented as deliberate.
+- **`allowDangerousEmailAccountLinking: true`** is included for clarity/future-proofing, but note it is **effectively a no-op in this design** — that flag governs *adapter-driven* `Account` linking, and we have no adapter. **The real linking and the real safety are our custom callbacks**, not this flag: the `signIn` `email_verified` gate (`assertGoogleEmailVerified`) plus the create-or-link by normalized email in `linkOrCreateGoogleUser`. Linking a Google-verified email to an existing row is the explicit requirement; the `email_verified` gate is what makes it safe.
 
 **The linking logic — extracted to a pure, testable function** in a new `app/_lib/google-auth.ts`:
 
@@ -164,7 +164,16 @@ callbacks: {
 
 > The `signIn` callback performs the create-or-link (it has `email_verified`); the `jwt` callback then re-reads the canonical user by normalized email to set `token.uid` (cuid) and `token.role` (DB role). Both run only in `auth.ts` (Node), so Prisma never enters the Edge `proxy.ts` bundle. (See §11 for the Edge-safety build check.)
 
-**Security guardrail — Google never *grants* ADMIN.** New Google users are always `CUSTOMER`. Linked users keep their existing DB role. An admin whose verified Google email matches their admin row still resolves to that row (correct); but the OAuth flow itself can never elevate a customer.
+**Testable seams (this is the highest-risk wiring, so it must be unit-tested, not just E2E'd).** The two Prisma-touching branches are extracted into pure functions in `app/_lib/google-auth.ts`, and the callbacks are thin wrappers over them:
+
+- `assertGoogleEmailVerified(profile): boolean` — the `signIn` gate (`profile.email_verified === true`).
+- `resolveGoogleToken(token, account): Promise<{ uid: string; role: AppRole } | null>` — the `jwt` Google branch: normalize `token.email`, look up the DB user, return `{ uid: cuid, role: dbRole }`, or `null` when not a Google account / no email / no match.
+
+This matters because the E2E `mock-google` provider (§7.3) is a Credentials-style shim — it has **no `profile`, no `email_verified`, and `account.provider !== "google"`**, so it deliberately does **not** drive these two branches. Without the extracted seams, the cuid-resolution and verified-email gate would execute in production but be covered by no test. The unit tests in §7.1 call `resolveGoogleToken`/`assertGoogleEmailVerified` directly to close that gap.
+
+**Security guardrail — Google never *grants* ADMIN.** New Google users are always `CUSTOMER`. Linked users keep their existing DB role. The OAuth flow can never elevate a customer to admin.
+
+**Policy decision pending user sign-off (see §10.0):** by default, an admin whose verified Google email matches their admin row *can sign in via Google* — which adds a second auth path to admin accounts (anyone controlling that Google inbox reaches admin). This is **not** a requirements violation (the "keep admin auth separate" ask was conditional on the system already separating them, which it doesn't — admins use the same `/login`). But it is a security-posture choice. The stricter alternative is one line in `signIn`: if the resolved user's `role === "ADMIN"`, return `false` for the Google provider, keeping **admins password-only**. Defaulting to the stricter option is reasonable; the user decides.
 
 ### 4.5 Email/password hardening
 
@@ -229,7 +238,7 @@ callbacks: {
 | `prisma/migrations/<ts>_auth_nullable_password_and_image/` | new | Migration SQL |
 | `scripts/normalize-emails.ts` | new | One-time dup-scan + lowercase backfill |
 | `app/_lib/validation.ts` | edit | `normalizeEmail()`; add `.toLowerCase()` transform to email schemas |
-| `app/_lib/google-auth.ts` | new | `linkOrCreateGoogleUser(profile)` + guest-order sync (pure, testable) |
+| `app/_lib/google-auth.ts` | new | `linkOrCreateGoogleUser(profile)` + guest-order sync, plus the testable seams `assertGoogleEmailVerified(profile)` and `resolveGoogleToken(token, account)` (all pure, unit-tested) |
 | `app/_lib/auth.ts` | edit | Conditional Google provider; `authorize()` handles null `passwordHash` + normalize; **Node-runtime `callbacks` override** (`signIn` link/gate, `jwt` DB-cuid/role resolution, `session`) |
 | `app/_lib/auth.config.ts` | verify | **No change** — stays Edge-safe (no Prisma); confirm `proxy.ts` bundle excludes Prisma/bcrypt |
 | `app/(auth)/actions.ts` | edit | Normalize emails; "created with Google" message in `loginAction` |
@@ -240,7 +249,7 @@ callbacks: {
 | `app/checkout/checkout-client.tsx` | edit | Unconditional "log in to track faster" soft prompt |
 | `app/_lib/auth-types.d.ts` | edit (if needed) | Ensure `image` flows through session types |
 | `.env.local.example` | edit | Add `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `E2E_MOCK_GOOGLE` (names only) |
-| `app/_lib/__tests__/google-auth.test.ts` | new | Link-or-create + sync + no-admin + cuid unit tests |
+| `app/_lib/__tests__/google-auth.test.ts` | new | Link-or-create + sync + no-admin tests, **plus `resolveGoogleToken` (cuid/role) and `assertGoogleEmailVerified` seam tests** |
 | `app/_lib/__tests__/normalize-email.test.ts` | new | `normalizeEmail` table tests |
 | `app/(auth)/__tests__/login-redirect.test.ts` | edit | New customer default |
 | `tests/e2e/customer-auth.spec.ts` | new | Login/signup/forgot/protection/mobile E2E |
@@ -269,7 +278,8 @@ callbacks: {
 
 ### 7.1 Unit (Vitest, `app/**/__tests__/`) — the security-critical core
 
-- **Google linking** (`google-auth.test.ts`): new email → creates CUSTOMER w/ null passwordHash · existing email → links, no duplicate, role preserved · existing Google user → idempotent · **never grants ADMIN** · returns DB cuid (not Google sub) · guest orders with matching `guestEmail` get `userId` set, non-matching untouched.
+- **Google linking** (`google-auth.test.ts`): new email → creates CUSTOMER w/ null passwordHash · existing email → links, no duplicate, role preserved · existing Google user → idempotent · **never grants ADMIN** · guest orders with matching `guestEmail` get `userId` set, non-matching untouched.
+- **Google token wiring — the highest-risk seams, tested directly** (`google-auth.test.ts`): `resolveGoogleToken` → for a verified-email Google account sets `uid` to the **DB cuid (never Google's `sub`)** and `role` from the **DB row (never elevated)**; returns `null` for a non-Google account, a missing `token.email`, or an email with no matching user. `assertGoogleEmailVerified` → `true` only when `email_verified === true`; rejects `false`/`undefined`. These cover the production code paths the `mock-google` E2E does **not** exercise.
 - **Email/password**: `normalizeEmail` table tests · `authorize()` returns null on `passwordHash == null` · `loginAction` returns the "created with Google" message for password-null accounts.
 - **Redirect**: updated `login-redirect.test.ts` (customer → `/account/orders`, admin → `/admin`, explicit callbackUrl honored).
 - Reset-flow tests already exist; extend if needed for null→value first-set.
@@ -282,7 +292,9 @@ callbacks: {
 
 ### 7.3 Google in CI — deterministic, never hits real Google
 
-A **test-only `mock-google` provider**, registered only when **both** `E2E_MOCK_GOOGLE === "1"` **and** `process.env.NODE_ENV !== "production"` (double-gated; impossible in a prod build). It is a Credentials-style provider that takes a test email and runs the **exact same** `linkOrCreateGoogleUser` + guest-order-sync code as the real Google path — so the E2E validates real linking/sync logic, including the post-Google "see my synced orders" flow, without any real OAuth. The real `Google()` provider is never invoked in CI.
+A **test-only `mock-google` provider**, registered only when **both** `E2E_MOCK_GOOGLE === "1"` **and** `process.env.NODE_ENV !== "production"` (double-gated; impossible in a prod build). It is a Credentials-style shim whose `authorize` runs the **same `linkOrCreateGoogleUser` + guest-order-sync** code and returns the resolved DB user (cuid + role).
+
+**Scope — what this E2E does and does NOT cover.** Because the shim is Credentials-style, it has no `profile`, no `email_verified`, and `account.provider !== "google"` — so it deliberately does **not** drive the real `signIn` `email_verified` gate or the `jwt` Google-resolution branch. Those two are the **highest-risk wiring and are covered by unit tests instead** (§7.1, via `resolveGoogleToken`/`assertGoogleEmailVerified`). The `mock-google` E2E is therefore scoped to the **app-level flow**: Google button visible → a session is established → the user lands on `/account/orders` → **guest orders synced by email appear**. The real `Google()` provider is never invoked in CI.
 
 Acceptance: `next build` with `E2E_MOCK_GOOGLE` unset must produce a bundle that does **not** register `mock-google` (guard verified).
 
@@ -303,7 +315,7 @@ Acceptance: `next build` with `E2E_MOCK_GOOGLE` unset must produce a bundle that
 ## 9. Risks & mitigations
 
 - **Breaking admin or credentials login** → no adapter, JWT untouched, Credentials provider config unchanged; `admin-auth.spec.ts` is the regression gate.
-- **Wrong user id on the Google path** (Google `sub` vs cuid) → explicit `jwt`-callback DB resolution + dedicated unit test + E2E assertion that a Google-logged-in user sees their orders.
+- **Wrong user id on the Google path** (Google `sub` vs cuid) → `jwt`-callback DB resolution extracted to `resolveGoogleToken` and **unit-tested directly** (the `mock-google` E2E does not exercise this branch — §7.3); app-level E2E additionally asserts a Google-logged-in user sees their orders.
 - **Migration collision** when backfilling lowercase → dup-scan first; stop-and-surface on any collision; never force-collide.
 - **Privilege escalation via Google** → role always sourced from the DB row; new Google users are CUSTOMER; OAuth cannot elevate.
 - **Email enumeration** → unconditional checkout prompt; "created with Google" message scoped to the `passwordHash == null` case only.
@@ -322,10 +334,21 @@ Acceptance: `next build` with `E2E_MOCK_GOOGLE` unset must produce a bundle that
 ## 11. Caveats (carried forward)
 
 - **JWT TTL is 30 days.** Role/password changes don't retroactively invalidate live tokens (e.g. a freshly set password doesn't force re-login). Acceptable for this store; same caveat as the admin-roles spec.
-- **`allowDangerousEmailAccountLinking`** is enabled deliberately and is safe under our constraints (no `Account` table; `email_verified` gate; Google-verified email). If a second OAuth provider is ever added, revisit this — cross-provider linking by email across *untrusted* providers would need reconsideration.
+- **`allowDangerousEmailAccountLinking`** does no protective work here (no adapter → no adapter-driven `Account` linking for it to govern); safety comes from our `email_verified` gate + custom `signIn`/`jwt` callbacks. If an adapter or a second OAuth provider is ever added, this flag and cross-provider linking-by-email across *untrusted* providers must be re-evaluated.
 - **Credentials provider requires JWT sessions.** This is the hard constraint that fixes the whole architecture; do not migrate to DB sessions without first replacing the Credentials provider.
 
 ## 12. Acceptance criteria
+
+### 10.0 Admin-via-Google policy — **needs user sign-off before implementation**
+
+Does a Google login whose verified email matches an existing **admin** account grant admin access?
+
+- **Option A (default in this spec):** yes — admins may also sign in with Google. Simpler; adds a second auth path to admin accounts.
+- **Option B (stricter, recommended for admin safety):** no — `signIn` returns `false` when the resolved user is `ADMIN`, so **admins remain password-only** and the customer Google flow can never touch an admin account. One extra line.
+
+This is the one decision with a security trade-off; the rest of the spec is settled. Default chosen pending the user's call.
+
+---
 
 The spec is implementable / done when:
 
