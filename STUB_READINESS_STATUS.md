@@ -8,7 +8,7 @@
 
 | Stub / Change | Purpose | Superpower Skill: Brainstorm | Superpower Executing Skill | Git Worktree | `/opsx:propose` | `/opsx:apply` | `/opsx:sync` | `/opsx:archive` | Current Status | TODO / Pending | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| claude-config-cleanup | Clean Claude/OpenSpec config, README DB docs, env example, and stub readiness tracking | Done | Applied | Done | Done | Applied | N/A | Done | Completed | — (merged to `main` `--no-ff`; worktree removed) | Executing skill = subagent-driven-development; doc-only → no deltas → sync N/A; `npm run build`/`test` not run here (deps not installed) — docs-only change cannot affect them |
+| claude-config-cleanup | Clean Claude/OpenSpec config, README DB docs, env example, and stub readiness tracking | Done | Applied | Done | Done | Applied | N/A | Done | Completed | — (merged to `main` `--no-ff`; worktree removed) | Executing skill = subagent-driven-development; doc-only → no deltas → sync N/A. Post-merge validation: `npm install` + `prisma generate` ok; `npm run test` ✅ 418/418; `npm run build` blocked only by missing `DATABASE_URL` (no local Postgres for build-time prerender) — environmental, not change-related (this change touched no source). |
 
 ## Workflow meaning
 
