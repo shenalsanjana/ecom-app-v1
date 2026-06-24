@@ -34,28 +34,38 @@ Every task implicitly includes these (verbatim from the spec):
 **Files:** none edited (git plumbing only).
 
 **Interfaces:**
-- Produces: a worktree at `../ecom-app-v1-claude-config-cleanup` on branch `feat/claude-config-cleanup` (cut from `main`). All later tasks run **inside** that worktree.
+- Produces: a `.claude/` baseline committed to `main`, plus a worktree at `../ecom-app-v1-claude-config-cleanup` on branch `feat/claude-config-cleanup` (cut from `main`). All later tasks run **inside** that worktree.
+
+> **Why baseline-first:** a new git worktree is a fresh checkout that contains **tracked files only**. `.claude/` is currently untracked, so without this step the worktree would be missing `.claude/` (breaking Tasks 6 and 9), and the final `--no-ff` merge would fail with "untracked working tree files would be overwritten." Committing the baseline to `main` first fixes both and makes `openspec init`'s regeneration (Task 2) a clean, legible diff.
 
 - [ ] **Step 1: Confirm a clean `main` and up-to-date base**
 
 Run (in the main checkout `c:/Devops/Project/ecom-app-v1`):
 ```bash
 git switch main
-git status --porcelain   # expect: only untracked .claude/ if anything; no staged changes mid-task
+git status --porcelain   # expect: untracked .claude/ present; no staged changes mid-task
 git log --oneline -1
 ```
-Expected: on `main`, working tree clean enough to branch.
+Expected: on `main`, working tree clean except untracked `.claude/`.
 
-- [ ] **Step 2: Create the worktree + branch (prefer the skill)**
+- [ ] **Step 2: Commit the `.claude/` baseline to `main`**
+
+```bash
+git add .claude
+git commit -m "chore(claude): track existing .claude config baseline"
+```
+Expected: `.claude/` is now tracked on `main` (current state — fixes come on the branch). This satisfies the acceptance criterion "`.claude/` is staged and committed."
+
+- [ ] **Step 3: Create the worktree + branch (prefer the skill)**
 
 Preferred: use `superpowers:using-git-worktrees` to create an isolated worktree for `feat/claude-config-cleanup`.
 Explicit fallback:
 ```bash
 git worktree add -b feat/claude-config-cleanup ../ecom-app-v1-claude-config-cleanup main
 ```
-Expected: `Preparing worktree (new branch 'feat/claude-config-cleanup')`.
+Expected: `Preparing worktree (new branch 'feat/claude-config-cleanup')`. The worktree now contains `.claude/` (tracked in Step 2).
 
-- [ ] **Step 3: Verify the worktree and branch**
+- [ ] **Step 4: Verify the worktree and branch**
 
 Run:
 ```bash
@@ -64,9 +74,9 @@ git -C ../ecom-app-v1-claude-config-cleanup branch --show-current
 ```
 Expected: the new worktree path is listed; current branch is `feat/claude-config-cleanup`.
 
-- [ ] **Step 4: From here on, work inside the worktree**
+- [ ] **Step 5: From here on, work inside the worktree**
 
-All subsequent commands run with the worktree as CWD (`../ecom-app-v1-claude-config-cleanup`). No commits land on `main` until the final merge.
+All subsequent commands run with the worktree as CWD (`../ecom-app-v1-claude-config-cleanup`). No further commits land on `main` until the final merge (the baseline commit in Step 2 is the only pre-merge `main` commit).
 
 ---
 
@@ -592,14 +602,9 @@ git commit -m "docs(status): mark apply complete in readiness tracker"
 
 **Files:** none edited.
 
-- [ ] **Step 1: Build + unit tests**
+- [ ] **Step 1: (Build/test deferred — no `node_modules` in the worktree)**
 
-Run:
-```bash
-npm run build
-npm run test
-```
-Expected: both pass (config/docs-only change must not break tooling).
+`node_modules` is gitignored, so the fresh worktree has none; running `npm run build`/`npm run test` here would fail on missing deps. This is a docs/config-only change that cannot affect the Next.js build, so build + tests run **once, post-merge, in the main checkout** (Task 14, Step 3, which has `node_modules`). No action here. (If you must validate in-worktree, run `npm install` first — slow, marginal value.)
 
 - [ ] **Step 2: Drift-absence gauntlet**
 
@@ -615,9 +620,10 @@ Expected: **no matches** in any of these (the historical `develop`-retired notes
 
 Run:
 ```bash
-git diff --name-only main...feat/claude-config-cleanup | git grep -f - 2>/dev/null; git diff --name-only main...feat/claude-config-cleanup
+git diff --name-only main...HEAD                                          # review the full changed-files list
+git diff --name-only main...HEAD | grep -iE 'auth|oauth|nextauth|login|session'   # expect: NO matches
 ```
-Expected: the changed-files list contains **no** auth/OAuth source files (only `.claude/`, `CLAUDE.md`, `docs/`, `openspec/`, `README.md`, `.env.local.example`, `STUB_READINESS_STATUS.md`).
+Expected: the second command prints nothing. The changed-files list contains only `.claude/`, `CLAUDE.md`, `docs/`, `openspec/`, `README.md`, `.env.local.example`, `STUB_READINESS_STATUS.md` — no auth/OAuth source files.
 
 - [ ] **Step 4: OPSX + worktree sanity**
 
@@ -701,13 +707,15 @@ git merge --no-ff feat/claude-config-cleanup -m "Merge: claude-config-cleanup (c
 ```
 Expected: a merge commit on `main`. Resolve conflicts (likely none — auth work touches different files).
 
-- [ ] **Step 3: Mark `.claude/` tracked + verify build on main**
+- [ ] **Step 3: Verify build + tests on `main` (the deferred Task 12 validation)**
 
-Run:
+`.claude/` is already tracked (Task 1 baseline); the merge brought the fixes. The main checkout has `node_modules`, so this is where build/test run:
 ```bash
-git status --porcelain        # .claude/ now tracked via the merge
-npm run build && npm run test
+git status --porcelain        # clean
+npm run build
+npm run test
 ```
+Expected: both pass. If either fails, fix on a follow-up commit before considering the change done.
 
 - [ ] **Step 4: Set tracker to Completed + commit on main**
 
