@@ -8,7 +8,7 @@
 
 | Stub / Change | Purpose | Superpower Skill: Brainstorm | Superpower Executing Skill | Git Worktree | `/opsx:propose` | `/opsx:apply` | `/opsx:sync` | `/opsx:archive` | Current Status | TODO / Pending | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| claude-config-cleanup | Clean Claude/OpenSpec config, README DB docs, env example, and stub readiness tracking | Done | Applied | Done | Done | Applied | N/A | Done | Archived | Merge `--no-ff` to `main`, then remove the worktree | Executing skill = subagent-driven-development; doc-only → no deltas → sync N/A |
+| claude-config-cleanup | Clean Claude/OpenSpec config, README DB docs, env example, and stub readiness tracking | Done | Applied | Done | Done | Applied | N/A | Done | Completed | — (merged to `main` `--no-ff`; worktree removed) | Executing skill = subagent-driven-development; doc-only → no deltas → sync N/A; `npm run build`/`test` not run here (deps not installed) — docs-only change cannot affect them |
 
 ## Workflow meaning
 
