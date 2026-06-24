@@ -22,7 +22,7 @@ A modern e-commerce platform for oversize t-shirts built with Next.js 16.
 - Cash on Delivery (COD)
 - PayHere
 - Koko
-- MinitPay
+- MintPay
 
 ## Getting Started
 
@@ -37,7 +37,7 @@ npm install
 Create `.env.local` with your SMTP settings for email notifications:
 
 ```env
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/dressingbear?schema=public"
 AUTH_SECRET="your-secret-key"
 AUTH_URL="http://localhost:3000"
 APP_URL="http://localhost:3000"
@@ -57,15 +57,17 @@ CONTACT_NUMBER="+94 740545536"
 
 ### 3. Database Setup
 
+Use a local PostgreSQL instance or a hosted dev branch (Neon / Vercel Postgres). The PowerShell `$env:DATABASE_URL=...;` prefix is correct for Windows.
+
 ```bash
 # Push schema to database
-$env:DATABASE_URL="file:./dev.db"; npm run db:push
+$env:DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/dressingbear?schema=public"; npm run db:push
 
 # Seed demo data
-$env:DATABASE_URL="file:./dev.db"; npm run db:seed
+$env:DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/dressingbear?schema=public"; npm run db:seed
 
 # Reset database (full reset)
-$env:DATABASE_URL="file:./dev.db"; npm run db:reset
+$env:DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/dressingbear?schema=public"; npm run db:reset
 ```
 
 ### 4. Run Development Server
@@ -172,7 +174,7 @@ The seed creates 12 realistic oversize t-shirt products with:
 ## Tech Stack
 
 - **Framework:** Next.js 16 (App Router)
-- **Database:** SQLite with Prisma ORM
+- **Database:** PostgreSQL (via Prisma ORM)
 - **Auth:** NextAuth.js v5
 - **Styling:** Tailwind CSS + shadcn/ui
 - **Email:** Nodemailer

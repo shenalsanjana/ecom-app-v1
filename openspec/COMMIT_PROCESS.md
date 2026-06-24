@@ -4,18 +4,23 @@ To maintain a clean and traceable history, all changes must follow this process:
 
 ## 1. Branching
 - Substantial work starts from `main` on a `feat/feature-name` or `fix/bug-description` branch; small fixes can go directly to `main`.
+- Substantial work is implemented in a dedicated git worktree (see the combined workflow in CLAUDE.md §1).
 - The `develop` branch was retired in 2026-05; older commits referencing "merge develop into main" predate this change.
 
 ## 2. Commit Messages
 - Use conventional commits:
   - `feat(...)`: New features
   - `fix(...)`: Bug fixes
-  - `chore(...)`: Maintenance, merges, or documentation
+  - `docs(...)`: Documentation and spec/plan changes
   - `refactor(...)`: Code changes that neither fix a bug nor add a feature
+  - `chore(...)`: Maintenance, merges, tooling
+  - `test(...)`: Adding or updating tests
+  - `perf(...)`: Performance improvements
 - Messages should be concise but descriptive. Include "why" if the "what" isn't obvious.
 
 ## 3. Verification
 - Before committing, run `npm run build` to ensure no regressions.
+- Run `npm test` (Vitest) — and `npm run test:e2e` (Playwright) when touching user flows — before committing.
 - Ensure all TypeScript errors are resolved.
 
 ## 4. Integration
