@@ -51,6 +51,10 @@ export function NavigationProgress() {
     // Route settled — drop the pending easing/safety timers and finish.
     timers.current.forEach(clearTimeout);
     timers.current = [];
+    // Completing the bar in response to a settled route is intentional UI
+    // synchronization with an external system (the router), not a cascading
+    // render — deliberately exempt from set-state-in-effect here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setWidth(100);
     const done = setTimeout(() => {
       setActive(false);

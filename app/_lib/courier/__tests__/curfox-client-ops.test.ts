@@ -101,7 +101,7 @@ describe("createCurfoxOrder", () => {
       order_data: [{ ...VALID_ENVELOPE.order_data[0], destination_city_id: undefined }],
     };
     // Zod throws on .parse()
-    await expect(createCurfoxOrder(bad as any)).rejects.toThrow();
+    await expect(createCurfoxOrder(bad as unknown as Parameters<typeof createCurfoxOrder>[0])).rejects.toThrow();
   });
 });
 
