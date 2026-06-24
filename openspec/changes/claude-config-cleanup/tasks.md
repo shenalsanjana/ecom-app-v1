@@ -15,7 +15,7 @@
 
 ## 4. README + env
 
-- [ ] 4.1 Fix README + `.env.local.example`: SQLite/`file:./dev.db` → PostgreSQL; "MinitPay" → "MintPay" (plan Task 10)
+- [x] 4.1 Fix README + `.env.local.example`: SQLite/`file:./dev.db` → PostgreSQL; "MinitPay" → "MintPay" (plan Task 10)
 
 ## 5. Coherence
 
