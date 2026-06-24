@@ -1,6 +1,6 @@
 ## 1. Status tracker
 
-- [ ] 1.1 Create root `STUB_READINESS_STATUS.md` living tracker (plan Task 4)
+- [x] 1.1 Create root `STUB_READINESS_STATUS.md` living tracker (plan Task 4)
 
 ## 2. Claude config
 
