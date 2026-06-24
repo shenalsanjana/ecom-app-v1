@@ -10,7 +10,7 @@
 
 ## 3. Docs
 
-- [ ] 3.1 Reframe `docs/commands/openspec.md` as the OPSX stage; fix `superpowers.md` file locations + real invocation (plan Task 7)
+- [x] 3.1 Reframe `docs/commands/openspec.md` as the OPSX stage; fix `superpowers.md` file locations + real invocation (plan Task 7)
 - [ ] 3.2 Tidy `openspec/COMMIT_PROCESS.md` — add docs/test/perf types, test verification, worktree note (plan Task 8)
 
 ## 4. README + env
