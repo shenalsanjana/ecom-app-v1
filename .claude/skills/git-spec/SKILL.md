@@ -1,151 +1,66 @@
 ---
 name: git-spec
-description: Use when creating a git branch, writing a commit message, or opening a PR in this workflow — defines lowercase Jira-derived branch names, typed commit prefixes (done/fix/refactor/cleanup/in-progress/pending), feature-with-stage branch structure, and uppercase PR title format `<SOURCE-BRANCH>: <Change Topic>`.
+description: Use when creating a git branch, writing a commit message, or opening a PR in this repo. Branches are `feat/*` or `fix/*` cut from `main` (small fixes may commit directly to `main`); there is no `develop` branch. Commits follow Conventional Commits (`feat(scope):`, `fix(scope):`, `docs(...)`, `refactor(...)`, `chore(...)`, `test(...)`, `perf(...)`). Substantial work is implemented in a dedicated git worktree.
 ---
 
 # Git Spec
 
 ## Overview
 
-Project git conventions: branch names and commit messages are lowercase and derived from Jira ticket numbers. Tasks get a single branch; user stories get a feature branch with a `stage` integration branch and sub-task branches underneath.
+Project git conventions, aligned with `openspec/COMMIT_PROCESS.md` (the single source of truth). `main` is the only integration/release branch; the `develop` branch was retired in 2026-05. Substantial work happens on short-lived `feat/*` or `fix/*` branches cut from `main`, implemented in a dedicated git worktree, and merged back with `--no-ff`. Small fixes may commit directly to `main`.
 
 ## When to Use
 
-- Creating a new branch from a Jira ticket
-- Writing a commit message
-- Deciding whether a ticket needs a single branch or a feature + stage structure
-- Opening a PR (target branch depends on structure)
+- Cutting a `feat/*` or `fix/*` branch from `main`
+- Deciding whether a change is small enough to commit directly to `main`
+- Writing a Conventional Commit message
+- Opening a PR into `main`
 
 ## Quick Reference
 
-### Naming
+### Branch naming
 
 | Rule | Value |
 | --- | --- |
-| Branch case | lowercase |
-| Commit message case | lowercase |
-| PR title (branch portion) case | UPPERCASE |
-| Branch name source | Jira ticket number (e.g., `trk-5`) |
-| Task ticket → | single branch |
-| User Story ticket → | feature branch + `stage` |
-| Epic ticket → | no branch |
+| Branch case | lowercase, kebab-case |
+| Integration branch | `main` |
+| Feature branch | `feat/<topic>` (e.g. `feat/admin-settings`) |
+| Fix branch | `fix/<topic>` (e.g. `fix/checkout-city-cap`) |
+| Small fix | may commit directly to `main` |
+| PR target | `main` |
+| Merge style | `--no-ff` |
 
-### Commit prefixes
+### Commit messages (Conventional Commits)
 
-| Prefix | Meaning |
+| Type | Use for |
 | --- | --- |
-| `done` | Implementation complete |
-| `fix` | Bug resolved |
-| `refactor` | Code refactored |
-| `cleanup` | Cleanup or formatting |
-| `in-progress` | Partial work being committed |
-| `pending` | Remaining task, not yet started |
+| `feat(scope):` | New feature |
+| `fix(scope):` | Bug fix |
+| `docs(...):` | Documentation and spec/plan changes |
+| `refactor(...):` | Code change that neither fixes a bug nor adds a feature |
+| `chore(...):` | Maintenance, merges, tooling |
+| `test(...):` | Adding or updating tests |
+| `perf(...):` | Performance improvement |
 
-### Commit header by branch type
+- Subject is concise but descriptive; include the "why" in the body when the "what" isn't obvious.
+- Verify with `npm run build` (and `npm run test`) before committing.
 
-The commit header is derived from the branch name by replacing `/` with ` > ` (space-greater-than-space).
-
-| Branch name | Commit header |
-| --- | --- |
-| `trk-3` | `trk-3:` |
-| `trk-40/stage` | `trk-40 > stage:` |
-| `trk-40/trk-41` | `trk-40 > trk-41:` |
-
-Schematic:
-
-| Branch type | Branch name | Header |
-| --- | --- | --- |
-| Single task | `<branch-name>` | `<branch-name>:` |
-| Feature stage | `<parent-branch>/stage` | `<parent-branch> > stage:` |
-| Sub-task under feature | `<parent-branch>/<sub-branch>` | `<parent-branch> > <sub-branch>:` |
-
-### Indentation
-
-- `- <prefix>:` lines → 2 spaces from header
-- `- note:` lines → 4 spaces (nested under their prefix line)
-
-### PR title
-
-Format: `<SOURCE-BRANCH>: <Change Topic>`
-
-PR titles use **UPPERCASE** for the branch portion (Jira IDs and `STAGE`) — distinct from the lowercase commit headers. The branch portion is derived from the source branch name with `/` replaced by ` > `.
-
-| Source branch | PR title |
-| --- | --- |
-| `trk-3` | `TRK-3: <Change Topic>` |
-| `trk-40/trk-41` | `TRK-40 > TRK-41: <Change Topic>` |
-| `trk-40/stage` | `TRK-40 > STAGE: <Change Topic>` |
-
-Schematic:
-
-| Branch type | Source branch | PR title |
-| --- | --- | --- |
-| Single task | `<branch-name>` | `<BRANCH-NAME>: <Change Topic>` |
-| Feature stage | `<parent-branch>/stage` | `<PARENT-BRANCH> > STAGE: <Change Topic>` |
-| Sub-task under feature | `<parent-branch>/<sub-branch>` | `<PARENT-BRANCH> > <SUB-BRANCH>: <Change Topic>` |
-
-### PR target
-
-| Source branch | Target branch |
-| --- | --- |
-| `trk-3` (single task) | `develop` |
-| `trk-40/trk-41` (sub-task) | `trk-40/stage` |
-| `trk-40/stage` (feature stage) | `develop` |
-
-## Example
-
-Single branch `trk-3`:
+### Examples (real commits from history)
 
 ```
-trk-3:
-  - done: added OIDC RP-initiated logout route (/api/logout) — clears NextAuth cookies and redirects to Zitadel end_session_endpoint
-  - done: made allowedDevOrigins configurable via ALLOWED_DEV_ORIGINS env var in next.config.mjs (was hardcoded IP)
-  - done: revised README — removed redundant Quick Start duplication, added bin/ dev scripts section, fixed docker compose v2 syntax, completed docs/ directory tree, corrected production Makefile path
-    - note: production Makefile path was previously pointing to the wrong directory
+feat(dispatch): admin tracking editor + DISPATCHED-aware order actions
+fix(checkout): show full city catalogue in combobox (remove 80-item cap)
+docs(config): rewrite CLAUDE.md lifecycle to combined workflow
 ```
 
-Sub-task branch `trk-5/trk-6`:
+## Workflow
 
-```
-trk-5 > trk-6:
-  - done: built login form layout with email and password fields
-  - in-progress: wiring up form validation
-  - pending: integrate with authentication server
-```
-
-Feature stage branch `trk-5/stage`:
-
-```
-trk-5 > stage:
-  - cleanup: removed unused imports across auth modules
-  - refactor: extracted shared auth helpers into lib/auth
-```
-
-PR titles for the branches above:
-
-```
-TRK-3: Add OIDC RP-initiated logout
-TRK-5 > TRK-6: Build login form layout
-TRK-5 > STAGE: Complete user authentication feature
-```
-
-## Feature branch workflow
-
-Sub-task branches are nested under the parent feature using `/`:
-
-```
-develop
- └── trk-5/stage      ← integration branch, created from develop
-      ├── trk-5/trk-6 ← created from trk-5/stage
-      ├── trk-5/trk-7 ← created from trk-5/stage
-      └── trk-5/trk-8 ← created from trk-5/stage
-```
-
-1. `<parent>/stage` is cut from `develop` — source of truth for the feature.
-2. Each sub-task branch is cut from `<parent>/stage`.
-3. Completed sub-tasks PR into `<parent>/stage`.
-4. When the feature is done, `<parent>/stage` merges into `develop`.
+1. Cut a `feat/*` or `fix/*` branch from `main`; implement substantial work in a dedicated git worktree (see `superpowers:using-git-worktrees`).
+2. Commit with Conventional Commits.
+3. `npm run build` (+ `npm run test`) to verify.
+4. Open a PR into `main`; merge with `--no-ff`.
+5. Clean up the worktree after merge.
 
 ## Full Spec
 
-See `references/documentation/overview/git-specification.md` for the complete specification with all examples and edge cases.
+See `openspec/COMMIT_PROCESS.md` — the single source of truth for commit, branch, and integration rules. This skill is the quick reference; that file governs.
