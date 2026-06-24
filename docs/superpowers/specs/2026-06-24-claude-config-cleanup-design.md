@@ -47,8 +47,9 @@ Three findings assert facts about the codebase; all three were confirmed against
 - **No file moves.** The 5 legacy `docs/spec/` files stay where they are (annotated as legacy).
 - **No OpenSpec adoption.** We scaffold `openspec/changes/` so references resolve; we do not run
   `openspec init` or commit to using the CLI.
-- **No README edits in this change.** `README.md` is treated as a source of truth and an edit
-  target only in a separate follow-up (see §8).
+- **No broad README rewrite.** `README.md` (and `.env.local.example`) are edited only for the
+  specific factual errors below (§5.7) — the SQLite/`file:./dev.db` drift and the "MinitPay"
+  spelling. Their structure and the rest of their content are left untouched.
 - **No application code changes.** This is a documentation/config change only.
 
 ## 4. Approved Decisions
@@ -61,6 +62,7 @@ Three findings assert facts about the codebase; all three were confirmed against
 | 4 | `settings.json` (fork) | **Promote all shared dev plugins** into committed `settings.json`; `settings.local.json` keeps only machine-specific overrides |
 | 5 | `git-spec` reference doc (fork) | **Shrink to a pointer** — `references/.../git-specification.md` becomes a thin summary pointing at `openspec/COMMIT_PROCESS.md` as the single source of truth |
 | 6 | `openspec/changes/` scaffolding (fork) | **Minimal** — `README.md` + `.gitkeep` only |
+| 7 | README fix | **In scope** — correct the SQLite→PostgreSQL drift (README + `.env.local.example`) and the "MinitPay"→"MintPay" spelling, within this same change (not a follow-up) |
 
 ## 5. Change Inventory
 
@@ -102,9 +104,9 @@ Severity reflects **how badly the current state misleads an agent** (high / medi
   and admin bootstrap (`npm run admin:ensure` / `npm run admin:create`).
 
 Note: the §3 Database **provider** correction (drop "SQLite", state PostgreSQL) stays **inline** —
-it is an accuracy fix to an existing CLAUDE.md claim, and the pointer must not aim agents at
-README's *uncorrected* SQLite wording (that is the §8 follow-up). The pointer covers
-migration/deploy/payments/courier/admin only.
+it is an accuracy fix to an existing CLAUDE.md claim. The "see README" pointer is safe because
+README's own SQLite drift is corrected in this same change (§5.7), so the pointer aims agents at a
+now-accurate README. The pointer covers migration/deploy/payments/courier/admin specifics.
 
 **Verified accurate — keep untouched:** §2 Branching, the `openspec/COMMIT_PROCESS.md` pointer,
 §3 Framework (Next.js 16), §3 Auth (NextAuth v5), §4 documentation pointers, the `openspec/archive/`
@@ -191,6 +193,29 @@ This makes the CLAUDE.md §1 and `docs/commands/openspec.md` references resolve.
   sync/archive (self-created by the flow); the `@fission-ai/openspec` dependency (resolves on
   `npm install`; global CLI already works).
 
+### 5.7 `README.md` + `.env.local.example` — DB-provider & payment-spelling fixes (in scope, Decision 7)
+
+The SQLite drift is broader than CLAUDE.md: `prisma/schema.prisma` declares `provider = "postgresql"`
+(single schema, no SQLite variant), yet README and `.env.local.example` still prescribe a SQLite
+`file:` URL — which a postgresql datasource cannot accept. Fix all of it consistently so the docs
+match the schema (the schema is ground truth):
+
+- **`README.md`:**
+  - Tech Stack "**Database:** SQLite with Prisma ORM" → "PostgreSQL (via Prisma ORM)".
+  - The env example (line ~40) and the three `$env:DATABASE_URL="file:./dev.db"; …` setup commands
+    (lines ~62/65/68) → a PostgreSQL connection-string placeholder consistent with the schema, e.g.
+    `postgresql://USER:PASSWORD@localhost:5432/dressingbear?schema=public` (with a one-line note that
+    a hosted dev branch — Neon / Vercel Postgres — also works). PowerShell `$env:…` invocation form
+    is retained (it is correct for this Windows repo).
+  - Payment Methods list "MinitPay" → "MintPay" (matches `app/_lib/payments/mintpay.ts`).
+- **`.env.local.example`:** line 1 `DATABASE_URL="file:./dev.db"` → the same PostgreSQL placeholder,
+  so the example and README setup commands agree.
+
+Not changed: the historical plan `docs/superpowers/plans/2026-05-25-payhere-checkout-implementation.md`
+still contains `file:./dev.db` — it is an archived record of past work and is left as-is. README's
+"Royal Express / RoyalExpress" courier wording is a legitimate carrier brand (the env vars are
+`ROYAL_EXPRESS_*`), so it is left untouched; only the DB and payment-spelling errors are corrected.
+
 ## 6. Spec-folder convention (resolves the dual-location ambiguity)
 
 `docs/superpowers/specs/` is the **canonical, current** location for design specs (paired with
@@ -200,11 +225,12 @@ This makes the CLAUDE.md §1 and `docs/commands/openspec.md` references resolve.
 
 ## 7. Validation / Acceptance Criteria
 
-**Implementation logistics:** this touches ~8 files including a full `git-spec` rewrite — i.e.
-substantial work — so per CLAUDE.md §2 it runs on a short-lived `feat/*` branch off `main`
-(e.g. `feat/claude-config-cleanup`), merged with `--no-ff`, rather than direct-to-main. (The
-*spec doc* commit going straight to `main` was fine — it is the multi-file implementation that
-warrants a branch.) Confirm with the user before planning.
+**Implementation logistics (confirmed with user):** this touches ~10 files including a full
+`git-spec` rewrite and README/`.env.local.example` fixes — i.e. substantial work — so per CLAUDE.md
+§2 it runs on a short-lived `feat/claude-config-cleanup` branch off `main`, merged with `--no-ff`,
+rather than direct-to-main. This also isolates it from the concurrent `docs(auth)` work landing on
+`main`. (The *spec doc* commits going straight to `main` were fine — it is the multi-file
+implementation that warrants a branch.)
 
 **Acceptance criteria:**
 
@@ -218,13 +244,20 @@ warrants a branch.) Confirm with the user before planning.
 - `docs/commands/superpowers.md` contains no `activate_skill(` snippet.
 - The committed `.claude/settings.json` enables `superpowers` (and the other shared plugins).
 - The `git-spec` skill's conventions match `openspec/COMMIT_PROCESS.md`.
+- No `file:./dev.db` / SQLite reference remains in `README.md` or `.env.local.example`; README's
+  Tech Stack says PostgreSQL and the Payment Methods list says "MintPay". (The historical plan doc
+  may still contain `file:./dev.db` — that is intentional.)
 - `.claude/` is staged and committed (it was previously untracked).
 
-## 8. Out of Scope (flagged for a follow-up)
+## 8. Out of Scope
 
-`README.md` repeats the DB error ("Database: SQLite with Prisma ORM", `DATABASE_URL="file:./dev.db"`)
-and spells the provider "MinitPay" (code uses **MintPay**). README is the agreed source of truth and
-is **not** edited here; these are noted for a separate follow-up change.
+- **No broad README/`.env.local.example` rewrite** — only the DB-provider and payment-spelling
+  errors in §5.7 are touched; structure and all other content are untouched.
+- README's "Royal Express / RoyalExpress" courier wording is left as-is (legitimate carrier brand;
+  env vars are `ROYAL_EXPRESS_*`).
+- The historical plan `docs/superpowers/plans/2026-05-25-payhere-checkout-implementation.md` keeps
+  its `file:./dev.db` reference as an archived record.
+- No application/source code changes; no runtime behavior changes.
 
 ## 9. Risks & Notes
 
