@@ -142,7 +142,10 @@ callbacks: {
   // Runs at sign-in. Has the full Google `profile` (incl. email_verified).
   async signIn({ account, profile }) {
     if (account?.provider !== "google") return true;        // credentials path untouched
-    if (profile?.email_verified !== true) return false;     // defense
+    if (!assertGoogleEmailVerified(profile)) return false;  // defense: require verified email
+    const email = normalizeEmail(profile.email);
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing?.role === "ADMIN") return false;           // Option B: admins are PASSWORD-ONLY
     await linkOrCreateGoogleUser(profile);                  // create-or-link + guest-order sync
     return true;
   },
@@ -173,7 +176,7 @@ This matters because the E2E `mock-google` provider (§7.3) is a Credentials-sty
 
 **Security guardrail — Google never *grants* ADMIN.** New Google users are always `CUSTOMER`. Linked users keep their existing DB role. The OAuth flow can never elevate a customer to admin.
 
-**Policy decision pending user sign-off (see §10.0):** by default, an admin whose verified Google email matches their admin row *can sign in via Google* — which adds a second auth path to admin accounts (anyone controlling that Google inbox reaches admin). This is **not** a requirements violation (the "keep admin auth separate" ask was conditional on the system already separating them, which it doesn't — admins use the same `/login`). But it is a security-posture choice. The stricter alternative is one line in `signIn`: if the resolved user's `role === "ADMIN"`, return `false` for the Google provider, keeping **admins password-only**. Defaulting to the stricter option is reasonable; the user decides.
+**Admins are PASSWORD-ONLY (decided — Option B, §10.0).** The `signIn` callback resolves the existing user by normalized email and returns `false` when `role === "ADMIN"`, so the customer Google flow can never authenticate into — or even touch — an admin account. Google therefore adds **no** new auth path to admin accounts; admin login stays exactly as it is today (email/password via `/login`). A denied attempt surfaces a generic friendly message (§4.7), not "this is an admin," to avoid revealing which emails are admin.
 
 ### 4.5 Email/password hardening
 
@@ -219,7 +222,7 @@ This matters because the E2E `mock-google` provider (§7.3) is a Credentials-sty
 └─────────────────────────────────┘
 ```
 
-- **Friendly error mapping:** a small map from NextAuth/technical codes → human copy (e.g. `CredentialsSignin` → *"Email or password is incorrect."*; `OAuthAccountNotLinked`/`Configuration`/unknown → generic *"Something went wrong. Please try again."*). Raw errors stay in server logs only.
+- **Friendly error mapping:** a small map from NextAuth/technical codes → human copy (e.g. `CredentialsSignin` → *"Email or password is incorrect."*; `AccessDenied` (a Google login denied by the admin guard or the `email_verified` gate) → generic *"We couldn't sign you in with Google. Please use your email and password."* — deliberately **not** "this is an admin," to avoid revealing admin emails; `OAuthAccountNotLinked`/`Configuration`/unknown → generic *"Something went wrong. Please try again."*). Raw errors stay in server logs only.
 - **`data-testid`** on: Google button, email input, password input, submit button, error region (for stable E2E selectors).
 - The signup page gets the same "Continue with Google" option + matching styling.
 - The Google button is **fully hidden** when `AUTH_GOOGLE_ID` is unset, so the UI never advertises an unavailable method.
@@ -280,19 +283,20 @@ This matters because the E2E `mock-google` provider (§7.3) is a Credentials-sty
 
 - **Google linking** (`google-auth.test.ts`): new email → creates CUSTOMER w/ null passwordHash · existing email → links, no duplicate, role preserved · existing Google user → idempotent · **never grants ADMIN** · guest orders with matching `guestEmail` get `userId` set, non-matching untouched.
 - **Google token wiring — the highest-risk seams, tested directly** (`google-auth.test.ts`): `resolveGoogleToken` → for a verified-email Google account sets `uid` to the **DB cuid (never Google's `sub`)** and `role` from the **DB row (never elevated)**; returns `null` for a non-Google account, a missing `token.email`, or an email with no matching user. `assertGoogleEmailVerified` → `true` only when `email_verified === true`; rejects `false`/`undefined`. These cover the production code paths the `mock-google` E2E does **not** exercise.
+- **Admins are password-only** (`google-auth.test.ts`): the `signIn` admin guard **denies** (returns `false`) when the email resolves to an `ADMIN` row, and **does not** create/link/sync for it; allows a CUSTOMER row and a brand-new email. (Extract the guard as a small pure predicate so it's unit-testable without standing up the full callback.)
 - **Email/password**: `normalizeEmail` table tests · `authorize()` returns null on `passwordHash == null` · `loginAction` returns the "created with Google" message for password-null accounts.
 - **Redirect**: updated `login-redirect.test.ts` (customer → `/account/orders`, admin → `/admin`, explicit callbackUrl honored).
 - Reset-flow tests already exist; extend if needed for null→value first-set.
 
 ### 7.2 E2E (Playwright, `tests/e2e/`) — matches existing fixture/seed style
 
-- `customer-auth.spec.ts`: login page loads · Google button visible when mock enabled / hidden when unset · email+password login works · invalid login → friendly error (and **no** raw/technical error text present) · create-account flow · forgot-password form submits · `/account/orders` redirects anon → `/login?callbackUrl=...` · logged-in user reaches `/account/orders` · **mobile viewport** (e.g. 390×844) renders the card correctly.
+- `customer-auth.spec.ts`: login page loads · Google button visible when mock enabled / hidden when unset · email+password login works · invalid login → friendly error (and **no** raw/technical error text present) · create-account flow · forgot-password form submits · `/account/orders` redirects anon → `/login?callbackUrl=...` · logged-in user reaches `/account/orders` · **admin email via (mock) Google is denied** and shown the generic friendly message (Option B) · **mobile viewport** (e.g. 390×844) renders the card correctly.
 - `customer-checkout.spec.ts`: guest checkout (new email) completes · guest checkout with an **existing-account email is not blocked** · logged-in checkout attaches the order to the user (assert it appears on `/account/orders`).
 - `admin-auth.spec.ts` (existing) — unchanged; serves as the **admin regression gate**.
 
 ### 7.3 Google in CI — deterministic, never hits real Google
 
-A **test-only `mock-google` provider**, registered only when **both** `E2E_MOCK_GOOGLE === "1"` **and** `process.env.NODE_ENV !== "production"` (double-gated; impossible in a prod build). It is a Credentials-style shim whose `authorize` runs the **same `linkOrCreateGoogleUser` + guest-order-sync** code and returns the resolved DB user (cuid + role).
+A **test-only `mock-google` provider**, registered only when **both** `E2E_MOCK_GOOGLE === "1"` **and** `process.env.NODE_ENV !== "production"` (double-gated; impossible in a prod build). It is a Credentials-style shim whose `authorize` applies the **same shared admin guard** (deny if the email resolves to an `ADMIN` row — Option B) and then runs the **same `linkOrCreateGoogleUser` + guest-order-sync** code, returning the resolved DB user (cuid + role), or denying for admin/non-existent-as-appropriate. Sharing the guard predicate means the app-level admin-denied path is exercised end-to-end.
 
 **Scope — what this E2E does and does NOT cover.** Because the shim is Credentials-style, it has no `profile`, no `email_verified`, and `account.provider !== "google"` — so it deliberately does **not** drive the real `signIn` `email_verified` gate or the `jwt` Google-resolution branch. Those two are the **highest-risk wiring and are covered by unit tests instead** (§7.1, via `resolveGoogleToken`/`assertGoogleEmailVerified`). The `mock-google` E2E is therefore scoped to the **app-level flow**: Google button visible → a session is established → the user lands on `/account/orders` → **guest orders synced by email appear**. The real `Google()` provider is never invoked in CI.
 
@@ -317,7 +321,7 @@ Acceptance: `next build` with `E2E_MOCK_GOOGLE` unset must produce a bundle that
 - **Breaking admin or credentials login** → no adapter, JWT untouched, Credentials provider config unchanged; `admin-auth.spec.ts` is the regression gate.
 - **Wrong user id on the Google path** (Google `sub` vs cuid) → `jwt`-callback DB resolution extracted to `resolveGoogleToken` and **unit-tested directly** (the `mock-google` E2E does not exercise this branch — §7.3); app-level E2E additionally asserts a Google-logged-in user sees their orders.
 - **Migration collision** when backfilling lowercase → dup-scan first; stop-and-surface on any collision; never force-collide.
-- **Privilege escalation via Google** → role always sourced from the DB row; new Google users are CUSTOMER; OAuth cannot elevate.
+- **Privilege escalation / admin exposure via Google** → role always sourced from the DB row; new Google users are CUSTOMER; OAuth cannot elevate; **and the `signIn` guard denies Google entirely for any ADMIN-resolved email (Option B), so Google adds no auth path to admin accounts.**
 - **Email enumeration** → unconditional checkout prompt; "created with Google" message scoped to the `passwordHash == null` case only.
 - **Edge bundle bloat / bcrypt-in-edge** → Prisma-touching link logic lives in `auth.ts`'s config, not the `proxy.ts` import; verify `next build` keeps `proxy.ts` Edge-safe (no bcrypt/Prisma in the proxy bundle).
 - **Test bypass leaking to prod** → `mock-google` double-gated on `E2E_MOCK_GOOGLE` + `NODE_ENV !== production`; build-time assertion.
@@ -339,14 +343,9 @@ Acceptance: `next build` with `E2E_MOCK_GOOGLE` unset must produce a bundle that
 
 ## 12. Acceptance criteria
 
-### 10.0 Admin-via-Google policy — **needs user sign-off before implementation**
+### 10.0 Admin-via-Google policy — **RESOLVED: Option B (admins password-only)**
 
-Does a Google login whose verified email matches an existing **admin** account grant admin access?
-
-- **Option A (default in this spec):** yes — admins may also sign in with Google. Simpler; adds a second auth path to admin accounts.
-- **Option B (stricter, recommended for admin safety):** no — `signIn` returns `false` when the resolved user is `ADMIN`, so **admins remain password-only** and the customer Google flow can never touch an admin account. One extra line.
-
-This is the one decision with a security trade-off; the rest of the spec is settled. Default chosen pending the user's call.
+Decision (user, 2026-06-24): a Google login whose verified email matches an existing **admin** account is **denied**. `signIn` returns `false` when the resolved user's `role === "ADMIN"`, so admins authenticate only via email/password and the customer Google flow can never touch an admin account. This is wired in §4.4 and asserted in §7 (unit + E2E).
 
 ---
 
@@ -355,7 +354,7 @@ The spec is implementable / done when:
 1. `User.passwordHash` is nullable and `User.image` exists; existing rows migrated; no case-variant duplicate emails remain (or they were surfaced and resolved).
 2. "Continue with Google" appears on `/login` (when `AUTH_GOOGLE_ID` is set) and completes a login that creates-or-links by normalized email, with **no duplicate** account.
 3. A Google login resolves `session.user.id` to the **DB cuid**, so `/account/orders` shows that user's orders (incl. guest orders synced by verified email).
-4. A new Google user is `CUSTOMER`; Google sign-in never yields `role === "ADMIN"`.
+4. A new Google user is `CUSTOMER`; Google sign-in never yields `role === "ADMIN"`; **a Google login matching an existing admin account is denied** (admins are password-only) and shows the generic friendly message.
 5. Email/password login, signup, forgot-password, and reset still work; emails are case-insensitive end-to-end.
 6. A password-null (Google-only) login attempt shows the "created with Google / set a password" message; setting a password via Forgot-password then enables email/password login.
 7. Guest checkout works, is not blocked by an existing-account email, shows the soft prompt; logged-in checkout attaches `userId`.
