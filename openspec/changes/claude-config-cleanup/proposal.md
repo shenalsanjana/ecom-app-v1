@@ -7,7 +7,7 @@ Full motivation, the adversarially-verified drift audit (62 findings), and all d
 ## What Changes
 
 - Rewrite CLAUDE.md §1 to the combined workflow; fix the §3 DB statement to PostgreSQL; add test commands + a single README pointer.
-- Reconcile the `git-spec` skill to `main` / `feat-*`-`fix-*` / Conventional Commits; shrink its reference doc to point at `openspec/COMMIT_PROCESS.md`.
+- Reconcile the `git-spec` skill to `main` / `feat/*` / `fix/*` / Conventional Commits; shrink its reference doc to point at `openspec/COMMIT_PROCESS.md`.
 - Reframe `docs/commands/openspec.md` as the OPSX stage; fix `superpowers.md` (file locations, real skill invocation).
 - Tidy `openspec/COMMIT_PROCESS.md` (add `docs`/`test`/`perf` types; test verification; worktree note).
 - Promote shared plugins into committed `.claude/settings.json`; drop the dangling `/opsx:continue` reference.
