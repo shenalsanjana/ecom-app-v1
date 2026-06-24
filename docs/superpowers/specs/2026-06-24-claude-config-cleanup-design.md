@@ -216,6 +216,12 @@ Jira/`develop` convention (13 confirmed drifts):
   clobbered, and do it all in the worktree so nothing lands on `main`.
 - **Create this change in OPSX:** `openspec new change claude-config-cleanup`, then generate
   `proposal.md` / `design.md` / `tasks.md` (derived from this spec + the `writing-plans` plan).
+- **Avoid a duplicate design:** OPSX `proposal.md` / `design.md` should **reference this spec as the
+  source of truth** (link it) rather than restate it — `tasks.md` is the one artifact that carries
+  real new content (the executable checklist).
+- **`/opsx:sync` honesty:** this is a docs/config change with **no capability/spec deltas**, so
+  `/opsx:sync` will likely have nothing to sync. If so, record that honestly (sync = N/A) — do **not**
+  manufacture spec deltas just to exercise the step.
 
 ### 6.6 `.claude/` OpenSpec tooling + settings
 
@@ -252,11 +258,14 @@ brand; env vars are `ROYAL_EXPRESS_*`).
 ### 6.8 `STUB_READINESS_STATUS.md` — NEW root tracker (Decision 9)
 
 Create **`STUB_READINESS_STATUS.md` in the repo root** (NOT under `docs/`). It tracks stub/change
-readiness across the combined workflow. Its full, authoritative content is in **Appendix A** and
-must be reproduced verbatim (with `/opsx:propose` = **Pending** per Decision 11). It contains: the
-main status table, the workflow-meaning table, the status legend, the change-details table, the TODO
-table, and the **Required Implementation Rule** section. Keep README, `.env.local.example`, and this
-file mutually consistent.
+readiness across the combined workflow. **It is a living tracker, created early** (right after the
+worktree, before the bulk edits) so it is true at creation, and **updated as the workflow
+progresses** (worktree → propose → apply → sync → archive flip from Pending to Done as each actually
+happens). Appendix A defines the **table structure/columns and the creation-time snapshot** (where
+only Brainstorm is Done and `/opsx:propose` is Pending per Decision 11) — it is **not** a frozen set
+of cell values to paste verbatim at the end. It contains: the main status table, the workflow-meaning
+table, the status legend, the change-details table, the TODO table, and the **Required Implementation
+Rule** section. Keep README, `.env.local.example`, and this file mutually consistent.
 
 ## 7. Spec-folder convention (resolves the dual-location ambiguity)
 
@@ -273,13 +282,27 @@ the worktree is cleaned up. Subagents are partitioned **by file** (CLAUDE.md, gi
 COMMIT_PROCESS, README/`.env`, STUB) to avoid write conflicts; a final **coherence pass** confirms
 README + `.env.local.example` + `STUB_READINESS_STATUS.md` agree (PostgreSQL everywhere; "MintPay").
 
+**Driver vs. checklist (make the composition concrete):** `subagent-driven-development` is the
+**driver** — it fans out the file-partitioned subagents and marks the OPSX `tasks.md` checkboxes as
+each subagent lands. The OPSX `/opsx:apply` skill's own sequential read-tick loop is **not** the
+driver; `tasks.md` is simply the shared checklist both the driver and `/opsx:apply` read. One driver,
+one checklist — no nesting of two loops.
+
+**`openspec init` is "init-then-inspect," not a blind pre-edit:** because init can regenerate
+`.claude/commands/opsx/*` + `openspec-*` and may touch AGENTS/CLAUDE files, the hand-edit list in
+§6.1–6.4 is **provisional**. The plan must: create the worktree → run `openspec init` → inspect
+`git status` / diff → **then reconcile** the hand-edit list against what init actually produced
+(drop edits init already made; keep the rest). Never commit init's output without reviewing its diff.
+
 **Acceptance criteria:**
 
 - `npm run build` passes; `npm run test` passes (config-only change must not break tooling).
 - OPSX is initialized: `.openspec.yaml` exists; `openspec list` shows `claude-config-cleanup`
   proposed → applied → archived by the end.
 - `STUB_READINESS_STATUS.md` exists **at the repo root** (not under `docs/`), with all five tables +
-  the Required Implementation Rule, and `/opsx:propose` shown honestly (Pending until run).
+  the Required Implementation Rule. Its cell values **reflect reality at commit time** (living
+  tracker), not a frozen Appendix-A snapshot — e.g. by the final commit, worktree/propose/apply are
+  Done, not Pending. `/opsx:propose` is never shown Done before it has actually run.
 - CLAUDE.md §1 documents the combined workflow; discovery is Superpowers `brainstorming`, and there
   is **no `/opsx:explore`** presented as the discovery step.
 - The `git-spec` skill (`SKILL.md` + reference doc) has **no** active `develop` / `trk-` /
@@ -315,12 +338,14 @@ README + `.env.local.example` + `STUB_READINESS_STATUS.md` agree (PostgreSQL eve
   solo/primary-maintainer repo).
 - **Worktree isolation** keeps this change off `main` and away from the concurrent `docs(auth)` work.
 
-## Appendix A — `STUB_READINESS_STATUS.md` content (authoritative; reproduce verbatim)
+## Appendix A — `STUB_READINESS_STATUS.md` content (table structure authoritative; cell values are the creation-time snapshot, then maintained live)
 
-> Lives at the repo **root**, not under `docs/`. `/opsx:propose` is **Pending** (Decision 11): we used
-> Superpowers brainstorming for discovery, so no OPSX proposal exists yet — it flips to Done when
-> `/opsx:propose` runs during implementation. The per-step **columns are status fields**, not a
-> sequence; the **Required Implementation Rule** (bottom) is the authoritative order.
+> Lives at the repo **root**, not under `docs/`. This is the **creation-time** snapshot: only
+> Brainstorm is Done and `/opsx:propose` is **Pending** (Decision 11) — we used Superpowers
+> brainstorming for discovery, so no OPSX proposal exists yet. As the workflow runs, flip cells to
+> Done when each step **actually** completes (it is a **living tracker**, not a frozen paste). The
+> per-step **columns are status fields**, not a sequence; the **Required Implementation Rule**
+> (bottom) is the authoritative order.
 
 ### Main status table
 
