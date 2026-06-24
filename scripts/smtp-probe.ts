@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 // One-off SMTP diagnostic. Loads .env.local, runs transport.verify(), then
 // attempts a real send to BRAND_EMAIL. Reports the exact nodemailer error
 // object on failure (code, command, response, responseCode) so we can
@@ -41,13 +40,14 @@ async function main() {
   try {
     await transport.verify();
     console.log("verify(): OK — SMTP connection + AUTH succeeded");
-  } catch (err: any) {
+  } catch (err) {
+    const e = err as Record<string, unknown>;
     console.error("verify() FAILED with:");
-    console.error("  code:", err.code);
-    console.error("  command:", err.command);
-    console.error("  responseCode:", err.responseCode);
-    console.error("  response:", err.response);
-    console.error("  message:", err.message);
+    console.error("  code:", e.code);
+    console.error("  command:", e.command);
+    console.error("  responseCode:", e.responseCode);
+    console.error("  response:", e.response);
+    console.error("  message:", e.message);
     process.exit(1);
   }
 
@@ -65,13 +65,14 @@ async function main() {
     console.log("  accepted:", info.accepted);
     console.log("  rejected:", info.rejected);
     console.log("  response:", info.response);
-  } catch (err: any) {
+  } catch (err) {
+    const e = err as Record<string, unknown>;
     console.error("send() FAILED with:");
-    console.error("  code:", err.code);
-    console.error("  command:", err.command);
-    console.error("  responseCode:", err.responseCode);
-    console.error("  response:", err.response);
-    console.error("  message:", err.message);
+    console.error("  code:", e.code);
+    console.error("  command:", e.command);
+    console.error("  responseCode:", e.responseCode);
+    console.error("  response:", e.response);
+    console.error("  message:", e.message);
     process.exit(2);
   }
 }

@@ -371,7 +371,6 @@ export function logMailerError(
     responseCode: number;
     message: string;
   }>;
-  // eslint-disable-next-line no-console
   console.error(`[mailer] ${template} FAILED`, {
     order: orderReference(orderRef) || "(none)",
     code: e.code,

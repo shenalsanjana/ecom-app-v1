@@ -9,7 +9,7 @@ export async function ProductGrid() {
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="mb-8 flex items-end justify-between">
           <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-brand">Editor's picks</p>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-brand">Editor&apos;s picks</p>
             <h2 className="font-heading text-2xl font-semibold tracking-tight">Featured products</h2>
           </div>
           <Link href="/categories" className="border-b border-border pb-0.5 text-sm font-medium text-foreground hover:border-foreground">

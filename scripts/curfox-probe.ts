@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 // Lightweight Curfox diagnostic. Tries just the login step — does NOT
 // create a real (billable) order. If login succeeds, the credentials and
 // network path to Curfox are working; the silent dispatch-email failure is
@@ -45,9 +44,9 @@ async function main() {
       },
       body: JSON.stringify({ email: user, password: pass }),
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("✗ Network error reaching Curfox login endpoint:");
-    console.error("  ", err.message ?? err);
+    console.error("  ", err instanceof Error ? err.message : err);
     process.exit(3);
   }
 

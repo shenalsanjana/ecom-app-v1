@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 // Reads the lifecycle fields on the most-recent orders to figure out where
 // the dispatch flow stopped for each. No external calls, no side effects.
 //

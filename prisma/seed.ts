@@ -30,16 +30,6 @@ function pickProductMain(productId: string): string {
   return `/products/${productId}/main.svg`;
 }
 
-function pickGalleryImage(productId: string, index: number): string {
-  const candidates = [`${index}.jpg`, `${index}.jpeg`, `${index}.png`, `${index}.webp`];
-  for (const file of candidates) {
-    if (existsSync(publicPath("products", productId, file))) {
-      return `/products/${productId}/${file}`;
-    }
-  }
-  return pickProductMain(productId);
-}
-
 const REVIEW_AUTHORS = [
   "Nethmi Perera", "Sanuli Fernando", "Tharushi Silva", "Senuri Jayawardena",
   "Dinuli Perera", "Oneli Fernando", "Yehani Silva", "Shenaya Wijesinghe",

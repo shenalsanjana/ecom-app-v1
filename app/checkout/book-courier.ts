@@ -4,6 +4,7 @@ import {
   createCurfoxOrder,
   CurfoxError,
 } from "@/app/_lib/courier/curfox-client";
+import type { CurfoxOrderDataItem } from "@/app/_lib/courier/curfox-types";
 import {
   resolveCurfoxCity,
   getDistrictForCity,
@@ -151,7 +152,7 @@ export async function bookCourierAndNotify(params: {
     return undefined;
   }
 
-  const orderItem: any = {
+  const orderItem: CurfoxOrderDataItem = {
     order_no: orderReference(order),
     customer_name: order.customerName,
     customer_address: buildAddressLine(order.shippingAddress),
