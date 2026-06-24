@@ -4,7 +4,7 @@
 
 ## 2. Claude config
 
-- [ ] 2.1 Rewrite CLAUDE.md §1 lifecycle to the combined workflow; fix §3 DB to PostgreSQL; add §2 test commands + single README pointer (plan Task 5)
+- [x] 2.1 Rewrite CLAUDE.md §1 lifecycle to the combined workflow; fix §3 DB to PostgreSQL; add §2 test commands + single README pointer (plan Task 5)
 - [ ] 2.2 Reconcile the `git-spec` skill (SKILL.md + reference doc) to main / feat-fix / Conventional Commits (plan Task 6)
 - [ ] 2.3 Promote shared plugins into committed `.claude/settings.json`; fix the dangling `/opsx:continue` reference (plan Task 9)
 
