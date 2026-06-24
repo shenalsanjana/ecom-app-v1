@@ -8,7 +8,7 @@
 
 | Stub / Change | Purpose | Superpower Skill: Brainstorm | Superpower Executing Skill | Git Worktree | `/opsx:propose` | `/opsx:apply` | `/opsx:sync` | `/opsx:archive` | Current Status | TODO / Pending | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| claude-config-cleanup | Clean Claude/OpenSpec config, README DB docs, env example, and stub readiness tracking | Done | Applying | Done | Done | Applied | Pending | Pending | Applied — validating | Run validation, archive (`--skip-specs`; sync N/A — no deltas), merge `--no-ff`, clean worktree | Executing skill = subagent-driven-development |
+| claude-config-cleanup | Clean Claude/OpenSpec config, README DB docs, env example, and stub readiness tracking | Done | Applied | Done | Done | Applied | N/A | Done | Archived | Merge `--no-ff` to `main`, then remove the worktree | Executing skill = subagent-driven-development; doc-only → no deltas → sync N/A |
 
 ## Workflow meaning
 
