@@ -4,6 +4,7 @@ import { SessionProvider } from "next-auth/react";
 import { CartProvider } from "@/app/_lib/cart-context";
 import { WishlistProvider } from "@/app/_lib/wishlist-context";
 import { WhatsAppFloatButton } from "@/app/_components/whatsapp-float-button";
+import { MetaPixelScript } from "@/app/_components/analytics/meta-pixel-script";
 import { Suspense } from "react";
 import { AnnouncementBar } from "@/app/_components/shared/announcement-bar";
 import { NavigationProgress } from "@/app/_components/shared/navigation-progress";
@@ -65,6 +66,7 @@ export default async function RootLayout({
       className={`${poppins.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <MetaPixelScript />
         <Suspense fallback={null}>
           <NavigationProgress />
         </Suspense>

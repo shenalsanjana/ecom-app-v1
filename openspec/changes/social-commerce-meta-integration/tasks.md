@@ -13,9 +13,9 @@ Each numbered group below maps to one plan task and ends in a commit.
 
 ## 2. Base Pixel script + PageView on navigation
 
-- [ ] 2.1 Create `app/_components/analytics/meta-pixel-script.tsx` (next/script base code, `fbq init` + PageView, PageView on `usePathname` change, renders null when unconfigured)
-- [ ] 2.2 Mount `<MetaPixelScript />` in `app/layout.tsx` `<body>`
-- [ ] 2.3 Verify `npm run build` (or `npx tsc --noEmit` if DB-blocked) and commit
+- [x] 2.1 Create `app/_components/analytics/meta-pixel-script.tsx` (next/script base code, `fbq init` + PageView, PageView on `usePathname` change, renders null when unconfigured)
+- [x] 2.2 Mount `<MetaPixelScript />` in `app/layout.tsx` `<body>`
+- [x] 2.3 Verify `npm run build` (or `npx tsc --noEmit` if DB-blocked) and commit
 
 ## 3. ViewContent + AddToCart tracking
 
