@@ -26,15 +26,15 @@ Each numbered group below maps to one plan task and ends in a commit.
 
 ## 4. InitiateCheckout tracking
 
-- [ ] 4.1 Add a fired-once ref + effect in `app/checkout/checkout-client.tsx` to fire `trackInitiateCheckout` when the form first has items (content_ids, subtotal, num_items)
-- [ ] 4.2 Verify `npx tsc --noEmit` and commit
+- [x] 4.1 Add a fired-once ref + effect in `app/checkout/checkout-client.tsx` to fire `trackInitiateCheckout` when the form first has items (content_ids, subtotal, num_items)
+- [x] 4.2 Verify `npx tsc --noEmit` and commit
 
 ## 5. Purchase tracking (COD inline + online success) with dedupe
 
-- [ ] 5.1 In `app/checkout/checkout-client.tsx` COD branch: capture content_ids + total before `clearCart()`, then call `trackPurchaseOnce`
-- [ ] 5.2 Create `app/checkout/success/track-purchase.tsx` (`<TrackPurchase>` leaf; fires `trackPurchaseOnce` from an effect when `confirmed`)
-- [ ] 5.3 Render `<TrackPurchase>` in `app/checkout/success/page.tsx` `OrderDetails` (confirmed = `isPaid || isCod`), beside `ClearCartOnPaid`
-- [ ] 5.4 Verify `npx tsc --noEmit` and commit
+- [x] 5.1 In `app/checkout/checkout-client.tsx` COD branch: capture content_ids + total before `clearCart()`, then call `trackPurchaseOnce`
+- [x] 5.2 Create `app/checkout/success/track-purchase.tsx` (`<TrackPurchase>` leaf; fires `trackPurchaseOnce` from an effect when `confirmed`)
+- [x] 5.3 Render `<TrackPurchase>` in `app/checkout/success/page.tsx` `OrderDetails` (confirmed = `isPaid || isCod`), beside `ClearCartOnPaid`
+- [x] 5.4 Verify `npx tsc --noEmit` and commit
 
 ## 6. OG price-in-title + Product JSON-LD
 

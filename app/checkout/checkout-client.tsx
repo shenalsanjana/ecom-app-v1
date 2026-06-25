@@ -1,12 +1,13 @@
 // app/checkout/checkout-client.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ShoppingBag, Truck, CreditCard, User, FileText, Loader2 } from "lucide-react";
 import { useCart } from "@/app/_lib/cart-context";
+import { trackInitiateCheckout, trackPurchaseOnce } from "@/app/_lib/meta-pixel";
 import { processOrder, type PaymentMethod } from "./actions";
 import { ProfileMenu } from "@/app/_components/header/profile-menu";
 import { BrandMark } from "@/app/_components/shared/brand-mark";
@@ -82,6 +83,20 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shipping = calculateDelivery(subtotal, zoneForCity(address.city ?? ""), deliveryConfig);
   const total = subtotal + shipping;
+
+  // Fire InitiateCheckout once, when the checkout form first has items. Guarded
+  // by a ref so cart hydration / re-renders don't refire it.
+  const initiateCheckoutFired = useRef(false);
+  useEffect(() => {
+    if (initiateCheckoutFired.current) return;
+    if (items.length === 0) return;
+    initiateCheckoutFired.current = true;
+    trackInitiateCheckout(
+      items.map((i) => i.productId),
+      subtotal,
+      items.reduce((n, i) => n + i.quantity, 0),
+    );
+  }, [items, subtotal]);
 
   if (orderId) {
     return (
@@ -226,10 +241,13 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
           return;
         }
 
-        // COD: clear cart and show success immediately
+        // COD: capture purchase data BEFORE clearing the cart, then track.
+        const purchaseContentIds = items.map((i) => i.productId);
+        const purchaseValue = total;
         clearCart();
         setOrderId(result.orderId);
         setOrderReference(result.webNumber ?? result.orderId);
+        trackPurchaseOnce(result.orderId, purchaseValue, purchaseContentIds);
       } else {
         setError(result.error);
       }
