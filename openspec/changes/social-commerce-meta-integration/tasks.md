@@ -6,10 +6,10 @@ Each numbered group below maps to one plan task and ends in a commit.
 
 ## 1. Shared helpers + Meta Pixel module
 
-- [ ] 1.1 Write failing tests for `absoluteUrl` (`app/_lib/__tests__/absolute-url.test.ts`) and implement `app/_lib/absolute-url.ts` (joins `APP_URL` + path, single slash, localhost fallback)
-- [ ] 1.2 Write failing tests for `app/_lib/__tests__/meta-pixel.test.ts` (no-op when unset, fires with payload when set, `trackPurchaseOnce` dedupe)
-- [ ] 1.3 Implement `app/_lib/meta-pixel.ts`: `pixelId`, `isPixelConfigured`, `track`, `trackViewContent`, `trackAddToCart`, `trackInitiateCheckout`, `trackPurchaseOnce`, `PURCHASE_DEDUPE_KEY` (gated on `window.fbq`, try/catch, LKR)
-- [ ] 1.4 Run `npm test -- absolute-url meta-pixel` (green) and commit
+- [x] 1.1 Write failing tests for `absoluteUrl` (`app/_lib/__tests__/absolute-url.test.ts`) and implement `app/_lib/absolute-url.ts` (joins `APP_URL` + path, single slash, localhost fallback)
+- [x] 1.2 Write failing tests for `app/_lib/__tests__/meta-pixel.test.ts` (no-op when unset, fires with payload when set, `trackPurchaseOnce` dedupe)
+- [x] 1.3 Implement `app/_lib/meta-pixel.ts`: `pixelId`, `isPixelConfigured`, `track`, `trackViewContent`, `trackAddToCart`, `trackInitiateCheckout`, `trackPurchaseOnce`, `PURCHASE_DEDUPE_KEY` (gated on `window.fbq`, try/catch, LKR)
+- [x] 1.4 Run `npm test -- absolute-url meta-pixel` (green) and commit
 
 ## 2. Base Pixel script + PageView on navigation
 
