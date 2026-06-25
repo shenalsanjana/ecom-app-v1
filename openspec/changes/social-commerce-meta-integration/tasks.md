@@ -60,10 +60,10 @@ Each numbered group below maps to one plan task and ends in a commit.
 
 ## 10. Playwright e2e tests
 
-- [ ] 10.1 Create `tests/e2e/meta-pixel.spec.ts`: stub `window.fbq` via `addInitScript`; assert ViewContent, AddToCart, InitiateCheckout, and COD Purchase-fires-once
-- [ ] 10.2 Create `tests/e2e/meta-share-seo.spec.ts`: assert OG price-in-title, absolute OG image, Product JSON-LD (`sku` = product.id), and share buttons present + Copy "Copied" state
-- [ ] 10.3 Create `tests/e2e/meta-feed.spec.ts`: assert `/feed/meta-catalog.csv` 200, `text/csv`, header row, and rows present
-- [ ] 10.4 Run `npm run test:e2e -- meta-pixel meta-share-seo meta-feed` (green) and commit
+- [x] 10.1 Create `tests/e2e/meta-pixel.spec.ts`: stub `window.fbq` via `addInitScript`; assert ViewContent, AddToCart, InitiateCheckout, and COD Purchase-fires-once
+- [x] 10.2 Create `tests/e2e/meta-share-seo.spec.ts`: assert OG price-in-title, absolute OG image, Product JSON-LD (`sku` = product.id), and share buttons present + Copy "Copied" state
+- [x] 10.3 Create `tests/e2e/meta-feed.spec.ts`: assert `/feed/meta-catalog.csv` 200, `text/csv`, header row, and rows present
+- [~] 10.4 Run `npm run test:e2e -- meta-pixel meta-share-seo meta-feed` — **ENV-BLOCKED** (no DATABASE_URL/seeded DB in this environment). Specs parse and are discovered via `playwright test --list`; execution must run in CI / a DB-connected env before merge. Specs committed.
 
 ## 11. Full regression
 
