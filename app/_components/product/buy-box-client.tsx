@@ -15,6 +15,7 @@ import { useWishlist } from "@/app/_lib/wishlist-context";
 import { formatPrice } from "@/app/_lib/format";
 import { useDeliveryConfig } from "@/app/_components/delivery/delivery-config-provider";
 import { trackViewContent, trackAddToCart } from "@/app/_lib/meta-pixel";
+import { ShareButtons } from "@/app/_components/product/share-buttons";
 
 type Props = {
   productId: string;
@@ -265,6 +266,11 @@ export function BuyBoxClient({
           <ShieldCheck className="h-4 w-4" aria-hidden /> Secure checkout
         </li>
       </ul>
+
+      <div className="border-t border-border pt-4">
+        <p className="mb-2 text-xs font-medium text-muted-foreground">Share</p>
+        <ShareButtons productId={productId} name={name} price={price} />
+      </div>
 
       {/* Sticky mobile purchase bar — keeps Add to Cart reachable without
           scrolling back up on small screens. Hidden on lg where the buy box

@@ -44,8 +44,8 @@ Each numbered group below maps to one plan task and ends in a commit.
 
 ## 7. Share buttons
 
-- [ ] 7.1 Create `app/_components/product/share-buttons.tsx` (native share when supported + Facebook (inline SVG) / WhatsApp / Copy-link with inline "Copied" state; no toast)
-- [ ] 7.2 Render `<ShareButtons>` in `app/_components/product/buy-box-client.tsx`; verify `npx tsc --noEmit` and commit
+- [x] 7.1 Create `app/_components/product/share-buttons.tsx` (native share when supported + Facebook (inline SVG) / WhatsApp / Copy-link with inline "Copied" state; no toast)
+- [x] 7.2 Render `<ShareButtons>` in `app/_components/product/buy-box-client.tsx`; verify `npx tsc --noEmit` and commit
 
 ## 8. CSV catalog feed
 
