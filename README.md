@@ -42,6 +42,9 @@ AUTH_SECRET="your-secret-key"
 AUTH_URL="http://localhost:3000"
 APP_URL="http://localhost:3000"
 
+# Meta / Facebook (optional — when unset, Pixel + tracking are fully disabled)
+NEXT_PUBLIC_META_PIXEL_ID=""
+
 # SMTP Configuration (for order emails)
 SMTP_HOST="smtp.gmail.com"
 SMTP_PORT="587"
@@ -170,6 +173,22 @@ The seed creates 12 realistic oversize t-shirt products with:
 5. Places order
 6. Order details sent to brand email
 7. Order submitted to RoyalExpress for delivery
+
+## Social Commerce / Meta Integration
+
+- **Meta Pixel** is optional. Set `NEXT_PUBLIC_META_PIXEL_ID` to your Pixel ID to
+  enable browser tracking of `PageView`, `ViewContent`, `AddToCart`,
+  `InitiateCheckout`, and `Purchase`. When the variable is unset or empty, no
+  Pixel script loads and the site behaves exactly as before.
+- **Catalog feed** for Meta Commerce Manager / Facebook Shop is served at
+  `/feed/meta-catalog.csv`. Point a scheduled feed at
+  `<APP_URL>/feed/meta-catalog.csv`. It excludes archived products and uses LKR
+  prices; on-sale products map `price` → original and `sale_price` → current per
+  Meta's convention.
+- **Shared links** show the product image, title with price (`Name — LKR 1,990`),
+  and description via Open Graph tags, plus `Product` JSON-LD for Google/Pinterest.
+- `APP_URL` must be set to the public site origin in production so feed links,
+  share URLs, and OG image URLs are absolute.
 
 ## Tech Stack
 

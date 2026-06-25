@@ -56,7 +56,7 @@ Each numbered group below maps to one plan task and ends in a commit.
 
 ## 9. README documentation
 
-- [ ] 9.1 Add `NEXT_PUBLIC_META_PIXEL_ID` to the `.env.local` example and a "Social Commerce / Meta Integration" section in `README.md`; commit
+- [x] 9.1 Add `NEXT_PUBLIC_META_PIXEL_ID` to the `.env.local` example and a "Social Commerce / Meta Integration" section in `README.md`; commit
 
 ## 10. Playwright e2e tests
 
