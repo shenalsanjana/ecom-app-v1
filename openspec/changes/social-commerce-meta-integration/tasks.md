@@ -67,7 +67,7 @@ Each numbered group below maps to one plan task and ends in a commit.
 
 ## 11. Full regression
 
-- [ ] 11.1 Run `npm test` (existing 418 + new unit tests) — all green
-- [ ] 11.2 Run `npm run test:e2e` — existing `order-confirmation` / `payhere-*` specs stay green (or record env-blocked, to run in CI before merge)
-- [ ] 11.3 Run `npx tsc --noEmit && npm run lint` — no type or new lint errors
-- [ ] 11.4 Verify no-op-when-unset: with `NEXT_PUBLIC_META_PIXEL_ID` unset, no `fbevents.js` request and no `meta-pixel-base` script tag
+- [x] 11.1 Run `npm test` — **434 passed** (418 prior + 16 new: absolute-url, meta-pixel, meta-feed)
+- [~] 11.2 Run `npm run test:e2e` — **ENV-BLOCKED** (no DATABASE_URL/seeded DB). Existing `order-confirmation`/`payhere-*` specs unchanged by this additive work; run in CI before merge.
+- [x] 11.3 Run `npx tsc --noEmit && npm run lint` — no type errors, no lint errors
+- [~] 11.4 Verify no-op-when-unset — live browser check ENV-BLOCKED (app needs DB). Guaranteed by code: `MetaPixelScript` returns `null` when `pixelId()` is undefined (env unset), so no `fbevents.js` request and no `meta-pixel-base` script tag. Covered by the `meta-pixel` unit test (`isPixelConfigured` false when unset).
