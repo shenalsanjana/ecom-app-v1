@@ -104,7 +104,8 @@ All additive; none change existing control flow.
 | `ViewContent` | `BuyBoxClient` (`app/_components/product/buy-box-client.tsx`) | `useEffect` on mount, per `productId` | `content_ids:[productId]`, `value:price`, `currency:'LKR'`, `content_type:'product'` |
 | `AddToCart` | plain `trackAddToCart(...)` helper called from `AddToCartButton.handleAdd` and `BuyBoxClient.handleBuyNow` | on successful add | `content_ids:[productId]`, `value:price*qty`, `num_items:qty` |
 | `InitiateCheckout` | `CheckoutClient` (`app/checkout/checkout-client.tsx`) | `useEffect` on mount when cart non-empty | `content_ids:[...cart ids]`, `value:subtotal`, `num_items:totalItems` |
-| `Purchase` | new `<TrackPurchase>` client component nested in `OrderDetails` on the success page | only when order confirmed (see below) | `content_ids:[...order item productIds]`, `value:order.total`, `currency:'LKR'`, `eventID:order.id` |
+| `Purchase` (online) | new `<TrackPurchase>` client component nested in `OrderDetails` on `/checkout/success` | only when order confirmed (see below) | `content_ids:[...order item productIds]`, `value:order.total`, `currency:'LKR'`, `eventID:order.id` |
+| `Purchase` (COD) | `CheckoutClient` inline success block (`app/checkout/checkout-client.tsx`) | when a COD order is placed (terminal immediately) | `content_ids:[...cart productIds]`, `value:order total`, `currency:'LKR'`, `eventID:order.id` |
 
 **AddToCart placement note:** the two existing call sites (`AddToCartButton` and
 `BuyBoxClient`'s Buy Now) both call `addItem`. Rather than instrument the cart reducer
@@ -113,6 +114,23 @@ two user-initiated add points. This keeps the event semantically "user added to 
 not "cart state changed".
 
 ### 4. Purchase event correctness (highest-risk piece)
+
+The two payment paths reach success **differently** — both must fire `Purchase`, and
+both must share one dedupe store:
+
+- **COD** never navigates to `/checkout/success`. `CheckoutClient` renders an inline
+  "Order Confirmed!" view (`if (orderId)` block) and clears the cart in `handleSubmit`.
+  So COD `Purchase` fires from `CheckoutClient`: capture `contentIds` (cart product ids)
+  and `value` (`total`) **before** `clearCart()`, then on the inline-success render call
+  the shared `trackPurchaseOnce(orderId, value, contentIds)` helper.
+- **Online payments** (PayHere/Koko/MintPay) redirect to the gateway and return to
+  `/checkout/success?order_id=...`, so their `Purchase` fires there.
+
+Both call the same `trackPurchaseOnce` helper (in `meta-pixel.ts`) which owns the
+localStorage dedupe + `eventID`, so the two firing points can never double-count a
+shared order id.
+
+#### Online success page (`<TrackPurchase>`)
 
 The success page (`app/checkout/success/page.tsx`) is **revisitable** (refresh,
 back-nav) and, for online payments, starts in an unconfirmed state that flips later via
@@ -127,11 +145,14 @@ the existing `PaymentStatusPoll` (which calls `router.refresh()`).
   `isCancelled`. For PayHere, `confirmed` is false on first render and becomes true after
   the poll triggers `router.refresh()`, which re-renders `OrderDetails` with updated
   props — the component then fires.
-- **Dedupe:** maintains a `localStorage` set of already-fired `order.id`s
-  (key e.g. `db-purchase-tracked`). On mount/update, if `confirmed` and the id is not in
-  the set, fire the event (with `eventID: order.id`) and record the id. Repeated visits /
-  refreshes are skipped. Browser Pixel does **not** auto-dedupe, so this guard is required.
-- Like `ClearCartOnPaid`, it returns `null` and is a leaf client component.
+- **Dedupe (shared helper):** `trackPurchaseOnce(orderId, value, contentIds)` maintains a
+  `localStorage` set of already-fired order ids (key e.g. `db-purchase-tracked`). It fires
+  `Purchase` (with `eventID: orderId`) only when the id is not already in the set, then
+  records it. Both `<TrackPurchase>` (online) and `CheckoutClient` (COD) call it, so
+  repeated visits/refreshes — and the COD-then-revisit-success edge — never double-count.
+  Browser Pixel does **not** auto-dedupe, so this guard is required.
+- Like `ClearCartOnPaid`, `<TrackPurchase>` returns `null` and is a leaf client component;
+  it calls `trackPurchaseOnce` from an effect when `confirmed` is true.
 
 ### 5. Shareable link previews — Open Graph + JSON-LD
 
@@ -253,7 +274,8 @@ Documented in `README.md` (env table) alongside the existing variables.
   from stock, archived exclusion, `LKR` formatting, CSV escaping, and the
   `id == product.id` invariant.
 - **`meta-pixel`:** `track()` no-ops when the ID is unset; calls `fbq` with the exact
-  event + payload when set (with `window.fbq` mocked).
+  event + payload when set (with `window.fbq` mocked). `trackPurchaseOnce` fires once per
+  order id and skips repeats (localStorage mocked).
 - **`absolute-url`:** joins base + path correctly (leading slash, trailing slash cases).
 
 ### e2e (Playwright)
@@ -263,7 +285,8 @@ Documented in `README.md` (env table) alongside the existing variables.
   - product page load → `ViewContent`,
   - add to cart → `AddToCart`,
   - checkout page → `InitiateCheckout`,
-  - success page (confirmed) → `Purchase` fires once,
+  - COD inline success → `Purchase` fires once,
+  - online success page (confirmed) → `Purchase` fires once,
   - cancelled success state → `Purchase` does **not** fire,
   - refresh of a confirmed success page → `Purchase` does **not** fire again (dedupe).
 - **Share buttons:** assert Facebook/WhatsApp anchor URLs contain the encoded canonical
