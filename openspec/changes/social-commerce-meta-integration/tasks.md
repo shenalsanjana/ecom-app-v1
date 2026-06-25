@@ -49,10 +49,10 @@ Each numbered group below maps to one plan task and ends in a commit.
 
 ## 8. CSV catalog feed
 
-- [ ] 8.1 Write failing tests `app/_lib/__tests__/meta-feed.test.ts` (price/sale inversion, availability, CSV escaping, header)
-- [ ] 8.2 Implement pure `app/_lib/meta-feed.ts` (`productToFeedRow`, `feedRowsToCsv`, `FEED_COLUMNS`, types)
-- [ ] 8.3 Create `app/feed/meta-catalog.csv/route.ts` (Node runtime, Prisma, archived excluded, cached, `text/csv`)
-- [ ] 8.4 Run `npx tsc --noEmit && npm test -- meta-feed` (green) and commit
+- [x] 8.1 Write failing tests `app/_lib/__tests__/meta-feed.test.ts` (price/sale inversion, availability, CSV escaping, header)
+- [x] 8.2 Implement pure `app/_lib/meta-feed.ts` (`productToFeedRow`, `feedRowsToCsv`, `FEED_COLUMNS`, types)
+- [x] 8.3 Create `app/feed/meta-catalog.csv/route.ts` (Node runtime, Prisma, archived excluded, cached, `text/csv`)
+- [x] 8.4 Run `npx tsc --noEmit && npm test -- meta-feed` (green) and commit
 
 ## 9. README documentation
 
