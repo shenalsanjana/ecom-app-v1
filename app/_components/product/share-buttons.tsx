@@ -8,7 +8,6 @@ import { useState } from "react";
 // state is the feedback (and what the e2e asserts).
 import { Share2, MessageCircle, Link2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { absoluteUrl } from "@/app/_lib/absolute-url";
 import { formatPrice } from "@/app/_lib/format";
 
 function FacebookIcon({ className }: { className?: string }) {
@@ -23,16 +22,20 @@ function FacebookIcon({ className }: { className?: string }) {
 // Messenger, etc.) plus explicit Facebook / WhatsApp / Copy-link buttons that
 // work on every device. Instagram has no web share-link URL, so it is reachable
 // only through the native sheet — there is intentionally no IG button.
+//
+// `url` is the canonical absolute product URL, computed SERVER-SIDE and passed
+// in. It must not be built here from absoluteUrl(): APP_URL is not a
+// NEXT_PUBLIC_ var, so in the client bundle it inlines to undefined and every
+// share would point at http://localhost:3000.
 export function ShareButtons({
-  productId,
+  url,
   name,
   price,
 }: {
-  productId: string;
+  url: string;
   name: string;
   price: number;
 }) {
-  const url = absoluteUrl(`/products/${productId}`);
   const shareTitle = `${name} — ${formatPrice(price)}`;
   const [copied, setCopied] = useState(false);
 

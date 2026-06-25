@@ -27,6 +27,9 @@ type Props = {
   ratingCount: number;
   stock: number;
   sizes?: string;
+  // Canonical absolute product URL, computed server-side (APP_URL is not a
+  // NEXT_PUBLIC_ var, so it can't be derived in this client component).
+  shareUrl: string;
 };
 
 function discountPct(price: number, original: number): number {
@@ -35,7 +38,7 @@ function discountPct(price: number, original: number): number {
 
 export function BuyBoxClient({
   productId, name, price, originalPrice, image,
-  ratingAvg, ratingCount, stock, sizes,
+  ratingAvg, ratingCount, stock, sizes, shareUrl,
 }: Props) {
   const router = useRouter();
   const { addItem, items } = useCart();
@@ -269,7 +272,7 @@ export function BuyBoxClient({
 
       <div className="border-t border-border pt-4">
         <p className="mb-2 text-xs font-medium text-muted-foreground">Share</p>
-        <ShareButtons productId={productId} name={name} price={price} />
+        <ShareButtons url={shareUrl} name={name} price={price} />
       </div>
 
       {/* Sticky mobile purchase bar — keeps Add to Cart reachable without

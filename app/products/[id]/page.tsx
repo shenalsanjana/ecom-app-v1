@@ -111,6 +111,7 @@ export default async function ProductPage({
               ratingCount={detail.ratingCount}
               stock={detail.product.stock}
               sizes={detail.product.sizes}
+              shareUrl={absoluteUrl(`/products/${detail.product.id}`)}
             />
           </div>
         </section>
