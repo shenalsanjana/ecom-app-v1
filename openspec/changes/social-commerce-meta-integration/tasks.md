@@ -38,9 +38,9 @@ Each numbered group below maps to one plan task and ends in a commit.
 
 ## 6. OG price-in-title + Product JSON-LD
 
-- [ ] 6.1 Enrich `generateMetadata` in `app/products/[id]/page.tsx` (price-in-title via `formatPrice`, absolute OG/twitter image)
-- [ ] 6.2 Create `app/_components/product/product-jsonld.tsx` (Product + Offer + conditional AggregateRating; `sku` = product.id)
-- [ ] 6.3 Render `<ProductJsonLd>` on the product page; verify `npx tsc --noEmit` and commit
+- [x] 6.1 Enrich `generateMetadata` in `app/products/[id]/page.tsx` (price-in-title via `formatPrice`, absolute OG/twitter image)
+- [x] 6.2 Create `app/_components/product/product-jsonld.tsx` (Product + Offer + conditional AggregateRating; `sku` = product.id)
+- [x] 6.3 Render `<ProductJsonLd>` on the product page; verify `npx tsc --noEmit` and commit
 
 ## 7. Share buttons
 

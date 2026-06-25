@@ -7,6 +7,9 @@ import {
   getReviewHistogram,
 } from "@/app/_lib/products";
 import { stripMarkdown } from "@/app/_lib/strip-markdown";
+import { formatPrice } from "@/app/_lib/format";
+import { absoluteUrl } from "@/app/_lib/absolute-url";
+import { ProductJsonLd } from "@/app/_components/product/product-jsonld";
 
 export const revalidate = 300;
 
@@ -34,13 +37,22 @@ export async function generateMetadata(
   const { id } = await params;
   const detail = await getProductDetail(id);
   if (!detail) return { title: { absolute: "Product not found — Dressing Bear" } };
+  const priceTitle = `${detail.product.name} — ${formatPrice(detail.product.price)}`;
+  const description = stripMarkdown(detail.product.description);
+  const imageUrl = absoluteUrl(detail.product.image);
   return {
-    title: detail.product.name,
-    description: stripMarkdown(detail.product.description),
+    title: { absolute: `${priceTitle} | Dressing Bear` },
+    description,
     openGraph: {
-      title: detail.product.name,
-      description: stripMarkdown(detail.product.description),
-      images: [detail.product.image],
+      title: priceTitle,
+      description,
+      images: [{ url: imageUrl, width: 1200, height: 1200, alt: detail.product.name }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: priceTitle,
+      description,
+      images: [imageUrl],
     },
   };
 }
@@ -67,6 +79,11 @@ export default async function ProductPage({
 
   return (
     <>
+      <ProductJsonLd
+        product={detail.product}
+        ratingAvg={detail.ratingAvg}
+        ratingCount={detail.ratingCount}
+      />
       <SiteHeader />
       <main className="flex-1">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
