@@ -14,6 +14,7 @@ import { useCart } from "@/app/_lib/cart-context";
 import { useWishlist } from "@/app/_lib/wishlist-context";
 import { formatPrice } from "@/app/_lib/format";
 import { useDeliveryConfig } from "@/app/_components/delivery/delivery-config-provider";
+import { trackViewContent, trackAddToCart } from "@/app/_lib/meta-pixel";
 
 type Props = {
   productId: string;
@@ -52,6 +53,11 @@ export function BuyBoxClient({
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const buyNowIntent = searchParams.get("action") === "buy-now";
+
+  // Fire ViewContent once per product when the buy box mounts.
+  useEffect(() => {
+    trackViewContent(productId, price);
+  }, [productId, price]);
 
   useEffect(() => {
     if (!buyNowIntent) return;
@@ -102,6 +108,7 @@ export function BuyBoxClient({
     }
     setIsBuying(true);
     addItem({ productId, name, price, image, size: selectedSize || null }, quantity);
+    trackAddToCart(productId, price * quantity, quantity);
     router.push("/checkout");
   }
 

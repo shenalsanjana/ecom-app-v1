@@ -19,10 +19,10 @@ Each numbered group below maps to one plan task and ends in a commit.
 
 ## 3. ViewContent + AddToCart tracking
 
-- [ ] 3.1 Fire `trackViewContent` on mount and `trackAddToCart` in Buy Now in `app/_components/product/buy-box-client.tsx`
-- [ ] 3.2 Fire `trackAddToCart` in `app/_components/cart/add-to-cart-button.tsx` `handleAdd`
-- [ ] 3.3 Fire `trackAddToCart` in `app/_components/cart/add-to-cart-dialog.tsx` `handleAdd` and `handleBuyNow`
-- [ ] 3.4 Verify `npx tsc --noEmit` and commit
+- [x] 3.1 Fire `trackViewContent` on mount and `trackAddToCart` in Buy Now in `app/_components/product/buy-box-client.tsx`
+- [x] 3.2 Fire `trackAddToCart` in `app/_components/cart/add-to-cart-button.tsx` `handleAdd`
+- [x] 3.3 Fire `trackAddToCart` in `app/_components/cart/add-to-cart-dialog.tsx` `handleAdd` and `handleBuyNow`
+- [x] 3.4 Verify `npx tsc --noEmit` and commit
 
 ## 4. InitiateCheckout tracking
 
