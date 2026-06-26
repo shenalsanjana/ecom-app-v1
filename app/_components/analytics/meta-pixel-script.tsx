@@ -28,8 +28,9 @@ export function MetaPixelScript() {
   if (!id) return null;
 
   return (
-    <Script id="meta-pixel-base" strategy="afterInteractive">
-      {`
+    <>
+      <Script id="meta-pixel-base" strategy="afterInteractive">
+        {`
         !function(f,b,e,v,n,t,s)
         {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
         n.callMethod.apply(n,arguments):n.queue.push(arguments)};
@@ -41,6 +42,19 @@ export function MetaPixelScript() {
         fbq('init', '${id}');
         fbq('track', 'PageView');
       `}
-    </Script>
+      </Script>
+      {/* Standard <noscript> fallback: fires a PageView for JS-disabled
+          visitors. A tracking pixel must be a plain <img>, not next/image. */}
+      <noscript>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          height="1"
+          width="1"
+          style={{ display: "none" }}
+          src={`https://www.facebook.com/tr?id=${id}&ev=PageView&noscript=1`}
+          alt=""
+        />
+      </noscript>
+    </>
   );
 }
