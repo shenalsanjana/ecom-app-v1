@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { firstName } from "@/app/_lib/format";
+import { Avatar } from "@/components/ui/avatar";
 
 export function ProfileMenu() {
   const { data: session, status } = useSession();
@@ -56,7 +57,11 @@ export function ProfileMenu() {
           />
         }
       >
-        <User className="h-5 w-5" />
+        {user && (user.name || user.email) ? (
+          <Avatar name={user.name || user.email} size="md" />
+        ) : (
+          <User className="h-5 w-5" />
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         {user ? (
@@ -76,6 +81,9 @@ export function ProfileMenu() {
             </DropdownMenuItem>
             <DropdownMenuItem render={<Link href="/account/addresses" />}>
               Saved addresses
+            </DropdownMenuItem>
+            <DropdownMenuItem render={<Link href="/wishlist" />}>
+              Wishlist
             </DropdownMenuItem>
             {user.isAdmin && (
               <>

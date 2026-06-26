@@ -14,12 +14,12 @@
 
 ## 3. Wire into ProfileMenu
 
-- [ ] 3.1 In `app/_components/header/profile-menu.tsx`, import `Avatar` from `@/components/ui/avatar`
-- [ ] 3.2 Replace the trigger child: render `<Avatar name={user.name || user.email} size="md" />` when `user && (user.name || user.email)`, else keep `<User className="h-5 w-5" />`
-- [ ] 3.3 Add a Wishlist `DropdownMenuItem` (`<Link href="/wishlist" />`, label "Wishlist") immediately after the "Saved addresses" item
-- [ ] 3.4 Run `npm run build` and `npm run lint`; confirm both succeed with no new findings
-- [ ] 3.5 Manual smoke check (`npm run dev`): signed-out shows `User` icon + Log in/Sign up; customer shows initials avatar + My account/My orders/Saved addresses/Wishlist/Log out with Wishlist→`/wishlist`; admin also shows Admin panel
-- [ ] 3.6 Commit: `feat(header): initials avatar trigger and Wishlist link in profile menu`
+- [x] 3.1 In `app/_components/header/profile-menu.tsx`, import `Avatar` from `@/components/ui/avatar`
+- [x] 3.2 Replace the trigger child: render `<Avatar name={user.name || user.email} size="md" />` when `user && (user.name || user.email)`, else keep `<User className="h-5 w-5" />`
+- [x] 3.3 Add a Wishlist `DropdownMenuItem` (`<Link href="/wishlist" />`, label "Wishlist") immediately after the "Saved addresses" item
+- [x] 3.4 Run `npm run build` and `npm run lint` — lint passes (exit 0); `next build` reports "✓ Compiled successfully" (tsc + bundling clean). Full prerender/export needs a reachable `DATABASE_URL` (pre-existing env requirement, unrelated to this change).
+- [ ] 3.5 Manual smoke check (`npm run dev`): signed-out shows `User` icon + Log in/Sign up; customer shows initials avatar + My account/My orders/Saved addresses/Wishlist/Log out with Wishlist→`/wishlist`; admin also shows Admin panel — DEFERRED: needs running app + DATABASE_URL + customer/admin accounts
+- [x] 3.6 Commit: `feat(header): initials avatar trigger and Wishlist link in profile menu`
 
 ## 4. Full validation
 
