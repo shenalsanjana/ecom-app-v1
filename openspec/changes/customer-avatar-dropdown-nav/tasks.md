@@ -23,6 +23,6 @@
 
 ## 4. Full validation
 
-- [ ] 4.1 Run `npm run test` (full suite) and confirm PASS including `avatar-format.test.ts`
-- [ ] 4.2 Run `npm run build` and confirm a clean production build
-- [ ] 4.3 Run `npm run lint` and confirm no new findings
+- [x] 4.1 Run `npm run test` (full suite) and confirm PASS including `avatar-format.test.ts` — 61 files / 442 tests passing
+- [ ] 4.2 Run `npm run build` and confirm a clean production build — DEFERRED: `next build` compiles cleanly ("✓ Compiled successfully"); full prerender requires a reachable `DATABASE_URL`
+- [x] 4.3 Run `npm run lint` and confirm no new findings — exit 0
