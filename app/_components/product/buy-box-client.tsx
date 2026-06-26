@@ -14,6 +14,8 @@ import { useCart } from "@/app/_lib/cart-context";
 import { useWishlist } from "@/app/_lib/wishlist-context";
 import { formatPrice } from "@/app/_lib/format";
 import { useDeliveryConfig } from "@/app/_components/delivery/delivery-config-provider";
+import { trackViewContent, trackAddToCart } from "@/app/_lib/meta-pixel";
+import { ShareButtons } from "@/app/_components/product/share-buttons";
 
 type Props = {
   productId: string;
@@ -25,6 +27,9 @@ type Props = {
   ratingCount: number;
   stock: number;
   sizes?: string;
+  // Canonical absolute product URL, computed server-side (APP_URL is not a
+  // NEXT_PUBLIC_ var, so it can't be derived in this client component).
+  shareUrl: string;
 };
 
 function discountPct(price: number, original: number): number {
@@ -33,7 +38,7 @@ function discountPct(price: number, original: number): number {
 
 export function BuyBoxClient({
   productId, name, price, originalPrice, image,
-  ratingAvg, ratingCount, stock, sizes,
+  ratingAvg, ratingCount, stock, sizes, shareUrl,
 }: Props) {
   const router = useRouter();
   const { addItem, items } = useCart();
@@ -52,6 +57,11 @@ export function BuyBoxClient({
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const buyNowIntent = searchParams.get("action") === "buy-now";
+
+  // Fire ViewContent once per product when the buy box mounts.
+  useEffect(() => {
+    trackViewContent(productId, price);
+  }, [productId, price]);
 
   useEffect(() => {
     if (!buyNowIntent) return;
@@ -102,6 +112,7 @@ export function BuyBoxClient({
     }
     setIsBuying(true);
     addItem({ productId, name, price, image, size: selectedSize || null }, quantity);
+    trackAddToCart(productId, price * quantity, quantity);
     router.push("/checkout");
   }
 
@@ -258,6 +269,11 @@ export function BuyBoxClient({
           <ShieldCheck className="h-4 w-4" aria-hidden /> Secure checkout
         </li>
       </ul>
+
+      <div className="border-t border-border pt-4">
+        <p className="mb-2 text-xs font-medium text-muted-foreground">Share</p>
+        <ShareButtons url={shareUrl} name={name} price={price} />
+      </div>
 
       {/* Sticky mobile purchase bar — keeps Add to Cart reachable without
           scrolling back up on small screens. Hidden on lg where the buy box

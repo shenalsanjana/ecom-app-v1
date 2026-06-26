@@ -2,6 +2,7 @@
 "use client";
 
 import { useCart } from "@/app/_lib/cart-context";
+import { trackAddToCart } from "@/app/_lib/meta-pixel";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -44,6 +45,7 @@ export function AddToCartButton({
   function handleAdd() {
     if (sizeMissing) return;
     addItem({ productId, name, price, image, size }, quantity);
+    trackAddToCart(productId, price * quantity, quantity);
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
   }

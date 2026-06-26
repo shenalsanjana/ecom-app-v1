@@ -15,6 +15,7 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { SizeChartContent } from "@/app/_components/product/size-chart-content";
 import { useCart } from "@/app/_lib/cart-context";
+import { trackAddToCart } from "@/app/_lib/meta-pixel";
 import { formatPrice } from "@/app/_lib/format";
 
 type Props = {
@@ -54,6 +55,7 @@ export function AddToCartDialog({
       { productId, name, price, image, size: selectedSize || null },
       1,
     );
+    trackAddToCart(productId, price, 1);
     setAdded(true);
     // Auto-close after a brief success flash so the customer sees confirmation
     // without a second click. Reset state for the next open.
@@ -71,6 +73,7 @@ export function AddToCartDialog({
       { productId, name, price, image, size: selectedSize || null },
       1,
     );
+    trackAddToCart(productId, price, 1);
     router.push("/checkout");
   }
 

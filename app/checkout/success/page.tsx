@@ -10,6 +10,7 @@ import { SiteFooter } from "@/app/_components/home/site-footer";
 import { ProfileMenu } from "@/app/_components/header/profile-menu";
 import { PaymentStatusPoll } from "./payment-status-poll";
 import { ClearCartOnPaid } from "./clear-cart-on-paid";
+import { TrackPurchase } from "./track-purchase";
 
 // Next.js parses repeated query keys as string[]. PayHere has historically
 // appended order_id to the return_url even when we already set one, so we
@@ -65,6 +66,12 @@ async function OrderDetails({ orderId, paymentStatus }: { orderId: string; payme
       {/* Clear local cart as soon as the user lands on success (covers the
           polling window between redirect and webhook). */}
       <ClearCartOnPaid shouldClear={!isCancelled} />
+      <TrackPurchase
+        orderId={order.id}
+        value={order.total}
+        contentIds={order.items.map((i) => i.productId)}
+        confirmed={isPaid || isCod}
+      />
       <div className="mx-auto max-w-2xl px-4 py-20 text-center">
         {/* Icon */}
         <div
