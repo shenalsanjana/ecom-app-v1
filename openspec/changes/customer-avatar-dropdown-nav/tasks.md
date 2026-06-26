@@ -8,9 +8,9 @@
 
 ## 2. Avatar UI primitive
 
-- [ ] 2.1 Create `components/ui/avatar.tsx` — a presentational `Avatar` exporting `{ name: string; size?: "sm"|"md"|"lg"; className?: string } & React.ComponentProps<"span">`, rendering a circular `aria-hidden` `<span>` with `cva` size variants, `cn(...)`, `avatarColor(name)` background, and `initials(name)` text
-- [ ] 2.2 Verify it type-checks: `npm run build` (or `npx tsc --noEmit`) succeeds with no errors from the new file
-- [ ] 2.3 Commit: `feat(ui): add initials Avatar component`
+- [x] 2.1 Create `components/ui/avatar.tsx` — a presentational `Avatar` exporting `{ name: string; size?: "sm"|"md"|"lg"; className?: string } & React.ComponentProps<"span">`, rendering a circular `aria-hidden` `<span>` with `cva` size variants, `cn(...)`, `avatarColor(name)` background, and `initials(name)` text
+- [x] 2.2 Verify it type-checks: `npm run build` (or `npx tsc --noEmit`) succeeds with no errors from the new file
+- [x] 2.3 Commit: `feat(ui): add initials Avatar component`
 
 ## 3. Wire into ProfileMenu
 
