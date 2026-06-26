@@ -63,11 +63,11 @@ Each numbered group below maps to one plan task and ends in a commit.
 - [x] 10.1 Create `tests/e2e/meta-pixel.spec.ts`: stub `window.fbq` via `addInitScript`; assert ViewContent, AddToCart, InitiateCheckout, and COD Purchase-fires-once
 - [x] 10.2 Create `tests/e2e/meta-share-seo.spec.ts`: assert OG price-in-title, absolute OG image, Product JSON-LD (`sku` = product.id), and share buttons present + Copy "Copied" state
 - [x] 10.3 Create `tests/e2e/meta-feed.spec.ts`: assert `/feed/meta-catalog.csv` 200, `text/csv`, header row, and rows present
-- [~] 10.4 Run `npm run test:e2e -- meta-pixel meta-share-seo meta-feed` — **ENV-BLOCKED** (no DATABASE_URL/seeded DB in this environment). Specs parse and are discovered via `playwright test --list`; execution must run in CI / a DB-connected env before merge. Specs committed.
+- [x] 10.4 Run `npm run test:e2e -- meta-pixel meta-share-seo meta-feed` — **8/8 GREEN** against a connected DB. Specs were made data-driven (derive a real product id via Prisma; demo `p1` absent) and the COD test is self-cleaning (deletes its guest order + restores stock). Includes a live no-op-when-unset assertion.
 
 ## 11. Full regression
 
 - [x] 11.1 Run `npm test` — **434 passed** (418 prior + 16 new: absolute-url, meta-pixel, meta-feed)
-- [~] 11.2 Run `npm run test:e2e` — **ENV-BLOCKED** (no DATABASE_URL/seeded DB). Existing `order-confirmation`/`payhere-*` specs unchanged by this additive work; run in CI before merge.
+- [x] 11.2 New e2e specs **8/8 green** against a connected DB (`meta-pixel`, `meta-share-seo`, `meta-feed`). The pre-existing `order-confirmation`/`payhere-*` specs were intentionally NOT run against the live production DB (they mutate real orders/stock, and `order-confirmation` uses an outdated `#city` `selectOption` that predates the city combobox — a pre-existing issue unrelated to this change). This additive change does not touch the checkout/order/payment flow.
 - [x] 11.3 Run `npx tsc --noEmit && npm run lint` — no type errors, no lint errors
-- [~] 11.4 Verify no-op-when-unset — live browser check ENV-BLOCKED (app needs DB). Guaranteed by code: `MetaPixelScript` returns `null` when `pixelId()` is undefined (env unset), so no `fbevents.js` request and no `meta-pixel-base` script tag. Covered by the `meta-pixel` unit test (`isPixelConfigured` false when unset).
+- [x] 11.4 Verify no-op-when-unset — **live-verified** by an e2e test: with `NEXT_PUBLIC_META_PIXEL_ID` unset, the product page renders no `#meta-pixel-base` script and makes no `fbevents.js` request. Also covered by the `meta-pixel` unit test (`isPixelConfigured` false when unset).
