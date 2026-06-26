@@ -1,10 +1,10 @@
 ## 1. Helpers (`initials`, `avatarColor`)
 
-- [ ] 1.1 Write failing unit tests in `app/_lib/__tests__/avatar-format.test.ts` covering `initials` (multi-word "Jane Doe"→"JD", "Mary Jane Watson"→"MW", single "Jane"→"J", email "jane@example.com"→"J", whitespace trim/collapse, empty→"") and `avatarColor` (matches `^bg-\S+ text-\S+$`, deterministic for same seed, valid for empty seed)
-- [ ] 1.2 Run `npm run test -- app/_lib/__tests__/avatar-format.test.ts` and confirm it FAILS (not exported)
-- [ ] 1.3 Implement `initials(name: string): string` and `avatarColor(seed: string): string` (hash → fixed palette of literal `"bg-… text-…"` class strings) in `app/_lib/format.ts`, appended after `firstName`
-- [ ] 1.4 Run `npm run test -- app/_lib/__tests__/avatar-format.test.ts` and confirm all assertions PASS
-- [ ] 1.5 Commit: `feat(format): add initials and avatarColor helpers`
+- [x] 1.1 Write failing unit tests in `app/_lib/__tests__/avatar-format.test.ts` covering `initials` (multi-word "Jane Doe"→"JD", "Mary Jane Watson"→"MW", single "Jane"→"J", email "jane@example.com"→"J", whitespace trim/collapse, empty→"") and `avatarColor` (matches `^bg-\S+ text-\S+$`, deterministic for same seed, valid for empty seed)
+- [x] 1.2 Run `npm run test -- app/_lib/__tests__/avatar-format.test.ts` and confirm it FAILS (not exported)
+- [x] 1.3 Implement `initials(name: string): string` and `avatarColor(seed: string): string` (hash → fixed palette of literal `"bg-… text-…"` class strings) in `app/_lib/format.ts`, appended after `firstName`
+- [x] 1.4 Run `npm run test -- app/_lib/__tests__/avatar-format.test.ts` and confirm all assertions PASS
+- [x] 1.5 Commit: `feat(format): add initials and avatarColor helpers`
 
 ## 2. Avatar UI primitive
 
