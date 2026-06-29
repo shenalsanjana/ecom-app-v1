@@ -14,7 +14,7 @@ vi.mock("@/app/_lib/prisma", () => ({
   prisma: { product: { findMany }, review: { groupBy } },
 }));
 
-import { getNewArrivals } from "../products";
+import { getNewArrivals, getFeaturedProducts } from "../products";
 
 beforeEach(() => {
   findMany.mockReset().mockResolvedValue([]);
@@ -27,11 +27,13 @@ describe("getNewArrivals", () => {
     expect(findMany.mock.calls[0][0].orderBy).toEqual({ id: "desc" });
   });
 
-  it("excludes archived and limits to catalog product ids", async () => {
+  it("excludes archived but includes all products regardless of id", async () => {
     await getNewArrivals();
     const where = findMany.mock.calls[0][0].where;
     expect(where.archived).toBe(false);
-    expect(where.id).toEqual({ startsWith: "p" });
+    // Must NOT filter by id prefix — admin-created products have slug ids
+    // (e.g. "oversized-bear-tee"), not "p1"/"p2" seed ids.
+    expect(where.id).toBeUndefined();
   });
 
   it("defaults to 6 items and respects an explicit limit", async () => {
@@ -40,5 +42,14 @@ describe("getNewArrivals", () => {
     findMany.mockClear();
     await getNewArrivals(3);
     expect(findMany.mock.calls[0][0].take).toBe(3);
+  });
+});
+
+describe("getFeaturedProducts", () => {
+  it("excludes archived but includes all products regardless of id", async () => {
+    await getFeaturedProducts();
+    const where = findMany.mock.calls[0][0].where;
+    expect(where.archived).toBe(false);
+    expect(where.id).toBeUndefined();
   });
 });
