@@ -90,6 +90,11 @@ describe("createProduct", () => {
     expect((await createProduct({ ...NEW_INPUT, price: 0 })).success).toBe(false);
     expect((await createProduct({ ...NEW_INPUT, image: "" })).success).toBe(false);
   });
+  it("rejects a name/slug with no slug-able characters", async () => {
+    const res = await createProduct({ ...NEW_INPUT, name: "!!!", slug: "" });
+    expect(res).toEqual({ success: false, error: "Name must contain letters or numbers" });
+    expect(productCreate).not.toHaveBeenCalled();
+  });
   it("generates a unique slug and creates product + ordered gallery", async () => {
     productFindUnique.mockResolvedValueOnce(null); // slug free
     productCreate.mockResolvedValueOnce({ id: "cat-white" });

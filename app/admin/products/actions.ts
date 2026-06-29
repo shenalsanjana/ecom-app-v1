@@ -88,8 +88,10 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
   if (!parsed.success) return { success: false, error: "Please complete all required fields." };
   const d = parsed.data;
 
+  const baseSlug = slugify(d.slug || d.name);
+  if (!baseSlug) return { success: false, error: "Name must contain letters or numbers" };
   const slug = await uniqueSlug(
-    slugify(d.slug || d.name),
+    baseSlug,
     async (s) => (await prisma.product.findUnique({ where: { id: s } })) !== null,
   );
 
