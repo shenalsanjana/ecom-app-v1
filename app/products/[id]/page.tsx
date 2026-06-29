@@ -1,10 +1,11 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 
 import {
   getProductDetail,
   getProductReviews,
   getReviewHistogram,
+  getProductSlugRedirect,
 } from "@/app/_lib/products";
 import { stripMarkdown } from "@/app/_lib/strip-markdown";
 import { formatPrice } from "@/app/_lib/format";
@@ -36,7 +37,11 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const { id } = await params;
   const detail = await getProductDetail(id);
-  if (!detail) return { title: { absolute: "Product not found — Dressing Bear" } };
+  if (!detail) {
+    const dest = await getProductSlugRedirect(id);
+    if (dest) permanentRedirect(`/products/${dest}`);
+    return { title: { absolute: "Product not found — Dressing Bear" } };
+  }
   const priceTitle = `${detail.product.name} — ${formatPrice(detail.product.price)}`;
   const description = stripMarkdown(detail.product.description);
   const imageUrl = absoluteUrl(detail.product.image);
@@ -66,7 +71,11 @@ export default async function ProductPage({
 }) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const detail = await getProductDetail(id);
-  if (!detail) notFound();
+  if (!detail) {
+    const dest = await getProductSlugRedirect(id);
+    if (dest) permanentRedirect(`/products/${dest}`);
+    notFound();
+  }
 
   const shown = clampReviews(sp.reviews);
 
