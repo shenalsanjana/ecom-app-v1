@@ -18,7 +18,7 @@ const STD_SIZES = ["S", "M", "L", "XL"];
 export function ProductForm({ mode, categories, initial }: { mode: "create" | "edit"; categories: Cat[]; initial: Initial }) {
   const router = useRouter();
   const [f, setF] = useState(initial);
-  const [slugTouched, setSlugTouched] = useState(mode === "edit");
+  const [slugTouched, setSlugTouched] = useState(false);
   const [slug, setSlug] = useState(initial.id ?? "");
   const [pending, start] = useTransition();
   const set = <K extends keyof Initial>(k: K, v: Initial[K]) => setF((p) => ({ ...p, [k]: v }));
@@ -35,7 +35,7 @@ export function ProductForm({ mode, categories, initial }: { mode: "create" | "e
 
   function submit() {
     const input = {
-      name: f.name.trim(), slug: mode === "create" ? slug : undefined, categorySlug: f.categorySlug,
+      name: f.name.trim(), slug, categorySlug: f.categorySlug,
       price: Number(f.price), originalPrice: f.originalPrice ? Number(f.originalPrice) : null,
       stock: Number(f.stock), sizes, description: f.description.trim(), image: f.image.trim(),
       gallery: f.gallery.map((g) => g.trim()).filter(Boolean),
@@ -69,11 +69,11 @@ export function ProductForm({ mode, categories, initial }: { mode: "create" | "e
           <div className="rounded-lg border p-4 space-y-3">
             <div><label className="text-xs text-muted-foreground">Name</label>
               <input value={f.name} className="w-full rounded border px-2 py-1.5 text-sm"
-                onChange={(e) => { set("name", e.target.value); if (mode === "create" && !slugTouched) setSlug(slugify(e.target.value)); }} /></div>
+                onChange={(e) => { set("name", e.target.value); if (!slugTouched) setSlug(slugify(e.target.value)); }} /></div>
             <div><label className="text-xs text-muted-foreground">Slug (URL id)</label>
-              <input value={mode === "create" ? slug : f.id} readOnly={mode === "edit"}
+              <input value={slug}
                 onChange={(e) => { setSlugTouched(true); setSlug(slugify(e.target.value)); }}
-                className={"w-full rounded border px-2 py-1.5 text-sm " + (mode === "edit" ? "bg-secondary text-muted-foreground" : "")} /></div>
+                className="w-full rounded border px-2 py-1.5 text-sm" /></div>
             <div><label className="text-xs text-muted-foreground">Category</label>
               <CategorySelect categories={categories} value={f.categorySlug} onChange={(s) => set("categorySlug", s)} /></div>
           </div>
