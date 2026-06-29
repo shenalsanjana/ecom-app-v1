@@ -29,4 +29,6 @@ encode these; new surfaces reuse the primitives rather than re-deciding values.
 - All transitions gated behind `motion-safe:`.
 
 ## Focus ring (one style)
-`focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50` (olive).
+`focus-visible:ring-3 focus-visible:ring-ring/50` (olive), plus `focus-visible:border-ring`
+on bordered controls (inputs, buttons). Unbordered controls like `TextLink` apply only the
+ring (a border color would be a no-op).
