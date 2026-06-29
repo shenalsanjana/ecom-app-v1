@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/app/_lib/prisma";
 import { CategoriesTable } from "@/app/_components/admin/categories/categories-table";
+import { absoluteUrl } from "@/app/_lib/absolute-url";
 
 export default async function AdminCategoriesPage() {
   const categories = await prisma.category.findMany({
@@ -9,6 +10,7 @@ export default async function AdminCategoriesPage() {
   });
   const rows = categories.map((c) => ({
     slug: c.slug, name: c.name, image: c.image, productCount: c._count.products,
+    adUrl: absoluteUrl(`/categories/${c.slug}`),
   }));
   return (
     <section>
