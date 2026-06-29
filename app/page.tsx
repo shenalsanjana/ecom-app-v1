@@ -1,6 +1,7 @@
 import { CategoryStrip } from "@/app/_components/home/category-strip";
 import { DealsSection } from "@/app/_components/home/deals-section";
 import { Hero } from "@/app/_components/home/hero";
+import { NewArrivals } from "@/app/_components/home/new-arrivals";
 import { ProductGrid } from "@/app/_components/home/product-grid";
 import { TrustStrip } from "@/app/_components/home/trust-strip";
 import { SiteFooter } from "@/app/_components/home/site-footer";
@@ -14,6 +15,7 @@ export default function Home() {
       <SiteHeader />
       <main className="flex-1">
         <Hero />
+        <NewArrivals />
         <CategoryStrip />
         <ProductGrid />
         <DealsSection />
