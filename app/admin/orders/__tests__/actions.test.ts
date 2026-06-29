@@ -173,6 +173,23 @@ describe("cancelOrder", () => {
     expect(res).toEqual({ success: true, warning: "Order was paid — refund must be handled manually." });
   });
 
+  it("skips stock restore for an item whose product was deleted (null productId)", async () => {
+    orderFindUnique.mockResolvedValueOnce({
+      id: "o1", status: "CONFIRMED", paymentStatus: "PENDING",
+      guestName: null, guestEmail: null, user: null,
+      items: [
+        { productId: null, name: "Gone", size: "M", price: 6500, quantity: 2 },
+        { productId: "p1", name: "Dress", size: "M", price: 1000, quantity: 1 },
+      ],
+    });
+    const res = await cancelOrder("o1");
+    // only the surviving product's stock is restored; the null one is skipped
+    expect(productUpdateMany).toHaveBeenCalledTimes(1);
+    expect(productUpdateMany).toHaveBeenCalledWith({ where: { id: "p1" }, data: { stock: { increment: 1 } } });
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CANCELLED" } });
+    expect(res).toEqual({ success: true });
+  });
+
   it("emails the customer that their order was cancelled", async () => {
     orderFindUnique.mockResolvedValueOnce({
       id: "o1", status: "CONFIRMED", paymentStatus: "COD_PENDING",
@@ -532,29 +549,42 @@ describe("deleteOrder", () => {
     expect(res).toEqual({ success: true });
   });
 
-  it("rejects deleting a non-cancelled order", async () => {
+  it("deletes a delivered order without restoring stock", async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "DELIVERED" });
+    orderDelete.mockResolvedValueOnce({});
+    const res = await deleteOrder("o1");
+    expect(orderDelete).toHaveBeenCalledWith({ where: { id: "o1" } });
+    // delivered goods shipped — deletion must NOT return them to inventory
+    expect(productUpdateMany).not.toHaveBeenCalled();
+    expect(res).toEqual({ success: true });
+  });
+
+  it("rejects deleting an order that is neither cancelled nor delivered", async () => {
     orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "CONFIRMED" });
     const res = await deleteOrder("o1");
-    expect(res).toEqual({ success: false, error: "Only cancelled orders can be deleted" });
+    expect(res).toEqual({ success: false, error: "Only cancelled or delivered orders can be deleted" });
     expect(orderDelete).not.toHaveBeenCalled();
   });
 });
 
 describe("bulkDelete", () => {
-  it("deletes cancelled orders and skips the rest", async () => {
+  it("deletes cancelled and delivered orders and skips the rest", async () => {
     orderFindUnique
       .mockResolvedValueOnce({ id: "o1", status: "CANCELLED" })
-      .mockResolvedValueOnce({ id: "o2", status: "DELIVERED" });
+      .mockResolvedValueOnce({ id: "o2", status: "DELIVERED" })
+      .mockResolvedValueOnce({ id: "o3", status: "CONFIRMED" });
     orderDelete.mockResolvedValue({});
-    const res = await bulkDelete(["o1", "o2"]);
-    expect(orderDelete).toHaveBeenCalledTimes(1);
+    const res = await bulkDelete(["o1", "o2", "o3"]);
+    expect(orderDelete).toHaveBeenCalledTimes(2);
     expect(orderDelete).toHaveBeenCalledWith({ where: { id: "o1" } });
+    expect(orderDelete).toHaveBeenCalledWith({ where: { id: "o2" } });
     expect(productUpdateMany).not.toHaveBeenCalled(); // delete must never restore stock
-    expect(res.okCount).toBe(1);
+    expect(res.okCount).toBe(2);
     expect(res.skippedCount).toBe(1);
     expect(res.results).toEqual([
       { id: "o1", ok: true },
-      { id: "o2", ok: false, error: "Not cancelled" },
+      { id: "o2", ok: true },
+      { id: "o3", ok: false, error: "Not deletable" },
     ]);
   });
 });

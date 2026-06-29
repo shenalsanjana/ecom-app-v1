@@ -151,26 +151,17 @@ describe("updateProduct", () => {
 });
 
 describe("deleteProduct", () => {
-  it("blocks deletion when the product has order history", async () => {
-    orderItemCount.mockResolvedValueOnce(3);
-    const res = await deleteProduct("cat-white");
-    expect(orderItemCount).toHaveBeenCalledWith({ where: { productId: "cat-white" } });
-    expect(productDelete).not.toHaveBeenCalled();
-    expect(res).toEqual({
-      success: false,
-      error: "This product has order history and can't be deleted. Archive it instead.",
-    });
-  });
-  it("deletes a product with no order history", async () => {
-    orderItemCount.mockResolvedValueOnce(0);
+  it("hard-deletes a product even when it has order history", async () => {
+    // The DB FK is ON DELETE SET NULL, so order line items keep their snapshot
+    // and lose only the product link — no application-level history guard.
     productDelete.mockResolvedValueOnce({});
     const res = await deleteProduct("cat-white");
     expect(requireAdmin).toHaveBeenCalled();
+    expect(orderItemCount).not.toHaveBeenCalled(); // guard removed
     expect(productDelete).toHaveBeenCalledWith({ where: { id: "cat-white" } });
     expect(res).toEqual({ success: true });
   });
   it("returns a generic error when the delete throws", async () => {
-    orderItemCount.mockResolvedValueOnce(0);
     productDelete.mockRejectedValueOnce(new Error("db down"));
     const res = await deleteProduct("cat-white");
     expect(res).toEqual({ success: false, error: "Something went wrong. Please try again." });

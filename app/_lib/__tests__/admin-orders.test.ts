@@ -100,6 +100,22 @@ describe("applyItemChanges", () => {
   it("rejects reducing quantity to zero (use remove instead)", () => {
     expect(() => applyItemChanges(makeItems(), [{ id: "i1", quantity: 0 }])).toThrow();
   });
+
+  it("skips stock deltas for an item whose product was deleted (null productId)", () => {
+    // Product hard-deleted while the order is still live → productId is null.
+    // There is no product to restore/decrement, so it must never enter deltas
+    // (a 'null' key would later try updateMany({ id: null }) and mis-fire).
+    const items = [
+      { id: "i1", productId: null, name: "Gone", size: "M", price: 6500, quantity: 2 },
+      { id: "i2", productId: "p2", name: "Scarf", size: null, price: 2000, quantity: 2 },
+    ];
+    const { nextItems, stockDeltas } = applyItemChanges(items, [
+      { id: "i1", remove: true },
+      { id: "i2", quantity: 1 },
+    ]);
+    expect(nextItems.map((i) => i.id)).toEqual(["i2"]);
+    expect(stockDeltas).toEqual({ p2: 1 }); // only the live product, never a null key
+  });
 });
 
 import { nextStatuses, canEdit, canCancel } from "../admin-orders";

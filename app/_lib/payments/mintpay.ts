@@ -62,8 +62,8 @@ export const mintpayProvider: PaymentProvider = {
       cart_updated_date: now,
       products: order.items.map((item) => ({
         name: item.name,
-        product_id: item.productId,
-        sku: item.size ?? item.productId,
+        product_id: item.productId ?? "",
+        sku: item.size ?? item.productId ?? "",
         quantity: String(item.quantity),
         unit_price: item.price.toFixed(2),
         discount: "0.00",

@@ -52,14 +52,10 @@ export async function unarchiveProduct(id: string): Promise<ActionResult> {
 
 export async function deleteProduct(id: string): Promise<ActionResult> {
   await requireAdmin();
+  // Hard delete is always permitted. Order line items reference the product via
+  // an ON DELETE SET NULL FK, so a product with order history can be removed
+  // without losing the historical record (the line item keeps its own snapshot).
   try {
-    const orderCount = await prisma.orderItem.count({ where: { productId: id } });
-    if (orderCount > 0) {
-      return {
-        success: false,
-        error: "This product has order history and can't be deleted. Archive it instead.",
-      };
-    }
     await prisma.product.delete({ where: { id } });
   } catch {
     return { success: false, error: "Something went wrong. Please try again." };

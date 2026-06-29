@@ -66,7 +66,9 @@ export function recomputeTotals(
 
 export type OrderItemRow = {
   id: string;
-  productId: string;
+  // Null when the referenced product was hard-deleted (FK ON DELETE SET NULL).
+  // Such items keep their own snapshot but have no product to adjust stock on.
+  productId: string | null;
   name: string;
   size: string | null;
   price: number;
@@ -90,8 +92,9 @@ export function applyItemChanges(
 ): { nextItems: OrderItemRow[]; stockDeltas: Record<string, number> } {
   const byId = new Map(current.map((i) => [i.id, { ...i }]));
   const deltas: Record<string, number> = {};
-  const addDelta = (productId: string, d: number) => {
-    if (d === 0) return;
+  const addDelta = (productId: string | null, d: number) => {
+    // No product (hard-deleted) → nothing to restore/decrement; never key on null.
+    if (!productId || d === 0) return;
     deltas[productId] = (deltas[productId] ?? 0) + d;
   };
 
