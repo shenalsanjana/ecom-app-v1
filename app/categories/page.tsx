@@ -46,10 +46,12 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
 
   const buildCategoryLink = (catSlug: string) => `/categories?category=${catSlug}${sortBy !== "newest" ? `&sort=${sortBy}` : ""}`;
   const buildPageLink = (page: number) => {
-    let base = selectedCategory ? `/categories?category=${selectedCategory}` : "/categories";
-    if (sortBy !== "newest") base += `&sort=${sortBy}`;
-    if (page > 1) base += `&page=${page}`;
-    return base;
+    const params = new URLSearchParams();
+    if (selectedCategory) params.set("category", selectedCategory);
+    if (sortBy !== "newest") params.set("sort", sortBy);
+    if (page > 1) params.set("page", page.toString());
+    const qs = params.toString();
+    return qs ? `/categories?${qs}` : "/categories";
   };
 
   return (
