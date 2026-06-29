@@ -123,4 +123,13 @@
   html {
     @apply font-sans;
   }
+  /* Below lg, the product page's sticky purchase bar (which sets
+     data-mobile-cta on <body> while mounted) occupies the bottom edge.
+     Lift the global WhatsApp FAB above it so it stops overlapping the
+     right-aligned "Add to cart" button. 6rem clears the ~72px bar. */
+  @media (max-width: 1023.98px) {
+    body[data-mobile-cta] .whatsapp-fab {
+      bottom: 6rem;
+    }
+  }
 }

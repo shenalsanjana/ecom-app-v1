@@ -92,6 +92,15 @@ export function BuyBoxClient({
   const inStock = stock > 0;
   const qtyMax = Math.min(stock, 10);
 
+  // Signal that the mobile sticky purchase bar is on screen so the global
+  // WhatsApp FAB can lift above it (it overlaps "Add to cart" otherwise).
+  // Mirrors the bar's render gate (inStock + lg:hidden); removed on unmount.
+  useEffect(() => {
+    if (!inStock) return;
+    document.body.setAttribute("data-mobile-cta", "");
+    return () => document.body.removeAttribute("data-mobile-cta");
+  }, [inStock]);
+
   // Match cart line by composite key (productId + size).
   const cartKey = selectedSize ? `${productId}::${selectedSize}` : productId;
   const existingItem = items.find((i) => i.key === cartKey);
