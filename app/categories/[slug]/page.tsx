@@ -5,6 +5,7 @@ import { ProductCard } from "@/app/_components/home/product-card";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { SortSelect } from "@/app/_components/shared/sort-select";
+import { TrackCategoryView } from "@/app/_components/analytics/track-category-view";
 import type { Metadata } from "next";
 
 export const revalidate = 300;
@@ -65,6 +66,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   return (
     <>
       <SiteHeader />
+      <TrackCategoryView name={category.name} />
       <main className="flex-1">
         <section className="border-b bg-muted/30">
           <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
