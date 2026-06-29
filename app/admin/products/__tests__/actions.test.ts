@@ -1,21 +1,23 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const { requireAdmin } = vi.hoisted(() => ({ requireAdmin: vi.fn() }));
-const { productUpdate, productFindUnique, productCreate, productDelete, orderItemCount, categoryCreate, categoryFindUnique, imageCreateMany, imageDeleteMany, txn } =
+const { productUpdate, productFindUnique, productFindFirst, productCreate, productDelete, orderItemCount, categoryCreate, categoryFindUnique, imageCreateMany, imageDeleteMany, historyUpsert, historyDeleteMany, txn } =
   vi.hoisted(() => ({
-    productUpdate: vi.fn(), productFindUnique: vi.fn(), productCreate: vi.fn(),
+    productUpdate: vi.fn(), productFindUnique: vi.fn(), productFindFirst: vi.fn(), productCreate: vi.fn(),
     productDelete: vi.fn(), orderItemCount: vi.fn(),
     categoryCreate: vi.fn(), categoryFindUnique: vi.fn(),
-    imageCreateMany: vi.fn(), imageDeleteMany: vi.fn(), txn: vi.fn(),
+    imageCreateMany: vi.fn(), imageDeleteMany: vi.fn(),
+    historyUpsert: vi.fn(), historyDeleteMany: vi.fn(), txn: vi.fn(),
   }));
 
 vi.mock("@/app/_lib/admin-auth", () => ({ requireAdmin }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 vi.mock("@/app/_lib/prisma", () => {
   const client = {
-    product: { update: productUpdate, findUnique: productFindUnique, create: productCreate, delete: productDelete },
+    product: { update: productUpdate, findUnique: productFindUnique, findFirst: productFindFirst, create: productCreate, delete: productDelete },
     category: { create: categoryCreate, findUnique: categoryFindUnique },
     productImage: { createMany: imageCreateMany, deleteMany: imageDeleteMany },
+    productSlugHistory: { upsert: historyUpsert, deleteMany: historyDeleteMany },
     orderItem: { count: orderItemCount },
   };
   return { prisma: { ...client, $transaction: txn.mockImplementation(async (fn: (c: unknown) => unknown) => fn(client)) } };
@@ -25,15 +27,17 @@ import { updateStock, archiveProduct, unarchiveProduct } from "../actions";
 
 beforeEach(() => {
   requireAdmin.mockReset().mockResolvedValue({ user: { email: "admin@x.test" } });
-  productUpdate.mockReset(); productFindUnique.mockReset(); productCreate.mockReset();
+  productUpdate.mockReset(); productFindUnique.mockReset(); productFindFirst.mockReset(); productCreate.mockReset();
   productDelete.mockReset(); orderItemCount.mockReset();
   categoryCreate.mockReset(); categoryFindUnique.mockReset();
   imageCreateMany.mockReset(); imageDeleteMany.mockReset();
+  historyUpsert.mockReset(); historyDeleteMany.mockReset();
   txn.mockReset().mockImplementation(async (fn: (c: unknown) => unknown) => {
     const client = {
-      product: { update: productUpdate, findUnique: productFindUnique, create: productCreate, delete: productDelete },
+      product: { update: productUpdate, findUnique: productFindUnique, findFirst: productFindFirst, create: productCreate, delete: productDelete },
       category: { create: categoryCreate, findUnique: categoryFindUnique },
       productImage: { createMany: imageCreateMany, deleteMany: imageDeleteMany },
+      productSlugHistory: { upsert: historyUpsert, deleteMany: historyDeleteMany },
       orderItem: { count: orderItemCount },
     };
     return fn(client);
@@ -134,10 +138,10 @@ describe("updateProduct", () => {
     const updArg = productUpdate.mock.calls[0][0];
     expect(updArg.where).toEqual({ id: "cat-white" });
     expect(updArg.data.name).toBe("Cat White v2");
-    expect(updArg.data.id).toBeUndefined(); // slug/id never updated
+    expect(updArg.data.id).toBeUndefined(); // slug/id never updated on field-only path
     expect(imageDeleteMany).toHaveBeenCalledWith({ where: { productId: "cat-white" } });
     expect(imageCreateMany).toHaveBeenCalledWith({ data: [{ productId: "cat-white", url: "/g/1.jpg", sortOrder: 0 }] });
-    expect(res).toEqual({ success: true });
+    expect(res).toEqual({ success: true, slug: "cat-white" });
   });
   it("clears the gallery (deleteMany, no createMany) when gallery is empty", async () => {
     productFindUnique.mockResolvedValueOnce({ id: "cat-white" });
@@ -146,7 +150,60 @@ describe("updateProduct", () => {
     const res = await updateProduct("cat-white", { ...NEW_INPUT, gallery: [] });
     expect(imageDeleteMany).toHaveBeenCalledWith({ where: { productId: "cat-white" } });
     expect(imageCreateMany).not.toHaveBeenCalled();
-    expect(res).toEqual({ success: true });
+    expect(res).toEqual({ success: true, slug: "cat-white" });
+  });
+});
+
+describe("updateProduct rename", () => {
+  it("renames the slug, records history, rebuilds gallery under the new id, clears self-loop", async () => {
+    productFindUnique.mockResolvedValueOnce({ id: "cat-white" });
+    productFindFirst.mockResolvedValueOnce(null); // cat-black is free
+    productUpdate.mockResolvedValueOnce({});
+    imageDeleteMany.mockResolvedValueOnce({ count: 1 });
+    imageCreateMany.mockResolvedValueOnce({ count: 1 });
+    historyUpsert.mockResolvedValueOnce({});
+    historyDeleteMany.mockResolvedValueOnce({ count: 0 });
+
+    const res = await updateProduct("cat-white", { ...NEW_INPUT, name: "Cat Black", slug: "cat-black", gallery: ["/g/1.jpg"] });
+
+    expect(productFindFirst).toHaveBeenCalledWith({ where: { id: "cat-black", NOT: { id: "cat-white" } } });
+    const updArg = productUpdate.mock.calls[0][0];
+    expect(updArg.data.id).toBe("cat-black");
+    expect(updArg.data.name).toBe("Cat Black");
+    expect(imageDeleteMany).toHaveBeenCalledWith({ where: { productId: "cat-black" } });
+    expect(imageCreateMany).toHaveBeenCalledWith({ data: [{ productId: "cat-black", url: "/g/1.jpg", sortOrder: 0 }] });
+    expect(historyUpsert).toHaveBeenCalledWith({
+      where: { oldSlug: "cat-white" },
+      update: { currentId: "cat-black" },
+      create: { oldSlug: "cat-white", currentId: "cat-black" },
+    });
+    expect(historyDeleteMany).toHaveBeenCalledWith({ where: { oldSlug: "cat-black" } });
+    expect(res).toEqual({ success: true, slug: "cat-black" });
+  });
+
+  it("rename collides with another product: appends a numeric suffix", async () => {
+    productFindUnique.mockResolvedValueOnce({ id: "cat-white" });
+    productFindFirst.mockResolvedValueOnce({ id: "cat-black" }).mockResolvedValueOnce(null); // cat-black taken, cat-black-2 free
+    productUpdate.mockResolvedValueOnce({});
+    imageDeleteMany.mockResolvedValueOnce({});
+    historyUpsert.mockResolvedValueOnce({});
+    historyDeleteMany.mockResolvedValueOnce({ count: 0 });
+
+    const res = await updateProduct("cat-white", { ...NEW_INPUT, name: "Cat Black", slug: "cat-black", gallery: [] });
+
+    const updArg = productUpdate.mock.calls[0][0];
+    expect(updArg.data.id).toBe("cat-black-2");
+    expect(res).toEqual({ success: true, slug: "cat-black-2" });
+  });
+
+  it("rejects a rename to a name/slug with no slug-able characters", async () => {
+    productFindUnique.mockResolvedValueOnce({ id: "cat-white" });
+
+    const res = await updateProduct("cat-white", { ...NEW_INPUT, name: "!!!", slug: "" });
+
+    expect(res).toEqual({ success: false, error: "Name must contain letters or numbers" });
+    expect(productUpdate).not.toHaveBeenCalled();
+    expect(historyUpsert).not.toHaveBeenCalled();
   });
 });
 

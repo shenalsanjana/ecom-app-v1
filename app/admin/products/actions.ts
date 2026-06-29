@@ -123,27 +123,72 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
   const existing = await prisma.product.findUnique({ where: { id } });
   if (!existing) return { success: false, error: "Product not found" };
 
+  const candidateSlug = slugify(d.slug || d.name);
+  if (!candidateSlug) return { success: false, error: "Name must contain letters or numbers" };
+
+  // Field-only edit (slug unchanged): update scalars + rebuild gallery, no rename, no history row.
+  if (candidateSlug === id) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.product.update({
+          where: { id },
+          data: {
+            name: d.name, categorySlug: d.categorySlug,
+            price: d.price, originalPrice: d.originalPrice ?? null, stock: d.stock,
+            sizes: serializeSizes(d.sizes), description: d.description, image: d.image,
+          },
+        });
+        await tx.productImage.deleteMany({ where: { productId: id } });
+        if (d.gallery.length > 0) {
+          await tx.productImage.createMany({
+            data: d.gallery.map((url, i) => ({ productId: id, url, sortOrder: i })),
+          });
+        }
+      });
+    } catch {
+      return { success: false, error: "Could not save product (check the category exists)." };
+    }
+    revalidate(id);
+    return { success: true, slug: id };
+  }
+
+  // Rename: resolve a unique new slug, excluding the current product itself.
+  const newSlug = await uniqueSlug(
+    candidateSlug,
+    async (s) => (await prisma.product.findFirst({ where: { id: s, NOT: { id } } })) !== null,
+  );
+
   try {
     await prisma.$transaction(async (tx) => {
+      // ON UPDATE CASCADE moves child rows (images/reviews/wishlist/order items)
+      // and existing ProductSlugHistory.currentId rows to newSlug automatically.
       await tx.product.update({
         where: { id },
         data: {
-          name: d.name, categorySlug: d.categorySlug,
+          id: newSlug, name: d.name, categorySlug: d.categorySlug,
           price: d.price, originalPrice: d.originalPrice ?? null, stock: d.stock,
           sizes: serializeSizes(d.sizes), description: d.description, image: d.image,
-          // id/slug intentionally NOT updated
         },
       });
-      await tx.productImage.deleteMany({ where: { productId: id } });
+      // Cascade already moved existing gallery rows to newSlug; rebuild under newSlug.
+      await tx.productImage.deleteMany({ where: { productId: newSlug } });
       if (d.gallery.length > 0) {
         await tx.productImage.createMany({
-          data: d.gallery.map((url, i) => ({ productId: id, url, sortOrder: i })),
+          data: d.gallery.map((url, i) => ({ productId: newSlug, url, sortOrder: i })),
         });
       }
+      await tx.productSlugHistory.upsert({
+        where: { oldSlug: id },
+        update: { currentId: newSlug },
+        create: { oldSlug: id, currentId: newSlug },
+      });
+      // If newSlug was itself a previously-retired slug, drop that row to avoid a self-redirect loop.
+      await tx.productSlugHistory.deleteMany({ where: { oldSlug: newSlug } });
     });
   } catch {
     return { success: false, error: "Could not save product (check the category exists)." };
   }
-  revalidate(id);
-  return { success: true };
+  revalidatePath(`/admin/products/${id}/edit`); // bust the old edit URL too
+  revalidate(newSlug);
+  return { success: true, slug: newSlug };
 }
