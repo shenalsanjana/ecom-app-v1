@@ -60,7 +60,7 @@ export function ProductCard({
           <WishlistHeart productId={id} fromPath={fromPath} />
         </div>
       </div>
-      <CardContent className="space-y-1.5 p-4">
+      <CardContent className="flex flex-col gap-1.5 p-4">
         {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
         <h3 className="font-heading line-clamp-2 min-h-[2.75rem] text-base font-medium leading-snug">
           <Link href={href} className="hover:underline underline-offset-4">
