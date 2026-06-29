@@ -1,6 +1,6 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import Link from "next/link";
-import { getCategories, getProducts, parseSortBy } from "@/app/_lib/products";
+import { getCategories, getProducts, parseSortBy, getCategorySlugRedirect } from "@/app/_lib/products";
 import { ProductCard } from "@/app/_components/home/product-card";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
@@ -16,6 +16,8 @@ export async function generateMetadata(
   const categories = await getCategories();
   const category = categories.find((c) => c.slug === slug);
   if (!category) {
+    const dest = await getCategorySlugRedirect(slug);
+    if (dest) permanentRedirect(`/categories/${dest}`);
     return { title: "Category not found" };
   }
   return {
@@ -41,7 +43,11 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   ]);
 
   const category = categories.find((c) => c.slug === slug);
-  if (!category) { notFound(); }
+  if (!category) {
+    const dest = await getCategorySlugRedirect(slug);
+    if (dest) permanentRedirect(`/categories/${dest}`);
+    notFound();
+  }
 
   const ITEMS_PER_PAGE = 12;
   const totalPages = Math.ceil(allProducts.length / ITEMS_PER_PAGE);

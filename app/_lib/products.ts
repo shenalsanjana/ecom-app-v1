@@ -316,6 +316,11 @@ export async function getProducts(opts: GetProductsOptions = {}): Promise<Produc
   return views;
 }
 
+export async function getCategorySlugRedirect(oldSlug: string): Promise<string | null> {
+  const row = await prisma.categorySlugHistory.findUnique({ where: { oldSlug } });
+  return row?.currentSlug ?? null;
+}
+
 export async function searchProducts(query: string, limit = 20): Promise<ProductView[]> {
   if (!query || !query.trim()) return [];
   const searchTerm = query.trim();
