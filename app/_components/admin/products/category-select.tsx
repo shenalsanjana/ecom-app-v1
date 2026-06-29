@@ -35,7 +35,7 @@ export function CategorySelect({
       {adding && (
         <div className="mt-2 space-y-2 rounded border p-2">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Category name" className="w-full rounded border px-2 py-1 text-sm" />
-          <ImageInput value={image} onChange={setImage} preview placeholder="Image URL / path — or upload →" />
+          <ImageInput value={image} onChange={setImage} preview resizeTarget="category" placeholder="Image URL / path — or upload →" />
           <div className="flex items-center gap-2">
             <button type="button" disabled={pending || !name.trim() || !image.trim()} onClick={add} className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">{pending ? "Creating…" : "Create"}</button>
             <button type="button" onClick={() => setAdding(false)} className="rounded border px-2 py-1 text-xs">Cancel</button>

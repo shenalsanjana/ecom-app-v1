@@ -21,7 +21,7 @@ export function GalleryEditor({ urls, onChange }: { urls: string[]; onChange: (u
           <button type="button" onClick={() => remove(i)} className="px-1 text-destructive">✕</button>
         </div>
       ))}
-      <UploadButton multiple label="⤴ Upload from device" onUploadedMany={(newUrls) => onChange([...urls, ...newUrls])} className="rounded border px-3 py-1 text-sm disabled:opacity-50" />
+      <UploadButton multiple resizeTarget="product" label="⤴ Upload from device" onUploadedMany={(newUrls) => onChange([...urls, ...newUrls])} className="rounded border px-3 py-1 text-sm disabled:opacity-50" />
 
     </div>
   );

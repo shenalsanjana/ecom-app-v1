@@ -114,7 +114,7 @@ export function ProductForm({ mode, categories, initial }: { mode: "create" | "e
         <div className="space-y-4">
           <div className="rounded-lg border p-4">
             <label className="mb-1 block text-xs text-muted-foreground">Main image (URL / path or upload)</label>
-            <ImageInput value={f.image} onChange={(v) => set("image", v)} preview />
+            <ImageInput value={f.image} onChange={(v) => set("image", v)} preview resizeTarget="product" />
           </div>
           <div className="rounded-lg border p-4">
             <label className="mb-2 block text-xs text-muted-foreground">Gallery</label>

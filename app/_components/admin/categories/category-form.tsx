@@ -46,7 +46,7 @@ export function CategoryForm({ mode, initial }: { mode: "create" | "edit"; initi
         </div>
         <div className="rounded-lg border p-4">
           <label className="mb-1 block text-xs text-muted-foreground">Image (URL / path or upload)</label>
-          <ImageInput value={image} onChange={setImage} preview />
+          <ImageInput value={image} onChange={setImage} preview resizeTarget="category" />
         </div>
         {mode === "edit" ? (
           <p className="text-xs text-muted-foreground">

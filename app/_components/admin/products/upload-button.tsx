@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
+import { resizeImageFile, type ResizeTarget } from "@/app/_lib/resize-image";
 
 // Upload one file and return its public URL. Production goes straight to Vercel
 // Blob (bypasses the 4.5MB body cap); local dev saves into /public/uploads.
@@ -30,12 +31,14 @@ export function UploadButton({
   onUploaded,
   onUploadedMany,
   multiple = false,
+  resizeTarget,
   label = "Upload",
   className = "rounded border px-2 py-1.5 text-sm whitespace-nowrap disabled:opacity-50",
 }: {
   onUploaded?: (url: string) => void;
   onUploadedMany?: (urls: string[]) => void;
   multiple?: boolean;
+  resizeTarget?: ResizeTarget;
   label?: string;
   className?: string;
 }) {
@@ -49,8 +52,14 @@ export function UploadButton({
 
     setBusy(true);
     try {
+      // Resize/crop each file (when a target is set) before uploading.
       // allSettled so one bad file doesn't discard the others; order preserved.
-      const results = await Promise.allSettled(files.map(uploadOne));
+      const results = await Promise.allSettled(
+        files.map(async (file) => {
+          const prepared = resizeTarget ? await resizeImageFile(file, resizeTarget) : file;
+          return uploadOne(prepared);
+        }),
+      );
       const urls = results
         .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
         .map((r) => r.value);
