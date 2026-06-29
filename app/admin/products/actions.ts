@@ -50,6 +50,24 @@ export async function unarchiveProduct(id: string): Promise<ActionResult> {
   return { success: true };
 }
 
+export async function deleteProduct(id: string): Promise<ActionResult> {
+  await requireAdmin();
+  const orderCount = await prisma.orderItem.count({ where: { productId: id } });
+  if (orderCount > 0) {
+    return {
+      success: false,
+      error: "This product has order history and can't be deleted. Archive it instead.",
+    };
+  }
+  try {
+    await prisma.product.delete({ where: { id } });
+  } catch {
+    return { success: false, error: "Something went wrong. Please try again." };
+  }
+  revalidate(id);
+  return { success: true };
+}
+
 const CategorySchema = z.object({
   name: z.string().trim().min(1),
   image: z.string().trim().min(1),

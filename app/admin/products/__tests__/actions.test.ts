@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const { requireAdmin } = vi.hoisted(() => ({ requireAdmin: vi.fn() }));
-const { productUpdate, productFindUnique, productCreate, categoryCreate, categoryFindUnique, imageCreateMany, imageDeleteMany, txn } =
+const { productUpdate, productFindUnique, productCreate, productDelete, orderItemCount, categoryCreate, categoryFindUnique, imageCreateMany, imageDeleteMany, txn } =
   vi.hoisted(() => ({
     productUpdate: vi.fn(), productFindUnique: vi.fn(), productCreate: vi.fn(),
+    productDelete: vi.fn(), orderItemCount: vi.fn(),
     categoryCreate: vi.fn(), categoryFindUnique: vi.fn(),
     imageCreateMany: vi.fn(), imageDeleteMany: vi.fn(), txn: vi.fn(),
   }));
@@ -12,9 +13,10 @@ vi.mock("@/app/_lib/admin-auth", () => ({ requireAdmin }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 vi.mock("@/app/_lib/prisma", () => {
   const client = {
-    product: { update: productUpdate, findUnique: productFindUnique, create: productCreate },
+    product: { update: productUpdate, findUnique: productFindUnique, create: productCreate, delete: productDelete },
     category: { create: categoryCreate, findUnique: categoryFindUnique },
     productImage: { createMany: imageCreateMany, deleteMany: imageDeleteMany },
+    orderItem: { count: orderItemCount },
   };
   return { prisma: { ...client, $transaction: txn.mockImplementation(async (fn: (c: unknown) => unknown) => fn(client)) } };
 });
@@ -24,13 +26,15 @@ import { updateStock, archiveProduct, unarchiveProduct } from "../actions";
 beforeEach(() => {
   requireAdmin.mockReset().mockResolvedValue({ user: { email: "admin@x.test" } });
   productUpdate.mockReset(); productFindUnique.mockReset(); productCreate.mockReset();
+  productDelete.mockReset(); orderItemCount.mockReset();
   categoryCreate.mockReset(); categoryFindUnique.mockReset();
   imageCreateMany.mockReset(); imageDeleteMany.mockReset();
   txn.mockReset().mockImplementation(async (fn: (c: unknown) => unknown) => {
     const client = {
-      product: { update: productUpdate, findUnique: productFindUnique, create: productCreate },
+      product: { update: productUpdate, findUnique: productFindUnique, create: productCreate, delete: productDelete },
       category: { create: categoryCreate, findUnique: categoryFindUnique },
       productImage: { createMany: imageCreateMany, deleteMany: imageDeleteMany },
+      orderItem: { count: orderItemCount },
     };
     return fn(client);
   });
@@ -124,6 +128,7 @@ describe("createProduct", () => {
 });
 
 import { updateProduct } from "../actions";
+import { deleteProduct } from "../actions";
 
 describe("updateProduct", () => {
   it("rejects when the product does not exist", async () => {
@@ -153,5 +158,32 @@ describe("updateProduct", () => {
     expect(imageDeleteMany).toHaveBeenCalledWith({ where: { productId: "cat-white" } });
     expect(imageCreateMany).not.toHaveBeenCalled();
     expect(res).toEqual({ success: true });
+  });
+});
+
+describe("deleteProduct", () => {
+  it("blocks deletion when the product has order history", async () => {
+    orderItemCount.mockResolvedValueOnce(3);
+    const res = await deleteProduct("cat-white");
+    expect(orderItemCount).toHaveBeenCalledWith({ where: { productId: "cat-white" } });
+    expect(productDelete).not.toHaveBeenCalled();
+    expect(res).toEqual({
+      success: false,
+      error: "This product has order history and can't be deleted. Archive it instead.",
+    });
+  });
+  it("deletes a product with no order history", async () => {
+    orderItemCount.mockResolvedValueOnce(0);
+    productDelete.mockResolvedValueOnce({});
+    const res = await deleteProduct("cat-white");
+    expect(requireAdmin).toHaveBeenCalled();
+    expect(productDelete).toHaveBeenCalledWith({ where: { id: "cat-white" } });
+    expect(res).toEqual({ success: true });
+  });
+  it("returns a generic error when the delete throws", async () => {
+    orderItemCount.mockResolvedValueOnce(0);
+    productDelete.mockRejectedValueOnce(new Error("db down"));
+    const res = await deleteProduct("cat-white");
+    expect(res).toEqual({ success: false, error: "Something went wrong. Please try again." });
   });
 });
