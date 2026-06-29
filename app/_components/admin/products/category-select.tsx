@@ -1,6 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
-import { createCategory } from "@/app/admin/products/actions";
+import { createCategory } from "@/app/admin/categories/actions";
 import { ImageInput } from "./image-input";
 
 type Cat = { slug: string; name: string };
