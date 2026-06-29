@@ -91,6 +91,23 @@ export const getFeaturedProducts = unstable_cache(
   { tags: ["catalog", "featured"], revalidate: 300 }
 );
 
+export const getNewArrivals = unstable_cache(
+  async (limit = 6): Promise<ProductView[]> => {
+    const rows = await prisma.product.findMany({
+      where: { archived: false, id: { startsWith: "p" } },
+      orderBy: { id: "desc" },
+      take: limit,
+      select: {
+        id: true, name: true, price: true, originalPrice: true,
+        image: true, categorySlug: true, sizes: true,
+      },
+    });
+    return attachAggregates(rows);
+  },
+  ["new-arrivals"],
+  { tags: ["catalog", "new-arrivals"], revalidate: 300 }
+);
+
 export const getDealsProducts = unstable_cache(
   async (limit = 4): Promise<ProductView[]> => {
     const rows = await prisma.product.findMany({
