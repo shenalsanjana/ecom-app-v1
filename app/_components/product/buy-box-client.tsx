@@ -260,7 +260,10 @@ export function BuyBoxClient({
 
       <ul className="flex flex-wrap gap-x-5 gap-y-2 border-t border-border pt-4 text-xs text-muted-foreground">
         <li className="flex items-center gap-1.5">
-          <Truck className="h-4 w-4" aria-hidden /> Free shipping over {formatPrice(FREE_DELIVERY_THRESHOLD)}
+          <Truck className="h-4 w-4" aria-hidden />{" "}
+          {FREE_DELIVERY_THRESHOLD > 0
+            ? `Free shipping over ${formatPrice(FREE_DELIVERY_THRESHOLD)}`
+            : "Free shipping for all products"}
         </li>
         <li className="flex items-center gap-1.5">
           <RotateCcw className="h-4 w-4" aria-hidden /> Free 14-day returns
