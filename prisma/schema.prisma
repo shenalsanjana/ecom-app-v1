@@ -40,10 +40,19 @@ model Address {
 }
 
 model Category {
-  slug      String    @id
-  name      String
-  image     String
-  products  Product[]
+  slug        String                @id
+  name        String
+  image       String
+  products    Product[]
+  slugHistory CategorySlugHistory[]
+}
+
+model CategorySlugHistory {
+  oldSlug     String   @id
+  currentSlug String
+  category    Category @relation(fields: [currentSlug], references: [slug], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([currentSlug])
 }
 
 model Product {
