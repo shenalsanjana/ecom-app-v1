@@ -72,9 +72,18 @@ model Product {
   images        ProductImage[]
   reviews       Review[]
   orderItems    OrderItem[]
+  slugHistory   ProductSlugHistory[]
 
   @@index([categorySlug])
   @@index([archived])
+}
+
+model ProductSlugHistory {
+  oldSlug   String  @id
+  currentId String
+  product   Product @relation(fields: [currentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([currentId])
 }
 
 model ProductImage {
