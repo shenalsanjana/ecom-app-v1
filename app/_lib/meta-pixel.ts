@@ -52,6 +52,26 @@ export function track(
   }
 }
 
+function trackCustom(name: string, payload?: Record<string, unknown>): void {
+  const f = fbq();
+  if (!f) return;
+  try {
+    f("trackCustom", name, payload ?? {});
+  } catch {
+    // Pixel must never break the page.
+  }
+}
+
+export function trackViewCategory(categoryName: string): void {
+  // Custom event (not ViewContent) so the product-level conversion signal stays
+  // clean. Carries the category NAME, not the slug, so audiences survive slug
+  // renames (the app rewrites slugs via getCategorySlugRedirect).
+  trackCustom("ViewCategory", {
+    content_category: categoryName,
+    content_name: categoryName,
+  });
+}
+
 function content(productIds: string[], value: number, extra?: Record<string, unknown>) {
   return {
     content_ids: productIds,

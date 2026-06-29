@@ -68,6 +68,25 @@ describe("meta-pixel", () => {
     expect(calls[0][2]).toMatchObject({ content_ids: ["p2"], value: 3980, num_items: 2 });
   });
 
+  it("trackViewCategory fires a custom ViewCategory event with the category name", async () => {
+    const { calls } = installWindow(true);
+    const m = await import("@/app/_lib/meta-pixel");
+    m.trackViewCategory("Dresses");
+    expect(calls).toHaveLength(1);
+    expect(calls[0][0]).toBe("trackCustom");
+    expect(calls[0][1]).toBe("ViewCategory");
+    expect(calls[0][2]).toMatchObject({
+      content_category: "Dresses",
+      content_name: "Dresses",
+    });
+  });
+
+  it("trackViewCategory no-ops when fbq is absent (no throw)", async () => {
+    installWindow(false);
+    const m = await import("@/app/_lib/meta-pixel");
+    expect(() => m.trackViewCategory("Dresses")).not.toThrow();
+  });
+
   it("trackPurchaseOnce fires once per order id and passes eventID", async () => {
     const { calls } = installWindow(true);
     const m = await import("@/app/_lib/meta-pixel");
