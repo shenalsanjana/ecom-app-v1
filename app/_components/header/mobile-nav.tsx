@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 const NAV_LINKS = [
+  { href: "/", label: "Home" },
   { href: "/categories", label: "Shop" },
   { href: "/deals", label: "Deals" },
   { href: "/about", label: "About" },

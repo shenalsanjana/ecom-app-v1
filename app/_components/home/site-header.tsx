@@ -1,6 +1,6 @@
 // app/_components/home/site-header.tsx
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Home, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { WishlistIcon } from "@/app/_components/header/wishlist-icon";
 import { ProfileMenu } from "@/app/_components/header/profile-menu";
@@ -21,6 +21,13 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:gap-6 sm:px-6 lg:px-8">
         <MobileNav />
         <BrandMark />
+        <Link
+          href="/"
+          aria-label="Home"
+          className="hidden items-center text-muted-foreground transition-colors duration-(--duration-fast) hover:text-brand md:inline-flex"
+        >
+          <Home className="h-5 w-5" />
+        </Link>
         <nav className="hidden items-center gap-5 text-sm md:flex">
           {NAV_LINKS.map((l) => (
             <Link
