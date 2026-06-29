@@ -26,8 +26,10 @@ export async function createCategory(input: { name: string; image: string }): Pr
   const parsed = CategorySchema.safeParse(input);
   if (!parsed.success) return { success: false, error: "Name and image are required" };
 
+  const baseSlug = slugify(parsed.data.name);
+  if (!baseSlug) return { success: false, error: "Name must contain letters or numbers" };
   const slug = await uniqueSlug(
-    slugify(parsed.data.name),
+    baseSlug,
     async (s) => (await prisma.category.findUnique({ where: { slug: s } })) !== null,
   );
   let created;
@@ -52,6 +54,7 @@ export async function updateCategory(
   const { name, image } = parsed.data;
 
   const candidateSlug = slugify(name);
+  if (!candidateSlug) return { success: false, error: "Name must contain letters or numbers" };
 
   // Name/image-only update — slug is unchanged, so no rename + no history row.
   if (candidateSlug === currentSlug) {

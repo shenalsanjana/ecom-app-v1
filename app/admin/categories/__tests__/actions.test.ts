@@ -47,6 +47,11 @@ describe("createCategory", () => {
     expect(categoryCreate).toHaveBeenCalledWith({ data: { slug: "hats-2", name: "Hats", image: "/hats.jpg" } });
     expect(res).toEqual({ success: true, slug: "hats-2", name: "Hats" });
   });
+  it("rejects a name with no slug-able characters", async () => {
+    const res = await createCategory({ name: "!!!", image: "/x.jpg" });
+    expect(res).toEqual({ success: false, error: "Name must contain letters or numbers" });
+    expect(categoryCreate).not.toHaveBeenCalled();
+  });
 });
 
 describe("updateCategory", () => {
@@ -82,6 +87,12 @@ describe("updateCategory", () => {
     const res = await updateCategory("cats", { name: "Kittens", image: "/k.jpg" });
     expect(categoryUpdate).toHaveBeenCalledWith({ where: { slug: "cats" }, data: { slug: "kittens-2", name: "Kittens", image: "/k.jpg" } });
     expect(res).toEqual({ success: true, slug: "kittens-2", name: "Kittens" });
+  });
+  it("rejects a rename to a name with no slug-able characters", async () => {
+    const res = await updateCategory("cats", { name: "!!!", image: "/k.jpg" });
+    expect(res).toEqual({ success: false, error: "Name must contain letters or numbers" });
+    expect(categoryUpdate).not.toHaveBeenCalled();
+    expect(categoryFindFirst).not.toHaveBeenCalled();
   });
 });
 
