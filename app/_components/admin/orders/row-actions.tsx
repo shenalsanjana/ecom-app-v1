@@ -19,6 +19,12 @@ export function RowActions(p: Props) {
   const unpaidOnline = p.paymentMethod !== "COD" && p.paymentStatus !== "PAID";
   const terminal = p.status === "DELIVERED" || p.status === "CANCELLED";
   const showCodCollected = !terminal && p.paymentMethod === "COD" && p.paymentStatus === "COD_PENDING";
+  // Both terminal states are hard-deletable. The delivered copy warns that the
+  // fulfilled-sale record is destroyed; cancelled orders carry no such history.
+  const deliveredDelete = p.status === "DELIVERED";
+  const deleteConfirm = deliveredDelete
+    ? "Permanently delete this delivered order? Its sale records will be lost. This cannot be undone."
+    : "Permanently delete this cancelled order? This cannot be undone.";
 
   const confirmOrder = () =>
     unpaidOnline
@@ -68,12 +74,12 @@ export function RowActions(p: Props) {
         </button>
       )}
       {terminal && <span className="text-muted-foreground">{p.waybill ?? "—"}</span>}
-      {p.status === "CANCELLED" && (
+      {terminal && (
         <button
           disabled={pending}
-          onClick={() => run("delete", () => deleteOrder(p.orderId), "Permanently delete this cancelled order? This cannot be undone.")}
+          onClick={() => run("delete", () => deleteOrder(p.orderId), deleteConfirm)}
           className="inline-flex items-center gap-1 rounded-md border border-destructive px-2 py-1 text-xs text-destructive disabled:opacity-50"
-          aria-label="Permanently delete this cancelled order"
+          aria-label={deliveredDelete ? "Permanently delete this delivered order" : "Permanently delete this cancelled order"}
         >
           {runningLabel === "delete" && <Spinner />} Delete
         </button>

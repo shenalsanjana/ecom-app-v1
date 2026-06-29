@@ -69,7 +69,7 @@ async function OrderDetails({ orderId, paymentStatus }: { orderId: string; payme
       <TrackPurchase
         orderId={order.id}
         value={order.total}
-        contentIds={order.items.map((i) => i.productId)}
+        contentIds={order.items.map((i) => i.productId).filter((id): id is string => id !== null)}
         confirmed={isPaid || isCod}
       />
       <div className="mx-auto max-w-2xl px-4 py-20 text-center">

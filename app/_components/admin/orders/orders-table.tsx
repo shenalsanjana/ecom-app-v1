@@ -81,7 +81,11 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
     });
 
   const selectedRows = rows.filter((o) => selected.has(o.id));
-  const allCancelled = selectedRows.length > 0 && selectedRows.every((o) => o.status === "CANCELLED");
+  // Both terminal states are hard-deletable; "Delete selected" only appears when
+  // every selected order qualifies, so the action never silently skips rows.
+  const allDeletable =
+    selectedRows.length > 0 && selectedRows.every((o) => o.status === "CANCELLED" || o.status === "DELIVERED");
+  const anyDeliveredSelected = selectedRows.some((o) => o.status === "DELIVERED");
   // A bulk action is only offered (enabled) when at least one selected order is
   // eligible for it; otherwise the button is greyed out (standard disabled state).
   const canConfirmAny = selectedRows.some((o) => o.status === "PENDING");
@@ -92,7 +96,10 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
     start(async () => {
       const ids = [...selected];
       if (ids.length === 0) return;
-      if (!window.confirm(`Permanently delete ${ids.length} cancelled order(s)? This cannot be undone.`)) return;
+      const warning = anyDeliveredSelected
+        ? ` Delivered orders among them will lose their sale records.`
+        : "";
+      if (!window.confirm(`Permanently delete ${ids.length} order(s)?${warning} This cannot be undone.`)) return;
       report(await bulkDelete(ids), "deleted");
     });
 
@@ -110,7 +117,7 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
           <button disabled={pending || !canCancelAny} onClick={cancelSelected} aria-label="Cancel selected orders"
             title={canCancelAny ? undefined : "Selected orders are delivered or cancelled"}
             className="rounded-md border border-destructive px-3 py-1 text-xs text-destructive disabled:opacity-50">Cancel selected</button>
-          {allCancelled && (
+          {allDeletable && (
             <button disabled={pending} onClick={deleteSelected} aria-label="Permanently delete selected orders"
               className="rounded-md bg-destructive px-3 py-1 text-xs font-semibold text-destructive-foreground disabled:opacity-50">Delete selected</button>
           )}

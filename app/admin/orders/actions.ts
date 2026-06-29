@@ -95,9 +95,11 @@ const PAID = new Set(["PAID", "COD_COLLECTED"]);
 async function cancelOrderTx(
   tx: Prisma.TransactionClient,
   orderId: string,
-  items: { productId: string; quantity: number }[],
+  items: { productId: string | null; quantity: number }[],
 ): Promise<void> {
   for (const it of items) {
+    // Skip items whose product was hard-deleted (productId null) — nothing to restore.
+    if (!it.productId) continue;
     await tx.product.updateMany({ where: { id: it.productId }, data: { stock: { increment: it.quantity } } });
   }
   await tx.order.update({ where: { id: orderId }, data: { status: "CANCELLED" } });
@@ -447,13 +449,21 @@ export async function bulkCancel(ids: string[]): Promise<BulkResult> {
   return summarize(results);
 }
 
+// Statuses an order may be hard-deleted from. CANCELLED already restored stock
+// at cancel time; DELIVERED shipped its goods — neither path returns stock to
+// inventory on delete (see below).
+const DELETABLE_STATUSES = new Set(["CANCELLED", "DELIVERED"]);
+
 export async function deleteOrder(orderId: string): Promise<ActionResult> {
   await requireAdmin();
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return { success: false, error: "Order not found" };
-  if (order.status !== "CANCELLED") return { success: false, error: "Only cancelled orders can be deleted" };
+  if (!DELETABLE_STATUSES.has(order.status)) {
+    return { success: false, error: "Only cancelled or delivered orders can be deleted" };
+  }
   // Pure record removal: items & notes cascade-delete (schema onDelete: Cascade).
-  // Do NOT restore stock here — cancellation already did.
+  // Do NOT restore stock here — a CANCELLED order already restored it, and a
+  // DELIVERED order's goods have shipped and must not return to inventory.
   try {
     await prisma.order.delete({ where: { id: orderId } });
   } catch {
@@ -469,7 +479,7 @@ export async function bulkDelete(ids: string[]): Promise<BulkResult> {
   for (const id of ids) {
     const order = await prisma.order.findUnique({ where: { id } });
     if (!order) { results.push({ id, ok: false, error: "Not found" }); continue; }
-    if (order.status !== "CANCELLED") { results.push({ id, ok: false, error: "Not cancelled" }); continue; }
+    if (!DELETABLE_STATUSES.has(order.status)) { results.push({ id, ok: false, error: "Not deletable" }); continue; }
     try {
       await prisma.order.delete({ where: { id } });
       results.push({ id, ok: true });

@@ -16,7 +16,9 @@ export type PaymentInitResult = {
 };
 
 export type PaymentOrderItem = {
-  productId: string;
+  // Null when the product was hard-deleted after the order was placed; the line
+  // item still carries its own name/price/size snapshot for the payment payload.
+  productId: string | null;
   name: string;
   quantity: number;
   price: number;
