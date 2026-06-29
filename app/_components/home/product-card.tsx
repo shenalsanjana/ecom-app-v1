@@ -1,14 +1,17 @@
 // app/_components/home/product-card.tsx
 import Image from "next/image";
 import Link from "next/link";
-import { Star, Zap } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Zap } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { AddToCartDialog } from "@/app/_components/cart/add-to-cart-dialog";
 import { WishlistHeart } from "@/app/_components/wishlist/wishlist-heart";
-import { formatPrice } from "@/app/_lib/format";
 import { prettifyCategory } from "@/app/_lib/category-label";
+import { discountPct } from "@/app/_lib/pricing";
+import { Eyebrow } from "@/app/_components/ui/eyebrow";
+import { Price } from "@/app/_components/ui/price";
+import { Rating } from "@/app/_components/ui/rating";
+import { SaleBadge } from "@/app/_components/ui/sale-badge";
 
 export type ProductCardProps = {
   id: string;
@@ -22,10 +25,6 @@ export type ProductCardProps = {
   category?: string;
   fromPath?: string;
 };
-
-function discountPct(price: number, original: number): number {
-  return Math.round(((original - price) / original) * 100);
-}
 
 export function ProductCard({
   id,
@@ -47,14 +46,7 @@ export function ProductCard({
   return (
     <Card className="group overflow-hidden p-0">
       <div className="relative aspect-[4/5] overflow-hidden bg-muted">
-        {onSale && (
-          <Badge
-            variant="outline"
-            className="absolute left-3 top-3 z-10 bg-card/90 text-brand"
-          >
-            -{pct}%
-          </Badge>
-        )}
+        {onSale && <SaleBadge pct={pct} className="absolute left-3 top-3 z-10" />}
         <Link href={href} aria-label={name} className="absolute inset-0">
           <Image
             src={image}
@@ -69,29 +61,14 @@ export function ProductCard({
         </div>
       </div>
       <CardContent className="space-y-1.5 p-4">
-        {eyebrow && (
-          <p className="text-[0.65rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            {eyebrow}
-          </p>
-        )}
+        {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
         <h3 className="font-heading line-clamp-2 min-h-[2.75rem] text-base font-medium leading-snug">
-          <Link href={href} className="hover:underline underline-offset-4">{name}</Link>
+          <Link href={href} className="hover:underline underline-offset-4">
+            {name}
+          </Link>
         </h3>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Star className="h-3.5 w-3.5 fill-amber-400 stroke-amber-400" />
-          <span className="font-medium text-foreground">{rating.toFixed(1)}</span>
-          <span>({reviewCount.toLocaleString()})</span>
-        </div>
-        <div className="flex items-baseline gap-2">
-          <span className={"font-heading text-base font-semibold " + (onSale ? "text-brand" : "")}>
-            {formatPrice(price)}
-          </span>
-          {onSale && (
-            <span className="text-sm text-muted-foreground line-through">
-              {formatPrice(originalPrice as number)}
-            </span>
-          )}
-        </div>
+        <Rating rating={rating} reviewCount={reviewCount} />
+        <Price price={price} originalPrice={originalPrice} />
       </CardContent>
       <CardFooter className="p-4 pt-0">
         <div className="flex w-full flex-col gap-2">
