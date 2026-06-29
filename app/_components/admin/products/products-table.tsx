@@ -3,6 +3,7 @@ import Image from "next/image";
 import { formatPrice } from "@/app/_lib/format";
 import { Badge } from "@/components/ui/badge";
 import { StockQuickEdit } from "./stock-quick-edit";
+import { DeleteProductButton } from "./delete-product-button";
 
 type Row = {
   id: string; name: string; price: number; originalPrice: number | null;
@@ -17,7 +18,7 @@ export function ProductsTable({ rows }: { rows: Row[] }) {
       <thead>
         <tr className="border-b text-left text-xs uppercase text-muted-foreground">
           <th className="p-2"></th><th className="p-2">Name</th><th className="p-2">Category</th>
-          <th className="p-2">Price</th><th className="p-2">Stock</th><th className="p-2">Sizes</th><th className="p-2">Status</th>
+          <th className="p-2">Price</th><th className="p-2">Stock</th><th className="p-2">Sizes</th><th className="p-2">Status</th><th className="p-2 text-right">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -33,6 +34,7 @@ export function ProductsTable({ rows }: { rows: Row[] }) {
             <td className="p-2"><StockQuickEdit id={p.id} value={p.stock} /></td>
             <td className="p-2 text-muted-foreground">{p.sizes}</td>
             <td className="p-2"><Badge variant={p.archived ? "outline" : "secondary"}>{p.archived ? "Archived" : "Active"}</Badge></td>
+            <td className="p-2 text-right"><DeleteProductButton id={p.id} name={p.name} /></td>
           </tr>
         ))}
       </tbody>
