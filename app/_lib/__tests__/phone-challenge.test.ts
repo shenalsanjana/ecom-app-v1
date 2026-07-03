@@ -66,6 +66,12 @@ describe("verifyChallenge", () => {
     const r = await verifyChallenge({ phone: "+94771234567", purpose: "SIGNUP", code });
     expect(r).toEqual({ ok: true, payload: "{\"x\":1}" });
     expect(update).toHaveBeenCalledWith(expect.objectContaining({ data: { consumedAt: expect.any(Date) } }));
+    // Guard the security-critical WHERE filters: an expired or already-consumed
+    // challenge must never be eligible for a match (rejects replay + expiry bypass).
+    expect(findFirst.mock.calls[0][0].where).toMatchObject({
+      consumedAt: null,
+      expiresAt: { gt: expect.any(Date) },
+    });
   });
 
   it("increments attempts and fails on a wrong code", async () => {
@@ -83,5 +89,6 @@ describe("verifyChallenge", () => {
   it("fails when attempts are exhausted", async () => {
     findFirst.mockResolvedValueOnce({ id: "c1", codeHash, attempts: 5, payload: null });
     expect(await verifyChallenge({ phone: "+94771234567", purpose: "SIGNUP", code })).toEqual({ ok: false });
+    expect(update).not.toHaveBeenCalled();
   });
 });
