@@ -48,6 +48,7 @@ next-env.d.ts
 
 # git worktrees
 .worktrees/
+.claude/worktrees/
 
 # bug-report screenshots (local debugging artefacts)
 bugs/
