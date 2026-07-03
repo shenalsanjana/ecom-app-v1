@@ -119,8 +119,10 @@ same way. Living under `app/**` is also required for Vitest to discover its test
 
 Pool sizing target: ~10–12 shared + ~6–8 per category ≈ 16–20 available per
 category, so 5–10 shown per product repeat little. Rating distribution across the
-combined pool stays positive-skewed (mostly 4–5★, occasional 3★, rare 2★) so the
-displayed average barely moves from today.
+combined pool is positive-skewed (mostly 4–5★, occasional 3★, rare 2★). Because
+templates are sampled uniformly, the displayed average **rises** from today's
+~3.9★ (old `RATING_POOL` mean) to ~4.4★ — a deliberate, desirable lift for a
+store, not a claim of stability.
 
 ### 5.2 `prisma/seed.ts` (edit)
 
@@ -150,8 +152,9 @@ Mirrors `update-review-names.ts`:
   deleted as part of this change.
 
 Note: this rewrites `rating` as well as title/body, because coherent templates
-require the stars to match the words. The template distribution is positive-skewed
-so the aggregate average is stable. (Alternative — freezing existing ratings — was
+require the stars to match the words. The template distribution is positive-skewed,
+which lifts the displayed average from ~3.9★ to ~4.4★ (a deliberate, desirable
+improvement for a store — not a claim that it stays put). (Alternative — freezing existing ratings — was
 weighed and rejected; see §9.)
 
 ## 6. Content voice
@@ -187,7 +190,8 @@ No DB in this workspace, so:
 - **`synthetic` column over a lighter guard** — approved. Durable, and makes the
   submission form (§10) safe by construction.
 - **Rewrite `rating` too, not just title+body** — approved. Coherent templates need
-  matching stars; positive-skewed distribution keeps the average stable.
+  matching stars; the positive-skewed distribution lifts the displayed average from
+  ~3.9★ to ~4.4★ (intended, and fine for a store).
 - **Author names re-assigned from the expanded pool** — introduces the new male
   names across existing reviews.
 
