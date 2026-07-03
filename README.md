@@ -190,6 +190,23 @@ The seed creates 12 realistic oversize t-shirt products with:
 - `APP_URL` must be set to the public site origin in production so feed links,
   share URLs, and OG image URLs are absolute.
 
+## SMS / Notify.lk Integration
+
+Phone signup and password reset send one-time codes via
+[Notify.lk](https://app.notify.lk). Configure three env vars:
+`NOTIFY_LK_USER_ID`, `NOTIFY_LK_API_KEY`, `NOTIFY_LK_SENDER_ID`.
+
+- **Get credentials** from the Notify.lk dashboard → **API Keys**.
+- **Sender ID must be approved** before it can send in production — use the
+  shared `NotifyDEMO` sender for testing while your own sender ID is pending
+  approval.
+- **SMS is pre-paid credits**, not free — top up the Notify.lk account or OTP
+  delivery will fail.
+- In production, set all three vars in **Vercel → Project → Settings →
+  Environment Variables** (do not commit real values to any file).
+- If a key was ever shared outside a secrets manager (e.g. pasted during a
+  design discussion), regenerate it in the dashboard before using it.
+
 ## Tech Stack
 
 - **Framework:** Next.js 16 (App Router)
