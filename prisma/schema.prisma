@@ -226,7 +226,7 @@ model PhoneChallenge {
   id         String    @id @default(cuid())
   phone      String
   codeHash   String
-  purpose    String    @db.VarChar(16) // "SIGNUP" | "RESET"
+  purpose    String    @db.VarChar(16) // "SIGNUP" | "RESET" | "NOTICE" (throttle-only marker for the already-registered signup branch; never verifiable)
   payload    String?                    // SIGNUP: JSON { name, email, passwordHash }
   attempts   Int       @default(0)
   expiresAt  DateTime
