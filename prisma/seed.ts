@@ -155,6 +155,7 @@ async function main() {
         body: tpl.body,
         createdAt,
         synthetic: true,
+        approved: true,
       };
     });
     await prisma.review.createMany({ data: reviews });
