@@ -3,15 +3,17 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const { create, findFirst, update, count, del } = vi.hoisted(() => ({
   create: vi.fn(), findFirst: vi.fn(), update: vi.fn(), count: vi.fn(), del: vi.fn(),
 }));
-const { sendOtpSms } = vi.hoisted(() => ({ sendOtpSms: vi.fn() }));
+const { sendOtpSms, sendAccountExistsSms } = vi.hoisted(() => ({
+  sendOtpSms: vi.fn(), sendAccountExistsSms: vi.fn(),
+}));
 
 vi.mock("@/app/_lib/prisma", () => ({
   prisma: { phoneChallenge: { create, findFirst, update, count, delete: del } },
 }));
-vi.mock("@/app/_lib/sms", () => ({ sendOtpSms }));
+vi.mock("@/app/_lib/sms", () => ({ sendOtpSms, sendAccountExistsSms }));
 
 import {
-  issueChallenge, verifyChallenge, ChallengeCooldownError, ChallengeRateLimitError,
+  issueChallenge, verifyChallenge, issueAccountExistsNotice, ChallengeCooldownError, ChallengeRateLimitError,
 } from "../phone-challenge";
 import { createHash } from "crypto";
 
@@ -22,6 +24,7 @@ beforeEach(() => {
   count.mockReset().mockResolvedValue(0);         // under hourly cap
   del.mockReset().mockResolvedValue({});
   sendOtpSms.mockReset().mockResolvedValue(undefined);
+  sendAccountExistsSms.mockReset().mockResolvedValue(undefined);
 });
 
 describe("issueChallenge", () => {
@@ -54,6 +57,39 @@ describe("issueChallenge", () => {
     sendOtpSms.mockRejectedValueOnce(new Error("notify down"));
     await expect(issueChallenge({ phone: "+94771234567", purpose: "SIGNUP" })).rejects.toThrow("notify down");
     expect(del).toHaveBeenCalledWith({ where: { id: "c1" } });
+  });
+});
+
+describe("issueAccountExistsNotice", () => {
+  it("throws cooldown when a recent challenge exists, and never sends", async () => {
+    findFirst.mockResolvedValueOnce({ id: "recent" }); // cooldown lookup hits
+    await expect(issueAccountExistsNotice("+94771234567")).rejects.toBeInstanceOf(ChallengeCooldownError);
+    expect(sendAccountExistsSms).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("throws rate limit when the hourly cap is reached, and never sends", async () => {
+    count.mockResolvedValueOnce(5); // at cap; findFirst stays null so cooldown passes
+    await expect(issueAccountExistsNotice("+94771234567")).rejects.toBeInstanceOf(ChallengeRateLimitError);
+    expect(sendAccountExistsSms).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("creates a purpose:NOTICE row and sends the account-exists SMS on the happy path", async () => {
+    await issueAccountExistsNotice("+94771234567");
+    expect(create).toHaveBeenCalledOnce();
+    const data = create.mock.calls[0][0].data;
+    expect(data.phone).toBe("+94771234567");
+    expect(data.purpose).toBe("NOTICE");
+    expect(data.codeHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(sendAccountExistsSms).toHaveBeenCalledWith("+94771234567");
+  });
+
+  it("deletes the dangling row and rethrows if the SMS send fails", async () => {
+    create.mockResolvedValueOnce({ id: "notice1" });
+    sendAccountExistsSms.mockRejectedValueOnce(new Error("notify down"));
+    await expect(issueAccountExistsNotice("+94771234567")).rejects.toThrow("notify down");
+    expect(del).toHaveBeenCalledWith({ where: { id: "notice1" } });
   });
 });
 

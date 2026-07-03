@@ -8,8 +8,13 @@ import { AuthError } from "next-auth";
 import { signIn } from "@/app/_lib/auth";
 import { prisma } from "@/app/_lib/prisma";
 import { issuePasswordReset } from "@/app/_lib/password-reset";
-import { issueChallenge, verifyChallenge, ChallengeCooldownError } from "@/app/_lib/phone-challenge";
-import { sendAccountExistsSms } from "@/app/_lib/sms";
+import {
+  issueChallenge,
+  verifyChallenge,
+  issueAccountExistsNotice,
+  ChallengeCooldownError,
+  ChallengeRateLimitError,
+} from "@/app/_lib/phone-challenge";
 import { resolveIdentifier } from "@/app/_lib/phone";
 import {
   SignupSchema,
@@ -68,8 +73,17 @@ async function signupRequest(formData: FormData, callbackUrl: string): Promise<S
   const existing = await prisma.user.findFirst({ where: { phone, phoneVerifiedAt: { not: null } } });
   if (existing) {
     // Enumeration-safe: identical web response; the number's owner learns the
-    // truth only by SMS. No usable signup challenge is created.
-    try { await sendAccountExistsSms(phone); } catch (e) { console.error("[Signup] existence SMS failed", e); }
+    // truth only by SMS. No usable signup challenge is created. The notice is
+    // throttled + counted identically to a real OTP send (issueAccountExistsNotice
+    // shares issueChallenge's cooldown/hourly-cap budget) so throttling can't be
+    // used to distinguish this branch from the fresh-number branch below.
+    try {
+      await issueAccountExistsNotice(phone);
+    } catch (e) {
+      if (!(e instanceof ChallengeCooldownError || e instanceof ChallengeRateLimitError)) {
+        console.error("[Signup] account-exists notice failed", e);
+      }
+    }
     return { step: "verify", phone, callbackUrl };
   }
 
@@ -84,7 +98,12 @@ async function signupRequest(formData: FormData, callbackUrl: string): Promise<S
   try {
     await issueChallenge({ phone, purpose: "SIGNUP", payload });
   } catch (e) {
-    if (e instanceof ChallengeCooldownError) return { step: "verify", phone, callbackUrl }; // a code was just sent
+    if (e instanceof ChallengeCooldownError || e instanceof ChallengeRateLimitError) {
+      // A code was just sent, or the hourly cap is hit — neutral response so this
+      // matches the already-registered branch's throttled state exactly and
+      // doesn't leak account existence via a "details" vs "verify" divergence.
+      return { step: "verify", phone, callbackUrl };
+    }
     console.error("[Signup] issueChallenge failed", e);
     return { step: "details", error: "We couldn't send a code right now. Please try again shortly.", callbackUrl };
   }
@@ -103,13 +122,19 @@ async function signupVerify(formData: FormData, callbackUrl: string): Promise<Si
   if (!result.ok || !result.payload) {
     return { step: "verify", phone, error: "That code is invalid or has expired.", callbackUrl };
   }
-  const data = JSON.parse(result.payload) as { name: string; email: string | null; passwordHash: string };
+  let data: { name: string; email: string | null; passwordHash: string };
+  try {
+    data = JSON.parse(result.payload) as { name: string; email: string | null; passwordHash: string };
+  } catch {
+    return { step: "verify", phone, error: "That code is invalid or has expired.", callbackUrl };
+  }
   try {
     await prisma.user.create({
       data: { name: data.name, email: data.email, phone, phoneVerifiedAt: new Date(), passwordHash: data.passwordHash },
     });
-  } catch {
+  } catch (e) {
     // Unique violation (race with a concurrent verify) → already registered.
+    console.error("[Signup] user create failed (treating as already-registered)", e);
     return { step: "verify", phone, error: "This number is already registered. Please sign in.", callbackUrl };
   }
   const suffix = callbackUrl && callbackUrl !== "/" ? `&callbackUrl=${encodeURIComponent(callbackUrl)}` : "";

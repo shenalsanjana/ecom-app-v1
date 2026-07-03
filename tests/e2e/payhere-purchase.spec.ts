@@ -205,7 +205,7 @@ test("guest checkout with PayHere creates PENDING order", async ({ page }) => {
 test("full PayHere checkout creates PENDING order, then verified state confirms", async ({ page }) => {
   // Log in.
   await page.goto("/login");
-  await page.getByLabel("Email").fill(EMAIL);
+  await page.getByLabel("Phone or email").fill(EMAIL);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: /Sign in/i }).click();
   await page.waitForURL("**/", { timeout: 10_000 });

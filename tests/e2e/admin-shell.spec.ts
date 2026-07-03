@@ -17,7 +17,7 @@ test.describe("Spec #2: admin UI shell", () => {
       // This follows the same path as admin-auth.spec.ts test #7 which is
       // known to pass. Once the cookie is settled, navigate to /admin.
       await page.goto("/login?callbackUrl=/about");
-      await page.fill("#email", ADMIN.email);
+      await page.fill("#identifier", ADMIN.email);
       await page.fill("#password", ADMIN.password);
       await Promise.all([
         page.waitForURL("/about"),

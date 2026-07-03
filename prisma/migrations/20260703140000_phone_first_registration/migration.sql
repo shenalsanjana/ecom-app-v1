@@ -10,7 +10,6 @@ ALTER TABLE "User" ALTER COLUMN "email" DROP NOT NULL;
 -- but the original init migration created this column NOT NULL — without this
 -- line the DB constraint would still reject phone-only inserts even though
 -- Prisma's generated types say it's allowed. Idempotent: no-op if already nullable.
--- (Deviation from the task brief's verbatim SQL — see task-2-report.md.)
 ALTER TABLE "User" ALTER COLUMN "passwordHash" DROP NOT NULL;
 
 -- Phone identity columns

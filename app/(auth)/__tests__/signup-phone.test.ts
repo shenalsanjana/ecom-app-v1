@@ -3,17 +3,19 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const { findFirst, findUnique, create } = vi.hoisted(() => ({
   findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(),
 }));
-const { issueChallenge, verifyChallenge } = vi.hoisted(() => ({
-  issueChallenge: vi.fn(), verifyChallenge: vi.fn(),
+const { issueChallenge, verifyChallenge, issueAccountExistsNotice } = vi.hoisted(() => ({
+  issueChallenge: vi.fn(), verifyChallenge: vi.fn(), issueAccountExistsNotice: vi.fn(),
 }));
-const { sendAccountExistsSms } = vi.hoisted(() => ({ sendAccountExistsSms: vi.fn() }));
 const { redirect } = vi.hoisted(() => ({ redirect: vi.fn(() => { throw new Error("REDIRECT"); }) }));
 
 vi.mock("@/app/_lib/prisma", () => ({ prisma: { user: { findFirst, findUnique, create } } }));
 vi.mock("@/app/_lib/phone-challenge", () => ({
-  issueChallenge, verifyChallenge, ChallengeCooldownError: class extends Error {},
+  issueChallenge,
+  verifyChallenge,
+  issueAccountExistsNotice,
+  ChallengeCooldownError: class extends Error {},
+  ChallengeRateLimitError: class extends Error {},
 }));
-vi.mock("@/app/_lib/sms", () => ({ sendAccountExistsSms }));
 vi.mock("next/navigation", () => ({ redirect }));
 // actions.ts still imports `signIn`/`AuthError` for the untouched loginAction;
 // without these mocks, next-auth's module graph fails to resolve "next/server"
@@ -23,6 +25,7 @@ vi.mock("@/app/_lib/auth", () => ({ signIn: vi.fn() }));
 vi.mock("next-auth", () => ({ AuthError: class extends Error {} }));
 
 import { signupAction } from "../actions";
+import { ChallengeRateLimitError } from "@/app/_lib/phone-challenge";
 
 function fd(obj: Record<string, string>): FormData {
   const f = new FormData();
@@ -31,9 +34,10 @@ function fd(obj: Record<string, string>): FormData {
 }
 
 beforeEach(() => {
-  [findFirst, findUnique, create, issueChallenge, verifyChallenge, sendAccountExistsSms, redirect]
+  [findFirst, findUnique, create, issueChallenge, verifyChallenge, issueAccountExistsNotice, redirect]
     .forEach((m) => m.mockReset());
   redirect.mockImplementation(() => { throw new Error("REDIRECT"); });
+  issueAccountExistsNotice.mockResolvedValue(undefined);
 });
 
 describe("signupAction — request step", () => {
@@ -46,12 +50,20 @@ describe("signupAction — request step", () => {
     expect(s).toMatchObject({ step: "verify", phone: "+94771234567" });
   });
 
-  it("is enumeration-safe: already-verified number → same verify step, no signup challenge, existence SMS", async () => {
+  it("is enumeration-safe: already-verified number → same verify step, no signup challenge, throttled account-exists notice", async () => {
     findFirst.mockResolvedValue({ id: "u1" }); // already verified
     const s = await signupAction(null, fd(details));
     expect(issueChallenge).not.toHaveBeenCalled();
-    expect(sendAccountExistsSms).toHaveBeenCalledWith("+94771234567");
+    expect(issueAccountExistsNotice).toHaveBeenCalledWith("+94771234567");
     expect(s).toMatchObject({ step: "verify", phone: "+94771234567" });
+  });
+
+  it("closes the enumeration oracle: fresh number hitting the hourly cap still returns step:verify, not step:details", async () => {
+    findFirst.mockResolvedValue(null); // no verified account — fresh-number branch
+    issueChallenge.mockRejectedValue(new ChallengeRateLimitError());
+    const s = await signupAction(null, fd(details));
+    expect(s).toMatchObject({ step: "verify", phone: "+94771234567" });
+    expect(s).not.toMatchObject({ step: "details" });
   });
 });
 

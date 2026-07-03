@@ -16,7 +16,7 @@ test.describe("Spec #15: admin orders page", () => {
       // cookie-propagation race that makes waitForURL("/admin/orders") time out.
       // Once the cookie is settled, navigate to /admin/orders.
       await page.goto("/login?callbackUrl=/about");
-      await page.fill("#email", ADMIN.email);
+      await page.fill("#identifier", ADMIN.email);
       await page.fill("#password", ADMIN.password);
       await Promise.all([
         page.waitForURL("/about"),
