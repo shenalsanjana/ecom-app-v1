@@ -38,9 +38,24 @@ Design spec: `docs/superpowers/specs/2026-07-04-checkout-contact-and-sms-notific
 | `app/checkout/page.tsx` | Load `User.phone` + default `Address`; pass to client |
 | `app/checkout/checkout-client.tsx` | Seed phone/address; alternate field; guest email optional; helper; mobile pattern |
 | `app/(auth)/login/page.tsx`, `forgot-password/page.tsx`, `_lib/auth.ts`, `_lib/validation.ts`, `(auth)/actions.ts` | "Email or Mobile Number" copy |
+| `app/checkout/checkout-prefill.ts` (new) | Pure resolver: session/user/address → checkout pre-fill |
 | `app/_lib/__tests__/order-sms.test.ts` (new) | SMS templates |
 | `app/_lib/__tests__/order-notifications.test.ts` (new) | Routing + idempotency matrix |
+| `app/checkout/__tests__/checkout-prefill.test.ts` (new) | Pre-fill resolver branches |
 | Existing tests | Updated to mock the dispatcher / new schema |
+
+---
+
+## Pre-flight (before Task 1)
+
+Establish a green baseline on `main` so per-task FAIL→PASS gates are unambiguous:
+
+```bash
+npm run test        # vitest run — expect all green
+npx tsc --noEmit    # expect no errors
+```
+
+If either is already red on `main`, stop and report it — do not start Task 1 on a red baseline.
 
 ---
 
@@ -955,6 +970,8 @@ async function trySendCancellationEmail(details: OrderDetails): Promise<void> {
 }
 ```
 
+Both `cancelOrder` (line 125) and `bulkCancel` (line 450) call this shared helper, so single **and** bulk cancellations are covered by this one change.
+
 3. In `dispatchManually`, replace the customer-email block (lines 330-339) with:
 
 ```ts
@@ -1060,7 +1077,118 @@ git commit -m "feat(courier): forward alternate delivery phone as Curfox seconda
 
 ---
 
-## Task 8: Checkout UI — pre-fill, alternate field, optional guest email, helper text
+## Task 8: Checkout pre-fill resolver (pure, tested)
+
+**Files:**
+- Create: `app/checkout/checkout-prefill.ts`
+- Test: `app/checkout/__tests__/checkout-prefill.test.ts` (new)
+
+**Interfaces:**
+- Produces: `type CheckoutPrefill = { name: string; email: string; phone: string; address: { line1: string; line2: string; city: string } | null }`; `resolveCheckoutPrefill(dbUser, defaultAddress, fallbackName): CheckoutPrefill | null`.
+
+- [ ] **Step 1: Write the failing test**
+
+Create `app/checkout/__tests__/checkout-prefill.test.ts`:
+
+```ts
+import { describe, it, expect } from "vitest";
+import { resolveCheckoutPrefill } from "../checkout-prefill";
+
+const user = { name: "Jane", email: "jane@example.com", phone: "+94771234567" };
+const addr = { line1: "1 Main St", line2: "Apt 2", city: "Colombo" };
+
+describe("resolveCheckoutPrefill", () => {
+  it("returns null when there is no db user (guest)", () => {
+    expect(resolveCheckoutPrefill(null, null, "")).toBeNull();
+  });
+
+  it("fills name/email/phone and the default address", () => {
+    expect(resolveCheckoutPrefill(user, addr, "Fallback")).toEqual({
+      name: "Jane",
+      email: "jane@example.com",
+      phone: "+94771234567",
+      address: { line1: "1 Main St", line2: "Apt 2", city: "Colombo" },
+    });
+  });
+
+  it("phone-only user (null email) → empty email, address null when none saved", () => {
+    expect(resolveCheckoutPrefill({ name: "P", email: null, phone: "+94770000000" }, null, "")).toEqual({
+      name: "P",
+      email: "",
+      phone: "+94770000000",
+      address: null,
+    });
+  });
+
+  it("coerces a null address line2 to an empty string", () => {
+    const out = resolveCheckoutPrefill(user, { line1: "1 Main St", line2: null, city: "Kandy" }, "");
+    expect(out?.address).toEqual({ line1: "1 Main St", line2: "", city: "Kandy" });
+  });
+
+  it("uses the fallback name when the user row has no name", () => {
+    expect(
+      resolveCheckoutPrefill({ name: null, email: null, phone: null }, null, "Session Name")?.name,
+    ).toBe("Session Name");
+  });
+});
+```
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `npm run test`
+Expected: FAIL — cannot resolve `../checkout-prefill`.
+
+- [ ] **Step 3: Implement the resolver**
+
+Create `app/checkout/checkout-prefill.ts`:
+
+```ts
+export type CheckoutPrefill = {
+  name: string;
+  email: string;
+  phone: string;
+  address: { line1: string; line2: string; city: string } | null;
+};
+
+/**
+ * Maps a logged-in customer's DB row + default address into the checkout
+ * pre-fill shape. Returns null for guests (no db user). Pure — unit-tested.
+ */
+export function resolveCheckoutPrefill(
+  dbUser: { name: string | null; email: string | null; phone: string | null } | null,
+  defaultAddress: { line1: string; line2: string | null; city: string } | null,
+  fallbackName: string,
+): CheckoutPrefill | null {
+  if (!dbUser) return null;
+  return {
+    name: dbUser.name ?? fallbackName ?? "",
+    email: dbUser.email ?? "",
+    phone: dbUser.phone ?? "",
+    address: defaultAddress
+      ? { line1: defaultAddress.line1, line2: defaultAddress.line2 ?? "", city: defaultAddress.city }
+      : null,
+  };
+}
+```
+
+- [ ] **Step 4: Run the test to verify it passes**
+
+Run: `npm run test`
+Expected: PASS.
+
+Run: `npx tsc --noEmit`
+Expected: no errors.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add app/checkout/checkout-prefill.ts app/checkout/__tests__/checkout-prefill.test.ts
+git commit -m "feat(checkout): add pure checkout pre-fill resolver"
+```
+
+---
+
+## Task 9: Checkout UI — pre-fill, alternate field, optional guest email, helper text
 
 **Files:**
 - Modify: `app/checkout/page.tsx`
@@ -1068,9 +1196,9 @@ git commit -m "feat(courier): forward alternate delivery phone as Curfox seconda
 - Test: `tests/e2e/` (edit for CI — not run locally)
 
 **Interfaces:**
-- Consumes: `prisma.user.findUnique`, `prisma.address.findFirst`, the widened `CheckoutUser` prop.
+- Consumes: `resolveCheckoutPrefill`/`CheckoutPrefill` (Task 8), `prisma.user.findUnique`, `prisma.address.findFirst`.
 
-> No local unit test — this is RSC/client wiring. The action-level guarantees are covered by Task 5. Gate locally with `npx tsc --noEmit`; the E2E edits validate in CI.
+> The pre-fill *logic* is unit-tested in Task 8; this task is the RSC/client wiring around it. Gate locally with `npx tsc --noEmit` + `npm run test`; the E2E edits validate in CI.
 
 - [ ] **Step 1: Load contact + default address in the server component**
 
@@ -1081,6 +1209,7 @@ Replace `app/checkout/page.tsx` body with:
 import { auth } from "@/app/_lib/auth";
 import { prisma } from "@/app/_lib/prisma";
 import { CheckoutClient } from "./checkout-client";
+import { resolveCheckoutPrefill } from "./checkout-prefill";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { checkoutPaymentOptions } from "@/app/_lib/payments/registry";
 import { catalogueByDistrict } from "@/app/_lib/courier/catalogue";
@@ -1101,14 +1230,7 @@ export default async function CheckoutPage() {
         select: { line1: true, line2: true, city: true },
       }),
     ]);
-    user = {
-      name: dbUser?.name ?? session.user.name ?? "",
-      email: dbUser?.email ?? "",
-      phone: dbUser?.phone ?? "",
-      address: defaultAddress
-        ? { line1: defaultAddress.line1, line2: defaultAddress.line2 ?? "", city: defaultAddress.city }
-        : null,
-    };
+    user = resolveCheckoutPrefill(dbUser, defaultAddress, session.user.name ?? "");
   }
 
   return (
@@ -1128,15 +1250,12 @@ export default async function CheckoutPage() {
 
 In `app/checkout/checkout-client.tsx`:
 
-1. Replace the `CheckoutUser` type (line 32):
+1. Replace the `CheckoutUser` type (line 32) by reusing the resolver's type (add the import near the top of the file):
 
 ```ts
-type CheckoutUser = {
-  name: string;
-  email: string;
-  phone: string;
-  address: { line1: string; line2: string; city: string } | null;
-} | null;
+import { type CheckoutPrefill } from "./checkout-prefill";
+
+type CheckoutUser = CheckoutPrefill | null;
 ```
 
 2. Seed phone, alternate, and address from the user (replace lines 65-77):
@@ -1255,7 +1374,7 @@ git commit -m "feat(checkout): pre-fill saved contact/address, optional guest em
 
 ---
 
-## Task 9: Auth copy — "Email or Mobile Number"
+## Task 10: Auth copy — "Email or Mobile Number"
 
 **Files:**
 - Modify: `app/(auth)/login/page.tsx:86, 93`
@@ -1315,7 +1434,7 @@ git commit -m "feat(auth): relabel login identifier to Email or Mobile Number"
 
 ## Self-Review Notes (author check completed)
 
-- **Spec coverage:** §4.1 schema → T1; §4.2 auth copy → T9; §4.3 pre-fill → T8; §4.4 guest email optional/helper → T5+T8; §4.5 alternate phone → T5(persist)+T7(courier); §4.6 mobile validation → T5; §4.7 dispatcher → T3; §4.8 SMS templates → T2; §4.9 wiring → T4(prepaid)+T5(COD)+T6(dispatch/cancel); admin resend stays email-only (untouched). All §11 acceptance criteria map to a task.
+- **Spec coverage:** §4.1 schema → T1; §4.2 auth copy → T10; §4.3 pre-fill → T8 (pure resolver) + T9 (wiring); §4.4 guest email optional/helper → T5 + T9; §4.5 alternate phone → T5 (persist) + T7 (courier); §4.6 mobile validation → T5; §4.7 dispatcher → T3; §4.8 SMS templates → T2; §4.9 wiring → T4 (prepaid) + T5 (COD) + T6 (dispatch/cancel); admin resend stays email-only (untouched). All §11 acceptance criteria map to a task.
 - **Type consistency:** dispatcher signatures (`notifyOrderConfirmed(details)`, `notifyOrderDispatched(details, trackingCode)`, `notifyOrderCancelled(details)`) are used identically in T4/T5/T6; SMS template param shapes in T2 match the dispatcher call sites in T3; `OrderDetails.alternatePhone` defined in T1 is consumed in T5/T7.
 - **Idempotency:** confirmation SMS + email use atomic `claimOnce`; the prepaid path keeps its outer `paymentStatus` claim (T4) so Koko's double callback cannot double-send.
 ```
