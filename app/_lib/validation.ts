@@ -1,5 +1,8 @@
 // app/_lib/validation.ts
 import { z } from "zod";
+import { LkMobileSchema } from "@/app/_lib/phone";
+
+export { LkMobileSchema };
 
 export const PasswordSchema = z
   .string()
@@ -10,7 +13,8 @@ export const PasswordSchema = z
 export const SignupSchema = z
   .object({
     name: z.string().trim().min(2, "Name must be at least 2 characters"),
-    email: z.string().trim().email("Enter a valid email"),
+    phone: LkMobileSchema,
+    email: z.string().trim().email("Enter a valid email").optional(),
     password: PasswordSchema,
     confirmPassword: z.string(),
   })
