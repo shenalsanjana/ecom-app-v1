@@ -11,4 +11,8 @@ for (const file of [".env", ".env.local"]) {
 
 export default defineConfig({
   schema: path.join("prisma", "schema.prisma"),
+  // Moved from the deprecated `package.json#prisma` block (removed in Prisma 7).
+  migrations: {
+    seed: "tsx prisma/seed.ts",
+  },
 });

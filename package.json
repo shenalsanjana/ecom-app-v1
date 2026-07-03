@@ -21,9 +21,6 @@
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset --force"
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  },
   "dependencies": {
     "@auth/core": "^0.41.2",
     "@base-ui/react": "^1.4.1",
