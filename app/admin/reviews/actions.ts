@@ -28,5 +28,6 @@ export async function deleteReview(id: string): Promise<ReviewModerationResult> 
     return { success: false, error: "Could not delete review." };
   }
   revalidatePath("/admin/reviews");
+  revalidateTag("catalog", "max"); // in case the deleted review was already approved & cached
   return { success: true };
 }

@@ -40,9 +40,10 @@ describe("review moderation actions", () => {
     expect(requireAdmin).toHaveBeenCalled();
   });
 
-  it("deleteReview removes the review", async () => {
+  it("deleteReview removes the review and busts the catalog cache", async () => {
     const res = await deleteReview("r1");
     expect(res.success).toBe(true);
     expect(reviewDelete.mock.calls[0][0]).toMatchObject({ where: { id: "r1" } });
+    expect(revalidateTag).toHaveBeenCalledWith("catalog", "max");
   });
 });
