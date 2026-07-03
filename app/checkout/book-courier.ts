@@ -16,6 +16,7 @@ import {
   logMailerError,
 } from "@/app/_lib/mailer";
 import type { OrderDetails } from "@/app/_lib/mailer";
+import { shouldEmailCustomer } from "@/app/_lib/mailer-guard";
 import { DELIVERY_COMPANY_NAME } from "@/app/_lib/carrier";
 import { orderReference } from "@/app/_lib/order-reference";
 
@@ -97,6 +98,10 @@ async function trySendCustomerDispatchEmail(
   order: OrderDetails,
   waybillNumber: string,
 ): Promise<void> {
+  if (!shouldEmailCustomer(order.customerEmail)) {
+    console.log(`[checkout] order ${order.orderId}: no customer email — dispatch email skipped`);
+    return;
+  }
   try {
     await sendCustomerDispatchEmail({ ...order, trackingCode: waybillNumber });
     await prisma.order

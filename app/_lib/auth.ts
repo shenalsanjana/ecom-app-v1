@@ -64,6 +64,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return null;
           }
 
+          if (!user.passwordHash) {
+            console.warn(`[Auth]: No password set for ${parsed.data.email}`);
+            return null;
+          }
+
           devLog(`[Auth]: User found, comparing passwords...`);
           const ok = await bcrypt.compare(parsed.data.password, user.passwordHash);
           

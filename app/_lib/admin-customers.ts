@@ -74,7 +74,7 @@ export async function listCustomers(
 
   const rows: CustomerRow[] = users.map((u) => {
     const m = map.get(u.id) ?? { count: 0, sum: 0 };
-    return { ...u, orderCount: m.count, totalSpent: m.sum };
+    return { ...u, email: u.email ?? "", orderCount: m.count, totalSpent: m.sum };
   });
 
   return { rows, total };

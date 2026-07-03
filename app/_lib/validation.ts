@@ -26,7 +26,7 @@ export const LoginSchema = z.object({
 
 export const ProfileSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters"),
-  email: z.string().trim().email("Enter a valid email"),
+  email: z.string().trim().email("Enter a valid email").optional().or(z.literal("")),
 });
 
 export const ChangePasswordSchema = z

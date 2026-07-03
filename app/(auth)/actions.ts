@@ -135,9 +135,9 @@ export async function requestResetAction(_prev: ActionState, formData: FormData)
   }
 
   const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
-  if (user) {
+  if (user && user.email) {
     try {
-      await issuePasswordReset(user);
+      await issuePasswordReset({ id: user.id, email: user.email });
     } catch (e) {
       console.error("[forgot-password] issuePasswordReset failed:", e);
     }

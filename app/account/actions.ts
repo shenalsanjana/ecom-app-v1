@@ -37,14 +37,17 @@ export async function updateProfileAction(_prev: ActionState, formData: FormData
   const current = await prisma.user.findUnique({ where: { id: userId } });
   if (!current) return { error: "Account not found" };
 
-  if (parsed.data.email !== current.email) {
-    const taken = await prisma.user.findUnique({ where: { email: parsed.data.email } });
-    if (taken) return { error: "Email already in use" };
+  const nextEmail = parsed.data.email?.trim() ? parsed.data.email.trim() : null;
+  if (nextEmail !== current.email) {
+    if (nextEmail) {
+      const taken = await prisma.user.findUnique({ where: { email: nextEmail } });
+      if (taken && taken.id !== current.id) return { error: "Email already in use" };
+    }
   }
 
   await prisma.user.update({
     where: { id: userId },
-    data: { name: parsed.data.name, email: parsed.data.email },
+    data: { name: parsed.data.name, email: nextEmail },
   });
 
   // Busts the /account router cache. We deliberately do NOT
@@ -67,6 +70,7 @@ export async function changePasswordAction(_prev: ActionState, formData: FormDat
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return { error: "Account not found" };
+  if (!user.passwordHash) return { error: "Current password is incorrect" };
 
   const ok = await bcrypt.compare(parsed.data.currentPassword, user.passwordHash);
   if (!ok) return { error: "Current password is incorrect" };

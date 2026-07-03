@@ -9,6 +9,7 @@ import { nextStatuses, applyItemChanges, recomputeTotals, canEdit, canConfirm, t
 import { getDeliveryConfig } from "@/app/_lib/store-settings";
 import { bookCourierAndNotify } from "@/app/checkout/book-courier";
 import { sendOrderConfirmationEmail, sendCustomerDispatchEmail, sendCustomerCancellationEmail, logMailerError, type OrderDetails } from "@/app/_lib/mailer";
+import { shouldEmailCustomer } from "@/app/_lib/mailer-guard";
 import { DELIVERY_COMPANY_NAME } from "@/app/_lib/carrier";
 
 export type ActionResult =
@@ -326,11 +327,15 @@ export async function dispatchManually(orderId: string, trackingNumber: string):
   }
 
   // Email the customer once. A send failure must not undo the dispatch.
-  try {
-    await sendCustomerDispatchEmail({ ...toOrderDetails(order), trackingCode: parsed.data });
-    await prisma.order.update({ where: { id: orderId }, data: { customerDispatchEmailSentAt: new Date() } });
-  } catch (err) {
-    logMailerError("dispatch", { orderId, webNumber: order.webNumber, rbNumber: order.rbNumber }, err);
+  if (shouldEmailCustomer(order.user?.email ?? order.guestEmail)) {
+    try {
+      await sendCustomerDispatchEmail({ ...toOrderDetails(order), trackingCode: parsed.data });
+      await prisma.order.update({ where: { id: orderId }, data: { customerDispatchEmailSentAt: new Date() } });
+    } catch (err) {
+      logMailerError("dispatch", { orderId, webNumber: order.webNumber, rbNumber: order.rbNumber }, err);
+    }
+  } else {
+    console.log(`[Admin] order ${orderId}: no customer email — dispatch email skipped`);
   }
 
   revalidate(orderId);

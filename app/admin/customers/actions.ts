@@ -44,9 +44,10 @@ export async function sendPasswordReset(userId: string): Promise<ActionResult> {
   await requireAdmin();
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true } });
   if (!user) return { success: false, error: "User not found" };
+  if (!user.email) return { success: false, error: "This customer has no email on file." };
 
   try {
-    await issuePasswordReset(user);
+    await issuePasswordReset({ id: user.id, email: user.email });
   } catch {
     return { success: false, error: "Couldn't send the reset email." };
   }
