@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Star } from "lucide-react";
 import type { Review } from "@prisma/client";
 import type { ReviewHistogram } from "@/app/_lib/products";
+import { ReviewForm } from "./review-form";
 
 type Props = {
   productId: string;
@@ -10,6 +11,7 @@ type Props = {
   ratingAvg: number;
   ratingCount: number;
   shown: number;
+  defaultAuthorName: string;
 };
 
 function StarRow({ value, max = 5 }: { value: number; max?: number }) {
@@ -42,7 +44,7 @@ function formatDate(d: Date): string {
 }
 
 export function ReviewsSection({
-  productId, reviews, histogram, ratingAvg, ratingCount, shown,
+  productId, reviews, histogram, ratingAvg, ratingCount, shown, defaultAuthorName,
 }: Props) {
   const hasReviews = ratingCount > 0;
   const moreAvailable = reviews.length < ratingCount;
@@ -54,7 +56,7 @@ export function ReviewsSection({
       </h2>
 
       {!hasReviews ? (
-        <p className="text-sm text-muted-foreground">No reviews yet.</p>
+        <p className="text-sm text-muted-foreground">No reviews yet. Be the first to write one.</p>
       ) : (
         <>
           <div className="grid gap-6 sm:grid-cols-[auto_1fr] sm:items-start">
@@ -113,6 +115,8 @@ export function ReviewsSection({
           )}
         </>
       )}
+
+      <ReviewForm productId={productId} defaultAuthorName={defaultAuthorName} />
     </section>
   );
 }
