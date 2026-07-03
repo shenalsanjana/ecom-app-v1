@@ -392,6 +392,25 @@ describe("dispatchManually", () => {
     expect(logMailerError).toHaveBeenCalledTimes(1);
     expect(res).toEqual({ success: true, warning: "Dispatched — tracking RX-9." });
   });
+
+  it("dispatches a phone-only customer (no email): status/tracking persist, dispatch email is skipped", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...FULL_ORDER, guestEmail: null, user: null });
+    orderUpdate.mockResolvedValue({});
+
+    const res = await dispatchManually("o1", "RX-777");
+
+    expect(orderUpdate).toHaveBeenCalledWith({
+      where: { id: "o1" },
+      data: { trackingCode: "RX-777", status: "DISPATCHED", deliveryCompany: "Royal Express" },
+    });
+    expect(sendCustomerDispatchEmail).not.toHaveBeenCalled();
+    // No email was ever sent, so the "sent" timestamp update must not happen either.
+    expect(orderUpdate).not.toHaveBeenCalledWith({
+      where: { id: "o1" },
+      data: { customerDispatchEmailSentAt: expect.any(Date) },
+    });
+    expect(res).toEqual({ success: true, warning: "Dispatched — tracking RX-777." });
+  });
 });
 
 describe("updateTrackingNumber", () => {
