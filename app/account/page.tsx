@@ -12,7 +12,7 @@ export default async function AccountProfilePage() {
   return (
     <section className="max-w-lg">
       <h1 className="mb-6 text-2xl font-semibold tracking-tight">Profile</h1>
-      <ProfileForm name={user.name} email={user.email} />
+      <ProfileForm name={user.name} email={user.email ?? ""} />
     </section>
   );
 }

@@ -11,7 +11,7 @@ test.afterAll(async () => {
 
 async function login(page: import("@playwright/test").Page, who: { email: string; password: string }) {
   await page.goto("/login?callbackUrl=/about");
-  await page.fill("#email", who.email);
+  await page.fill("#identifier", who.email);
   await page.fill("#password", who.password);
   await Promise.all([page.waitForURL("/about"), page.click('button[type="submit"]')]);
 }

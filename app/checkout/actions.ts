@@ -12,6 +12,7 @@ import {
   type OrderItem,
   type OrderDetails,
 } from "@/app/_lib/mailer";
+import { shouldEmailCustomer } from "@/app/_lib/mailer-guard";
 import { prisma } from "@/app/_lib/prisma";
 import { calculateDelivery } from "@/app/_lib/checkout-config";
 import { getDeliveryConfig } from "@/app/_lib/store-settings";
@@ -305,21 +306,25 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
   // For prepaid (PAYHERE/KOKO/MINTPAY): confirmation email is sent by the
   // webhook handler only after payment is verified — do NOT send it here.
   if (paymentMethod === "COD") {
-    try {
-      await sendOrderConfirmationEmail({
-        ...orderDetailsForEmail,
-        trackingCode,
-      });
-      await prisma.order.update({
-        where: { id: orderId },
-        data: { emailSent: true },
-      });
-    } catch (error) {
-      logMailerError(
-        "order-confirmation",
-        { orderId, webNumber: created.webNumber },
-        error,
-      );
+    if (shouldEmailCustomer(orderDetailsForEmail.customerEmail)) {
+      try {
+        await sendOrderConfirmationEmail({
+          ...orderDetailsForEmail,
+          trackingCode,
+        });
+        await prisma.order.update({
+          where: { id: orderId },
+          data: { emailSent: true },
+        });
+      } catch (error) {
+        logMailerError(
+          "order-confirmation",
+          { orderId, webNumber: created.webNumber },
+          error,
+        );
+      }
+    } else {
+      console.log(`[Checkout] order ${orderId}: no customer email — confirmation email skipped`);
     }
   }
 

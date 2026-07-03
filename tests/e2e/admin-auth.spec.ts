@@ -30,7 +30,7 @@ test.describe("Spec #1: admin route protection", () => {
   test.describe("customer", () => {
     test.beforeEach(async ({ page }) => {
       await page.goto("/login");
-      await page.fill("#email", CUSTOMER.email);
+      await page.fill("#identifier", CUSTOMER.email);
       await page.fill("#password", CUSTOMER.password);
       await Promise.all([
         page.waitForURL("/"),
@@ -57,7 +57,7 @@ test.describe("Spec #1: admin route protection", () => {
       // a loop and router.refresh() aborted the in-flight push to the slower,
       // auth-gated /admin route. See app/(auth)/login/page.tsx.
       await page.goto("/login");
-      await page.fill("#email", ADMIN.email);
+      await page.fill("#identifier", ADMIN.email);
       await page.fill("#password", ADMIN.password);
       await Promise.all([
         page.waitForURL("**/admin", { timeout: 15_000 }),
@@ -68,7 +68,7 @@ test.describe("Spec #1: admin route protection", () => {
 
     test("login with callbackUrl=/about honours the callback", async ({ page }) => {
       await page.goto("/login?callbackUrl=/about");
-      await page.fill("#email", ADMIN.email);
+      await page.fill("#identifier", ADMIN.email);
       await page.fill("#password", ADMIN.password);
       await Promise.all([
         page.waitForURL("/about"),

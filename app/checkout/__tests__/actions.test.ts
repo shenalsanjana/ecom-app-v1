@@ -181,6 +181,30 @@ describe("processOrder — size is required", () => {
   });
 });
 
+describe("processOrder — phone-only customer (no email)", () => {
+  it("COD checkout with no customer email: order succeeds and confirmation email is skipped", async () => {
+    vi.mocked(auth).mockResolvedValueOnce({
+      user: { id: "U1", name: "Phone Customer", email: null },
+    } as never);
+
+    const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
+
+    expect(result.success).toBe(true);
+    expect(sendOrderConfirmationEmail).not.toHaveBeenCalled();
+  });
+
+  it("COD checkout WITH a customer email still sends the confirmation (companion case)", async () => {
+    vi.mocked(auth).mockResolvedValueOnce({
+      user: { id: "U1", name: "Email Customer", email: "customer@example.com" },
+    } as never);
+
+    const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
+
+    expect(result.success).toBe(true);
+    expect(sendOrderConfirmationEmail).toHaveBeenCalledOnce();
+  });
+});
+
 describe("processOrder — customer name requirement", () => {
   it("rejects logged-in checkout when session.user.name is empty", async () => {
     vi.mocked(auth).mockResolvedValueOnce({

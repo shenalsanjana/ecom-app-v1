@@ -123,6 +123,22 @@ describe("bookCourierAndNotify — happy path", () => {
   });
 });
 
+describe("bookCourierAndNotify — phone-only customer (no email)", () => {
+  it("books successfully and skips the customer dispatch email when customerEmail is empty", async () => {
+    vi.mocked(createCurfoxOrder).mockResolvedValueOnce("RA00000001");
+    vi.mocked(sendDispatchNotificationEmail).mockResolvedValueOnce(undefined);
+
+    const order: OrderDetails = { ...ORDER, customerEmail: "" };
+    const waybill = await bookCourierAndNotify({ order });
+
+    expect(waybill).toBe("RA00000001");
+    expect(sendCustomerDispatchEmail).not.toHaveBeenCalled();
+    // The admin-facing dispatch notification is unaffected by the customer's
+    // email guard — it must still be sent.
+    expect(sendDispatchNotificationEmail).toHaveBeenCalledOnce();
+  });
+});
+
 describe("bookCourierAndNotify — failure cascade", () => {
   it("create-order failure → admin alert(curfox-create) with response body", async () => {
     vi.mocked(createCurfoxOrder).mockRejectedValueOnce(

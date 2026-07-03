@@ -42,7 +42,7 @@ test.afterAll(async () => {
 test("COD order shows RB number and payment-status badge on /account/orders", async ({ page }) => {
   // Log in.
   await page.goto("/login");
-  await page.getByLabel("Email").fill(EMAIL);
+  await page.getByLabel("Phone or email").fill(EMAIL);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: /Sign in/i }).click();
   await page.waitForURL("**/", { timeout: 10_000 });

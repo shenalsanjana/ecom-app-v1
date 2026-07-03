@@ -42,7 +42,7 @@ export default async function CustomerProfilePage({ params }: { params: Promise<
           <div className="rounded-lg border p-4">
             <div className="mb-2 flex items-center justify-between">
               <h4 className="text-xs font-semibold uppercase text-muted-foreground">Orders</h4>
-              <Link href={`/admin/orders?q=${encodeURIComponent(customer.email)}`} className="text-xs text-primary">View all in Orders ↗</Link>
+              <Link href={`/admin/orders?q=${encodeURIComponent(customer.email ?? "")}`} className="text-xs text-primary">View all in Orders ↗</Link>
             </div>
             {customer.orders.length === 0 ? <p className="text-sm text-muted-foreground">No orders yet.</p> : (
               <table className="w-full border-collapse text-sm">

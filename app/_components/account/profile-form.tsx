@@ -25,8 +25,8 @@ export function ProfileForm({ name, email }: { name: string; email: string }) {
           <Input id="name" name="name" defaultValue={name} required />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" defaultValue={email} required />
+          <Label htmlFor="email">Email (optional)</Label>
+          <Input id="email" name="email" type="email" defaultValue={email} />
         </div>
         <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Save changes"}</Button>
       </form>
