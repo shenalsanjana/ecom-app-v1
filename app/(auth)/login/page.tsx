@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { loginAction, type ActionState } from "@/app/(auth)/actions";
 
-type Props = { searchParams: Promise<{ callbackUrl?: string; reset?: string }> };
+type Props = { searchParams: Promise<{ callbackUrl?: string; reset?: string; created?: string }> };
 
 export default function LoginPage({ searchParams }: Props) {
   const [state, formAction, pending] = useActionState<ActionState, FormData>(loginAction, null);
@@ -29,7 +29,7 @@ function LoginInner({
   state: ActionState;
   formAction: (fd: FormData) => void;
   pending: boolean;
-  searchParams: Promise<{ callbackUrl?: string; reset?: string }>;
+  searchParams: Promise<{ callbackUrl?: string; reset?: string; created?: string }>;
 }) {
   const params = use(searchParams);
   const router = useRouter();
@@ -65,6 +65,11 @@ function LoginInner({
         ← Back to home
       </Link>
       <h1 className="mb-6 text-2xl font-semibold tracking-tight">Sign in</h1>
+      {params.created === "1" ? (
+        <Alert className="mb-4">
+          <AlertDescription>Account created. Sign in to continue.</AlertDescription>
+        </Alert>
+      ) : null}
       {params.reset === "success" ? (
         <Alert className="mb-4">
           <AlertDescription>Password updated. You can now sign in with your new password.</AlertDescription>

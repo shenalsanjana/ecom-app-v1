@@ -8,11 +8,14 @@ import { AuthError } from "next-auth";
 import { signIn } from "@/app/_lib/auth";
 import { prisma } from "@/app/_lib/prisma";
 import { issuePasswordReset } from "@/app/_lib/password-reset";
+import { issueChallenge, verifyChallenge, ChallengeCooldownError } from "@/app/_lib/phone-challenge";
+import { sendAccountExistsSms } from "@/app/_lib/sms";
 import {
   SignupSchema,
   LoginSchema,
   RequestResetSchema,
   ResetPasswordSchema,
+  LkMobileSchema,
 } from "@/app/_lib/validation";
 import { chooseLoginRedirect } from "./login-redirect";
 
@@ -34,54 +37,81 @@ function flatten(errs: unknown): string {
   return "Invalid input";
 }
 
-const NEUTRAL_SIGNUP_MESSAGE =
-  "If this email isn't already registered, your account is ready. Sign in to continue.";
+export type SignupState =
+  | { step: "details" | "verify"; phone?: string; callbackUrl?: string; error?: string }
+  | null;
 
-export async function signupAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  console.log("[Signup Action]: Starting...");
+export async function signupAction(_prev: SignupState, formData: FormData): Promise<SignupState> {
+  const callbackUrl = safeCallbackUrl(formData.get("callbackUrl") as string | null);
+  if (formData.get("step") === "verify") return signupVerify(formData, callbackUrl);
+  return signupRequest(formData, callbackUrl);
+}
+
+function emptyToUndef(v: FormDataEntryValue | null): string | undefined {
+  const s = typeof v === "string" ? v.trim() : "";
+  return s.length ? s : undefined;
+}
+
+async function signupRequest(formData: FormData, callbackUrl: string): Promise<SignupState> {
   const parsed = SignupSchema.safeParse({
     name: formData.get("name"),
-    email: formData.get("email"),
+    phone: formData.get("phone"),
+    email: emptyToUndef(formData.get("email")),
     password: formData.get("password"),
     confirmPassword: formData.get("confirmPassword"),
   });
-  if (!parsed.success) {
-    console.warn("[Signup Action]: Validation failed", parsed.error.format());
-    return { error: flatten(parsed.error) };
-  }
+  if (!parsed.success) return { step: "details", error: flatten(parsed.error), callbackUrl };
 
-  console.log(`[Signup Action]: Checking for existing user: ${parsed.data.email}`);
-  const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+  const phone = parsed.data.phone; // canonical +947...
+  const existing = await prisma.user.findFirst({ where: { phone, phoneVerifiedAt: { not: null } } });
   if (existing) {
-    console.log("[Signup Action]: User already exists, returning neutral message.");
-    return { success: NEUTRAL_SIGNUP_MESSAGE };
+    // Enumeration-safe: identical web response; the number's owner learns the
+    // truth only by SMS. No usable signup challenge is created.
+    try { await sendAccountExistsSms(phone); } catch (e) { console.error("[Signup] existence SMS failed", e); }
+    return { step: "verify", phone, callbackUrl };
   }
 
-  console.log(`[Signup Action]: Creating new user: ${parsed.data.email}`);
+  let email = parsed.data.email ?? null;
+  if (email) {
+    const taken = await prisma.user.findUnique({ where: { email } });
+    if (taken) email = null; // optional-email collision → silently drop; never leak/fail
+  }
+
   const passwordHash = await bcrypt.hash(parsed.data.password, 10);
-  await prisma.user.create({
-    data: { name: parsed.data.name, email: parsed.data.email, passwordHash },
-  });
-
-  const callbackUrl = safeCallbackUrl(formData.get("callbackUrl") as string | null);
-  console.log(`[Signup Action]: User created, calling signIn with callbackUrl: ${callbackUrl}`);
-
+  const payload = JSON.stringify({ name: parsed.data.name, email, passwordHash });
   try {
-    await signIn("credentials", {
-      email: parsed.data.email,
-      password: parsed.data.password,
-      redirect: false,
-    });
-    console.log("[Signup Action]: signIn cookie set, returning redirectTo for client navigation");
-    return { redirectTo: callbackUrl };
-  } catch (error) {
-    if (error instanceof AuthError) {
-      console.warn("[Signup Action]: AuthError during auto sign-in", error.type);
-      return { success: NEUTRAL_SIGNUP_MESSAGE };
-    }
-    console.error("[Signup Action]: Unexpected error during signIn", error);
-    return { success: NEUTRAL_SIGNUP_MESSAGE };
+    await issueChallenge({ phone, purpose: "SIGNUP", payload });
+  } catch (e) {
+    if (e instanceof ChallengeCooldownError) return { step: "verify", phone, callbackUrl }; // a code was just sent
+    console.error("[Signup] issueChallenge failed", e);
+    return { step: "details", error: "We couldn't send a code right now. Please try again shortly.", callbackUrl };
   }
+  return { step: "verify", phone, callbackUrl };
+}
+
+async function signupVerify(formData: FormData, callbackUrl: string): Promise<SignupState> {
+  const phoneParsed = LkMobileSchema.safeParse(formData.get("phone"));
+  const code = formData.get("code");
+  if (!phoneParsed.success || typeof code !== "string" || !/^\d{6}$/.test(code)) {
+    const phone = phoneParsed.success ? phoneParsed.data : undefined;
+    return { step: "verify", phone, error: "Enter the 6-digit code we sent you.", callbackUrl };
+  }
+  const phone = phoneParsed.data;
+  const result = await verifyChallenge({ phone, purpose: "SIGNUP", code });
+  if (!result.ok || !result.payload) {
+    return { step: "verify", phone, error: "That code is invalid or has expired.", callbackUrl };
+  }
+  const data = JSON.parse(result.payload) as { name: string; email: string | null; passwordHash: string };
+  try {
+    await prisma.user.create({
+      data: { name: data.name, email: data.email, phone, phoneVerifiedAt: new Date(), passwordHash: data.passwordHash },
+    });
+  } catch {
+    // Unique violation (race with a concurrent verify) → already registered.
+    return { step: "verify", phone, error: "This number is already registered. Please sign in.", callbackUrl };
+  }
+  const suffix = callbackUrl && callbackUrl !== "/" ? `&callbackUrl=${encodeURIComponent(callbackUrl)}` : "";
+  redirect(`/login?created=1${suffix}`);
 }
 
 export async function loginAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
