@@ -69,6 +69,13 @@ export const CATEGORY_REVIEWS: Record<string, ReviewTemplate[]> = {
   ],
 };
 
+// Live category slugs that map onto a template set defined under a different key.
+// Dev/mock uses "cat"; the production catalogue uses "cats".
+const CATEGORY_SLUG_ALIASES: Record<string, string> = {
+  cats: "cat",
+};
+
 export function reviewPoolForCategory(slug: string): ReviewTemplate[] {
-  return [...SHARED_REVIEWS, ...(CATEGORY_REVIEWS[slug] ?? [])];
+  const key = CATEGORY_SLUG_ALIASES[slug] ?? slug;
+  return [...SHARED_REVIEWS, ...(CATEGORY_REVIEWS[key] ?? [])];
 }

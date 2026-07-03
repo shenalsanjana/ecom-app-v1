@@ -46,6 +46,12 @@ describe("review-content", () => {
     expect(reviewPoolForCategory("nope")).toEqual(SHARED_REVIEWS);
   });
 
+  it("maps the live 'cats' slug onto the 'cat' template set", () => {
+    expect(reviewPoolForCategory("cats")).toEqual(reviewPoolForCategory("cat"));
+    // ...and that's more than the shared pool, i.e. cat templates are included.
+    expect(reviewPoolForCategory("cats").length).toBeGreaterThan(SHARED_REVIEWS.length);
+  });
+
   it("gives each category >= 15 templates (variety for 5–10 shown)", () => {
     for (const slug of Object.keys(CATEGORY_REVIEWS)) {
       expect(reviewPoolForCategory(slug).length).toBeGreaterThanOrEqual(15);
