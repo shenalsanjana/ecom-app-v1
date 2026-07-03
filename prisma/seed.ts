@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { categories, featuredProducts, dealsProducts } from "../app/_data/mock";
+import { REVIEW_AUTHORS, reviewPoolForCategory } from "../app/_data/review-content";
 
 // Load Next.js-convention env files for local runs (`tsx prisma/seed.ts`).
 // On Vercel/CI, DATABASE_URL is already in process.env and these files are
@@ -30,37 +31,6 @@ function pickProductMain(productId: string): string {
   return `/products/${productId}/main.svg`;
 }
 
-const REVIEW_AUTHORS = [
-  "Nethmi Perera", "Sanuli Fernando", "Tharushi Silva", "Senuri Jayawardena",
-  "Dinuli Perera", "Oneli Fernando", "Yehani Silva", "Shenaya Wijesinghe",
-  "Kavindi Perera", "Methmi Fernando", "Thevini Silva", "Sayuni Jayasinghe",
-  "Himashi Bandara", "Rashmi Perera", "Dinethmi Fernando", "Vihangi Silva",
-  "Lithumi Perera", "Senuji Fernando", "Amaaya Silva",
-];
-
-const REVIEW_TITLES = [
-  "Loving it so far",
-  "Solid quality",
-  null,
-  "Better than expected",
-  "Would buy again",
-  null,
-  "Great gift",
-  "Not bad for the price",
-];
-
-const REVIEW_BODIES = [
-  "Worked exactly as described. Shipping was quick and packaging was clean.",
-  "Quality feels above the price point. A few small nitpicks but nothing dealbreaking.",
-  "Has held up well after a few weeks of daily use. Recommended.",
-  "Solid build, looks good, does the job. No complaints.",
-  "Bought as a gift — they loved it. Would order again.",
-  "Took a bit to get used to but now I use it constantly.",
-  "Fine. Nothing remarkable but no obvious flaws either.",
-  "Exceeded my expectations honestly. Glad I picked this one.",
-];
-
-const RATING_POOL = [5, 5, 5, 4, 4, 4, 4, 3, 3, 2];
 
 // Stable per-product RNG so reseeds produce the same data.
 function rngFromId(id: string): () => number {
@@ -176,13 +146,15 @@ async function main() {
     const reviews = Array.from({ length: count }, () => {
       const daysAgo = Math.floor(rng() * 90);
       const createdAt = new Date(Date.now() - daysAgo * 86400_000);
+      const tpl = pick(reviewPoolForCategory(p.category), rng);
       return {
         productId: p.id,
         authorName: pick(REVIEW_AUTHORS, rng),
-        rating: pick(RATING_POOL, rng),
-        title: pick(REVIEW_TITLES, rng),
-        body: pick(REVIEW_BODIES, rng),
+        rating: tpl.rating,
+        title: tpl.title,
+        body: tpl.body,
         createdAt,
+        synthetic: true,
       };
     });
     await prisma.review.createMany({ data: reviews });
