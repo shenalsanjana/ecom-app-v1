@@ -45,8 +45,20 @@ export const ChangePasswordSchema = z
   });
 
 export const RequestResetSchema = z.object({
-  email: z.string().trim().email("Enter a valid email"),
+  identifier: z.string().trim().min(1, "Phone or email required"),
 });
+
+export const ResetByPhoneSchema = z
+  .object({
+    phone: LkMobileSchema,
+    code: z.string().regex(/^\d{6}$/, "Enter the 6-digit code"),
+    newPassword: PasswordSchema,
+    confirmPassword: z.string(),
+  })
+  .refine((d) => d.newPassword === d.confirmPassword, {
+    path: ["confirmPassword"],
+    message: "Passwords don't match",
+  });
 
 export const ResetPasswordSchema = z
   .object({
@@ -95,6 +107,7 @@ export type ProfileInput = z.infer<typeof ProfileSchema>;
 export type ChangePasswordInput = z.infer<typeof ChangePasswordSchema>;
 export type RequestResetInput = z.infer<typeof RequestResetSchema>;
 export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
+export type ResetByPhoneInput = z.infer<typeof ResetByPhoneSchema>;
 export type AddressInput = z.infer<typeof AddressSchema>;
 export type LkPhoneInput = z.infer<typeof LkPhoneSchema>;
 

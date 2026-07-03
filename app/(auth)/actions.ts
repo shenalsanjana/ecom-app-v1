@@ -16,6 +16,7 @@ import {
   LoginSchema,
   RequestResetSchema,
   ResetPasswordSchema,
+  ResetByPhoneSchema,
   LkMobileSchema,
 } from "@/app/_lib/validation";
 import { chooseLoginRedirect } from "./login-redirect";
@@ -160,22 +161,65 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   }
 }
 
-export async function requestResetAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const parsed = RequestResetSchema.safeParse({ email: formData.get("email") });
-  if (!parsed.success) {
-    return { success: "If an account with that email exists, you'll receive a reset link shortly." };
+export type ResetState =
+  | { mode: "request" | "phone-code" | "email-sent"; phone?: string; error?: string; success?: string }
+  | null;
+
+const NEUTRAL_EMAIL_SENT = "If an account with that email exists, you'll receive a reset link shortly.";
+
+export async function requestResetAction(_prev: ResetState, formData: FormData): Promise<ResetState> {
+  const parsed = RequestResetSchema.safeParse({ identifier: formData.get("identifier") });
+  if (!parsed.success) return { mode: "request", error: "Enter your phone or email." };
+
+  const id = resolveIdentifier(parsed.data.identifier);
+  if (id.kind === "email") {
+    const user = await prisma.user.findUnique({ where: { email: id.value } });
+    if (user?.email) {
+      try {
+        await issuePasswordReset({ id: user.id, email: user.email });
+      } catch (e) {
+        console.error("[forgot-password] email reset failed:", e);
+      }
+    }
+    return { mode: "email-sent", success: NEUTRAL_EMAIL_SENT };
   }
 
-  const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
-  if (user && user.email) {
+  // Phone path — neutral regardless of existence.
+  const user = await prisma.user.findUnique({ where: { phone: id.value } });
+  if (user) {
     try {
-      await issuePasswordReset({ id: user.id, email: user.email });
+      await issueChallenge({ phone: id.value, purpose: "RESET" });
     } catch (e) {
-      console.error("[forgot-password] issuePasswordReset failed:", e);
+      if (!(e instanceof ChallengeCooldownError)) console.error("[forgot-password] SMS reset failed:", e);
     }
   }
+  return { mode: "phone-code", phone: id.value };
+}
 
-  return { success: "If an account with that email exists, you'll receive a reset link shortly." };
+export async function resetByPhoneAction(_prev: ResetState, formData: FormData): Promise<ResetState> {
+  const parsed = ResetByPhoneSchema.safeParse({
+    phone: formData.get("phone"),
+    code: formData.get("code"),
+    newPassword: formData.get("newPassword"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
+  if (!parsed.success) {
+    const phoneRaw = formData.get("phone");
+    return { mode: "phone-code", phone: typeof phoneRaw === "string" ? phoneRaw : undefined, error: flatten(parsed.error) };
+  }
+  const { phone, code, newPassword } = parsed.data;
+  const result = await verifyChallenge({ phone, purpose: "RESET", code });
+  if (!result.ok) return { mode: "phone-code", phone, error: "That code is invalid or has expired." };
+
+  const user = await prisma.user.findUnique({ where: { phone } });
+  if (!user) return { mode: "phone-code", phone, error: "That code is invalid or has expired." };
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: user.id }, data: { passwordHash } }),
+    prisma.passwordResetToken.updateMany({ where: { userId: user.id, usedAt: null }, data: { usedAt: new Date() } }),
+  ]);
+  redirect("/login?reset=success");
 }
 
 export async function resetPasswordAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
