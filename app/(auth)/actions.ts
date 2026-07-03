@@ -10,6 +10,7 @@ import { prisma } from "@/app/_lib/prisma";
 import { issuePasswordReset } from "@/app/_lib/password-reset";
 import { issueChallenge, verifyChallenge, ChallengeCooldownError } from "@/app/_lib/phone-challenge";
 import { sendAccountExistsSms } from "@/app/_lib/sms";
+import { resolveIdentifier } from "@/app/_lib/phone";
 import {
   SignupSchema,
   LoginSchema,
@@ -117,30 +118,31 @@ async function signupVerify(formData: FormData, callbackUrl: string): Promise<Si
 export async function loginAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   console.log("[Login Action]: Starting...");
   const parsed = LoginSchema.safeParse({
-    email: formData.get("email"),
+    identifier: formData.get("identifier"),
     password: formData.get("password"),
   });
   if (!parsed.success) {
     console.warn("[Login Action]: Validation failed");
-    return { error: "Invalid email or password" };
+    return { error: "Invalid phone/email or password" };
   }
 
   const callbackUrl = safeCallbackUrl(formData.get("callbackUrl") as string | null);
-  console.log(`[Login Action]: Attempting signIn for ${parsed.data.email} with callbackUrl: ${callbackUrl}`);
+  console.log(`[Login Action]: Attempting signIn with callbackUrl: ${callbackUrl}`);
 
   // Read role from the DB BEFORE signIn — auth() in the same request does not
   // reliably see the just-set session cookie under NextAuth v5 + JWT sessions.
   // This is one extra indexed lookup; the alternative (relying on auth() to
   // see the new cookie) silently sends admins to the wrong page on miss.
-  const dbUser = await prisma.user.findUnique({
-    where: { email: parsed.data.email },
-    select: { role: true },
-  });
+  const id = resolveIdentifier(parsed.data.identifier);
+  const dbUser =
+    id.kind === "phone"
+      ? await prisma.user.findUnique({ where: { phone: id.value }, select: { role: true } })
+      : await prisma.user.findUnique({ where: { email: id.value }, select: { role: true } });
   const role = dbUser?.role === "ADMIN" ? "ADMIN" : "CUSTOMER";
 
   try {
     await signIn("credentials", {
-      email: parsed.data.email,
+      identifier: parsed.data.identifier,
       password: parsed.data.password,
       redirect: false,
     });
@@ -151,7 +153,7 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   } catch (error) {
     if (error instanceof AuthError) {
       console.warn("[Login Action]: AuthError during signIn", error.type);
-      return { error: "Invalid email or password" };
+      return { error: "Invalid phone/email or password" };
     }
     console.error("[Login Action]: Unexpected error during signIn", error);
     throw error;

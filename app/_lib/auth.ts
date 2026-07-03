@@ -4,6 +4,7 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/app/_lib/prisma";
 import { LoginSchema } from "@/app/_lib/validation";
+import { resolveIdentifier } from "@/app/_lib/phone";
 import { authConfig } from "@/app/_lib/auth.config";
 
 const devLog = (...args: unknown[]) => {
@@ -43,7 +44,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Credentials({
       credentials: {
-        email: { label: "Email", type: "email" },
+        identifier: { label: "Phone or email", type: "text" },
         password: { label: "Password", type: "password" },
       },
       async authorize(creds) {
@@ -54,30 +55,26 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return null;
           }
 
-          devLog(`[Auth]: Attempting login for ${parsed.data.email}`);
-          const user = await prisma.user.findUnique({
-            where: { email: parsed.data.email },
-          });
+          const id = resolveIdentifier(parsed.data.identifier);
+          const user =
+            id.kind === "phone"
+              ? await prisma.user.findUnique({ where: { phone: id.value } })
+              : await prisma.user.findUnique({ where: { email: id.value } });
 
-          if (!user) {
-            console.warn(`[Auth]: User not found: ${parsed.data.email}`);
-            return null;
-          }
-
-          if (!user.passwordHash) {
-            console.warn(`[Auth]: No password set for ${parsed.data.email}`);
+          if (!user || !user.passwordHash) {
+            console.warn(`[Auth]: No matching user/password for identifier`);
             return null;
           }
 
           devLog(`[Auth]: User found, comparing passwords...`);
           const ok = await bcrypt.compare(parsed.data.password, user.passwordHash);
-          
+
           if (!ok) {
-            console.warn(`[Auth]: Invalid password for ${parsed.data.email}`);
+            console.warn(`[Auth]: Invalid password for ${user.id}`);
             return null;
           }
 
-          devLog(`[Auth]: Login success for ${parsed.data.email} (${user.id})`);
+          devLog(`[Auth]: Login success for ${user.id}`);
           return {
             id: user.id,
             name: user.name,

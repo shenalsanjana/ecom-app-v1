@@ -83,8 +83,17 @@ function LoginInner({
       <form action={formAction} className="space-y-4">
         <input type="hidden" name="callbackUrl" value={params.callbackUrl ?? "/"} />
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" required autoComplete="email" disabled={busy} />
+          <Label htmlFor="identifier">Phone or email</Label>
+          <Input
+            id="identifier"
+            name="identifier"
+            type="text"
+            required
+            autoComplete="username"
+            placeholder="0771234567 or you@email.com"
+            disabled={busy}
+            data-testid="login-identifier"
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="password">Password</Label>
