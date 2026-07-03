@@ -1,15 +1,11 @@
 name: DB Migrate
 
-# Apply Prisma migrations whenever main changes. This used to run inside the
-# Vercel build command; it was moved out so a paused/unreachable database no
-# longer fails an otherwise-fine frontend deploy.
+# Manual migration fallback. Production migrations normally run inside the Vercel
+# build command (`prisma migrate deploy` before `next build`, see vercel.json) so
+# the schema is always current before pages prerender against the DB. The `push`
+# trigger was removed to avoid two `migrate deploy` jobs racing the same database;
+# use "Run workflow" here if you ever need to migrate without a full redeploy.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "prisma/migrations/**"
-      - "prisma/schema.prisma"
-      - ".github/workflows/migrate.yml"
   workflow_dispatch: {}
 
 # Never run two migration jobs against the same database at once.
