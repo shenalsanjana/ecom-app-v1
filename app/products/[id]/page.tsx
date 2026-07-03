@@ -11,6 +11,7 @@ import { stripMarkdown } from "@/app/_lib/strip-markdown";
 import { formatPrice } from "@/app/_lib/format";
 import { absoluteUrl } from "@/app/_lib/absolute-url";
 import { ProductJsonLd } from "@/app/_components/product/product-jsonld";
+import { auth } from "@/app/_lib/auth";
 
 export const revalidate = 300;
 
@@ -77,6 +78,8 @@ export default async function ProductPage({
     notFound();
   }
 
+  const session = await auth();
+
   const shown = clampReviews(sp.reviews);
 
   const [reviews, histogram] = await Promise.all([
@@ -134,6 +137,7 @@ export default async function ProductPage({
             ratingAvg={detail.ratingAvg}
             ratingCount={detail.ratingCount}
             shown={shown}
+            defaultAuthorName={session?.user?.name ?? ""}
           />
           <RelatedStrip
             products={detail.related}

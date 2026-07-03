@@ -106,10 +106,12 @@ model Review {
   body        String
   createdAt   DateTime @default(now())
   synthetic   Boolean  @default(false)
+  approved    Boolean  @default(false)
 
   product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId, createdAt])
+  @@index([approved])
 }
 
 model WishlistItem {

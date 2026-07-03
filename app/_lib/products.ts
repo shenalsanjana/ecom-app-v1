@@ -37,7 +37,7 @@ async function attachAggregates(rows: ProductRow[]): Promise<ProductView[]> {
   const ids = rows.map((r) => r.id);
   const grouped = await prisma.review.groupBy({
     by: ["productId"],
-    where: { productId: { in: ids } },
+    where: { productId: { in: ids }, approved: true },
     _avg: { rating: true },
     _count: { _all: true },
   });
@@ -145,7 +145,7 @@ export const getProductDetail = unstable_cache(
 
     const [agg, relatedRows] = await Promise.all([
       prisma.review.aggregate({
-        where: { productId: id },
+        where: { productId: id, approved: true },
         _avg: { rating: true },
         _count: { _all: true },
       }),
@@ -177,7 +177,7 @@ export const getProductReviews = unstable_cache(
   async (productId: string, take: number): Promise<Review[]> => {
     const safeTake = Number.isFinite(take) && take > 0 ? Math.min(Math.trunc(take), 100) : 5;
     return prisma.review.findMany({
-      where: { productId },
+      where: { productId, approved: true },
       orderBy: { createdAt: "desc" },
       take: safeTake,
     });
@@ -192,7 +192,7 @@ export const getReviewHistogram = unstable_cache(
   async (productId: string): Promise<ReviewHistogram> => {
     const rows = await prisma.review.groupBy({
       by: ["rating"],
-      where: { productId },
+      where: { productId, approved: true },
       _count: { _all: true },
     });
     const hist: ReviewHistogram = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
