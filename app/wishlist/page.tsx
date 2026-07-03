@@ -26,7 +26,10 @@ export default async function WishlistPage() {
     productIds.length > 0
       ? await prisma.review.groupBy({
           by: ["productId"],
-          where: { productId: { in: productIds } },
+          // Only approved reviews count toward the wishlist card rating — mirrors
+          // the four readers in products.ts (this inline groupBy is the fifth
+          // storefront review aggregation and must stay in sync).
+          where: { productId: { in: productIds }, approved: true },
           _avg: { rating: true },
           _count: { _all: true },
         })
