@@ -60,8 +60,11 @@ describe("review readers only see approved reviews", () => {
 
   it("list-rating aggregate filters approved:true", async () => {
     productFindMany.mockResolvedValueOnce([{
-      id: "cat-white", name: "Cat", price: 2190, originalPrice: null,
-      image: "/x.jpg", categorySlug: "cat", sizes: "S,M,L,XL",
+      id: "cat-white", name: "Cat", price: 2190, originalPrice: null, categorySlug: "cat",
+      variants: [{
+        colorSlug: "white", color: "White", swatchHex: "#ffffff", price: null, originalPrice: null,
+        sortOrder: 0, images: [{ url: "/x.jpg" }], sizeStocks: [{ size: "M", stock: 5 }],
+      }],
     }]);
     await getFeaturedProducts();
     expect(reviewGroupBy.mock.calls[0][0].where.approved).toBe(true);

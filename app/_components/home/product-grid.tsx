@@ -14,19 +14,7 @@ export async function ProductGrid() {
       />
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {products.map((p) => (
-          <ProductCard
-            key={p.id}
-            id={p.id}
-            name={p.name}
-            price={p.price}
-            originalPrice={p.originalPrice}
-            image={p.image}
-            rating={p.rating}
-            reviewCount={p.reviewCount}
-            sizes={p.sizes}
-            category={p.category}
-            fromPath="/"
-          />
+          <ProductCard key={p.id} product={p} fromPath="/" showEyebrow />
         ))}
       </div>
     </Section>
