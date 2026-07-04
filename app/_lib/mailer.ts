@@ -97,6 +97,7 @@ export type OrderDetails = {
   customerName: string;
   customerEmail: string;
   customerPhone?: string;
+  alternatePhone?: string | null; // secondary delivery phone → courier only
   items: OrderItem[];
   subtotal: number;
   shipping: number;
