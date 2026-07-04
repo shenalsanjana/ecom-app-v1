@@ -7,13 +7,13 @@ TBD - created by archiving change admin-delete-product. Update Purpose after arc
 
 The system SHALL allow an admin to permanently delete a product if and only if the product has no associated order line items (`OrderItem`). Deletion SHALL be refused for any product that has ever been ordered, preserving order history. The deletion action SHALL require an authenticated admin.
 
-When a deletable product is removed, its associated gallery images, reviews, and wishlist entries SHALL be removed with it.
+When a deletable product is removed, its associated color variants (including each variant's images and size-stock cells), reviews, and wishlist entries SHALL be removed with it.
 
 #### Scenario: Delete a product that has never been ordered
 
 - **WHEN** an admin confirms deletion of a product that has zero order line items
 - **THEN** the product is permanently removed from the catalog
-- **AND** its gallery images, reviews, and wishlist entries are removed with it
+- **AND** its color variants (with their images and size-stock cells), reviews, and wishlist entries are removed with it
 - **AND** the product no longer appears in the admin products list or the storefront
 
 #### Scenario: Deletion blocked for a product with order history
@@ -32,4 +32,33 @@ When a deletable product is removed, its associated gallery images, reviews, and
 
 - **WHEN** an admin views the products table on either the Active or Archived tab
 - **THEN** each product row exposes a Delete control that asks for confirmation before deleting
+
+### Requirement: Admin manages color variants
+
+The system SHALL let an admin edit a product as a design with a repeatable list of color variants. For each variant the admin SHALL be able to set the color name and slug, an optional swatch color, an optional SKU, an optional price and original-price override, an ordered set of card images and a separate ordered set of detail images, and a per-size stock grid. The admin SHALL be able to add, remove, reorder, and duplicate variants; the first variant (lowest sort order) is the design's default color. Saving SHALL persist all variants, their two image sets, and their size-stock cells in a single transaction, and SHALL reject duplicate color slugs or duplicate SKUs within the product with a clear message. Editing a product SHALL preserve existing variant identity (so historical order references survive); a removed color SHALL be archived rather than hard-deleted.
+
+#### Scenario: Create a multi-color product
+
+- **WHEN** an admin creates a product with three colors, each with card images, detail images, and size stock
+- **THEN** the product is saved with three variants and their image sets and size-stock cells
+
+#### Scenario: Duplicate SKU within a product is rejected
+
+- **WHEN** an admin saves a product with two variants sharing the same non-empty SKU
+- **THEN** the save is refused with a message identifying the duplicate
+
+#### Scenario: Editing a product preserves variant identity
+
+- **WHEN** an admin edits any field of a product that has past orders
+- **THEN** the existing color variants keep their identity (order line items still reference them)
+- **AND** a color the admin removes is archived, not hard-deleted
+
+### Requirement: Product list shows colors and total stock
+
+The system SHALL show, for each product in the admin list, its number of color variants and its total stock (the sum of all its color+size cells). The low-stock view SHALL select products having any color+size cell at or below the low-stock threshold.
+
+#### Scenario: List reflects variant data
+
+- **WHEN** an admin views the products list
+- **THEN** each row shows the product's color count and total stock
 
