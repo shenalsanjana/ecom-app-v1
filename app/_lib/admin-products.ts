@@ -61,7 +61,15 @@ export async function listProducts(
       skip: (page - 1) * pageSize,
       include: {
         category: { select: { name: true } },
-        variants: { select: { sizeStocks: { select: { stock: true } } } },
+        variants: {
+          orderBy: { sortOrder: "asc" },
+          select: {
+            sortOrder: true,
+            archived: true,
+            sizeStocks: { select: { stock: true } },
+            images: { where: { role: "CARD" }, orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } },
+          },
+        },
         _count: { select: { variants: true } },
       },
     }),

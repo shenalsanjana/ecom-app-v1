@@ -17,8 +17,8 @@ test.beforeAll(async () => {
     update: { passwordHash, name: NAME },
     create: { name: NAME, email: EMAIL, passwordHash },
   });
-  // Ensure all products have enough stock so the test is idempotent across runs.
-  await prisma.product.updateMany({
+  // Ensure all variant size-stock cells have enough stock so the test is idempotent across runs.
+  await prisma.variantSizeStock.updateMany({
     where: { stock: { lt: 10 } },
     data: { stock: 20 },
   });
@@ -32,7 +32,7 @@ test.afterAll(async () => {
   }
   await prisma.user.deleteMany({ where: { email: EMAIL } });
   // Restore stock that may have been decremented during the test.
-  await prisma.product.updateMany({
+  await prisma.variantSizeStock.updateMany({
     where: { stock: { lt: 10 } },
     data: { stock: 20 },
   });

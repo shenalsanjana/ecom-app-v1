@@ -93,26 +93,15 @@ async function main() {
   }
 
   for (const p of catalogProducts) {
-    // Legacy scalar columns are still NOT NULL until the Phase 7 contract migration.
-    // Populate them from variant data so the row is valid; storefront/admin no
-    // longer read them after their respective phases migrate.
-    const firstVariant = p.variants[0];
-    const legacyImage = resolveVariantImages(p.id, firstVariant.colorSlug, "card")[0];
-    const legacySizes = Array.from(
-      new Set(p.variants.flatMap((v) => v.sizes.map((s) => s.size))),
-    ).join(",");
-
     await prisma.product.upsert({
       where: { id: p.id },
       update: {
         name: p.name, price: p.price, originalPrice: p.originalPrice ?? null,
-        image: legacyImage, description: DEFAULT_DESCRIPTION, stock: 0,
-        categorySlug: p.category, sizes: legacySizes,
+        description: DEFAULT_DESCRIPTION, categorySlug: p.category,
       },
       create: {
         id: p.id, name: p.name, price: p.price, originalPrice: p.originalPrice ?? null,
-        image: legacyImage, description: DEFAULT_DESCRIPTION, stock: 0,
-        categorySlug: p.category, sizes: legacySizes,
+        description: DEFAULT_DESCRIPTION, categorySlug: p.category,
       },
     });
 

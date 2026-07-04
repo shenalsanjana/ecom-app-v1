@@ -3,17 +3,28 @@ import Image from "next/image";
 import { formatPrice } from "@/app/_lib/format";
 import { Badge } from "@/components/ui/badge";
 import { DeleteProductButton } from "./delete-product-button";
+import { resolveDefaultVariant } from "@/app/_lib/variants";
 
 type Row = {
   id: string; name: string; price: number; originalPrice: number | null;
-  image: string; archived: boolean;
+  archived: boolean;
   category: { name: string } | null;
-  variants: { sizeStocks: { stock: number }[] }[];
+  variants: {
+    sortOrder: number;
+    archived: boolean;
+    sizeStocks: { stock: number }[];
+    images: { url: string }[];
+  }[];
   _count: { variants: number };
 };
 
 function totalStock(row: Row): number {
   return row.variants.reduce((sum, v) => sum + v.sizeStocks.reduce((a, s) => a + s.stock, 0), 0);
+}
+
+function thumbnail(row: Row): string {
+  const variant = resolveDefaultVariant(row.variants);
+  return variant?.images[0]?.url ?? "";
 }
 
 export function ProductsTable({ rows }: { rows: Row[] }) {
@@ -29,7 +40,7 @@ export function ProductsTable({ rows }: { rows: Row[] }) {
       <tbody>
         {rows.map((p) => (
           <tr key={p.id} className={"border-b hover:bg-secondary/40 " + (p.archived ? "opacity-60" : "")}>
-            <td className="p-2"><Image src={p.image} alt="" width={36} height={36} className="rounded object-cover" /></td>
+            <td className="p-2">{thumbnail(p) && <Image src={thumbnail(p)} alt="" width={36} height={36} className="rounded object-cover" />}</td>
             <td className="p-2 font-medium">
               <Link href={`/admin/products/${p.id}/edit`} className="hover:underline">{p.name}</Link>
               <br /><span className="text-muted-foreground">{p.id}</span>

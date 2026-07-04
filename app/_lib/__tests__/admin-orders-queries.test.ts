@@ -36,12 +36,12 @@ describe("listOrders", () => {
 });
 
 describe("getOrderDetail", () => {
-  it("includes items, product sizes, user and notesLog", async () => {
+  it("includes items, variant size-stocks, user and notesLog", async () => {
     findUnique.mockResolvedValueOnce({ id: "o1" });
     const res = await getOrderDetail("o1");
     const arg = findUnique.mock.calls[0][0];
     expect(arg.where).toEqual({ id: "o1" });
-    expect(arg.include.items.include.product.select.sizes).toBe(true);
+    expect(arg.include.items.include.variant.select.sizeStocks.select.size).toBe(true);
     expect(arg.include.notesLog.orderBy).toEqual({ createdAt: "desc" });
     expect(res).toEqual({ id: "o1" });
   });

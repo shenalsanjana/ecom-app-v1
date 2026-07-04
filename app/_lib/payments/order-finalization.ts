@@ -125,9 +125,9 @@ export async function finalizeFailedPayment(orderId: string, expectedMethod: str
     if (claim.count !== 1) return;
     claimed = true;
     for (const item of order.items) {
-      if (!item.productId) continue; // product hard-deleted — nothing to restore
-      await tx.product.update({
-        where: { id: item.productId },
+      if (!item.variantId || !item.size) continue; // variant hard-deleted or sizeless — nothing to restore
+      await tx.variantSizeStock.updateMany({
+        where: { variantId: item.variantId, size: item.size },
         data: { stock: { increment: item.quantity } },
       });
     }

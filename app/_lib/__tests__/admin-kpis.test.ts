@@ -59,14 +59,14 @@ describe("getDashboardKpis", () => {
     expect(result.todaysOrders).toBe(12);
   });
 
-  it("queries low-stock with stock<=5 threshold", async () => {
+  it("queries low-stock via variants whose size-stock cells are <=5", async () => {
     orderCount.mockResolvedValueOnce(0).mockResolvedValueOnce(0).mockResolvedValueOnce(0);
     productCount.mockResolvedValueOnce(2);
 
     const result = await getDashboardKpis();
 
     expect(productCount).toHaveBeenCalledWith({
-      where: { stock: { lte: 5 } },
+      where: { variants: { some: { sizeStocks: { some: { stock: { lte: 5 } } } } } },
     });
     expect(result.lowStock).toBe(2);
   });

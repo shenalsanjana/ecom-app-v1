@@ -82,22 +82,6 @@ const ProductInputSchema = z.object({
 export type VariantInput = z.infer<typeof VariantInputSchema>;
 export type ProductInput = z.infer<typeof ProductInputSchema>;
 
-// Back-fill values for the legacy Product scalar columns (still NOT NULL until
-// the Phase 7 contract migration). Derived from variant data; not read by the
-// storefront after Phases 4–5 migrate.
-function legacyScalars(d: ProductInput): { image: string; sizes: string; stock: number } {
-  const first = d.variants[0];
-  const image = first.cardImages[0];
-  const sizes = Array.from(
-    new Set(d.variants.flatMap((v) => v.sizeStocks.map((s) => s.size))),
-  ).join(",");
-  const stock = d.variants.reduce(
-    (sum, v) => sum + v.sizeStocks.reduce((a, s) => a + s.stock, 0),
-    0,
-  );
-  return { image, sizes, stock };
-}
-
 // Reject duplicate colorSlugs or duplicate non-empty SKUs within one product,
 // so the DB unique constraints surface as a friendly message, not a 500.
 function variantConflict(d: ProductInput): string | null {
@@ -168,7 +152,6 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
     async (s) => (await prisma.product.findUnique({ where: { id: s } })) !== null,
   );
 
-  const legacy = legacyScalars(d);
   try {
     await prisma.$transaction(async (tx) => {
       await tx.product.create({
@@ -176,7 +159,6 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
           id: slug, name: d.name, categorySlug: d.categorySlug,
           price: d.price, originalPrice: d.originalPrice ?? null,
           description: d.description, archived: false,
-          image: legacy.image, stock: legacy.stock, sizes: legacy.sizes,
         },
       });
       await writeVariants(tx, slug, d.variants);
@@ -202,7 +184,6 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
 
   const candidateSlug = slugify(d.slug || d.name);
   if (!candidateSlug) return { success: false, error: "Name must contain letters or numbers" };
-  const legacy = legacyScalars(d);
 
   // Field-only edit (slug unchanged): update scalars + rebuild variants.
   if (candidateSlug === id) {
@@ -214,7 +195,6 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
             name: d.name, categorySlug: d.categorySlug,
             price: d.price, originalPrice: d.originalPrice ?? null,
             description: d.description,
-            image: legacy.image, stock: legacy.stock, sizes: legacy.sizes,
           },
         });
         await writeVariants(tx, id, d.variants);
@@ -240,7 +220,6 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
           id: newSlug, name: d.name, categorySlug: d.categorySlug,
           price: d.price, originalPrice: d.originalPrice ?? null,
           description: d.description,
-          image: legacy.image, stock: legacy.stock, sizes: legacy.sizes,
         },
       });
       await writeVariants(tx, newSlug, d.variants);

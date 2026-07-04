@@ -109,7 +109,7 @@ export default async function ProductPage({
               variants={detail.variants.map((v) => ({ colorSlug: v.colorSlug, detailImages: v.detailImages }))}
               defaultColorSlug={detail.variants[0].colorSlug}
               productName={detail.product.name}
-              fallbackImage={detail.product.image}
+              fallbackImage={detail.variants[0].detailImages[0] ?? ""}
             />
             <BuyBoxClient
               productId={detail.product.id}

@@ -96,12 +96,15 @@ const PAID = new Set(["PAID", "COD_COLLECTED"]);
 async function cancelOrderTx(
   tx: Prisma.TransactionClient,
   orderId: string,
-  items: { productId: string | null; quantity: number }[],
+  items: { variantId: string | null; size: string | null; quantity: number }[],
 ): Promise<void> {
   for (const it of items) {
-    // Skip items whose product was hard-deleted (productId null) — nothing to restore.
-    if (!it.productId) continue;
-    await tx.product.updateMany({ where: { id: it.productId }, data: { stock: { increment: it.quantity } } });
+    // Skip items with no variant (hard-deleted) or no size (sizeless) — nothing to restore.
+    if (!it.variantId || !it.size) continue;
+    await tx.variantSizeStock.updateMany({
+      where: { variantId: it.variantId, size: it.size },
+      data: { stock: { increment: it.quantity } },
+    });
   }
   await tx.order.update({ where: { id: orderId }, data: { status: "CANCELLED" } });
 }
@@ -181,7 +184,7 @@ export async function editItems(orderId: string, changes: ItemChange[]): Promise
   let next;
   try {
     next = applyItemChanges(
-      order.items.map((i) => ({ id: i.id, productId: i.productId, name: i.name, size: i.size, price: i.price, quantity: i.quantity })),
+      order.items.map((i) => ({ id: i.id, variantId: i.variantId, name: i.name, size: i.size, price: i.price, quantity: i.quantity })),
       changes,
     );
   } catch (e) {
@@ -189,20 +192,20 @@ export async function editItems(orderId: string, changes: ItemChange[]): Promise
   }
 
   const totals = recomputeTotals(next.nextItems, order.shippingCity, await getDeliveryConfig());
-  const nameByProduct = new Map(order.items.map((i) => [i.productId, i.name]));
+  const nameByVariant = new Map(order.items.map((i) => [i.variantId, i.name]));
 
   try {
     await prisma.$transaction(async (tx) => {
-      for (const [productId, delta] of Object.entries(next.stockDeltas)) {
+      for (const { variantId, size, delta } of next.stockDeltas) {
         if (delta > 0) {
-          await tx.product.updateMany({ where: { id: productId }, data: { stock: { increment: delta } } });
+          await tx.variantSizeStock.updateMany({ where: { variantId, size }, data: { stock: { increment: delta } } });
         } else if (delta < 0) {
           const dec = -delta;
-          const r = await tx.product.updateMany({
-            where: { id: productId, stock: { gte: dec } },
+          const r = await tx.variantSizeStock.updateMany({
+            where: { variantId, size, stock: { gte: dec } },
             data: { stock: { decrement: dec } },
           });
-          if (r.count === 0) throw new Error(`Insufficient stock for "${nameByProduct.get(productId) ?? productId}"`);
+          if (r.count === 0) throw new Error(`Insufficient stock for "${nameByVariant.get(variantId) ?? variantId}" (size ${size})`);
         }
       }
 
@@ -261,12 +264,12 @@ function toOrderDetails(order: DbOrderForDetails): OrderDetails {
   };
 }
 
-// Like ORDER_INCLUDE but also pulls each item's productId, which the
+// Like ORDER_INCLUDE but also pulls each item's variantId, which the
 // stock-restore in cancelOrderTx needs. The extra field is harmless to
 // toOrderDetails (which ignores it).
 const CANCEL_INCLUDE = {
   user: { select: { name: true, email: true } },
-  items: { select: { productId: true, name: true, size: true, price: true, quantity: true } },
+  items: { select: { variantId: true, name: true, size: true, price: true, quantity: true } },
 } satisfies Prisma.OrderInclude;
 
 /** Best-effort customer cancellation email — never throws; a send failure is

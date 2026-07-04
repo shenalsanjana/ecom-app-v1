@@ -138,7 +138,17 @@ async function main() {
     await bench("getProductDetail (3 waves)", async () => {
       const product = await prisma.product.findUnique({
         where: { id: pid, archived: false },
-        include: { category: true, images: { orderBy: { sortOrder: "asc" } } },
+        include: {
+          category: true,
+          variants: {
+            where: { archived: false },
+            orderBy: { sortOrder: "asc" },
+            include: {
+              images: { where: { role: "DETAIL" }, orderBy: { sortOrder: "asc" } },
+              sizeStocks: true,
+            },
+          },
+        },
       });
       if (!product) return;
       const [, related] = await Promise.all([

@@ -110,7 +110,7 @@ describe("createProduct", () => {
     expect(res).toEqual({ success: false, error: 'Duplicate SKU "CAT-WHITE"' });
     expect(productCreate).not.toHaveBeenCalled();
   });
-  it("generates a unique slug, back-fills legacy scalars, and writes variants + images + stock", async () => {
+  it("generates a unique slug and writes variants + images + stock", async () => {
     productFindUnique.mockResolvedValueOnce(null); // slug free
     productCreate.mockResolvedValueOnce({ id: "cat-white" });
     const res = await createProduct(NEW_INPUT);
@@ -119,8 +119,10 @@ describe("createProduct", () => {
     expect(createArg.data).toMatchObject({
       id: "cat-white", name: "Cat White", categorySlug: "cat",
       price: 2190, originalPrice: null, description: "Soft tee", archived: false,
-      image: "/products/cat-white/card/1.jpg", stock: 15, sizes: "S,M",
     });
+    expect(createArg.data).not.toHaveProperty("image");
+    expect(createArg.data).not.toHaveProperty("stock");
+    expect(createArg.data).not.toHaveProperty("sizes");
 
     expect(variantDeleteMany).toHaveBeenCalledWith({ where: { productId: "cat-white" } });
     const variantArg = variantCreate.mock.calls[0][0];

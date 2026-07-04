@@ -69,52 +69,55 @@ describe("recomputeTotals", () => {
 import { applyItemChanges } from "../admin-orders";
 
 const makeItems = () => [
-  { id: "i1", productId: "p1", name: "Dress", size: "M", price: 6500, quantity: 1 },
-  { id: "i2", productId: "p2", name: "Scarf", size: null, price: 2000, quantity: 2 },
+  { id: "i1", variantId: "v1", name: "Dress", size: "M", price: 6500, quantity: 1 },
+  { id: "i2", variantId: "v2", name: "Scarf", size: "S", price: 2000, quantity: 2 },
 ];
 
 describe("applyItemChanges", () => {
   it("decreasing quantity restores stock (positive delta)", () => {
     const { nextItems, stockDeltas } = applyItemChanges(makeItems(), [{ id: "i2", quantity: 1 }]);
     expect(nextItems.find((i) => i.id === "i2")!.quantity).toBe(1);
-    expect(stockDeltas).toEqual({ p2: 1 });
+    expect(stockDeltas).toEqual([{ variantId: "v2", size: "S", delta: 1 }]);
   });
 
   it("increasing quantity decrements stock (negative delta)", () => {
     const { stockDeltas } = applyItemChanges(makeItems(), [{ id: "i1", quantity: 3 }]);
-    expect(stockDeltas).toEqual({ p1: -2 });
+    expect(stockDeltas).toEqual([{ variantId: "v1", size: "M", delta: -2 }]);
   });
 
   it("removing an item restores its full quantity and drops it", () => {
     const { nextItems, stockDeltas } = applyItemChanges(makeItems(), [{ id: "i2", remove: true }]);
     expect(nextItems.map((i) => i.id)).toEqual(["i1"]);
-    expect(stockDeltas).toEqual({ p2: 2 });
+    expect(stockDeltas).toEqual([{ variantId: "v2", size: "S", delta: 2 }]);
   });
 
   it("changes size without affecting stock", () => {
     const { nextItems, stockDeltas } = applyItemChanges(makeItems(), [{ id: "i1", size: "L" }]);
     expect(nextItems.find((i) => i.id === "i1")!.size).toBe("L");
-    expect(stockDeltas).toEqual({});
+    expect(stockDeltas).toEqual([]);
   });
 
   it("rejects reducing quantity to zero (use remove instead)", () => {
     expect(() => applyItemChanges(makeItems(), [{ id: "i1", quantity: 0 }])).toThrow();
   });
 
-  it("skips stock deltas for an item whose product was deleted (null productId)", () => {
-    // Product hard-deleted while the order is still live → productId is null.
-    // There is no product to restore/decrement, so it must never enter deltas
-    // (a 'null' key would later try updateMany({ id: null }) and mis-fire).
+  it("skips stock deltas for an item with no variant (hard-deleted) or no size (sizeless)", () => {
+    // Variant hard-deleted while the order is still live → variantId is null.
+    // A sizeless variant has no size-stock cell at all. Neither can be
+    // restored/decremented, so they must never enter deltas (a null/undefined
+    // key would later try updateMany({ variantId: null }) and mis-fire).
     const items = [
-      { id: "i1", productId: null, name: "Gone", size: "M", price: 6500, quantity: 2 },
-      { id: "i2", productId: "p2", name: "Scarf", size: null, price: 2000, quantity: 2 },
+      { id: "i1", variantId: null, name: "Gone", size: "M", price: 6500, quantity: 2 },
+      { id: "i2", variantId: "v2", name: "Scarf", size: null, price: 2000, quantity: 2 },
+      { id: "i3", variantId: "v3", name: "Live", size: "M", price: 3000, quantity: 1 },
     ];
     const { nextItems, stockDeltas } = applyItemChanges(items, [
       { id: "i1", remove: true },
       { id: "i2", quantity: 1 },
+      { id: "i3", quantity: 2 },
     ]);
-    expect(nextItems.map((i) => i.id)).toEqual(["i2"]);
-    expect(stockDeltas).toEqual({ p2: 1 }); // only the live product, never a null key
+    expect(nextItems.map((i) => i.id)).toEqual(["i2", "i3"]);
+    expect(stockDeltas).toEqual([{ variantId: "v3", size: "M", delta: -1 }]); // only the live variant+size
   });
 });
 

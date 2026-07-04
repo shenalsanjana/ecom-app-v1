@@ -36,7 +36,10 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
             <OrderItemsEditor
               orderId={order.id}
               editable={canEditOrder}
-              items={order.items.map((i) => ({ id: i.id, name: i.name, size: i.size, price: i.price, quantity: i.quantity, sizes: i.product?.sizes ?? i.size ?? "" }))}
+              items={order.items.map((i) => ({
+                id: i.id, name: i.name, size: i.size, price: i.price, quantity: i.quantity,
+                sizes: i.variant ? i.variant.sizeStocks.map((s) => s.size).join(",") : (i.size ?? ""),
+              }))}
             />
             <div className="mt-3 border-t pt-2 text-sm">
               <div className="flex justify-between"><span>Subtotal</span><span>{formatPrice(order.subtotal)}</span></div>
