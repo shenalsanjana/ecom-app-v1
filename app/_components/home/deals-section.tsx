@@ -18,18 +18,7 @@ export async function DealsSection() {
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
           {products.map((p) => (
-            <ProductCard
-              key={p.id}
-              id={p.id}
-              name={p.name}
-              price={p.price}
-              originalPrice={p.originalPrice}
-              image={p.image}
-              rating={p.rating}
-              reviewCount={p.reviewCount}
-              sizes={p.sizes}
-              fromPath="/"
-            />
+            <ProductCard key={p.id} product={p} fromPath="/" />
           ))}
         </div>
       </div>

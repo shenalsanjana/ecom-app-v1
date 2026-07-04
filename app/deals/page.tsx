@@ -1,10 +1,14 @@
 import Link from "next/link";
-import { getProducts, type SortBy } from "@/app/_lib/products";
+import { getProducts, type SortBy, type ProductView } from "@/app/_lib/products";
 import { ProductCard } from "@/app/_components/home/product-card";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { SortSelect } from "@/app/_components/shared/sort-select";
 import type { Metadata } from "next";
+
+function defaultVariantOf(p: ProductView) {
+  return p.variants.find((v) => v.colorSlug === p.defaultColorSlug) ?? p.variants[0];
+}
 
 export const revalidate = 120;
 
@@ -47,11 +51,12 @@ export default async function DealsPage({ searchParams }: DealsPageProps) {
     sortBy === "discount" ? "newest" : (sortBy as SortBy);
   const allProducts = await getProducts({ sortBy: productsSort });
 
-  const dealsProducts = allProducts.filter((p) => p.originalPrice !== null);
+  const dealsProducts = allProducts.filter((p) => defaultVariantOf(p).originalPrice !== null);
   if (sortBy === "discount") {
     dealsProducts.sort((a, b) => {
-      const da = a.originalPrice ? (a.originalPrice - a.price) / a.originalPrice : 0;
-      const db = b.originalPrice ? (b.originalPrice - b.price) / b.originalPrice : 0;
+      const va = defaultVariantOf(a), vb = defaultVariantOf(b);
+      const da = va.originalPrice ? (va.originalPrice - va.price) / va.originalPrice : 0;
+      const db = vb.originalPrice ? (vb.originalPrice - vb.price) / vb.originalPrice : 0;
       return db - da;
     });
   }
@@ -102,8 +107,9 @@ export default async function DealsPage({ searchParams }: DealsPageProps) {
                 Up to{" "}
                 {(() => {
                   const maxDiscount = dealsProducts.reduce((max, p) => {
-                    if (p.originalPrice) {
-                      const discount = Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100);
+                    const v = defaultVariantOf(p);
+                    if (v.originalPrice) {
+                      const discount = Math.round(((v.originalPrice - v.price) / v.originalPrice) * 100);
                       return Math.max(max, discount);
                     }
                     return max;
@@ -164,33 +170,19 @@ export default async function DealsPage({ searchParams }: DealsPageProps) {
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
             {paginatedProducts.map((product) => {
+              const v = defaultVariantOf(product);
               const discount =
-                product.originalPrice && product.originalPrice > product.price
-                  ? Math.round(
-                      ((product.originalPrice - product.price) / product.originalPrice) *
-                        100
-                    )
+                v.originalPrice && v.originalPrice > v.price
+                  ? Math.round(((v.originalPrice - v.price) / v.originalPrice) * 100)
                   : 0;
-
               return (
                 <div key={product.id} className="group relative">
-                  {/* Discount Badge */}
                   {discount > 0 && (
                     <div className="absolute left-2 top-2 z-10 rounded-full bg-brand px-2 py-0.5 text-xs font-bold text-brand-foreground shadow-lg">
                       -{discount}%
                     </div>
                   )}
-                  <ProductCard
-                    id={product.id}
-                    name={product.name}
-                    price={product.price}
-                    originalPrice={product.originalPrice}
-                    image={product.image}
-                    rating={product.rating}
-                    reviewCount={product.reviewCount}
-                    sizes={product.sizes}
-                    fromPath="/deals"
-                  />
+                  <ProductCard product={product} fromPath="/deals" />
                 </div>
               );
             })}

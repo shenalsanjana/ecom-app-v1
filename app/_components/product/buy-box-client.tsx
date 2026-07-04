@@ -1,7 +1,7 @@
 // app/_components/product/buy-box-client.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Heart, Star, Loader2, Truck, RotateCcw, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -10,25 +10,34 @@ import { AddToCartButton } from "@/app/_components/cart/add-to-cart-button";
 import { SizeChartDialog } from "@/app/_components/product/size-chart-dialog";
 import { StockIndicator } from "@/app/_components/shared/stock-indicator";
 import { InstallmentNote } from "@/app/_components/shared/installment-note";
-import { useCart } from "@/app/_lib/cart-context";
+import { ColorSwatches, type SwatchOption } from "@/app/_components/product/color-swatches";
 import { useWishlist } from "@/app/_lib/wishlist-context";
 import { formatPrice } from "@/app/_lib/format";
 import { useDeliveryConfig } from "@/app/_components/delivery/delivery-config-provider";
 import { trackViewContent, trackAddToCart } from "@/app/_lib/meta-pixel";
+import { useCart } from "@/app/_lib/cart-context";
 import { ShareButtons } from "@/app/_components/product/share-buttons";
+import { variantInStock, availableSizes, stockForSize } from "@/app/_lib/variants";
+
+export type VariantDetail = {
+  id: string;
+  color: string;
+  colorSlug: string;
+  swatchHex: string | null;
+  sku: string | null;
+  price: number;
+  originalPrice: number | null;
+  detailImages: string[];
+  sizeStocks: { size: string; stock: number }[];
+};
 
 type Props = {
   productId: string;
   name: string;
-  price: number;
-  originalPrice: number | null;
-  image: string;
+  variants: VariantDetail[];
+  defaultColorSlug: string;
   ratingAvg: number;
   ratingCount: number;
-  stock: number;
-  sizes?: string;
-  // Canonical absolute product URL, computed server-side (APP_URL is not a
-  // NEXT_PUBLIC_ var, so it can't be derived in this client component).
   shareUrl: string;
 };
 
@@ -37,74 +46,81 @@ function discountPct(price: number, original: number): number {
 }
 
 export function BuyBoxClient({
-  productId, name, price, originalPrice, image,
-  ratingAvg, ratingCount, stock, sizes, shareUrl,
+  productId, name, variants, defaultColorSlug, ratingAvg, ratingCount, shareUrl,
 }: Props) {
   const router = useRouter();
-  const { addItem, items } = useCart();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { addItem } = useCart();
   const { freeThreshold: FREE_DELIVERY_THRESHOLD } = useDeliveryConfig();
   const { has: isWishlisted, toggle: toggleWishlist } = useWishlist();
   const wishlisted = isWishlisted(productId);
+
+  const colorParam = searchParams.get("color");
+  const buyNowIntent = searchParams.get("action") === "buy-now";
+  const selectedVariant =
+    variants.find((v) => v.colorSlug === colorParam) ??
+    variants.find((v) => v.colorSlug === defaultColorSlug) ??
+    variants[0];
+
   const [quantity, setQuantity] = useState(1);
   const [isBuying, setIsBuying] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string>("");
 
-  const sizeList = useMemo(
-    () => (sizes ? sizes.split(",").map((s) => s.trim()) : []),
-    [sizes],
-  );
+  // Clear size + quantity when the color changes (availability differs per color).
+  useEffect(() => { setSelectedSize(""); setQuantity(1); }, [selectedVariant.colorSlug]);
 
-  const searchParams = useSearchParams();
-  const pathname = usePathname();
-  const buyNowIntent = searchParams.get("action") === "buy-now";
-
-  // Fire ViewContent once per product when the buy box mounts.
-  useEffect(() => {
-    trackViewContent(productId, price);
-  }, [productId, price]);
-
-  useEffect(() => {
-    if (!buyNowIntent) return;
-    if (!sizeList.length) return;
-    if (selectedSize) return;
-    const el = document.getElementById("size-picker");
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-    el.setAttribute("data-attention", "true");
-    const t = setTimeout(() => el.removeAttribute("data-attention"), 2000);
-
-    // Strip ?action=buy-now from the URL so refresh / back-nav doesn't re-fire
-    // the nudge. Preserve any other query params.
-    const next = new URLSearchParams(searchParams.toString());
-    next.delete("action");
-    const qs = next.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-
-    return () => {
-      clearTimeout(t);
-      el.removeAttribute("data-attention");
-    };
-  }, [buyNowIntent, sizeList.length, selectedSize, searchParams, pathname, router]);
+  const price = selectedVariant.price;
+  const originalPrice = selectedVariant.originalPrice;
+  const image = selectedVariant.detailImages[0] ?? "";
+  const inStock = variantInStock(selectedVariant.sizeStocks);
+  const sizeList = selectedVariant.sizeStocks.map((s) => s.size);
+  const inStockSizes = new Set(availableSizes(selectedVariant.sizeStocks));
+  const sizeStock = selectedSize ? stockForSize(selectedVariant.sizeStocks, selectedSize) : 0;
+  const qtyMax = Math.min(selectedSize ? sizeStock : 10, 10);
+  // Show the exact per-size count only once a size is chosen; before that, a
+  // generic "in stock" (a value above the low-stock threshold) so we never
+  // falsely render "Only 1 left" on a product that simply has no size selected.
+  const displayStock = selectedSize ? sizeStock : inStock ? 999 : 0;
 
   const onSale = originalPrice != null && originalPrice > price;
   const pct = onSale ? discountPct(price, originalPrice as number) : 0;
   const fromPath = `/products/${productId}`;
-  const inStock = stock > 0;
-  const qtyMax = Math.min(stock, 10);
 
-  // Signal that the mobile sticky purchase bar is on screen so the global
-  // WhatsApp FAB can lift above it (it overlaps "Add to cart" otherwise).
-  // Mirrors the bar's render gate (inStock + lg:hidden); removed on unmount.
+  useEffect(() => { trackViewContent(productId, price); }, [productId, price]);
+
   useEffect(() => {
     if (!inStock) return;
     document.body.setAttribute("data-mobile-cta", "");
     return () => document.body.removeAttribute("data-mobile-cta");
   }, [inStock]);
 
-  // Match cart line by composite key (productId + size).
-  const cartKey = selectedSize ? `${productId}::${selectedSize}` : productId;
-  const existingItem = items.find((i) => i.key === cartKey);
-  const inCartQty = existingItem ? existingItem.quantity : 0;
+  // Buy-it-now from a card lands here with ?action=buy-now: scroll to and flash
+  // the size picker, then strip the param so refresh/back-nav doesn't re-fire.
+  useEffect(() => {
+    if (!buyNowIntent || !sizeList.length || selectedSize) return;
+    const el = document.getElementById("size-picker");
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.setAttribute("data-attention", "true");
+    const t = setTimeout(() => el.removeAttribute("data-attention"), 2000);
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("action");
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    return () => { clearTimeout(t); el.removeAttribute("data-attention"); };
+  }, [buyNowIntent, sizeList.length, selectedSize, searchParams, pathname, router]);
+
+  function selectColor(slug: string) {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("color", slug);
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  }
+
+  const swatchOptions: SwatchOption[] = variants.map((v) => ({
+    colorSlug: v.colorSlug, color: v.color, swatchHex: v.swatchHex,
+    image: v.detailImages[0] ?? "",
+  }));
 
   function nudgeSizePicker() {
     const el = document.getElementById("size-picker");
@@ -115,12 +131,9 @@ export function BuyBoxClient({
   }
 
   function handleBuyNow() {
-    if (sizeList.length > 0 && !selectedSize) {
-      nudgeSizePicker();
-      return;
-    }
+    if (sizeList.length > 0 && !selectedSize) { nudgeSizePicker(); return; }
     setIsBuying(true);
-    addItem({ productId, name, price, image, size: selectedSize || null }, quantity);
+    addItem({ productId, variantId: selectedVariant.id, color: selectedVariant.color, name, price, image, size: selectedSize || null }, quantity);
     trackAddToCart(productId, price * quantity, quantity);
     router.push("/checkout");
   }
@@ -140,32 +153,31 @@ export function BuyBoxClient({
       </a>
 
       <div className="flex items-baseline gap-3">
-        <span
-          className={
-            "font-heading text-2xl font-semibold " + (onSale ? "text-brand" : "")
-          }
-        >
-          {formatPrice(price)}
-        </span>
+        <span className={"font-heading text-2xl font-semibold " + (onSale ? "text-brand" : "")}>{formatPrice(price)}</span>
         {onSale && (
           <>
-            <span className="text-base text-muted-foreground line-through">
-              {formatPrice(originalPrice as number)}
-            </span>
+            <span className="text-base text-muted-foreground line-through">{formatPrice(originalPrice as number)}</span>
             <Badge variant="brand">-{pct}%</Badge>
           </>
         )}
       </div>
       <InstallmentNote total={price} />
 
-      <div><StockIndicator stock={stock} /></div>
+      {/* Color selector */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="font-medium">Color:</span>
+          <span className="text-muted-foreground">{selectedVariant.color}</span>
+          {selectedVariant.sku && <span className="ml-auto text-xs text-muted-foreground">SKU {selectedVariant.sku}</span>}
+        </div>
+        <ColorSwatches options={swatchOptions} selected={selectedVariant.colorSlug} onSelect={selectColor} />
+      </div>
+
+      <div><StockIndicator stock={displayStock} /></div>
 
       {/* Size Selection */}
       {sizeList.length > 0 && (
-        <div
-          id="size-picker"
-          className="space-y-2 rounded-md transition-shadow data-[attention=true]:ring-2 data-[attention=true]:ring-ring data-[attention=true]:ring-offset-2 data-[attention=true]:ring-offset-background"
-        >
+        <div id="size-picker" className="space-y-2 rounded-md transition-shadow data-[attention=true]:ring-2 data-[attention=true]:ring-ring data-[attention=true]:ring-offset-2 data-[attention=true]:ring-offset-background">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">Size:</span>
             <span className="text-sm text-muted-foreground">{selectedSize || "Select a size"}</span>
@@ -174,17 +186,18 @@ export function BuyBoxClient({
           <div className="flex flex-wrap gap-2">
             {sizeList.map((size) => {
               const isSelected = selectedSize === size;
+              const disabled = !inStockSizes.has(size);
               return (
                 <button
                   key={size}
                   type="button"
-                  onClick={() => setSelectedSize(size)}
+                  onClick={() => !disabled && setSelectedSize(size)}
                   aria-pressed={isSelected}
+                  disabled={disabled}
                   className={
                     "min-w-[48px] rounded-md border bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors duration-(--duration-fast) " +
-                    (isSelected
-                      ? "border-ring bg-muted ring-2 ring-ring"
-                      : "border-border hover:border-foreground/40")
+                    (disabled ? "cursor-not-allowed opacity-40 line-through" :
+                      isSelected ? "border-ring bg-muted ring-2 ring-ring" : "border-border hover:border-foreground/40")
                   }
                 >
                   {size}
@@ -199,40 +212,19 @@ export function BuyBoxClient({
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium">Quantity</span>
           <div className="inline-flex items-center rounded-md border border-border">
-            <button
-              type="button"
-              onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-              disabled={quantity <= 1}
-              aria-label="Decrease quantity"
-              className="px-3 py-2 text-sm transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
-            >
-              −
-            </button>
-            <span className="min-w-[2.5rem] border-x border-border px-2 py-2 text-center text-sm tabular-nums">
-              {quantity}
-            </span>
-            <button
-              type="button"
-              onClick={() => setQuantity((q) => Math.min(qtyMax, q + 1))}
-              disabled={quantity >= qtyMax}
-              aria-label="Increase quantity"
-              className="px-3 py-2 text-sm transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
-            >
-              +
-            </button>
+            <button type="button" onClick={() => setQuantity((q) => Math.max(1, q - 1))} disabled={quantity <= 1} aria-label="Decrease quantity" className="px-3 py-2 text-sm transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40">−</button>
+            <span className="min-w-[2.5rem] border-x border-border px-2 py-2 text-center text-sm tabular-nums">{quantity}</span>
+            <button type="button" onClick={() => setQuantity((q) => Math.min(qtyMax, q + 1))} disabled={quantity >= qtyMax} aria-label="Increase quantity" className="px-3 py-2 text-sm transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40">+</button>
           </div>
-          {inCartQty > 0 && (
-            <span className="text-sm text-muted-foreground">({inCartQty} in cart)</span>
-          )}
         </div>
       )}
 
       <div className="space-y-2">
-        {/* Primary row: Add to Cart is the single dominant CTA; wishlist is a
-            quiet icon button, not a third competing button. */}
         <div className="flex items-stretch gap-2">
           <AddToCartButton
             productId={productId}
+            variantId={selectedVariant.id}
+            color={selectedVariant.color}
             name={name}
             price={price}
             image={image}
@@ -242,25 +234,14 @@ export function BuyBoxClient({
             disabled={!inStock}
             className="h-12 flex-1"
           />
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-12 w-12"
-            aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
-            aria-pressed={wishlisted}
-            onClick={() => toggleWishlist(productId, fromPath)}
-          >
+          <Button type="button" variant="outline" size="icon" className="h-12 w-12"
+            aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"} aria-pressed={wishlisted}
+            onClick={() => toggleWishlist(productId, fromPath)}>
             <Heart className={"h-5 w-5 " + (wishlisted ? "fill-current text-brand" : "")} />
           </Button>
         </div>
         {inStock && (
-          <Button
-            onClick={handleBuyNow}
-            disabled={isBuying}
-            variant="outline"
-            className="h-12 w-full"
-          >
+          <Button onClick={handleBuyNow} disabled={isBuying} variant="outline" className="h-12 w-full">
             {isBuying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Buy Now
           </Button>
@@ -268,18 +249,9 @@ export function BuyBoxClient({
       </div>
 
       <ul className="flex flex-wrap gap-x-5 gap-y-2 border-t border-border pt-4 text-xs text-muted-foreground">
-        <li className="flex items-center gap-1.5">
-          <Truck className="h-4 w-4" aria-hidden />{" "}
-          {FREE_DELIVERY_THRESHOLD > 0
-            ? `Free shipping over ${formatPrice(FREE_DELIVERY_THRESHOLD)}`
-            : "Free shipping for all products"}
-        </li>
-        <li className="flex items-center gap-1.5">
-          <RotateCcw className="h-4 w-4" aria-hidden /> Free 14-day returns
-        </li>
-        <li className="flex items-center gap-1.5">
-          <ShieldCheck className="h-4 w-4" aria-hidden /> Secure checkout
-        </li>
+        <li className="flex items-center gap-1.5"><Truck className="h-4 w-4" aria-hidden /> {FREE_DELIVERY_THRESHOLD > 0 ? `Free shipping over ${formatPrice(FREE_DELIVERY_THRESHOLD)}` : "Free shipping for all products"}</li>
+        <li className="flex items-center gap-1.5"><RotateCcw className="h-4 w-4" aria-hidden /> Free 14-day returns</li>
+        <li className="flex items-center gap-1.5"><ShieldCheck className="h-4 w-4" aria-hidden /> Secure checkout</li>
       </ul>
 
       <div className="border-t border-border pt-4">
@@ -287,42 +259,18 @@ export function BuyBoxClient({
         <ShareButtons url={shareUrl} name={name} price={price} />
       </div>
 
-      {/* Sticky mobile purchase bar — keeps Add to Cart reachable without
-          scrolling back up on small screens. Hidden on lg where the buy box
-          is already sticky. When a size is required but unselected, tapping
-          scrolls to and flashes the size picker instead of dead-ending on a
-          disabled button. */}
       {inStock && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 px-4 py-3 backdrop-blur lg:hidden">
           <div className="mx-auto flex max-w-7xl items-center gap-3">
             <div className="min-w-0 shrink">
               <p className="truncate text-sm font-medium">{name}</p>
-              <p
-                className={
-                  "font-heading text-base font-semibold " +
-                  (onSale ? "text-brand" : "")
-                }
-              >
-                {formatPrice(price)}
-              </p>
+              <p className={"font-heading text-base font-semibold " + (onSale ? "text-brand" : "")}>{formatPrice(price)}</p>
             </div>
             <div className="ml-auto shrink-0">
               {sizeList.length > 0 && !selectedSize ? (
-                <Button className="h-12 px-6" onClick={nudgeSizePicker}>
-                  Add to cart
-                </Button>
+                <Button className="h-12 px-6" onClick={nudgeSizePicker}>Add to cart</Button>
               ) : (
-                <AddToCartButton
-                  productId={productId}
-                  name={name}
-                  price={price}
-                  image={image}
-                  size={selectedSize || null}
-                  quantity={quantity}
-                  requiresSize={true}
-                  disabled={!inStock}
-                  className="h-12 px-6"
-                />
+                <AddToCartButton productId={productId} variantId={selectedVariant.id} color={selectedVariant.color} name={name} price={price} image={image} size={selectedSize || null} quantity={quantity} requiresSize={true} disabled={!inStock} className="h-12 px-6" />
               )}
             </div>
           </div>

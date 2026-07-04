@@ -2,9 +2,10 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/app/_lib/prisma";
 import { requireAdmin } from "@/app/_lib/admin-auth";
-import { slugify, uniqueSlug, serializeSizes } from "@/app/_lib/admin-products";
+import { slugify, uniqueSlug } from "@/app/_lib/admin-products";
 
 export type ActionResult =
   | { success: true; slug?: string; name?: string }
@@ -14,18 +15,6 @@ function revalidate(id?: string) {
   revalidatePath("/admin/products");
   if (id) revalidatePath(`/admin/products/${id}/edit`);
   revalidateTag("catalog", "max"); // bust the storefront unstable_cache readers
-}
-
-export async function updateStock(id: string, stock: number): Promise<ActionResult> {
-  await requireAdmin();
-  if (!Number.isInteger(stock) || stock < 0) return { success: false, error: "Stock must be 0 or more" };
-  try {
-    await prisma.product.update({ where: { id }, data: { stock } });
-  } catch {
-    return { success: false, error: "Something went wrong. Please try again." };
-  }
-  revalidate(id);
-  return { success: true };
 }
 
 export async function archiveProduct(id: string): Promise<ActionResult> {
@@ -64,25 +53,168 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
   return { success: true };
 }
 
+const VariantSizeInputSchema = z.object({
+  size: z.string().trim().min(1),
+  stock: z.number().int().min(0),
+});
+
+const VariantInputSchema = z.object({
+  id: z.string().optional(),
+  color: z.string().trim().min(1),
+  colorSlug: z.string().trim().min(1),
+  swatchHex: z.string().trim().nullable().optional(),
+  sku: z.string().trim().nullable().optional(),
+  price: z.number().positive().nullable().optional(),
+  originalPrice: z.number().positive().nullable().optional(),
+  cardImages: z.array(z.string().trim().min(1)).min(1, "Each color needs at least one card image"),
+  detailImages: z.array(z.string().trim().min(1)).min(1, "Each color needs at least one detail image"),
+  sizeStocks: z.array(VariantSizeInputSchema).min(1, "Each color needs at least one size"),
+});
+
 const ProductInputSchema = z.object({
   name: z.string().trim().min(1),
   slug: z.string().trim().optional(),
   categorySlug: z.string().trim().min(1),
   price: z.number().positive(),
   originalPrice: z.number().positive().nullable().optional(),
-  stock: z.number().int().min(0),
-  sizes: z.array(z.string()),
   description: z.string().trim().min(1),
-  image: z.string().trim().min(1),
-  gallery: z.array(z.string().trim().min(1)),
+  variants: z.array(VariantInputSchema).min(1, "Add at least one color variant"),
 });
+export type VariantInput = z.infer<typeof VariantInputSchema>;
 export type ProductInput = z.infer<typeof ProductInputSchema>;
+
+// Reject duplicate colorSlugs or duplicate non-empty SKUs within one product,
+// so the DB unique constraints surface as a friendly message, not a 500.
+function variantConflict(d: ProductInput): string | null {
+  const slugs = new Set<string>();
+  const skus = new Set<string>();
+  for (const v of d.variants) {
+    const cs = slugify(v.colorSlug || v.color);
+    if (!cs) return "Each color needs a name";
+    if (slugs.has(cs)) return `Duplicate color "${v.color}"`;
+    slugs.add(cs);
+    const sku = v.sku?.trim();
+    if (sku) {
+      if (skus.has(sku)) return `Duplicate SKU "${sku}"`;
+      skus.add(sku);
+    }
+  }
+  return null;
+}
+
+// Writes all variants for a product inside an open transaction (delete-and-
+// recreate, mirroring the old gallery rebuild). Assumes the Product row exists.
+async function writeVariants(
+  tx: Prisma.TransactionClient,
+  productId: string,
+  variants: VariantInput[],
+): Promise<void> {
+  await tx.productVariant.deleteMany({ where: { productId } });
+  for (let i = 0; i < variants.length; i++) {
+    const v = variants[i];
+    const variant = await tx.productVariant.create({
+      data: {
+        productId,
+        color: v.color,
+        colorSlug: slugify(v.colorSlug || v.color),
+        swatchHex: v.swatchHex?.trim() || null,
+        sku: v.sku?.trim() || null,
+        price: v.price ?? null,
+        originalPrice: v.originalPrice ?? null,
+        sortOrder: i,
+        archived: false,
+      },
+    });
+    await tx.variantImage.createMany({
+      data: [
+        ...v.cardImages.map((url, j) => ({ variantId: variant.id, url, role: "CARD", sortOrder: j })),
+        ...v.detailImages.map((url, j) => ({ variantId: variant.id, url, role: "DETAIL", sortOrder: j })),
+      ],
+    });
+    await tx.variantSizeStock.createMany({
+      data: v.sizeStocks.map((s) => ({ variantId: variant.id, size: s.size, stock: s.stock })),
+    });
+  }
+}
+
+// UPDATE path: preserve ProductVariant row identity so OrderItem.variantId
+// (onDelete: SetNull) survives edits. Existing variants are updated in place;
+// new ones created; removed ones ARCHIVED (not deleted) so historical order
+// stock-restore still resolves their (variantId,size) cell. Images and size
+// cells have no incoming order FK, so they're safe to rebuild.
+async function reconcileVariants(
+  tx: Prisma.TransactionClient,
+  productId: string,
+  variants: VariantInput[],
+): Promise<void> {
+  // Only ACTIVE variants are managed by the edit form; archived rows are left alone.
+  const existing = await tx.productVariant.findMany({
+    where: { productId, archived: false },
+    select: { id: true },
+  });
+  const existingIds = new Set(existing.map((v) => v.id));
+
+  // Release every active variant's unique slots first (colorSlug + sku) so the
+  // reassignments below can't collide mid-transaction on the immediate unique
+  // checks — handles color renames, swaps, and remove+re-add of the same color.
+  for (const { id } of existing) {
+    await tx.productVariant.update({ where: { id }, data: { colorSlug: `tmp-${id}`, sku: null } });
+  }
+
+  const keptIds = new Set<string>();
+  for (let i = 0; i < variants.length; i++) {
+    const v = variants[i];
+    const data = {
+      color: v.color,
+      colorSlug: slugify(v.colorSlug || v.color),
+      swatchHex: v.swatchHex?.trim() || null,
+      sku: v.sku?.trim() || null,
+      price: v.price ?? null,
+      originalPrice: v.originalPrice ?? null,
+      sortOrder: i,
+      archived: false,
+    };
+    let variantId: string;
+    if (v.id && existingIds.has(v.id)) {
+      await tx.productVariant.update({ where: { id: v.id }, data });
+      variantId = v.id;
+    } else {
+      const created = await tx.productVariant.create({ data: { productId, ...data } });
+      variantId = created.id;
+    }
+    keptIds.add(variantId);
+    await tx.variantImage.deleteMany({ where: { variantId } });
+    await tx.variantImage.createMany({
+      data: [
+        ...v.cardImages.map((url, j) => ({ variantId, url, role: "CARD", sortOrder: j })),
+        ...v.detailImages.map((url, j) => ({ variantId, url, role: "DETAIL", sortOrder: j })),
+      ],
+    });
+    await tx.variantSizeStock.deleteMany({ where: { variantId } });
+    await tx.variantSizeStock.createMany({
+      data: v.sizeStocks.map((s) => ({ variantId, size: s.size, stock: s.stock })),
+    });
+  }
+
+  // Archive removed variants; free their unique colorSlug/sku so those values
+  // can be reused by a future variant without a unique-constraint collision.
+  const removed = [...existingIds].filter((id) => !keptIds.has(id));
+  for (const rid of removed) {
+    await tx.productVariant.update({
+      where: { id: rid },
+      data: { archived: true, colorSlug: `archived-${rid}`, sku: null },
+    });
+  }
+}
 
 export async function createProduct(input: ProductInput): Promise<ActionResult> {
   await requireAdmin();
   const parsed = ProductInputSchema.safeParse(input);
-  if (!parsed.success) return { success: false, error: "Please complete all required fields." };
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Please complete all required fields." };
   const d = parsed.data;
+
+  const conflict = variantConflict(d);
+  if (conflict) return { success: false, error: conflict };
 
   const baseSlug = slugify(d.slug || d.name);
   if (!baseSlug) return { success: false, error: "Name must contain letters or numbers" };
@@ -96,19 +228,14 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
       await tx.product.create({
         data: {
           id: slug, name: d.name, categorySlug: d.categorySlug,
-          price: d.price, originalPrice: d.originalPrice ?? null, stock: d.stock,
-          sizes: serializeSizes(d.sizes), description: d.description, image: d.image,
-          archived: false,
+          price: d.price, originalPrice: d.originalPrice ?? null,
+          description: d.description, archived: false,
         },
       });
-      if (d.gallery.length > 0) {
-        await tx.productImage.createMany({
-          data: d.gallery.map((url, i) => ({ productId: slug, url, sortOrder: i })),
-        });
-      }
+      await writeVariants(tx, slug, d.variants);
     });
   } catch {
-    return { success: false, error: "Could not create product (check the category exists)." };
+    return { success: false, error: "Could not create product (check the category and that SKUs are unique)." };
   }
   revalidate(slug);
   return { success: true, slug };
@@ -117,8 +244,11 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
 export async function updateProduct(id: string, input: ProductInput): Promise<ActionResult> {
   await requireAdmin();
   const parsed = ProductInputSchema.safeParse(input);
-  if (!parsed.success) return { success: false, error: "Please complete all required fields." };
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Please complete all required fields." };
   const d = parsed.data;
+
+  const conflict = variantConflict(d);
+  if (conflict) return { success: false, error: conflict };
 
   const existing = await prisma.product.findUnique({ where: { id } });
   if (!existing) return { success: false, error: "Product not found" };
@@ -126,7 +256,7 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
   const candidateSlug = slugify(d.slug || d.name);
   if (!candidateSlug) return { success: false, error: "Name must contain letters or numbers" };
 
-  // Field-only edit (slug unchanged): update scalars + rebuild gallery, no rename, no history row.
+  // Field-only edit (slug unchanged): update scalars + rebuild variants.
   if (candidateSlug === id) {
     try {
       await prisma.$transaction(async (tx) => {
@@ -134,61 +264,47 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
           where: { id },
           data: {
             name: d.name, categorySlug: d.categorySlug,
-            price: d.price, originalPrice: d.originalPrice ?? null, stock: d.stock,
-            sizes: serializeSizes(d.sizes), description: d.description, image: d.image,
+            price: d.price, originalPrice: d.originalPrice ?? null,
+            description: d.description,
           },
         });
-        await tx.productImage.deleteMany({ where: { productId: id } });
-        if (d.gallery.length > 0) {
-          await tx.productImage.createMany({
-            data: d.gallery.map((url, i) => ({ productId: id, url, sortOrder: i })),
-          });
-        }
+        await reconcileVariants(tx, id, d.variants);
       });
     } catch {
-      return { success: false, error: "Could not save product (check the category exists)." };
+      return { success: false, error: "Could not save product (check the category and that SKUs are unique)." };
     }
     revalidate(id);
     return { success: true, slug: id };
   }
 
-  // Rename: resolve a unique new slug, excluding the current product itself.
+  // Rename branch: resolve a unique new slug, excluding this product.
   const newSlug = await uniqueSlug(
     candidateSlug,
     async (s) => (await prisma.product.findFirst({ where: { id: s, NOT: { id } } })) !== null,
   );
-
   try {
     await prisma.$transaction(async (tx) => {
-      // ON UPDATE CASCADE moves child rows (images/reviews/wishlist/order items)
-      // and existing ProductSlugHistory.currentId rows to newSlug automatically.
+      // ON UPDATE CASCADE moves child rows (variants/reviews/wishlist/order items) to newSlug.
       await tx.product.update({
         where: { id },
         data: {
           id: newSlug, name: d.name, categorySlug: d.categorySlug,
-          price: d.price, originalPrice: d.originalPrice ?? null, stock: d.stock,
-          sizes: serializeSizes(d.sizes), description: d.description, image: d.image,
+          price: d.price, originalPrice: d.originalPrice ?? null,
+          description: d.description,
         },
       });
-      // Cascade already moved existing gallery rows to newSlug; rebuild under newSlug.
-      await tx.productImage.deleteMany({ where: { productId: newSlug } });
-      if (d.gallery.length > 0) {
-        await tx.productImage.createMany({
-          data: d.gallery.map((url, i) => ({ productId: newSlug, url, sortOrder: i })),
-        });
-      }
+      await reconcileVariants(tx, newSlug, d.variants);
       await tx.productSlugHistory.upsert({
         where: { oldSlug: id },
         update: { currentId: newSlug },
         create: { oldSlug: id, currentId: newSlug },
       });
-      // If newSlug was itself a previously-retired slug, drop that row to avoid a self-redirect loop.
       await tx.productSlugHistory.deleteMany({ where: { oldSlug: newSlug } });
     });
   } catch {
-    return { success: false, error: "Could not save product (check the category exists)." };
+    return { success: false, error: "Could not save product (check the category and that SKUs are unique)." };
   }
-  revalidatePath(`/admin/products/${id}/edit`); // bust the old edit URL too
+  revalidatePath(`/admin/products/${id}/edit`);
   revalidate(newSlug);
   return { success: true, slug: newSlug };
 }

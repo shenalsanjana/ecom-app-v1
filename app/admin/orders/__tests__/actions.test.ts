@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const { requireAdmin } = vi.hoisted(() => ({ requireAdmin: vi.fn() }));
-const { orderFindUnique, orderUpdate, orderDelete, noteCreate, productUpdateMany, txn } = vi.hoisted(() => ({
+const { orderFindUnique, orderUpdate, orderDelete, noteCreate, variantSizeStockUpdateMany, txn } = vi.hoisted(() => ({
   orderFindUnique: vi.fn(),
   orderUpdate: vi.fn(),
   orderDelete: vi.fn(),
   noteCreate: vi.fn(),
-  productUpdateMany: vi.fn(),
+  variantSizeStockUpdateMany: vi.fn(),
   txn: vi.fn(),
 }));
 const { orderItemUpdate, orderItemDelete } = vi.hoisted(() => ({
@@ -40,7 +40,7 @@ vi.mock("@/app/_lib/prisma", () => {
   const client = {
     order: { findUnique: orderFindUnique, update: orderUpdate, delete: orderDelete },
     orderNote: { create: noteCreate },
-    product: { updateMany: productUpdateMany },
+    variantSizeStock: { updateMany: variantSizeStockUpdateMany },
     orderItem: { update: orderItemUpdate, delete: orderItemDelete },
   };
   return { prisma: { ...client, $transaction: txn.mockImplementation(async (fn: (c: unknown) => unknown) => fn(client)) } };
@@ -55,14 +55,14 @@ beforeEach(() => {
   orderUpdate.mockReset();
   orderDelete.mockReset();
   noteCreate.mockReset();
-  productUpdateMany.mockReset();
+  variantSizeStockUpdateMany.mockReset();
   orderItemUpdate.mockReset();
   orderItemDelete.mockReset();
   txn.mockReset().mockImplementation(async (fn: (c: unknown) => unknown) => {
     const client = {
       order: { findUnique: orderFindUnique, update: orderUpdate, delete: orderDelete },
       orderNote: { create: noteCreate },
-      product: { updateMany: productUpdateMany },
+      variantSizeStock: { updateMany: variantSizeStockUpdateMany },
       orderItem: { update: orderItemUpdate, delete: orderItemDelete },
     };
     return fn(client);
@@ -171,29 +171,30 @@ describe("cancelOrder", () => {
   it("restores stock and warns when the order was paid", async () => {
     orderFindUnique.mockResolvedValueOnce({
       id: "o1", status: "CONFIRMED", paymentStatus: "PAID",
-      items: [{ productId: "p1", quantity: 2 }],
+      items: [{ variantId: "v1", size: "M", quantity: 2 }],
     });
     const res = await cancelOrder("o1");
-    expect(productUpdateMany).toHaveBeenCalledWith({
-      where: { id: "p1" }, data: { stock: { increment: 2 } },
+    expect(variantSizeStockUpdateMany).toHaveBeenCalledWith({
+      where: { variantId: "v1", size: "M" }, data: { stock: { increment: 2 } },
     });
     expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CANCELLED" } });
     expect(res).toEqual({ success: true, warning: "Order was paid — refund must be handled manually." });
   });
 
-  it("skips stock restore for an item whose product was deleted (null productId)", async () => {
+  it("skips stock restore for an item with no variant (hard-deleted) or no size (sizeless)", async () => {
     orderFindUnique.mockResolvedValueOnce({
       id: "o1", status: "CONFIRMED", paymentStatus: "PENDING",
       guestName: null, guestEmail: null, user: null,
       items: [
-        { productId: null, name: "Gone", size: "M", price: 6500, quantity: 2 },
-        { productId: "p1", name: "Dress", size: "M", price: 1000, quantity: 1 },
+        { variantId: null, name: "Gone", size: "M", price: 6500, quantity: 2 },
+        { variantId: "v2", name: "Scarf", size: null, price: 2000, quantity: 3 },
+        { variantId: "v1", name: "Dress", size: "M", price: 1000, quantity: 1 },
       ],
     });
     const res = await cancelOrder("o1");
-    // only the surviving product's stock is restored; the null one is skipped
-    expect(productUpdateMany).toHaveBeenCalledTimes(1);
-    expect(productUpdateMany).toHaveBeenCalledWith({ where: { id: "p1" }, data: { stock: { increment: 1 } } });
+    // only the surviving variant+size is restored; the null variant and the sizeless item are skipped
+    expect(variantSizeStockUpdateMany).toHaveBeenCalledTimes(1);
+    expect(variantSizeStockUpdateMany).toHaveBeenCalledWith({ where: { variantId: "v1", size: "M" }, data: { stock: { increment: 1 } } });
     expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CANCELLED" } });
     expect(res).toEqual({ success: true });
   });
@@ -203,7 +204,7 @@ describe("cancelOrder", () => {
       id: "o1", status: "CONFIRMED", paymentStatus: "COD_PENDING",
       guestName: "Nimali", guestEmail: "n@x.test", user: null,
       webNumber: "WEB1", rbNumber: null, trackingCode: null,
-      items: [{ productId: "p1", name: "Dress", size: "M", price: 1000, quantity: 1 }],
+      items: [{ variantId: "v1", name: "Dress", size: "M", price: 1000, quantity: 1 }],
     });
     const res = await cancelOrder("o1");
     expect(notifyOrderCancelled).toHaveBeenCalledTimes(1);
@@ -215,7 +216,7 @@ describe("cancelOrder", () => {
     orderFindUnique.mockResolvedValueOnce({
       id: "o1", status: "CONFIRMED", paymentStatus: "COD_PENDING",
       guestName: null, guestEmail: null, user: null,
-      items: [{ productId: "p1", name: "Dress", size: "M", price: 1000, quantity: 1 }],
+      items: [{ variantId: "v1", name: "Dress", size: "M", price: 1000, quantity: 1 }],
     });
     await cancelOrder("o1");
     // The dispatcher is now always invoked — it decides the email skip internally.
@@ -229,7 +230,7 @@ describe("editItems", () => {
   const ORDER = {
     id: "o1", status: "CONFIRMED", paymentStatus: "PENDING", shippingCity: "Colombo",
     items: [
-      { id: "i1", productId: "p1", name: "Dress", size: "M", price: 2000, quantity: 2 },
+      { id: "i1", variantId: "v1", name: "Dress", size: "M", price: 2000, quantity: 2 },
     ],
   };
 
@@ -241,12 +242,12 @@ describe("editItems", () => {
 
   it("decreasing quantity restores stock and recomputes totals", async () => {
     orderFindUnique.mockResolvedValueOnce(ORDER);
-    productUpdateMany.mockResolvedValue({ count: 1 });
+    variantSizeStockUpdateMany.mockResolvedValue({ count: 1 });
     orderUpdate.mockResolvedValueOnce({});
     orderItemUpdate.mockResolvedValueOnce({});
     const res = await editItems("o1", [{ id: "i1", quantity: 1 }]);
-    // restore 1 unit of p1
-    expect(productUpdateMany).toHaveBeenCalledWith({ where: { id: "p1" }, data: { stock: { increment: 1 } } });
+    // restore 1 unit of v1/M
+    expect(variantSizeStockUpdateMany).toHaveBeenCalledWith({ where: { variantId: "v1", size: "M" }, data: { stock: { increment: 1 } } });
     // item updated to new quantity
     expect(orderItemUpdate).toHaveBeenCalledWith({ where: { id: "i1" }, data: { quantity: 1, size: "M" } });
     // subtotal 2000 (qty 2→1), Colombo, below the 5000 free-shipping threshold → 350 shipping
@@ -259,12 +260,12 @@ describe("editItems", () => {
 
   it("remove path: deletes item, restores stock, recomputes totals to zero subtotal", async () => {
     orderFindUnique.mockResolvedValueOnce(ORDER);
-    productUpdateMany.mockResolvedValue({ count: 1 });
+    variantSizeStockUpdateMany.mockResolvedValue({ count: 1 });
     orderUpdate.mockResolvedValueOnce({});
     orderItemDelete.mockResolvedValueOnce({});
     const res = await editItems("o1", [{ id: "i1", remove: true }]);
-    // restore 2 units of p1
-    expect(productUpdateMany).toHaveBeenCalledWith({ where: { id: "p1" }, data: { stock: { increment: 2 } } });
+    // restore 2 units of v1/M
+    expect(variantSizeStockUpdateMany).toHaveBeenCalledWith({ where: { variantId: "v1", size: "M" }, data: { stock: { increment: 2 } } });
     // item deleted
     expect(orderItemDelete).toHaveBeenCalledWith({ where: { id: "i1" } });
     // totals recomputed for empty item set: subtotal 0
@@ -277,9 +278,9 @@ describe("editItems", () => {
 
   it("fails the increase when stock is insufficient", async () => {
     orderFindUnique.mockResolvedValueOnce(ORDER);
-    productUpdateMany.mockResolvedValueOnce({ count: 0 }); // decrement guard fails
+    variantSizeStockUpdateMany.mockResolvedValueOnce({ count: 0 }); // decrement guard fails
     const res = await editItems("o1", [{ id: "i1", quantity: 5 }]);
-    expect(res).toEqual({ success: false, error: "Insufficient stock for \"Dress\"" });
+    expect(res).toEqual({ success: false, error: "Insufficient stock for \"Dress\" (size M)" });
     expect(orderUpdate).not.toHaveBeenCalled();
   });
 });
@@ -540,16 +541,16 @@ describe("bulkCancel", () => {
   it("cancels eligible orders, restores stock, and skips terminal ones", async () => {
     // o1: CONFIRMED → cancel + restore; o2: already CANCELLED → skip; o3: DELIVERED → skip
     orderFindUnique
-      .mockResolvedValueOnce({ id: "o1", status: "CONFIRMED", paymentStatus: "PENDING", items: [{ productId: "p1", quantity: 2 }] })
+      .mockResolvedValueOnce({ id: "o1", status: "CONFIRMED", paymentStatus: "PENDING", items: [{ variantId: "v1", size: "M", quantity: 2 }] })
       .mockResolvedValueOnce({ id: "o2", status: "CANCELLED", paymentStatus: "PENDING", items: [] })
-      .mockResolvedValueOnce({ id: "o3", status: "DELIVERED", paymentStatus: "PAID", items: [{ productId: "p9", quantity: 1 }] });
+      .mockResolvedValueOnce({ id: "o3", status: "DELIVERED", paymentStatus: "PAID", items: [{ variantId: "v9", size: "S", quantity: 1 }] });
     orderUpdate.mockResolvedValue({});
-    productUpdateMany.mockResolvedValue({ count: 1 });
+    variantSizeStockUpdateMany.mockResolvedValue({ count: 1 });
 
     const res = await bulkCancel(["o1", "o2", "o3"]);
 
-    expect(productUpdateMany).toHaveBeenCalledTimes(1);
-    expect(productUpdateMany).toHaveBeenCalledWith({ where: { id: "p1" }, data: { stock: { increment: 2 } } });
+    expect(variantSizeStockUpdateMany).toHaveBeenCalledTimes(1);
+    expect(variantSizeStockUpdateMany).toHaveBeenCalledWith({ where: { variantId: "v1", size: "M" }, data: { stock: { increment: 2 } } });
     expect(orderUpdate).toHaveBeenCalledTimes(1);
     expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CANCELLED" } });
     expect(res.okCount).toBe(1);
@@ -570,7 +571,7 @@ describe("deleteOrder", () => {
     orderDelete.mockResolvedValueOnce({});
     const res = await deleteOrder("o1");
     expect(orderDelete).toHaveBeenCalledWith({ where: { id: "o1" } });
-    expect(productUpdateMany).not.toHaveBeenCalled();
+    expect(variantSizeStockUpdateMany).not.toHaveBeenCalled();
     expect(res).toEqual({ success: true });
   });
 
@@ -580,7 +581,7 @@ describe("deleteOrder", () => {
     const res = await deleteOrder("o1");
     expect(orderDelete).toHaveBeenCalledWith({ where: { id: "o1" } });
     // delivered goods shipped — deletion must NOT return them to inventory
-    expect(productUpdateMany).not.toHaveBeenCalled();
+    expect(variantSizeStockUpdateMany).not.toHaveBeenCalled();
     expect(res).toEqual({ success: true });
   });
 
@@ -603,7 +604,7 @@ describe("bulkDelete", () => {
     expect(orderDelete).toHaveBeenCalledTimes(2);
     expect(orderDelete).toHaveBeenCalledWith({ where: { id: "o1" } });
     expect(orderDelete).toHaveBeenCalledWith({ where: { id: "o2" } });
-    expect(productUpdateMany).not.toHaveBeenCalled(); // delete must never restore stock
+    expect(variantSizeStockUpdateMany).not.toHaveBeenCalled(); // delete must never restore stock
     expect(res.okCount).toBe(2);
     expect(res.skippedCount).toBe(1);
     expect(res.results).toEqual([

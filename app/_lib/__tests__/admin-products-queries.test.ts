@@ -28,13 +28,14 @@ describe("listProducts", () => {
     productFindMany.mockResolvedValueOnce([{ id: "cat-white" }]);
     productCount.mockResolvedValueOnce(42);
     const res = await listProducts({ tab: "low-stock", page: 2, pageSize: 25 });
-    expect(productCount).toHaveBeenCalledWith({ where: { archived: false, stock: { lte: 5 } } });
+    const lowStockWhere = { archived: false, variants: { some: { sizeStocks: { some: { stock: { lte: 5 } } } } } };
+    expect(productCount).toHaveBeenCalledWith({ where: lowStockWhere });
     const arg = productFindMany.mock.calls[0][0];
-    expect(arg.where).toEqual({ archived: false, stock: { lte: 5 } });
+    expect(arg.where).toEqual(lowStockWhere);
     expect(arg.take).toBe(25);
     expect(arg.skip).toBe(25);
     expect(arg.orderBy).toEqual({ name: "asc" });
-    expect(arg.include._count.select.images).toBe(true);
+    expect(arg.include._count.select.variants).toBe(true);
     expect(res).toEqual({ rows: [{ id: "cat-white" }], total: 42 });
   });
 
@@ -49,13 +50,16 @@ describe("listProducts", () => {
 });
 
 describe("getProduct", () => {
-  it("includes ordered gallery and category", async () => {
+  it("includes ordered variants with images and size stock, plus category", async () => {
     productFindUnique.mockResolvedValueOnce({ id: "cat-white" });
     await getProduct("cat-white");
     const arg = productFindUnique.mock.calls[0][0];
     expect(arg.where).toEqual({ id: "cat-white" });
-    expect(arg.include.images.orderBy).toEqual({ sortOrder: "asc" });
     expect(arg.include.category).toBe(true);
+    expect(arg.include.variants.where).toEqual({ archived: false });
+    expect(arg.include.variants.orderBy).toEqual({ sortOrder: "asc" });
+    expect(arg.include.variants.include.images.orderBy).toEqual({ sortOrder: "asc" });
+    expect(arg.include.variants.include.sizeStocks.orderBy).toEqual({ size: "asc" });
   });
 });
 

@@ -4,7 +4,7 @@ const {
   orderFindUnique,
   orderUpdate,
   orderUpdateMany,
-  productUpdate,
+  variantSizeStockUpdateMany,
   orderItemFindMany,
   sendOrderConfirmationEmail,
   sendAdminFailureAlertEmail,
@@ -13,7 +13,7 @@ const {
   orderFindUnique: vi.fn(),
   orderUpdate: vi.fn(),
   orderUpdateMany: vi.fn(),
-  productUpdate: vi.fn(),
+  variantSizeStockUpdateMany: vi.fn(),
   orderItemFindMany: vi.fn(),
   sendOrderConfirmationEmail: vi.fn(),
   sendAdminFailureAlertEmail: vi.fn(),
@@ -24,11 +24,11 @@ vi.mock("@/app/_lib/prisma", () => ({
   prisma: {
     order: { findUnique: orderFindUnique, update: orderUpdate, updateMany: orderUpdateMany },
     orderItem: { findMany: orderItemFindMany },
-    product: { update: productUpdate },
+    variantSizeStock: { updateMany: variantSizeStockUpdateMany },
     $transaction: vi.fn(async (fn) =>
       fn({
         order: { findUnique: orderFindUnique, update: orderUpdate, updateMany: orderUpdateMany },
-        product: { update: productUpdate },
+        variantSizeStock: { updateMany: variantSizeStockUpdateMany },
       }),
     ),
   },
@@ -69,7 +69,7 @@ const ORDER = {
   emailSent: false,
 };
 
-const ITEMS = [{ productId: "P1", name: "Tee", size: "M", price: 1000, quantity: 2 }];
+const ITEMS = [{ variantId: "V1", name: "Tee", size: "M", price: 1000, quantity: 2 }];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -104,8 +104,8 @@ describe("order finalization", () => {
       },
       data: { paymentStatus: "PAYMENT_FAILED", status: "CANCELLED" },
     });
-    expect(productUpdate).toHaveBeenCalledWith({
-      where: { id: "P1" },
+    expect(variantSizeStockUpdateMany).toHaveBeenCalledWith({
+      where: { variantId: "V1", size: "M" },
       data: { stock: { increment: 2 } },
     });
     expect(notifyOrderConfirmed).not.toHaveBeenCalled();
@@ -116,7 +116,7 @@ describe("order finalization", () => {
 
     await finalizeFailedPayment("ORD-1", "KOKO", "cancelled");
 
-    expect(productUpdate).not.toHaveBeenCalled();
+    expect(variantSizeStockUpdateMany).not.toHaveBeenCalled();
   });
 
   it("ignores failure when already paid", async () => {
@@ -125,7 +125,7 @@ describe("order finalization", () => {
     await finalizeFailedPayment("ORD-1", "KOKO", "cancelled");
 
     expect(orderUpdateMany).not.toHaveBeenCalled();
-    expect(productUpdate).not.toHaveBeenCalled();
+    expect(variantSizeStockUpdateMany).not.toHaveBeenCalled();
   });
 
   it("never books the courier on payment, even when RoyalExpress is enabled", async () => {
@@ -162,6 +162,6 @@ describe("order finalization", () => {
     const result = await finalizeFailedPayment("ORD-1", "KOKO", "duplicate callback");
 
     expect(result).toEqual({ status: "already_failed" });
-    expect(productUpdate).not.toHaveBeenCalled();
+    expect(variantSizeStockUpdateMany).not.toHaveBeenCalled();
   });
 });

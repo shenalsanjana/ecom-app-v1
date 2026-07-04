@@ -3,8 +3,10 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from "react";
 
 export type CartItem = {
-  key: string; // unique per (productId, size) — used for cart operations
+  key: string; // unique per (variantId, size)
   productId: string;
+  variantId: string;
+  color: string | null;
   size: string | null;
   name: string;
   price: number;
@@ -37,15 +39,15 @@ type CartContextType = CartState & {
 
 const CartContext = createContext<CartContextType | null>(null);
 
-// Bumped from "shoply-cart" → carts saved before the size/quantity fix are
-// silently discarded. They lacked the size and key fields and would break
-// checkout validation otherwise.
-const STORAGE_KEY = "shoply-cart-v2";
+// Bumped from "shoply-cart-v2" → carts saved before variant-keyed items are
+// silently discarded. They lacked variantId/color and would break checkout
+// validation otherwise.
+const STORAGE_KEY = "shoply-cart-v3";
 
 const MAX_PER_LINE = 10;
 
-function deriveKey(productId: string, size: string | null): string {
-  return size ? `${productId}::${size}` : productId;
+function deriveKey(variantId: string, size: string | null): string {
+  return size ? `${variantId}::${size}` : variantId;
 }
 
 function clamp(n: number, min: number, max: number): number {
@@ -55,7 +57,7 @@ function clamp(n: number, min: number, max: number): number {
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case "ADD_ITEM": {
-      const key = deriveKey(action.payload.productId, action.payload.size);
+      const key = deriveKey(action.payload.variantId, action.payload.size);
       const qty = clamp(action.quantity, 1, MAX_PER_LINE);
       const existing = state.items.find((i) => i.key === key);
       if (existing) {
@@ -102,6 +104,8 @@ function isValidStoredItem(v: unknown): v is CartItem {
   return (
     typeof o.key === "string" &&
     typeof o.productId === "string" &&
+    typeof o.variantId === "string" &&
+    (o.color === null || typeof o.color === "string") &&
     (o.size === null || typeof o.size === "string") &&
     typeof o.name === "string" &&
     typeof o.price === "number" &&
@@ -114,8 +118,10 @@ const DEBUG_SEED_ITEMS: CartItem[] =
   process.env.NEXT_PUBLIC_DEBUG_CART === "1"
     ? [
         {
-          key: "debug::M",
+          key: "debug-variant::M",
           productId: "debug-product",
+          variantId: "debug-variant",
+          color: "White",
           size: "M",
           name: "Debug Tee",
           price: 1990,

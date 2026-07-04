@@ -20,6 +20,8 @@ import { formatPrice } from "@/app/_lib/format";
 
 type Props = {
   productId: string;
+  variantId: string;
+  color?: string | null;
   name: string;
   price: number;
   image: string;
@@ -30,6 +32,8 @@ type Props = {
 
 export function AddToCartDialog({
   productId,
+  variantId,
+  color = null,
   name,
   price,
   image,
@@ -52,7 +56,7 @@ export function AddToCartDialog({
   function handleAdd() {
     if (!canAdd) return;
     addItem(
-      { productId, name, price, image, size: selectedSize || null },
+      { productId, variantId, color, name, price, image, size: selectedSize || null },
       1,
     );
     trackAddToCart(productId, price, 1);
@@ -70,7 +74,7 @@ export function AddToCartDialog({
   function handleBuyNow() {
     if (!canAdd) return;
     addItem(
-      { productId, name, price, image, size: selectedSize || null },
+      { productId, variantId, color, name, price, image, size: selectedSize || null },
       1,
     );
     trackAddToCart(productId, price, 1);

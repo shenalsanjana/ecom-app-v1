@@ -7,8 +7,7 @@
 // freshness wins over micro-latency on a low-traffic admin route.
 import { prisma } from "@/app/_lib/prisma";
 import { startOfTodaySLT } from "@/app/_lib/time";
-
-const LOW_STOCK_THRESHOLD = 5;
+import { LOW_STOCK_THRESHOLD } from "@/app/_lib/admin-products";
 
 export type DashboardKpis = {
   ordersToConfirm: number;
@@ -22,7 +21,9 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
     prisma.order.count({ where: { status: "PENDING" } }),
     prisma.order.count({ where: { status: "CONFIRMED", courierBookedAt: null } }),
     prisma.order.count({ where: { createdAt: { gte: startOfTodaySLT() } } }),
-    prisma.product.count({ where: { stock: { lte: LOW_STOCK_THRESHOLD } } }),
+    prisma.product.count({
+      where: { variants: { some: { sizeStocks: { some: { stock: { lte: LOW_STOCK_THRESHOLD } } } } } },
+    }),
   ]);
   return { ordersToConfirm, ordersToDispatch, todaysOrders, lowStock };
 }

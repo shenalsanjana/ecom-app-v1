@@ -2,18 +2,22 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createProduct, updateProduct, archiveProduct, unarchiveProduct } from "@/app/admin/products/actions";
-import { slugify, parseSizes, serializeSizes } from "@/app/_lib/product-helpers";
+import { slugify } from "@/app/_lib/product-helpers";
 import { CategorySelect } from "./category-select";
-import { GalleryEditor } from "./gallery-editor";
-import { ImageInput } from "./image-input";
+import { VariantEditor, emptyVariant, type VariantDraft } from "./variant-editor";
 
 type Cat = { slug: string; name: string };
 type Initial = {
   id?: string; name: string; categorySlug: string; price: string; originalPrice: string;
-  stock: string; sizesCsv: string; description: string; image: string; gallery: string[]; archived: boolean;
+  description: string; archived: boolean; variants: VariantDraft[];
 };
 
-const STD_SIZES = ["S", "M", "L", "XL"];
+function toNum(s: string): number | null {
+  const t = s.trim();
+  if (!t) return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
 
 export function ProductForm({ mode, categories, initial }: { mode: "create" | "edit"; categories: Cat[]; initial: Initial }) {
   const router = useRouter();
@@ -23,22 +27,25 @@ export function ProductForm({ mode, categories, initial }: { mode: "create" | "e
   const [pending, start] = useTransition();
   const set = <K extends keyof Initial>(k: K, v: Initial[K]) => setF((p) => ({ ...p, [k]: v }));
 
-  const [customSize, setCustomSize] = useState("");
-  const sizes = parseSizes(f.sizesCsv);
-  const toggleSize = (s: string) => set("sizesCsv", serializeSizes(sizes.includes(s) ? sizes.filter((x) => x !== s) : [...sizes, s]));
-  const addCustomSize = () => {
-    const s = customSize.trim();
-    if (!s || sizes.includes(s)) { setCustomSize(""); return; }
-    set("sizesCsv", serializeSizes([...sizes, s]));
-    setCustomSize("");
-  };
-
   function submit() {
     const input = {
       name: f.name.trim(), slug, categorySlug: f.categorySlug,
-      price: Number(f.price), originalPrice: f.originalPrice ? Number(f.originalPrice) : null,
-      stock: Number(f.stock), sizes, description: f.description.trim(), image: f.image.trim(),
-      gallery: f.gallery.map((g) => g.trim()).filter(Boolean),
+      price: Number(f.price), originalPrice: toNum(f.originalPrice),
+      description: f.description.trim(),
+      variants: f.variants.map((v) => ({
+        id: v.id,
+        color: v.color.trim(),
+        colorSlug: v.colorSlug.trim(),
+        swatchHex: v.swatchHex.trim() || null,
+        sku: v.sku.trim() || null,
+        price: toNum(v.price),
+        originalPrice: toNum(v.originalPrice),
+        cardImages: v.cardImages.map((u) => u.trim()).filter(Boolean),
+        detailImages: v.detailImages.map((u) => u.trim()).filter(Boolean),
+        sizeStocks: v.sizeStocks
+          .map((s) => ({ size: s.size.trim(), stock: Math.max(0, Math.trunc(Number(s.stock) || 0)) }))
+          .filter((s) => s.size),
+      })),
     };
     start(async () => {
       const r = mode === "create" ? await createProduct(input) : await updateProduct(f.id!, input);
@@ -64,64 +71,35 @@ export function ProductForm({ mode, categories, initial }: { mode: "create" | "e
         </span>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="space-y-4 md:col-span-2">
-          <div className="rounded-lg border p-4 space-y-3">
-            <div><label className="text-xs text-muted-foreground">Name</label>
-              <input value={f.name} className="w-full rounded border px-2 py-1.5 text-sm"
-                onChange={(e) => { set("name", e.target.value); if (!slugTouched) setSlug(slugify(e.target.value)); }} /></div>
-            <div><label className="text-xs text-muted-foreground">Slug (URL id)</label>
-              <input value={slug}
-                onChange={(e) => { setSlugTouched(true); setSlug(slugify(e.target.value)); }}
-                className="w-full rounded border px-2 py-1.5 text-sm" /></div>
-            <div><label className="text-xs text-muted-foreground">Category</label>
-              <CategorySelect categories={categories} value={f.categorySlug} onChange={(s) => set("categorySlug", s)} /></div>
-          </div>
-          <div className="rounded-lg border p-4 grid grid-cols-3 gap-3">
-            <div><label className="text-xs text-muted-foreground">Price (LKR)</label><input value={f.price} onChange={(e) => set("price", e.target.value)} className="w-full rounded border px-2 py-1.5 text-sm" /></div>
-            <div><label className="text-xs text-muted-foreground">Original price</label><input value={f.originalPrice} onChange={(e) => set("originalPrice", e.target.value)} placeholder="optional" className="w-full rounded border px-2 py-1.5 text-sm" /></div>
-            <div><label className="text-xs text-muted-foreground">Stock</label><input value={f.stock} onChange={(e) => set("stock", e.target.value)} className="w-full rounded border px-2 py-1.5 text-sm" /></div>
-          </div>
-          <div className="rounded-lg border p-4">
-            <label className="text-xs text-muted-foreground">Sizes</label>
-            <div className="mt-1 flex flex-wrap gap-2">
-              {STD_SIZES.map((s) => (
-                <button key={s} type="button" onClick={() => toggleSize(s)}
-                  className={"rounded-full px-3 py-1 text-xs " + (sizes.includes(s) ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground")}>{s}</button>
-              ))}
-              {sizes.filter((s) => !STD_SIZES.includes(s)).map((s) => (
-                <button key={s} type="button" onClick={() => toggleSize(s)}
-                  className="rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground">{s} ✕</button>
-              ))}
-            </div>
-            <div className="mt-2 flex gap-2">
-              <input
-                value={customSize}
-                onChange={(e) => setCustomSize(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomSize(); } }}
-                placeholder="+ add custom"
-                className="rounded border px-2 py-1 text-xs w-28"
-              />
-              <button type="button" onClick={addCustomSize} className="rounded border px-2 py-1 text-xs">Add</button>
-            </div>
-          </div>
-          <div className="rounded-lg border p-4">
-            <label className="text-xs text-muted-foreground">Description</label>
-            <textarea value={f.description} onChange={(e) => set("description", e.target.value)} rows={4} className="mt-1 w-full rounded border px-2 py-1.5 text-sm" />
-          </div>
+      <div className="space-y-4">
+        <div className="rounded-lg border p-4 space-y-3">
+          <div><label className="text-xs text-muted-foreground">Name</label>
+            <input value={f.name} className="w-full rounded border px-2 py-1.5 text-sm"
+              onChange={(e) => { set("name", e.target.value); if (!slugTouched) setSlug(slugify(e.target.value)); }} /></div>
+          <div><label className="text-xs text-muted-foreground">Slug (URL id)</label>
+            <input value={slug} onChange={(e) => { setSlugTouched(true); setSlug(slugify(e.target.value)); }} className="w-full rounded border px-2 py-1.5 text-sm" /></div>
+          <div><label className="text-xs text-muted-foreground">Category</label>
+            <CategorySelect categories={categories} value={f.categorySlug} onChange={(s) => set("categorySlug", s)} /></div>
         </div>
 
-        <div className="space-y-4">
-          <div className="rounded-lg border p-4">
-            <label className="mb-1 block text-xs text-muted-foreground">Main image (URL / path or upload)</label>
-            <ImageInput value={f.image} onChange={(v) => set("image", v)} preview resizeTarget="product" />
-          </div>
-          <div className="rounded-lg border p-4">
-            <label className="mb-2 block text-xs text-muted-foreground">Gallery</label>
-            <GalleryEditor urls={f.gallery} onChange={(u) => set("gallery", u)} />
-          </div>
+        <div className="rounded-lg border p-4 grid grid-cols-2 gap-3">
+          <div><label className="text-xs text-muted-foreground">Base price (LKR)</label><input value={f.price} onChange={(e) => set("price", e.target.value)} className="w-full rounded border px-2 py-1.5 text-sm" /></div>
+          <div><label className="text-xs text-muted-foreground">Base original price</label><input value={f.originalPrice} onChange={(e) => set("originalPrice", e.target.value)} placeholder="optional" className="w-full rounded border px-2 py-1.5 text-sm" /></div>
+        </div>
+
+        <div className="rounded-lg border p-4">
+          <label className="text-xs text-muted-foreground">Description</label>
+          <textarea value={f.description} onChange={(e) => set("description", e.target.value)} rows={4} className="mt-1 w-full rounded border px-2 py-1.5 text-sm" />
+        </div>
+
+        <div>
+          <h2 className="mb-2 text-sm font-semibold">Color variants</h2>
+          <VariantEditor value={f.variants} onChange={(v) => set("variants", v)} />
         </div>
       </div>
     </section>
   );
 }
+
+export { emptyVariant };
+export type { VariantDraft };

@@ -2,18 +2,28 @@
 import { unstable_cache } from "next/cache";
 
 import { prisma } from "@/app/_lib/prisma";
-import type { Category, Prisma, Product, ProductImage, Review } from "@prisma/client";
+import type { Category, Prisma, Product, Review } from "@prisma/client";
+import { effectivePrice, effectiveOriginalPrice, availableSizes, sortSizeStocks } from "@/app/_lib/variants";
+
+export type ProductCardVariant = {
+  id: string;
+  colorSlug: string;
+  color: string;
+  swatchHex: string | null;
+  price: number;               // effective
+  originalPrice: number | null;
+  cardImages: string[];        // sorted CARD urls
+  sizes: string[];             // in-stock sizes for this color
+};
 
 export type ProductView = {
   id: string;
   name: string;
-  price: number;
-  originalPrice: number | null;
-  image: string;
   rating: number;
   reviewCount: number;
   category: string;
-  sizes: string;
+  defaultColorSlug: string;
+  variants: ProductCardVariant[];
 };
 
 export type CategoryView = {
@@ -22,19 +32,34 @@ export type CategoryView = {
   image: string;
 };
 
-type ProductRow = {
-  id: string;
-  name: string;
-  price: number;
-  originalPrice: number | null;
-  image: string;
-  categorySlug: string;
-  sizes: string;
-};
+// Shared select for every product-card list read. `satisfies` keeps the literal
+// types so `ProductGetPayload` below infers the exact row shape.
+const cardSelect = {
+  id: true, name: true, price: true, originalPrice: true, categorySlug: true,
+  variants: {
+    where: { archived: false },
+    orderBy: { sortOrder: "asc" },
+    select: {
+      id: true, colorSlug: true, color: true, swatchHex: true, price: true, originalPrice: true, sortOrder: true,
+      images: { where: { role: "CARD" }, orderBy: { sortOrder: "asc" }, select: { url: true } },
+      sizeStocks: { select: { size: true, stock: true } },
+    },
+  },
+} satisfies Prisma.ProductSelect;
+
+type ProductRow = Prisma.ProductGetPayload<{ select: typeof cardSelect }>;
+
+// Typing fallback: `satisfies Prisma.ProductSelect` usually preserves the
+// nested `orderBy: "asc"` literal via contextual typing. If tsc instead widens
+// it to `string` and errors on `SortOrder`/select at Step 6, swap the const to
+// `const cardSelect = Prisma.validator<Prisma.ProductSelect>()({ ...same... });`
+// and keep the `ProductGetPayload<{ select: typeof cardSelect }>` line as-is.
 
 async function attachAggregates(rows: ProductRow[]): Promise<ProductView[]> {
-  if (rows.length === 0) return [];
-  const ids = rows.map((r) => r.id);
+  // A design with no active variants can't be carded; drop it.
+  const usable = rows.filter((r) => r.variants.length > 0);
+  if (usable.length === 0) return [];
+  const ids = usable.map((r) => r.id);
   const grouped = await prisma.review.groupBy({
     by: ["productId"],
     where: { productId: { in: ids }, approved: true },
@@ -44,18 +69,26 @@ async function attachAggregates(rows: ProductRow[]): Promise<ProductView[]> {
   const map = new Map(
     grouped.map((g) => [g.productId, { avg: g._avg.rating ?? 0, count: g._count._all }]),
   );
-  return rows.map((p) => {
+  return usable.map((p) => {
     const agg = map.get(p.id) ?? { avg: 0, count: 0 };
+    const variants: ProductCardVariant[] = p.variants.map((v) => ({
+      id: v.id,
+      colorSlug: v.colorSlug,
+      color: v.color,
+      swatchHex: v.swatchHex,
+      price: effectivePrice(v, p),
+      originalPrice: effectiveOriginalPrice(v, p),
+      cardImages: v.images.map((im) => im.url),
+      sizes: availableSizes(sortSizeStocks(v.sizeStocks)),
+    }));
     return {
       id: p.id,
       name: p.name,
-      price: p.price,
-      originalPrice: p.originalPrice ?? null,
-      image: p.image,
       rating: agg.avg,
       reviewCount: agg.count,
       category: p.categorySlug,
-      sizes: p.sizes,
+      defaultColorSlug: variants[0].colorSlug,
+      variants,
     };
   });
 }
@@ -80,10 +113,7 @@ export const getFeaturedProducts = unstable_cache(
       where: { archived: false },
       orderBy: { id: "asc" },
       take: limit,
-      select: {
-        id: true, name: true, price: true, originalPrice: true,
-        image: true, categorySlug: true, sizes: true,
-      },
+      select: cardSelect,
     });
     return attachAggregates(rows);
   },
@@ -97,10 +127,7 @@ export const getDealsProducts = unstable_cache(
       where: { archived: false, originalPrice: { not: null } },
       orderBy: { id: "asc" },
       take: limit,
-      select: {
-        id: true, name: true, price: true, originalPrice: true,
-        image: true, categorySlug: true, sizes: true,
-      },
+      select: cardSelect,
     });
     return attachAggregates(rows);
   },
@@ -112,10 +139,7 @@ export const getProductById = unstable_cache(
   async (id: string): Promise<ProductView | null> => {
     const row = await prisma.product.findUnique({
       where: { id, archived: false },
-      select: {
-        id: true, name: true, price: true, originalPrice: true,
-        image: true, categorySlug: true, sizes: true,
-      },
+      select: cardSelect,
     });
     if (!row) return null;
     const [view] = await attachAggregates([row]);
@@ -125,8 +149,21 @@ export const getProductById = unstable_cache(
   { tags: ["catalog", "product"], revalidate: 300 }
 );
 
+export type VariantDetail = {
+  id: string;
+  color: string;
+  colorSlug: string;
+  swatchHex: string | null;
+  sku: string | null;
+  price: number;                       // effective
+  originalPrice: number | null;        // effective
+  detailImages: string[];              // sorted DETAIL urls
+  sizeStocks: { size: string; stock: number }[];
+};
+
 export type ProductDetail = {
-  product: Product & { category: Category; images: ProductImage[] };
+  product: Product & { category: Category };
+  variants: VariantDetail[];
   ratingAvg: number;
   ratingCount: number;
   related: ProductView[];
@@ -138,10 +175,29 @@ export const getProductDetail = unstable_cache(
       where: { id, archived: false },
       include: {
         category: true,
-        images: { orderBy: { sortOrder: "asc" } },
+        variants: {
+          where: { archived: false },
+          orderBy: { sortOrder: "asc" },
+          include: {
+            images: { where: { role: "DETAIL" }, orderBy: { sortOrder: "asc" } },
+            sizeStocks: { orderBy: { size: "asc" } },
+          },
+        },
       },
     });
-    if (!product) return null;
+    if (!product || product.variants.length === 0) return null;
+
+    const variants: VariantDetail[] = product.variants.map((v) => ({
+      id: v.id,
+      color: v.color,
+      colorSlug: v.colorSlug,
+      swatchHex: v.swatchHex,
+      sku: v.sku,
+      price: effectivePrice(v, product),
+      originalPrice: effectiveOriginalPrice(v, product),
+      detailImages: v.images.map((im) => im.url),
+      sizeStocks: sortSizeStocks(v.sizeStocks).map((s) => ({ size: s.size, stock: s.stock })),
+    }));
 
     const [agg, relatedRows] = await Promise.all([
       prisma.review.aggregate({
@@ -153,20 +209,21 @@ export const getProductDetail = unstable_cache(
         where: { archived: false, categorySlug: product.categorySlug, id: { not: id } },
         take: 4,
         orderBy: { id: "asc" },
-        select: {
-          id: true, name: true, price: true, originalPrice: true,
-          image: true, categorySlug: true, sizes: true,
-        },
+        select: cardSelect,
       }),
     ]);
 
-    const related = await attachAggregates(relatedRows);
+    // `product` still carries a variants relation; strip it from the returned
+    // shape so the type stays Product & { category }.
+    const { variants: _drop, ...productScalars } = product;
+    void _drop;
 
     return {
-      product,
+      product: productScalars,
+      variants,
       ratingAvg: agg._avg.rating ?? 0,
       ratingCount: agg._count._all,
-      related,
+      related: await attachAggregates(relatedRows),
     };
   },
   ["product-detail"],
@@ -262,7 +319,9 @@ export async function getProducts(opts: GetProductsOptions = {}): Promise<Produc
     ];
   }
 
-  // Price range filter
+  // Price range filter. Filters on Product.price (the base price), not any
+  // per-variant price override — acceptable for now; a future improvement
+  // could filter on the min effective variant price instead.
   if (minPrice !== undefined || maxPrice !== undefined) {
     const priceFilter: Prisma.FloatFilter = {};
     if (minPrice !== undefined) priceFilter.gte = minPrice;
@@ -272,7 +331,7 @@ export async function getProducts(opts: GetProductsOptions = {}): Promise<Produc
 
   // In stock only filter
   if (inStockOnly) {
-    where.stock = { gt: 0 };
+    where.variants = { some: { sizeStocks: { some: { stock: { gt: 0 } } } } };
   }
 
   // Sort order
@@ -300,10 +359,7 @@ export async function getProducts(opts: GetProductsOptions = {}): Promise<Produc
   const rows = await prisma.product.findMany({
     where,
     orderBy,
-    select: {
-      id: true, name: true, price: true, originalPrice: true,
-      image: true, categorySlug: true, sizes: true,
-    },
+    select: cardSelect,
   });
 
   const views = await attachAggregates(rows);
@@ -339,10 +395,18 @@ export async function searchProducts(query: string, limit = 20): Promise<Product
     },
     take: limit,
     orderBy: { id: "asc" },
-    select: {
-      id: true, name: true, price: true, originalPrice: true,
-      image: true, categorySlug: true, sizes: true,
-    },
+    select: cardSelect,
+  });
+  return attachAggregates(rows);
+}
+
+// Wishlist renders ProductCards for a set of product ids; reuse the same
+// card projection + rating aggregation as every other list.
+export async function getWishlistProductCards(productIds: string[]): Promise<ProductView[]> {
+  if (productIds.length === 0) return [];
+  const rows = await prisma.product.findMany({
+    where: { id: { in: productIds }, archived: false },
+    select: cardSelect,
   });
   return attachAggregates(rows);
 }

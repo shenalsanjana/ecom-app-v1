@@ -62,19 +62,16 @@ model Product {
   name          String
   price         Float
   originalPrice Float?
-  image         String
   description   String
-  stock         Int      @default(0)
   categorySlug  String
-  sizes         String   @default("S,M,L,XL") // Comma-separated sizes available
   archived      Boolean  @default(false)
 
   category      Category       @relation(fields: [categorySlug], references: [slug])
   wishlistItems WishlistItem[]
-  images        ProductImage[]
   reviews       Review[]
   orderItems    OrderItem[]
   slugHistory   ProductSlugHistory[]
+  variants      ProductVariant[]
 
   @@index([categorySlug])
   @@index([archived])
@@ -88,15 +85,49 @@ model ProductSlugHistory {
   @@index([currentId])
 }
 
-model ProductImage {
-  id        String  @id @default(cuid())
-  productId String
+model ProductVariant {
+  id            String   @id @default(cuid())
+  productId     String
+  color         String                     // display, e.g. "Baby Pink"
+  colorSlug     String                     // url-safe, used in ?color=
+  swatchHex     String?                    // swatch dot color; null => use first CARD image
+  sku           String?  @unique           // optional; unique when present
+  price         Float?                     // optional override; null => Product.price
+  originalPrice Float?                     // optional override; null => Product.originalPrice
+  sortOrder     Int      @default(0)       // lowest = default color
+  archived      Boolean  @default(false)
+
+  product    Product            @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  images     VariantImage[]
+  sizeStocks VariantSizeStock[]
+  orderItems OrderItem[]
+
+  @@unique([productId, colorSlug])
+  @@index([productId])
+}
+
+model VariantImage {
+  id        String @id @default(cuid())
+  variantId String
   url       String
-  sortOrder Int     @default(0)
+  role      String @db.VarChar(8)          // "CARD" | "DETAIL"
+  sortOrder Int    @default(0)
 
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
-  @@index([productId, sortOrder])
+  @@index([variantId, role, sortOrder])
+}
+
+model VariantSizeStock {
+  id        String @id @default(cuid())
+  variantId String
+  size      String
+  stock     Int    @default(0)
+
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([variantId, size])
+  @@index([variantId])
 }
 
 model Review {
@@ -188,16 +219,21 @@ model OrderItem {
   // The line item keeps its own name/size/price/quantity snapshot, so deleting
   // the product (onDelete: SetNull) preserves the historical record.
   productId String?
+  variantId String?
+  color     String?
+  sku       String?
   name      String
   size      String?
   price     Float
   quantity  Int
 
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  order     Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
   @@index([productId])
+  @@index([variantId])
 }
 
 model OrderNote {

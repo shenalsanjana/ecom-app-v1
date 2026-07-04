@@ -9,27 +9,38 @@ import { prisma } from "../../app/_lib/prisma";
 const COD_GUEST_EMAIL = "e2e-meta-purchase@example.com";
 
 // Resolve a real in-stock, non-archived product id from the seeded catalog
-// (the demo "p1" id does not exist in every environment).
+// (the demo "p1" id does not exist in every environment). Stock now lives per
+// color-variant/size, so we snapshot the whole size-stock grid of one in-stock
+// variant and restore every cell afterward (the UI may pick any size button).
 let productId: string;
-let originalStock: number;
+let restoreVariantId: string;
+let originalSizeStocks: { size: string; stock: number }[];
 
 test.beforeAll(async () => {
-  const product = await prisma.product.findFirst({
-    where: { archived: false, stock: { gt: 0 } },
-    orderBy: { id: "asc" },
-    select: { id: true, stock: true },
+  const variant = await prisma.productVariant.findFirst({
+    where: { archived: false, product: { archived: false }, sizeStocks: { some: { stock: { gt: 0 } } } },
+    orderBy: { productId: "asc" },
+    select: { productId: true, id: true, sizeStocks: { select: { size: true, stock: true } } },
   });
-  if (!product) throw new Error("No in-stock product found to drive e2e");
-  productId = product.id;
-  originalStock = product.stock;
+  if (!variant) throw new Error("No in-stock product found to drive e2e");
+  productId = variant.productId;
+  restoreVariantId = variant.id;
+  originalSizeStocks = variant.sizeStocks;
 });
 
 test.afterAll(async () => {
   // Leave the DB exactly as we found it: remove the guest COD order(s) this
-  // suite created (items cascade on delete) and restore the product stock that
-  // order placement decremented.
+  // suite created (items cascade on delete) and restore the size-stock cells
+  // that order placement decremented.
   await prisma.order.deleteMany({ where: { guestEmail: COD_GUEST_EMAIL } });
-  await prisma.product.update({ where: { id: productId }, data: { stock: originalStock } });
+  await Promise.all(
+    originalSizeStocks.map((s) =>
+      prisma.variantSizeStock.updateMany({
+        where: { variantId: restoreVariantId, size: s.size },
+        data: { stock: s.stock },
+      }),
+    ),
+  );
   await prisma.$disconnect();
 });
 

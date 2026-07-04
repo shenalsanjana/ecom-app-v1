@@ -7,36 +7,22 @@ import { buttonVariants } from "@/components/ui/button";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { ProductCard } from "@/app/_components/home/product-card";
+import { getWishlistProductCards } from "@/app/_lib/products";
 
 export default async function WishlistPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login?callbackUrl=/wishlist");
 
   const items = await prisma.wishlistItem.findMany({
-    // Exclude archived products so they drop off the storefront wishlist too
-    // (a relation-include reader that the products.ts archived filter missed).
     where: { userId: session.user.id, product: { archived: false } },
-    include: { product: true },
+    select: { id: true, productId: true },
     orderBy: { createdAt: "desc" },
   });
 
-  // Compute rating/reviewCount per product via a single groupBy.
-  const productIds = items.map((it) => it.productId);
-  const grouped =
-    productIds.length > 0
-      ? await prisma.review.groupBy({
-          by: ["productId"],
-          // Only approved reviews count toward the wishlist card rating — mirrors
-          // the four readers in products.ts (this inline groupBy is the fifth
-          // storefront review aggregation and must stay in sync).
-          where: { productId: { in: productIds }, approved: true },
-          _avg: { rating: true },
-          _count: { _all: true },
-        })
-      : [];
-  const aggMap = new Map(
-    grouped.map((g) => [g.productId, { avg: g._avg.rating ?? 0, count: g._count._all }]),
-  );
+  const cards = await getWishlistProductCards(items.map((it) => it.productId));
+  // Preserve wishlist order (getWishlistProductCards returns unordered).
+  const byId = new Map(cards.map((c) => [c.id, c]));
+  const ordered = items.map((it) => byId.get(it.productId)).filter((c): c is NonNullable<typeof c> => Boolean(c));
 
   return (
     <>
@@ -44,35 +30,17 @@ export default async function WishlistPage() {
       <main className="flex-1">
         <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
           <h1 className="mb-6 text-2xl font-semibold tracking-tight">Your wishlist</h1>
-          {items.length === 0 ? (
+          {ordered.length === 0 ? (
             <div className="rounded border p-10 text-center">
               <h2 className="text-lg font-medium">Your wishlist is empty</h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Tap the heart on any product to save it for later.
-              </p>
-              <Link href="/" className={buttonVariants({ className: "mt-4" })}>
-                Continue shopping
-              </Link>
+              <p className="mt-2 text-sm text-muted-foreground">Tap the heart on any product to save it for later.</p>
+              <Link href="/" className={buttonVariants({ className: "mt-4" })}>Continue shopping</Link>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {items.map((it) => {
-                const agg = aggMap.get(it.productId) ?? { avg: 0, count: 0 };
-                return (
-                  <ProductCard
-                    key={it.id}
-                    id={it.product.id}
-                    name={it.product.name}
-                    price={it.product.price}
-                    originalPrice={it.product.originalPrice}
-                    image={it.product.image}
-                    rating={agg.avg}
-                    reviewCount={agg.count}
-                    sizes={it.product.sizes}
-                    fromPath="/wishlist"
-                  />
-                );
-              })}
+              {ordered.map((card) => (
+                <ProductCard key={card.id} product={card} fromPath="/wishlist" />
+              ))}
             </div>
           )}
         </section>

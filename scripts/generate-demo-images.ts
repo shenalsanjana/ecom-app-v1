@@ -9,7 +9,7 @@
 
 import { mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { featuredProducts, dealsProducts } from "../app/_data/mock";
+import { catalogProducts } from "../app/_data/mock";
 
 type Look = {
   id: string;
@@ -123,7 +123,7 @@ function svg(look: Look): string {
 }
 
 function main() {
-  const all = [...featuredProducts, ...dealsProducts];
+  const all = catalogProducts;
   const root = resolve(process.cwd(), "public", "products");
   let written = 0;
   let skipped = 0;

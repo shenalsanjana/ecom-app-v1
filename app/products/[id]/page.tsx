@@ -25,7 +25,7 @@ import { ReviewsSection } from "@/app/_components/product/reviews-section";
 import { RelatedStrip } from "@/app/_components/product/related-strip";
 
 type Params = { id: string };
-type SearchParams = { reviews?: string };
+type SearchParams = { reviews?: string; color?: string };
 
 function clampReviews(raw: string | undefined): number {
   const n = Number(raw);
@@ -34,18 +34,19 @@ function clampReviews(raw: string | undefined): number {
 }
 
 export async function generateMetadata(
-  { params }: { params: Promise<Params> },
+  { params, searchParams }: { params: Promise<Params>; searchParams: Promise<SearchParams> },
 ): Promise<Metadata> {
-  const { id } = await params;
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
   const detail = await getProductDetail(id);
   if (!detail) {
     const dest = await getProductSlugRedirect(id);
     if (dest) permanentRedirect(`/products/${dest}`);
     return { title: { absolute: "Product not found — Dressing Bear" } };
   }
-  const priceTitle = `${detail.product.name} — ${formatPrice(detail.product.price)}`;
+  const variant = detail.variants.find((v) => v.colorSlug === sp.color) ?? detail.variants[0];
+  const priceTitle = `${detail.product.name} — ${formatPrice(variant.price)}`;
   const description = stripMarkdown(detail.product.description);
-  const imageUrl = absoluteUrl(detail.product.image);
+  const imageUrl = absoluteUrl(variant.detailImages[0] ?? "");
   return {
     title: { absolute: `${priceTitle} | Dressing Bear` },
     description,
@@ -54,12 +55,7 @@ export async function generateMetadata(
       description,
       images: [{ url: imageUrl, width: 1200, height: 1500, alt: detail.product.name }],
     },
-    twitter: {
-      card: "summary_large_image",
-      title: priceTitle,
-      description,
-      images: [imageUrl],
-    },
+    twitter: { card: "summary_large_image", title: priceTitle, description, images: [imageUrl] },
   };
 }
 
@@ -92,7 +88,8 @@ export default async function ProductPage({
   return (
     <>
       <ProductJsonLd
-        product={detail.product}
+        product={{ id: detail.product.id, name: detail.product.name, description: detail.product.description }}
+        variants={detail.variants}
         ratingAvg={detail.ratingAvg}
         ratingCount={detail.ratingCount}
       />
@@ -109,20 +106,18 @@ export default async function ProductPage({
         <section className="mx-auto max-w-7xl px-4 pb-10 sm:px-6 lg:px-8">
           <div className="grid gap-8 lg:grid-cols-[1.6fr_1fr] lg:gap-12">
             <ImageGallery
-              images={detail.product.images}
+              variants={detail.variants.map((v) => ({ colorSlug: v.colorSlug, detailImages: v.detailImages }))}
+              defaultColorSlug={detail.variants[0].colorSlug}
               productName={detail.product.name}
-              fallbackImage={detail.product.image}
+              fallbackImage={detail.variants[0].detailImages[0] ?? ""}
             />
             <BuyBoxClient
               productId={detail.product.id}
               name={detail.product.name}
-              price={detail.product.price}
-              originalPrice={detail.product.originalPrice}
-              image={detail.product.image}
+              variants={detail.variants}
+              defaultColorSlug={detail.variants[0].colorSlug}
               ratingAvg={detail.ratingAvg}
               ratingCount={detail.ratingCount}
-              stock={detail.product.stock}
-              sizes={detail.product.sizes}
               shareUrl={absoluteUrl(`/products/${detail.product.id}`)}
             />
           </div>

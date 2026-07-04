@@ -39,7 +39,7 @@ test.beforeAll(async () => {
     update: { passwordHash, name: NAME },
     create: { name: NAME, email: EMAIL, passwordHash },
   });
-  await prisma.product.updateMany({
+  await prisma.variantSizeStock.updateMany({
     where: { stock: { lt: 10 } },
     data: { stock: 20 },
   });
@@ -57,7 +57,7 @@ test.afterAll(async () => {
   // Delete webhook test orders created with guestEmail (no userId).
   await prisma.order.deleteMany({ where: { guestEmail: EMAIL } });
   await prisma.user.deleteMany({ where: { email: EMAIL } });
-  await prisma.product.updateMany({
+  await prisma.variantSizeStock.updateMany({
     where: { stock: { lt: 10 } },
     data: { stock: 20 },
   });

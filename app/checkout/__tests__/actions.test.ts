@@ -14,13 +14,22 @@ vi.mock("@/app/_lib/prisma", () => ({
       create: vi.fn(),
       update: vi.fn(async () => ({})),
     },
-    product: {
-      findMany: vi.fn(async () => [{ id: "P1", sizes: "S,M,L" }]),
-      updateMany: vi.fn(async () => ({ count: 1 })),
+    productVariant: {
+      findMany: vi.fn(async () => [
+        {
+          id: "V1",
+          sku: null,
+          sizeStocks: [
+            { size: "S", stock: 5 },
+            { size: "M", stock: 5 },
+            { size: "L", stock: 5 },
+          ],
+        },
+      ]),
     },
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
       fn({
-        product: {
+        variantSizeStock: {
           updateMany: async () => ({ count: 1 }),
         },
         order: {
@@ -57,7 +66,7 @@ import { auth } from "@/app/_lib/auth";
 import { processOrder, type ProcessOrderInput } from "../actions";
 
 const baseInput: Omit<ProcessOrderInput, "paymentMethod"> = {
-  items: [{ productId: "P1", name: "T-Shirt", price: 1200, quantity: 2, size: "M" }],
+  items: [{ productId: "P1", variantId: "V1", color: "White", name: "T-Shirt", price: 1200, quantity: 2, size: "M" }],
   shippingAddress: {
     line1: "1 Walls Lane",
     line2: "Apt 5",
@@ -162,7 +171,7 @@ describe("processOrder — size is required", () => {
   it("rejects a sized product checked out without a size", async () => {
     const result = await processOrder({
       ...baseInput,
-      items: [{ productId: "P1", name: "T-Shirt", price: 1200, quantity: 2, size: null }],
+      items: [{ productId: "P1", variantId: "V1", color: "White", name: "T-Shirt", price: 1200, quantity: 2, size: null }],
       paymentMethod: "COD",
     });
     expect(result.success).toBe(false);
@@ -174,7 +183,7 @@ describe("processOrder — size is required", () => {
   it("still rejects a size the product does not offer", async () => {
     const result = await processOrder({
       ...baseInput,
-      items: [{ productId: "P1", name: "T-Shirt", price: 1200, quantity: 2, size: "XXL" }],
+      items: [{ productId: "P1", variantId: "V1", color: "White", name: "T-Shirt", price: 1200, quantity: 2, size: "XXL" }],
       paymentMethod: "COD",
     });
     expect(result.success).toBe(false);
