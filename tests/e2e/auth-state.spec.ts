@@ -37,7 +37,7 @@ test("navbar reflects login and logout instantly without a page refresh", async 
   await page.keyboard.press("Escape");
 
   await page.goto("/login");
-  await page.getByLabel("Phone or email").fill(EMAIL);
+  await page.getByLabel("Email or Mobile Number").fill(EMAIL);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: /Sign in/i }).click();
 
