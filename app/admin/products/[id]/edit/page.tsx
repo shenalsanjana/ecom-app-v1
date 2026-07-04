@@ -10,9 +10,18 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
     <ProductForm mode="edit" categories={categories.map((c) => ({ slug: c.slug, name: c.name }))}
       initial={{
         id: product.id, name: product.name, categorySlug: product.categorySlug,
-        price: String(product.price), originalPrice: product.originalPrice != null ? String(product.originalPrice) : "",
-        stock: String(product.stock), sizesCsv: product.sizes, description: product.description,
-        image: product.image, gallery: product.images.map((im) => im.url), archived: product.archived,
+        price: String(product.price),
+        originalPrice: product.originalPrice != null ? String(product.originalPrice) : "",
+        description: product.description, archived: product.archived,
+        variants: product.variants.map((v) => ({
+          color: v.color, colorSlug: v.colorSlug, swatchHex: v.swatchHex ?? "",
+          sku: v.sku ?? "",
+          price: v.price != null ? String(v.price) : "",
+          originalPrice: v.originalPrice != null ? String(v.originalPrice) : "",
+          cardImages: v.images.filter((im) => im.role === "CARD").map((im) => im.url),
+          detailImages: v.images.filter((im) => im.role === "DETAIL").map((im) => im.url),
+          sizeStocks: v.sizeStocks.map((s) => ({ size: s.size, stock: String(s.stock) })),
+        })),
       }} />
   );
 }

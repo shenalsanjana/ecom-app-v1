@@ -2,14 +2,19 @@ import Link from "next/link";
 import Image from "next/image";
 import { formatPrice } from "@/app/_lib/format";
 import { Badge } from "@/components/ui/badge";
-import { StockQuickEdit } from "./stock-quick-edit";
 import { DeleteProductButton } from "./delete-product-button";
 
 type Row = {
   id: string; name: string; price: number; originalPrice: number | null;
-  image: string; stock: number; sizes: string; archived: boolean;
+  image: string; archived: boolean;
   category: { name: string } | null;
+  variants: { sizeStocks: { stock: number }[] }[];
+  _count: { variants: number };
 };
+
+function totalStock(row: Row): number {
+  return row.variants.reduce((sum, v) => sum + v.sizeStocks.reduce((a, s) => a + s.stock, 0), 0);
+}
 
 export function ProductsTable({ rows }: { rows: Row[] }) {
   if (rows.length === 0) return <p className="text-sm text-muted-foreground">No products match this view.</p>;
@@ -18,7 +23,7 @@ export function ProductsTable({ rows }: { rows: Row[] }) {
       <thead>
         <tr className="border-b text-left text-xs uppercase text-muted-foreground">
           <th className="p-2"></th><th className="p-2">Name</th><th className="p-2">Category</th>
-          <th className="p-2">Price</th><th className="p-2">Stock</th><th className="p-2">Sizes</th><th className="p-2">Status</th><th className="p-2 text-right">Actions</th>
+          <th className="p-2">Price</th><th className="p-2">Colors</th><th className="p-2">Total stock</th><th className="p-2">Status</th><th className="p-2 text-right">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -31,8 +36,8 @@ export function ProductsTable({ rows }: { rows: Row[] }) {
             </td>
             <td className="p-2">{p.category?.name ?? "—"}</td>
             <td className="p-2 font-medium">{formatPrice(p.price)}{p.originalPrice ? <span className="ml-1 text-xs text-muted-foreground line-through">{formatPrice(p.originalPrice)}</span> : null}</td>
-            <td className="p-2"><StockQuickEdit id={p.id} value={p.stock} /></td>
-            <td className="p-2 text-muted-foreground">{p.sizes}</td>
+            <td className="p-2">{p._count.variants}</td>
+            <td className="p-2 tabular-nums">{totalStock(p)}</td>
             <td className="p-2"><Badge variant={p.archived ? "outline" : "secondary"}>{p.archived ? "Archived" : "Active"}</Badge></td>
             <td className="p-2 text-right"><DeleteProductButton id={p.id} name={p.name} /></td>
           </tr>

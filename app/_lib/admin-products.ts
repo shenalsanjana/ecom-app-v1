@@ -19,7 +19,7 @@ export function buildProductWhere(params: ProductListParams): Prisma.ProductWher
   switch (params.tab) {
     case "low-stock":
       where.archived = false;
-      where.stock = { lte: LOW_STOCK_THRESHOLD };
+      where.variants = { some: { sizeStocks: { some: { stock: { lte: LOW_STOCK_THRESHOLD } } } } };
       break;
     case "archived":
       where.archived = true;
@@ -61,7 +61,8 @@ export async function listProducts(
       skip: (page - 1) * pageSize,
       include: {
         category: { select: { name: true } },
-        _count: { select: { images: true } },
+        variants: { select: { sizeStocks: { select: { stock: true } } } },
+        _count: { select: { variants: true } },
       },
     }),
     prisma.product.count({ where }),
@@ -75,7 +76,13 @@ export async function getProduct(id: string) {
     where: { id },
     include: {
       category: true,
-      images: { orderBy: { sortOrder: "asc" } },
+      variants: {
+        orderBy: { sortOrder: "asc" },
+        include: {
+          images: { orderBy: { sortOrder: "asc" } },
+          sizeStocks: { orderBy: { size: "asc" } },
+        },
+      },
     },
   });
 }

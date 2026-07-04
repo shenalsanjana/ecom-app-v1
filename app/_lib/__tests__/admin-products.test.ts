@@ -35,8 +35,11 @@ describe("buildProductWhere", () => {
   it("active tab → archived:false", () => {
     expect(buildProductWhere({ tab: "active" })).toEqual({ archived: false });
   });
-  it("low-stock tab → archived:false + stock<=5", () => {
-    expect(buildProductWhere({ tab: "low-stock" })).toEqual({ archived: false, stock: { lte: 5 } });
+  it("low-stock tab → archived:false + any variant size cell at/below threshold", () => {
+    expect(buildProductWhere({ tab: "low-stock" })).toEqual({
+      archived: false,
+      variants: { some: { sizeStocks: { some: { stock: { lte: 5 } } } } },
+    });
   });
   it("archived tab → archived:true", () => {
     expect(buildProductWhere({ tab: "archived" })).toEqual({ archived: true });

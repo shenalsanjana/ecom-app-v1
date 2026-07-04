@@ -1,67 +1,51 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const { requireAdmin } = vi.hoisted(() => ({ requireAdmin: vi.fn() }));
-const { productUpdate, productFindUnique, productFindFirst, productCreate, productDelete, orderItemCount, categoryCreate, categoryFindUnique, imageCreateMany, imageDeleteMany, historyUpsert, historyDeleteMany, txn } =
+const {
+  productUpdate, productFindUnique, productFindFirst, productCreate, productDelete, orderItemCount,
+  categoryCreate, categoryFindUnique,
+  variantDeleteMany, variantCreate, variantImageCreateMany, variantSizeStockCreateMany,
+  historyUpsert, historyDeleteMany, txn,
+} =
   vi.hoisted(() => ({
     productUpdate: vi.fn(), productFindUnique: vi.fn(), productFindFirst: vi.fn(), productCreate: vi.fn(),
     productDelete: vi.fn(), orderItemCount: vi.fn(),
     categoryCreate: vi.fn(), categoryFindUnique: vi.fn(),
-    imageCreateMany: vi.fn(), imageDeleteMany: vi.fn(),
+    variantDeleteMany: vi.fn(), variantCreate: vi.fn(),
+    variantImageCreateMany: vi.fn(), variantSizeStockCreateMany: vi.fn(),
     historyUpsert: vi.fn(), historyDeleteMany: vi.fn(), txn: vi.fn(),
   }));
+
+function buildClient() {
+  return {
+    product: { update: productUpdate, findUnique: productFindUnique, findFirst: productFindFirst, create: productCreate, delete: productDelete },
+    category: { create: categoryCreate, findUnique: categoryFindUnique },
+    productVariant: { deleteMany: variantDeleteMany, create: variantCreate },
+    variantImage: { createMany: variantImageCreateMany },
+    variantSizeStock: { createMany: variantSizeStockCreateMany },
+    productSlugHistory: { upsert: historyUpsert, deleteMany: historyDeleteMany },
+    orderItem: { count: orderItemCount },
+  };
+}
 
 vi.mock("@/app/_lib/admin-auth", () => ({ requireAdmin }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 vi.mock("@/app/_lib/prisma", () => {
-  const client = {
-    product: { update: productUpdate, findUnique: productFindUnique, findFirst: productFindFirst, create: productCreate, delete: productDelete },
-    category: { create: categoryCreate, findUnique: categoryFindUnique },
-    productImage: { createMany: imageCreateMany, deleteMany: imageDeleteMany },
-    productSlugHistory: { upsert: historyUpsert, deleteMany: historyDeleteMany },
-    orderItem: { count: orderItemCount },
-  };
+  const client = buildClient();
   return { prisma: { ...client, $transaction: txn.mockImplementation(async (fn: (c: unknown) => unknown) => fn(client)) } };
 });
 
-import { updateStock, archiveProduct, unarchiveProduct } from "../actions";
+import { archiveProduct, unarchiveProduct } from "../actions";
 
 beforeEach(() => {
   requireAdmin.mockReset().mockResolvedValue({ user: { email: "admin@x.test" } });
   productUpdate.mockReset(); productFindUnique.mockReset(); productFindFirst.mockReset(); productCreate.mockReset();
   productDelete.mockReset(); orderItemCount.mockReset();
   categoryCreate.mockReset(); categoryFindUnique.mockReset();
-  imageCreateMany.mockReset(); imageDeleteMany.mockReset();
+  variantDeleteMany.mockReset(); variantCreate.mockReset().mockResolvedValue({ id: "variant-1" });
+  variantImageCreateMany.mockReset(); variantSizeStockCreateMany.mockReset();
   historyUpsert.mockReset(); historyDeleteMany.mockReset();
-  txn.mockReset().mockImplementation(async (fn: (c: unknown) => unknown) => {
-    const client = {
-      product: { update: productUpdate, findUnique: productFindUnique, findFirst: productFindFirst, create: productCreate, delete: productDelete },
-      category: { create: categoryCreate, findUnique: categoryFindUnique },
-      productImage: { createMany: imageCreateMany, deleteMany: imageDeleteMany },
-      productSlugHistory: { upsert: historyUpsert, deleteMany: historyDeleteMany },
-      orderItem: { count: orderItemCount },
-    };
-    return fn(client);
-  });
-});
-
-describe("updateStock", () => {
-  it("rejects a negative stock", async () => {
-    const res = await updateStock("cat-white", -1);
-    expect(res).toEqual({ success: false, error: "Stock must be 0 or more" });
-    expect(productUpdate).not.toHaveBeenCalled();
-  });
-  it("rejects a non-integer stock", async () => {
-    const res = await updateStock("cat-white", 1.5);
-    expect(res).toEqual({ success: false, error: "Stock must be 0 or more" });
-    expect(productUpdate).not.toHaveBeenCalled();
-  });
-  it("sets stock", async () => {
-    productUpdate.mockResolvedValueOnce({});
-    const res = await updateStock("cat-white", 12);
-    expect(requireAdmin).toHaveBeenCalled();
-    expect(productUpdate).toHaveBeenCalledWith({ where: { id: "cat-white" }, data: { stock: 12 } });
-    expect(res).toEqual({ success: true });
-  });
+  txn.mockReset().mockImplementation(async (fn: (c: unknown) => unknown) => fn(buildClient()));
 });
 
 describe("archive/unarchive", () => {
@@ -83,37 +67,78 @@ import { createProduct } from "../actions";
 
 const NEW_INPUT = {
   name: "Cat White", slug: "cat-white", categorySlug: "cat",
-  price: 2190, originalPrice: null, stock: 10,
-  sizes: ["S", "M", "L"], description: "Soft tee", image: "/products/cat-white/main.jpg",
-  gallery: ["/products/cat-white/2.jpg", "/products/cat-white/3.jpg"],
+  price: 2190, originalPrice: null,
+  description: "Soft tee",
+  variants: [
+    {
+      color: "White", colorSlug: "white", swatchHex: "#FFFFFF", sku: "CAT-WHITE",
+      price: null, originalPrice: null,
+      cardImages: ["/products/cat-white/card/1.jpg"],
+      detailImages: ["/products/cat-white/detail/1.jpg", "/products/cat-white/detail/2.jpg"],
+      sizeStocks: [{ size: "S", stock: 5 }, { size: "M", stock: 10 }],
+    },
+  ],
 };
 
 describe("createProduct", () => {
-  it("rejects empty name / non-positive price / empty image", async () => {
+  it("rejects empty name / non-positive price / empty variants", async () => {
     expect((await createProduct({ ...NEW_INPUT, name: " " })).success).toBe(false);
     expect((await createProduct({ ...NEW_INPUT, price: 0 })).success).toBe(false);
-    expect((await createProduct({ ...NEW_INPUT, image: "" })).success).toBe(false);
+    expect((await createProduct({ ...NEW_INPUT, variants: [] })).success).toBe(false);
   });
   it("rejects a name/slug with no slug-able characters", async () => {
     const res = await createProduct({ ...NEW_INPUT, name: "!!!", slug: "" });
     expect(res).toEqual({ success: false, error: "Name must contain letters or numbers" });
     expect(productCreate).not.toHaveBeenCalled();
   });
-  it("generates a unique slug and creates product + ordered gallery", async () => {
+  it("rejects duplicate colorSlugs across variants before touching the DB", async () => {
+    const res = await createProduct({
+      ...NEW_INPUT,
+      variants: [NEW_INPUT.variants[0], { ...NEW_INPUT.variants[0], color: "White 2", sku: "OTHER-SKU" }],
+    });
+    expect(res).toEqual({ success: false, error: 'Duplicate color "White 2"' });
+    expect(productCreate).not.toHaveBeenCalled();
+  });
+  it("rejects duplicate non-empty SKUs across variants before touching the DB", async () => {
+    const res = await createProduct({
+      ...NEW_INPUT,
+      variants: [
+        NEW_INPUT.variants[0],
+        { ...NEW_INPUT.variants[0], color: "Black", colorSlug: "black" },
+      ],
+    });
+    expect(res).toEqual({ success: false, error: 'Duplicate SKU "CAT-WHITE"' });
+    expect(productCreate).not.toHaveBeenCalled();
+  });
+  it("generates a unique slug, back-fills legacy scalars, and writes variants + images + stock", async () => {
     productFindUnique.mockResolvedValueOnce(null); // slug free
     productCreate.mockResolvedValueOnce({ id: "cat-white" });
-    imageCreateMany.mockResolvedValueOnce({ count: 2 });
     const res = await createProduct(NEW_INPUT);
+
     const createArg = productCreate.mock.calls[0][0];
     expect(createArg.data).toMatchObject({
       id: "cat-white", name: "Cat White", categorySlug: "cat",
-      price: 2190, originalPrice: null, stock: 10, sizes: "S,M,L",
-      description: "Soft tee", image: "/products/cat-white/main.jpg", archived: false,
+      price: 2190, originalPrice: null, description: "Soft tee", archived: false,
+      image: "/products/cat-white/card/1.jpg", stock: 15, sizes: "S,M",
     });
-    expect(imageCreateMany).toHaveBeenCalledWith({
+
+    expect(variantDeleteMany).toHaveBeenCalledWith({ where: { productId: "cat-white" } });
+    const variantArg = variantCreate.mock.calls[0][0];
+    expect(variantArg.data).toMatchObject({
+      productId: "cat-white", color: "White", colorSlug: "white", swatchHex: "#FFFFFF",
+      sku: "CAT-WHITE", price: null, originalPrice: null, sortOrder: 0, archived: false,
+    });
+    expect(variantImageCreateMany).toHaveBeenCalledWith({
       data: [
-        { productId: "cat-white", url: "/products/cat-white/2.jpg", sortOrder: 0 },
-        { productId: "cat-white", url: "/products/cat-white/3.jpg", sortOrder: 1 },
+        { variantId: "variant-1", url: "/products/cat-white/card/1.jpg", role: "CARD", sortOrder: 0 },
+        { variantId: "variant-1", url: "/products/cat-white/detail/1.jpg", role: "DETAIL", sortOrder: 0 },
+        { variantId: "variant-1", url: "/products/cat-white/detail/2.jpg", role: "DETAIL", sortOrder: 1 },
+      ],
+    });
+    expect(variantSizeStockCreateMany).toHaveBeenCalledWith({
+      data: [
+        { variantId: "variant-1", size: "S", stock: 5 },
+        { variantId: "variant-1", size: "M", stock: 10 },
       ],
     });
     expect(res).toEqual({ success: true, slug: "cat-white" });
@@ -129,49 +154,36 @@ describe("updateProduct", () => {
     const res = await updateProduct("nope", { ...NEW_INPUT });
     expect(res).toEqual({ success: false, error: "Product not found" });
   });
-  it("updates scalars, never changes slug, and replaces the gallery", async () => {
+  it("updates scalars, never changes slug, and rebuilds variants", async () => {
     productFindUnique.mockResolvedValueOnce({ id: "cat-white" });
     productUpdate.mockResolvedValueOnce({});
-    imageDeleteMany.mockResolvedValueOnce({ count: 2 });
-    imageCreateMany.mockResolvedValueOnce({ count: 1 });
-    const res = await updateProduct("cat-white", { ...NEW_INPUT, name: "Cat White v2", gallery: ["/g/1.jpg"] });
+    const res = await updateProduct("cat-white", { ...NEW_INPUT, name: "Cat White v2" });
     const updArg = productUpdate.mock.calls[0][0];
     expect(updArg.where).toEqual({ id: "cat-white" });
     expect(updArg.data.name).toBe("Cat White v2");
     expect(updArg.data.id).toBeUndefined(); // slug/id never updated on field-only path
-    expect(imageDeleteMany).toHaveBeenCalledWith({ where: { productId: "cat-white" } });
-    expect(imageCreateMany).toHaveBeenCalledWith({ data: [{ productId: "cat-white", url: "/g/1.jpg", sortOrder: 0 }] });
-    expect(res).toEqual({ success: true, slug: "cat-white" });
-  });
-  it("clears the gallery (deleteMany, no createMany) when gallery is empty", async () => {
-    productFindUnique.mockResolvedValueOnce({ id: "cat-white" });
-    productUpdate.mockResolvedValueOnce({});
-    imageDeleteMany.mockResolvedValueOnce({ count: 2 });
-    const res = await updateProduct("cat-white", { ...NEW_INPUT, gallery: [] });
-    expect(imageDeleteMany).toHaveBeenCalledWith({ where: { productId: "cat-white" } });
-    expect(imageCreateMany).not.toHaveBeenCalled();
+    expect(variantDeleteMany).toHaveBeenCalledWith({ where: { productId: "cat-white" } });
+    expect(variantCreate.mock.calls[0][0].data.productId).toBe("cat-white");
     expect(res).toEqual({ success: true, slug: "cat-white" });
   });
 });
 
 describe("updateProduct rename", () => {
-  it("renames the slug, records history, rebuilds gallery under the new id, clears self-loop", async () => {
+  it("renames the slug, records history, rebuilds variants under the new id, clears self-loop", async () => {
     productFindUnique.mockResolvedValueOnce({ id: "cat-white" });
     productFindFirst.mockResolvedValueOnce(null); // cat-black is free
     productUpdate.mockResolvedValueOnce({});
-    imageDeleteMany.mockResolvedValueOnce({ count: 1 });
-    imageCreateMany.mockResolvedValueOnce({ count: 1 });
     historyUpsert.mockResolvedValueOnce({});
     historyDeleteMany.mockResolvedValueOnce({ count: 0 });
 
-    const res = await updateProduct("cat-white", { ...NEW_INPUT, name: "Cat Black", slug: "cat-black", gallery: ["/g/1.jpg"] });
+    const res = await updateProduct("cat-white", { ...NEW_INPUT, name: "Cat Black", slug: "cat-black" });
 
     expect(productFindFirst).toHaveBeenCalledWith({ where: { id: "cat-black", NOT: { id: "cat-white" } } });
     const updArg = productUpdate.mock.calls[0][0];
     expect(updArg.data.id).toBe("cat-black");
     expect(updArg.data.name).toBe("Cat Black");
-    expect(imageDeleteMany).toHaveBeenCalledWith({ where: { productId: "cat-black" } });
-    expect(imageCreateMany).toHaveBeenCalledWith({ data: [{ productId: "cat-black", url: "/g/1.jpg", sortOrder: 0 }] });
+    expect(variantDeleteMany).toHaveBeenCalledWith({ where: { productId: "cat-black" } });
+    expect(variantCreate.mock.calls[0][0].data.productId).toBe("cat-black");
     expect(historyUpsert).toHaveBeenCalledWith({
       where: { oldSlug: "cat-white" },
       update: { currentId: "cat-black" },
@@ -185,11 +197,10 @@ describe("updateProduct rename", () => {
     productFindUnique.mockResolvedValueOnce({ id: "cat-white" });
     productFindFirst.mockResolvedValueOnce({ id: "cat-black" }).mockResolvedValueOnce(null); // cat-black taken, cat-black-2 free
     productUpdate.mockResolvedValueOnce({});
-    imageDeleteMany.mockResolvedValueOnce({});
     historyUpsert.mockResolvedValueOnce({});
     historyDeleteMany.mockResolvedValueOnce({ count: 0 });
 
-    const res = await updateProduct("cat-white", { ...NEW_INPUT, name: "Cat Black", slug: "cat-black", gallery: [] });
+    const res = await updateProduct("cat-white", { ...NEW_INPUT, name: "Cat Black", slug: "cat-black" });
 
     const updArg = productUpdate.mock.calls[0][0];
     expect(updArg.data.id).toBe("cat-black-2");
