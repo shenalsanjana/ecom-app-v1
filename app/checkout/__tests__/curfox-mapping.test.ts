@@ -85,6 +85,18 @@ describe("Curfox payload mirrors customer-entered details", () => {
     });
   });
 
+  describe("customer_secondary_phone (alternate delivery number)", () => {
+    it("maps a provided alternate phone to the normalized local form", async () => {
+      const item = await callAndGetItem({ ...ORDER, alternatePhone: "+94712223333" });
+      expect(item.customer_secondary_phone).toBe("0712223333");
+    });
+
+    it("is null when no alternate phone is provided", async () => {
+      const item = await callAndGetItem({ ...ORDER, alternatePhone: null });
+      expect(item.customer_secondary_phone).toBeNull();
+    });
+  });
+
   describe("customer_address", () => {
     it("joins line1, line2, and city", async () => {
       const item = await callAndGetItem();

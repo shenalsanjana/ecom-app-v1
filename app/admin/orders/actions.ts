@@ -243,6 +243,7 @@ function toOrderDetails(order: DbOrderForDetails): OrderDetails {
     customerName: order.user?.name ?? order.guestName ?? "Customer",
     customerEmail: order.user?.email ?? order.guestEmail ?? "",
     customerPhone: order.customerPhone,
+    alternatePhone: order.alternatePhone,
     items: order.items.map((i) => ({ name: i.name, size: i.size, price: i.price, quantity: i.quantity })),
     subtotal: order.subtotal,
     shipping: order.shippingCost,

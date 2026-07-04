@@ -15,6 +15,7 @@ function paidDetails(order: OrderWithUser, items: OrderItem[]): OrderDetails {
     customerName: order.guestName ?? order.user?.name ?? "Customer",
     customerEmail: order.guestEmail ?? order.user?.email ?? "",
     customerPhone: order.customerPhone,
+    alternatePhone: order.alternatePhone,
     items: items.map((it) => ({
       name: it.name,
       size: it.size,
