@@ -30,8 +30,8 @@ beforeEach(() => {
   reviewAggregate.mockReset().mockResolvedValue({ _avg: { rating: null }, _count: { _all: 0 } });
   reviewFindMany.mockReset().mockResolvedValue([]);
   productFindUnique.mockReset().mockResolvedValue({
-    id: "cat-white", name: "Cat", price: 2190, originalPrice: null, image: "/x.jpg",
-    description: "d", stock: 5, categorySlug: "cat", sizes: "S,M,L,XL", archived: false,
+    id: "cat-white", name: "Cat", price: 2190, originalPrice: null,
+    description: "d", categorySlug: "cat", archived: false,
     category: { slug: "cat", name: "Cat", image: "/x.jpg" },
     variants: [{
       id: "var-1", productId: "cat-white", color: "White", colorSlug: "white",

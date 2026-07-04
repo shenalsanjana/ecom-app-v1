@@ -91,10 +91,42 @@ describe("applyItemChanges", () => {
     expect(stockDeltas).toEqual([{ variantId: "v2", size: "S", delta: 2 }]);
   });
 
-  it("changes size without affecting stock", () => {
+  it("size-only change moves the whole line between (variant,size) cells", () => {
     const { nextItems, stockDeltas } = applyItemChanges(makeItems(), [{ id: "i1", size: "L" }]);
     expect(nextItems.find((i) => i.id === "i1")!.size).toBe("L");
+    // Old cell (v1,M) restored by the full old quantity; new cell (v1,L) taken by
+    // the full (unchanged) quantity — never left as a no-op.
+    expect(stockDeltas).toEqual([
+      { variantId: "v1", size: "M", delta: 1 },
+      { variantId: "v1", size: "L", delta: -1 },
+    ]);
+  });
+
+  it("combined size+quantity change moves the new quantity into the new cell", () => {
+    const { nextItems, stockDeltas } = applyItemChanges(makeItems(), [{ id: "i1", size: "L", quantity: 3 }]);
+    expect(nextItems.find((i) => i.id === "i1")!.size).toBe("L");
+    expect(nextItems.find((i) => i.id === "i1")!.quantity).toBe(3);
+    expect(stockDeltas).toEqual([
+      { variantId: "v1", size: "M", delta: 1 }, // full old quantity restored to the old cell
+      { variantId: "v1", size: "L", delta: -3 }, // full new quantity taken from the new cell
+    ]);
+  });
+
+  it("a size change on a hard-deleted (null variantId) item emits no delta", () => {
+    // No variant to key a stock cell on, old or new — nothing to restore or decrement.
+    const items = [{ id: "i1", variantId: null, name: "Gone", size: "M", price: 6500, quantity: 2 }];
+    const { nextItems, stockDeltas } = applyItemChanges(items, [{ id: "i1", size: "L" }]);
+    expect(nextItems.find((i) => i.id === "i1")!.size).toBe("L");
     expect(stockDeltas).toEqual([]);
+  });
+
+  it("moving a sizeless item (null size) onto a real size only decrements the new cell", () => {
+    // Old cell has no size, so nothing to restore there; the new cell is a real
+    // (variant,size) pair and must be decremented like any other size change.
+    const items = [{ id: "i2", variantId: "v2", name: "Scarf", size: null, price: 2000, quantity: 2 }];
+    const { nextItems, stockDeltas } = applyItemChanges(items, [{ id: "i2", size: "M" }]);
+    expect(nextItems.find((i) => i.id === "i2")!.size).toBe("M");
+    expect(stockDeltas).toEqual([{ variantId: "v2", size: "M", delta: -2 }]);
   });
 
   it("rejects reducing quantity to zero (use remove instead)", () => {
