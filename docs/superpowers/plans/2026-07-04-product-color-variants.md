@@ -1609,6 +1609,7 @@ export function BuyBoxClient({
   const wishlisted = isWishlisted(productId);
 
   const colorParam = searchParams.get("color");
+  const buyNowIntent = searchParams.get("action") === "buy-now";
   const selectedVariant =
     variants.find((v) => v.colorSlug === colorParam) ??
     variants.find((v) => v.colorSlug === defaultColorSlug) ??
@@ -1629,6 +1630,10 @@ export function BuyBoxClient({
   const inStockSizes = new Set(availableSizes(selectedVariant.sizeStocks));
   const sizeStock = selectedSize ? stockForSize(selectedVariant.sizeStocks, selectedSize) : 0;
   const qtyMax = Math.min(selectedSize ? sizeStock : 10, 10);
+  // Show the exact per-size count only once a size is chosen; before that, a
+  // generic "in stock" (a value above the low-stock threshold) so we never
+  // falsely render "Only 1 left" on a product that simply has no size selected.
+  const displayStock = selectedSize ? sizeStock : inStock ? 999 : 0;
 
   const onSale = originalPrice != null && originalPrice > price;
   const pct = onSale ? discountPct(price, originalPrice as number) : 0;
@@ -1641,6 +1646,22 @@ export function BuyBoxClient({
     document.body.setAttribute("data-mobile-cta", "");
     return () => document.body.removeAttribute("data-mobile-cta");
   }, [inStock]);
+
+  // Buy-it-now from a card lands here with ?action=buy-now: scroll to and flash
+  // the size picker, then strip the param so refresh/back-nav doesn't re-fire.
+  useEffect(() => {
+    if (!buyNowIntent || !sizeList.length || selectedSize) return;
+    const el = document.getElementById("size-picker");
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.setAttribute("data-attention", "true");
+    const t = setTimeout(() => el.removeAttribute("data-attention"), 2000);
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("action");
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    return () => { clearTimeout(t); el.removeAttribute("data-attention"); };
+  }, [buyNowIntent, sizeList.length, selectedSize, searchParams, pathname, router]);
 
   function selectColor(slug: string) {
     const next = new URLSearchParams(searchParams.toString());
@@ -1706,7 +1727,7 @@ export function BuyBoxClient({
         <ColorSwatches options={swatchOptions} selected={selectedVariant.colorSlug} onSelect={selectColor} />
       </div>
 
-      <div><StockIndicator stock={inStock ? Math.max(1, sizeStock || 1) : 0} /></div>
+      <div><StockIndicator stock={displayStock} /></div>
 
       {/* Size Selection */}
       {sizeList.length > 0 && (
@@ -1812,7 +1833,10 @@ export function BuyBoxClient({
 }
 ```
 
-Note: `StockIndicator` still takes a numeric `stock`; we feed it the selected size's count (or a positive sentinel when in stock but no size chosen) to preserve its low-stock/in-stock display without changing that shared component.
+**Behavior notes vs. the pre-variant buy box** (deliberate, so an implementer doesn't "restore" them by accident):
+- `StockIndicator` still takes a numeric `stock`; it's fed `displayStock` — the selected size's count once chosen, else a positive sentinel (`999`) so it shows a plain "in stock" rather than a false "Only 1 left".
+- The old **"(N in cart)"** quantity hint is intentionally dropped here — the cart is color-blind until Phase 6, so a variant-accurate count isn't available yet and a productId-level count would be misleading. Not re-added in Phase 6 (out of scope; add later if desired).
+- **Known minor UX edge:** `quantity` is reset only when the *color* changes, not when the selected *size* changes to a lower-stock cell. Checkout's atomic per-cell decrement still prevents oversell, so this is a rough edge, not a correctness hole. Leave as-is.
 
 ### Task 4.5: Wire the PDP page to variants
 
@@ -1916,6 +1940,12 @@ const cardSelect = {
 } satisfies Prisma.ProductSelect;
 
 type ProductRow = Prisma.ProductGetPayload<{ select: typeof cardSelect }>;
+
+// Typing fallback: `satisfies Prisma.ProductSelect` usually preserves the
+// nested `orderBy: "asc"` literal via contextual typing. If tsc instead widens
+// it to `string` and errors on `SortOrder`/select at Step 6, swap the const to
+// `const cardSelect = Prisma.validator<Prisma.ProductSelect>()({ ...same... });`
+// and keep the `ProductGetPayload<{ select: typeof cardSelect }>` line as-is.
 
 async function attachAggregates(rows: ProductRow[]): Promise<ProductView[]> {
   // A design with no active variants can't be carded; drop it.
