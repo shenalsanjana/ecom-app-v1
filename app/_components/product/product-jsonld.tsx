@@ -1,37 +1,42 @@
-import type { Product } from "@prisma/client";
 import { absoluteUrl } from "@/app/_lib/absolute-url";
 import { stripMarkdown } from "@/app/_lib/strip-markdown";
+import { variantInStock } from "@/app/_lib/variants";
+import type { VariantDetail } from "@/app/_lib/products";
 
-// Emits Product JSON-LD for the product detail page. Helps Meta catalog
-// matching plus Google/Pinterest rich results. Uses the same absolute-URL
-// helper as the feed and share buttons so canonical URLs agree everywhere.
+// Emits Product JSON-LD with one Offer per color variant (shared design, many
+// colors) for Meta/Google/Pinterest rich results.
 export function ProductJsonLd({
   product,
+  variants,
   ratingAvg,
   ratingCount,
 }: {
-  product: Pick<Product, "id" | "name" | "description" | "price" | "image" | "stock">;
+  product: { id: string; name: string; description: string };
+  variants: VariantDetail[];
   ratingAvg: number;
   ratingCount: number;
 }) {
+  const primary = variants[0];
+  const images = variants.flatMap((v) => v.detailImages).slice(0, 6).map((u) => absoluteUrl(u));
   const json: Record<string, unknown> = {
     "@context": "https://schema.org/",
     "@type": "Product",
     name: product.name,
-    image: absoluteUrl(product.image),
+    image: images.length > 0 ? images : undefined,
     description: stripMarkdown(product.description, 5000),
-    sku: product.id,
-    mpn: product.id,
     brand: { "@type": "Brand", name: "Dressing Bear" },
-    offers: {
+    sku: primary?.sku ?? product.id,
+    mpn: primary?.sku ?? product.id,
+    offers: variants.map((v) => ({
       "@type": "Offer",
-      url: absoluteUrl(`/products/${product.id}`),
+      url: absoluteUrl(`/products/${product.id}?color=${v.colorSlug}`),
       priceCurrency: "LKR",
-      price: product.price.toFixed(2),
-      availability: product.stock > 0
+      price: v.price.toFixed(2),
+      sku: v.sku ?? `${product.id}-${v.colorSlug}`,
+      availability: variantInStock(v.sizeStocks)
         ? "https://schema.org/InStock"
         : "https://schema.org/OutOfStock",
-    },
+    })),
   };
 
   if (ratingCount > 0) {
@@ -45,7 +50,6 @@ export function ProductJsonLd({
   return (
     <script
       type="application/ld+json"
-      // JSON.stringify output is safe to inline; escape `<` defensively.
       dangerouslySetInnerHTML={{ __html: JSON.stringify(json).replace(/</g, "\\u003c") }}
     />
   );
