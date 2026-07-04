@@ -19,7 +19,7 @@ export function buildProductWhere(params: ProductListParams): Prisma.ProductWher
   switch (params.tab) {
     case "low-stock":
       where.archived = false;
-      where.variants = { some: { sizeStocks: { some: { stock: { lte: LOW_STOCK_THRESHOLD } } } } };
+      where.variants = { some: { archived: false, sizeStocks: { some: { stock: { lte: LOW_STOCK_THRESHOLD } } } } };
       break;
     case "archived":
       where.archived = true;
@@ -62,6 +62,9 @@ export async function listProducts(
       include: {
         category: { select: { name: true } },
         variants: {
+          // Deleting a color archives (soft-deletes) it; the admin list must show
+          // only live colors, so its stock/count/thumbnail exclude archived rows.
+          where: { archived: false },
           orderBy: { sortOrder: "asc" },
           select: {
             sortOrder: true,
@@ -70,7 +73,7 @@ export async function listProducts(
             images: { where: { role: "CARD" }, orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } },
           },
         },
-        _count: { select: { variants: true } },
+        _count: { select: { variants: { where: { archived: false } } } },
       },
     }),
     prisma.product.count({ where }),

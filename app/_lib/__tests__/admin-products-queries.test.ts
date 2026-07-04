@@ -28,14 +28,20 @@ describe("listProducts", () => {
     productFindMany.mockResolvedValueOnce([{ id: "cat-white" }]);
     productCount.mockResolvedValueOnce(42);
     const res = await listProducts({ tab: "low-stock", page: 2, pageSize: 25 });
-    const lowStockWhere = { archived: false, variants: { some: { sizeStocks: { some: { stock: { lte: 5 } } } } } };
+    // low-stock only counts LIVE colors — an archived variant's stock must not
+    // flag a product as low-stock.
+    const lowStockWhere = { archived: false, variants: { some: { archived: false, sizeStocks: { some: { stock: { lte: 5 } } } } } };
     expect(productCount).toHaveBeenCalledWith({ where: lowStockWhere });
     const arg = productFindMany.mock.calls[0][0];
     expect(arg.where).toEqual(lowStockWhere);
     expect(arg.take).toBe(25);
     expect(arg.skip).toBe(25);
     expect(arg.orderBy).toEqual({ name: "asc" });
-    expect(arg.include._count.select.variants).toBe(true);
+    // A deleted color is archived, not hard-deleted — the list's variant rows and
+    // its color count must both exclude archived variants (else the row shows the
+    // deleted color's stock/count).
+    expect(arg.include.variants.where).toEqual({ archived: false });
+    expect(arg.include._count.select.variants).toEqual({ where: { archived: false } });
     expect(res).toEqual({ rows: [{ id: "cat-white" }], total: 42 });
   });
 
