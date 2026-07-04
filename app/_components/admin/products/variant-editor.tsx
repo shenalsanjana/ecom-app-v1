@@ -1,29 +1,12 @@
 "use client";
 import { slugify } from "@/app/_lib/product-helpers";
 import { GalleryEditor } from "./gallery-editor";
+import { emptyVariant, type VariantDraft } from "./variant-draft";
 
-export type VariantDraft = {
-  id?: string;
-  color: string;
-  colorSlug: string;
-  swatchHex: string;
-  sku: string;
-  price: string;         // "" => no override
-  originalPrice: string; // "" => no override
-  cardImages: string[];
-  detailImages: string[];
-  sizeStocks: { size: string; stock: string }[];
-};
-
-const STD_SIZES = ["S", "M", "L", "XL"];
-
-export function emptyVariant(): VariantDraft {
-  return {
-    color: "", colorSlug: "", swatchHex: "", sku: "", price: "", originalPrice: "",
-    cardImages: [], detailImages: [],
-    sizeStocks: STD_SIZES.map((size) => ({ size, stock: "0" })),
-  };
-}
+// Re-export so existing client-side imports (product-form) keep working.
+// Server components must import emptyVariant from ./variant-draft directly.
+export { emptyVariant };
+export type { VariantDraft };
 
 export function VariantEditor({
   value,

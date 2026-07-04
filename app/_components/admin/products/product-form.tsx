@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { createProduct, updateProduct, archiveProduct, unarchiveProduct } from "@/app/admin/products/actions";
 import { slugify } from "@/app/_lib/product-helpers";
 import { CategorySelect } from "./category-select";
-import { VariantEditor, emptyVariant, type VariantDraft } from "./variant-editor";
+import { VariantEditor } from "./variant-editor";
+import { emptyVariant, type VariantDraft } from "./variant-draft";
 
 type Cat = { slug: string; name: string };
 type Initial = {

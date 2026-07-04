@@ -1,6 +1,6 @@
 import { listCategories } from "@/app/_lib/admin-products";
 import { ProductForm } from "@/app/_components/admin/products/product-form";
-import { emptyVariant } from "@/app/_components/admin/products/variant-editor";
+import { emptyVariant } from "@/app/_components/admin/products/variant-draft";
 
 export default async function NewProductPage() {
   const categories = await listCategories();
