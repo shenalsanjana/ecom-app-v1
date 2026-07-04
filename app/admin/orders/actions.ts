@@ -8,8 +8,8 @@ import { requireAdmin } from "@/app/_lib/admin-auth";
 import { nextStatuses, applyItemChanges, recomputeTotals, canEdit, canConfirm, type ItemChange } from "@/app/_lib/admin-orders";
 import { getDeliveryConfig } from "@/app/_lib/store-settings";
 import { bookCourierAndNotify } from "@/app/checkout/book-courier";
-import { sendOrderConfirmationEmail, sendCustomerDispatchEmail, sendCustomerCancellationEmail, logMailerError, type OrderDetails } from "@/app/_lib/mailer";
-import { shouldEmailCustomer } from "@/app/_lib/mailer-guard";
+import { sendOrderConfirmationEmail, logMailerError, type OrderDetails } from "@/app/_lib/mailer";
+import { notifyOrderDispatched, notifyOrderCancelled } from "@/app/_lib/order-notifications";
 import { DELIVERY_COMPANY_NAME } from "@/app/_lib/carrier";
 
 export type ActionResult =
@@ -269,19 +269,9 @@ const CANCEL_INCLUDE = {
   items: { select: { productId: true, name: true, size: true, price: true, quantity: true } },
 } satisfies Prisma.OrderInclude;
 
-/** Best-effort customer cancellation email — never throws; a send failure is
- *  logged but must not fail the cancellation. */
+/** Customer cancellation notifications (email when present + SMS). Never throws. */
 async function trySendCancellationEmail(details: OrderDetails): Promise<void> {
-  if (!details.customerEmail) return;
-  try {
-    await sendCustomerCancellationEmail(details);
-  } catch (err) {
-    logMailerError(
-      "cancellation",
-      { orderId: details.orderId, webNumber: details.webNumber, rbNumber: details.rbNumber },
-      err,
-    );
-  }
+  await notifyOrderCancelled(details);
 }
 
 export async function bookCourier(orderId: string): Promise<ActionResult> {
@@ -326,16 +316,10 @@ export async function dispatchManually(orderId: string, trackingNumber: string):
     return { success: false, error: "Something went wrong. Please try again." };
   }
 
-  // Email the customer once. A send failure must not undo the dispatch.
-  if (shouldEmailCustomer(order.user?.email ?? order.guestEmail)) {
-    try {
-      await sendCustomerDispatchEmail({ ...toOrderDetails(order), trackingCode: parsed.data });
-      await prisma.order.update({ where: { id: orderId }, data: { customerDispatchEmailSentAt: new Date() } });
-    } catch (err) {
-      logMailerError("dispatch", { orderId, webNumber: order.webNumber, rbNumber: order.rbNumber }, err);
-    }
-  } else {
-    console.log(`[Admin] order ${orderId}: no customer email — dispatch email skipped`);
+  try {
+    await notifyOrderDispatched(toOrderDetails(order), parsed.data);
+  } catch (err) {
+    logMailerError("dispatch", { orderId, webNumber: order.webNumber, rbNumber: order.rbNumber }, err);
   }
 
   revalidate(orderId);
