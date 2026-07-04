@@ -11,6 +11,12 @@ export type ActionResult =
   | { success: true; slug?: string; name?: string }
   | { success: false; error: string };
 
+// Product writes rebuild every variant + its images + size cells inside one
+// interactive transaction. On a pooled/Accelerate connection each statement is a
+// network round-trip, so the default 5s interactive-transaction limit is tight
+// for multi-color products — raise it so a valid edit can't be killed mid-flight.
+const TX_OPTIONS = { maxWait: 5_000, timeout: 10_000 };
+
 function revalidate(id?: string) {
   revalidatePath("/admin/products");
   if (id) revalidatePath(`/admin/products/${id}/edit`);
@@ -162,6 +168,8 @@ async function reconcileVariants(
   }
 
   const keptIds = new Set<string>();
+  const imageRows: Prisma.VariantImageCreateManyInput[] = [];
+  const sizeRows: Prisma.VariantSizeStockCreateManyInput[] = [];
   for (let i = 0; i < variants.length; i++) {
     const v = variants[i];
     const data = {
@@ -183,18 +191,20 @@ async function reconcileVariants(
       variantId = created.id;
     }
     keptIds.add(variantId);
-    await tx.variantImage.deleteMany({ where: { variantId } });
-    await tx.variantImage.createMany({
-      data: [
-        ...v.cardImages.map((url, j) => ({ variantId, url, role: "CARD", sortOrder: j })),
-        ...v.detailImages.map((url, j) => ({ variantId, url, role: "DETAIL", sortOrder: j })),
-      ],
-    });
-    await tx.variantSizeStock.deleteMany({ where: { variantId } });
-    await tx.variantSizeStock.createMany({
-      data: v.sizeStocks.map((s) => ({ variantId, size: s.size, stock: s.stock })),
-    });
+    v.cardImages.forEach((url, j) => imageRows.push({ variantId, url, role: "CARD", sortOrder: j }));
+    v.detailImages.forEach((url, j) => imageRows.push({ variantId, url, role: "DETAIL", sortOrder: j }));
+    v.sizeStocks.forEach((s) => sizeRows.push({ variantId, size: s.size, stock: s.stock }));
   }
+
+  // Rebuild every kept variant's images + size cells with one delete + one insert
+  // apiece, rather than two writes per variant. This keeps the interactive
+  // transaction short: a product with N colors dropped from ~4N round-trips to 4,
+  // so edits no longer risk exceeding the interactive-transaction time limit.
+  const keptIdList = [...keptIds];
+  await tx.variantImage.deleteMany({ where: { variantId: { in: keptIdList } } });
+  await tx.variantSizeStock.deleteMany({ where: { variantId: { in: keptIdList } } });
+  if (imageRows.length) await tx.variantImage.createMany({ data: imageRows });
+  if (sizeRows.length) await tx.variantSizeStock.createMany({ data: sizeRows });
 
   // Archive removed variants; free their unique colorSlug/sku so those values
   // can be reused by a future variant without a unique-constraint collision.
@@ -233,8 +243,9 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
         },
       });
       await writeVariants(tx, slug, d.variants);
-    });
-  } catch {
+    }, TX_OPTIONS);
+  } catch (e) {
+    console.error("createProduct failed", { slug, categorySlug: d.categorySlug, error: e });
     return { success: false, error: "Could not create product (check the category and that SKUs are unique)." };
   }
   revalidate(slug);
@@ -269,9 +280,10 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
           },
         });
         await reconcileVariants(tx, id, d.variants);
-      });
-    } catch {
-      return { success: false, error: "Could not save product (check the category and that SKUs are unique)." };
+      }, TX_OPTIONS);
+    } catch (e) {
+      console.error("updateProduct failed (field-only)", { id, categorySlug: d.categorySlug, error: e });
+      return { success: false, error: "Could not save the product. Please try again — if you changed a SKU, make sure it isn't already used by another product." };
     }
     revalidate(id);
     return { success: true, slug: id };
@@ -300,9 +312,10 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
         create: { oldSlug: id, currentId: newSlug },
       });
       await tx.productSlugHistory.deleteMany({ where: { oldSlug: newSlug } });
-    });
-  } catch {
-    return { success: false, error: "Could not save product (check the category and that SKUs are unique)." };
+    }, TX_OPTIONS);
+  } catch (e) {
+    console.error("updateProduct failed (rename)", { id, newSlug, categorySlug: d.categorySlug, error: e });
+    return { success: false, error: "Could not save the product. Please try again — if you changed a SKU, make sure it isn't already used by another product." };
   }
   revalidatePath(`/admin/products/${id}/edit`);
   revalidate(newSlug);

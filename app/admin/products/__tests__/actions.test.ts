@@ -235,6 +235,35 @@ describe("updateProduct", () => {
     expect(res).toEqual({ success: true, slug: "cat-white" });
   });
 
+  it("runs inside a transaction with a raised timeout and batches image/size rebuilds into one call each", async () => {
+    // Regression: the update transaction rebuilt images + size cells with two
+    // writes per color, so a multi-color edit exceeded Prisma's default 5s
+    // interactive-transaction limit and every save failed with the generic
+    // "check the category and that SKUs are unique" message. The fix batches the
+    // rebuild (short tx) and raises the timeout ceiling.
+    productFindUnique.mockResolvedValueOnce({ id: "cat-white" });
+    productUpdate.mockResolvedValueOnce({});
+    variantFindMany.mockResolvedValueOnce([{ id: "variant-existing" }]);
+
+    const res = await updateProduct("cat-white", {
+      ...NEW_INPUT,
+      variants: [{ ...NEW_INPUT.variants[0], id: "variant-existing" }],
+    });
+
+    const txOpts = txn.mock.calls.at(-1)?.[1];
+    expect(txOpts?.timeout).toBeGreaterThan(5000);
+
+    // one delete + one insert for ALL images, scoped to the kept variant ids —
+    // not one pair of writes per color.
+    expect(variantImageDeleteMany).toHaveBeenCalledTimes(1);
+    expect(variantImageDeleteMany).toHaveBeenCalledWith({ where: { variantId: { in: ["variant-existing"] } } });
+    expect(variantImageCreateMany).toHaveBeenCalledTimes(1);
+    expect(variantSizeStockDeleteMany).toHaveBeenCalledTimes(1);
+    expect(variantSizeStockDeleteMany).toHaveBeenCalledWith({ where: { variantId: { in: ["variant-existing"] } } });
+    expect(variantSizeStockCreateMany).toHaveBeenCalledTimes(1);
+    expect(res).toEqual({ success: true, slug: "cat-white" });
+  });
+
   it("reconciles: an existing variant absent from the incoming set is archived, not deleted", async () => {
     productFindUnique.mockResolvedValueOnce({ id: "cat-white" });
     productUpdate.mockResolvedValueOnce({});
