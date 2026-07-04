@@ -66,18 +66,18 @@ export default function ForgotPasswordPage() {
       ) : (
         <>
           <p className="mb-4 text-sm text-muted-foreground">
-            Enter your phone or email. We&apos;ll text a code (phone) or email a link.
+            Enter your email or mobile number. We&apos;ll text a code (phone) or email a link.
           </p>
           <form action={requestAction} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="identifier">Phone or email</Label>
+              <Label htmlFor="identifier">Email or Mobile Number</Label>
               <Input
                 id="identifier"
                 name="identifier"
                 type="text"
                 required
                 autoComplete="username"
-                placeholder="0771234567 or you@email.com"
+                placeholder="you@email.com or 0771234567"
                 disabled={reqPending}
               />
             </div>

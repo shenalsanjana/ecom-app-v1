@@ -22,6 +22,7 @@ vi.mock("@/app/_lib/mailer", () => ({
   sendAdminFailureAlertEmail: vi.fn(),
   logMailerError: vi.fn(),
 }));
+vi.mock("@/app/_lib/order-notifications", () => ({ notifyOrderDispatched: vi.fn() }));
 vi.mock("@/app/_lib/prisma", () => ({
   prisma: {
     order: {
@@ -43,6 +44,7 @@ import {
   sendCustomerDispatchEmail,
   sendAdminFailureAlertEmail,
 } from "@/app/_lib/mailer";
+import { notifyOrderDispatched } from "@/app/_lib/order-notifications";
 import { prisma } from "@/app/_lib/prisma";
 import { bookCourierAndNotify } from "../book-courier";
 
@@ -70,6 +72,7 @@ beforeEach(() => {
   vi.mocked(sendDispatchNotificationEmail).mockReset();
   vi.mocked(sendCustomerDispatchEmail).mockReset();
   vi.mocked(sendAdminFailureAlertEmail).mockReset();
+  vi.mocked(notifyOrderDispatched).mockReset();
   vi.mocked(prisma.order.update).mockReset();
   vi.mocked(prisma.order.update).mockResolvedValue({} as never);
 });
@@ -117,9 +120,9 @@ describe("bookCourierAndNotify — happy path", () => {
     expect(data.status).toBe("DISPATCHED");
     expect(data.deliveryCompany).toBe("Royal Express");
 
-    expect(sendCustomerDispatchEmail).toHaveBeenCalledOnce();
-    expect(vi.mocked(sendCustomerDispatchEmail).mock.calls[0][0].trackingCode).toBe("RA03870247");
-    expect(vi.mocked(sendCustomerDispatchEmail).mock.calls[0][0].customerEmail).toBe("jane@example.com");
+    expect(notifyOrderDispatched).toHaveBeenCalledOnce();
+    expect(vi.mocked(notifyOrderDispatched).mock.calls[0][1]).toBe("RA03870247");
+    expect(vi.mocked(notifyOrderDispatched).mock.calls[0][0].customerEmail).toBe("jane@example.com");
   });
 });
 
@@ -132,7 +135,7 @@ describe("bookCourierAndNotify — phone-only customer (no email)", () => {
     const waybill = await bookCourierAndNotify({ order });
 
     expect(waybill).toBe("RA00000001");
-    expect(sendCustomerDispatchEmail).not.toHaveBeenCalled();
+    expect(notifyOrderDispatched).toHaveBeenCalledOnce();
     // The admin-facing dispatch notification is unaffected by the customer's
     // email guard — it must still be sent.
     expect(sendDispatchNotificationEmail).toHaveBeenCalledOnce();

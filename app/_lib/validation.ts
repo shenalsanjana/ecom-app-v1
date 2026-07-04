@@ -24,7 +24,7 @@ export const SignupSchema = z
   });
 
 export const LoginSchema = z.object({
-  identifier: z.string().trim().min(1, "Phone or email required"),
+  identifier: z.string().trim().min(1, "Email or mobile number required"),
   password: z.string().min(1, "Password required"),
 });
 
@@ -45,7 +45,7 @@ export const ChangePasswordSchema = z
   });
 
 export const RequestResetSchema = z.object({
-  identifier: z.string().trim().min(1, "Phone or email required"),
+  identifier: z.string().trim().min(1, "Email or mobile number required"),
 });
 
 export const ResetByPhoneSchema = z

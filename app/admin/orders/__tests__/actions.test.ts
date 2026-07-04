@@ -30,6 +30,12 @@ const { sendOrderConfirmationEmail, sendCustomerDispatchEmail, sendCustomerCance
 }));
 vi.mock("@/app/_lib/mailer", () => ({ sendOrderConfirmationEmail, sendCustomerDispatchEmail, sendCustomerCancellationEmail, logMailerError }));
 
+const { notifyOrderDispatched, notifyOrderCancelled } = vi.hoisted(() => ({
+  notifyOrderDispatched: vi.fn(),
+  notifyOrderCancelled: vi.fn(),
+}));
+vi.mock("@/app/_lib/order-notifications", () => ({ notifyOrderDispatched, notifyOrderCancelled }));
+
 vi.mock("@/app/_lib/prisma", () => {
   const client = {
     order: { findUnique: orderFindUnique, update: orderUpdate, delete: orderDelete },
@@ -66,6 +72,8 @@ beforeEach(() => {
   sendCustomerDispatchEmail.mockReset();
   sendCustomerCancellationEmail.mockReset();
   logMailerError.mockReset();
+  notifyOrderDispatched.mockReset();
+  notifyOrderCancelled.mockReset();
 });
 
 describe("addNote", () => {
@@ -198,8 +206,8 @@ describe("cancelOrder", () => {
       items: [{ productId: "p1", name: "Dress", size: "M", price: 1000, quantity: 1 }],
     });
     const res = await cancelOrder("o1");
-    expect(sendCustomerCancellationEmail).toHaveBeenCalledTimes(1);
-    expect(sendCustomerCancellationEmail.mock.calls[0][0].customerEmail).toBe("n@x.test");
+    expect(notifyOrderCancelled).toHaveBeenCalledTimes(1);
+    expect(notifyOrderCancelled.mock.calls[0][0].customerEmail).toBe("n@x.test");
     expect(res).toEqual({ success: true });
   });
 
@@ -210,7 +218,8 @@ describe("cancelOrder", () => {
       items: [{ productId: "p1", name: "Dress", size: "M", price: 1000, quantity: 1 }],
     });
     await cancelOrder("o1");
-    expect(sendCustomerCancellationEmail).not.toHaveBeenCalled();
+    // The dispatcher is now always invoked — it decides the email skip internally.
+    expect(notifyOrderCancelled).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -365,7 +374,7 @@ describe("dispatchManually", () => {
   it("sets DISPATCHED + Royal Express + tracking and emails the customer once", async () => {
     orderFindUnique.mockResolvedValueOnce(FULL_ORDER);
     orderUpdate.mockResolvedValue({});
-    sendCustomerDispatchEmail.mockResolvedValueOnce(undefined);
+    notifyOrderDispatched.mockResolvedValueOnce(undefined);
 
     const res = await dispatchManually("o1", "  RX-123  ");
 
@@ -373,19 +382,15 @@ describe("dispatchManually", () => {
       where: { id: "o1" },
       data: { trackingCode: "RX-123", status: "DISPATCHED", deliveryCompany: "Royal Express" },
     });
-    expect(sendCustomerDispatchEmail).toHaveBeenCalledTimes(1);
-    expect(sendCustomerDispatchEmail.mock.calls[0][0].trackingCode).toBe("RX-123");
-    expect(orderUpdate).toHaveBeenCalledWith({
-      where: { id: "o1" },
-      data: { customerDispatchEmailSentAt: expect.any(Date) },
-    });
+    expect(notifyOrderDispatched).toHaveBeenCalledTimes(1);
+    expect(notifyOrderDispatched.mock.calls[0][1]).toBe("RX-123");
     expect(res).toEqual({ success: true, warning: "Dispatched — tracking RX-123." });
   });
 
   it("still reports success (and does not throw) when the email send fails", async () => {
     orderFindUnique.mockResolvedValueOnce(FULL_ORDER);
     orderUpdate.mockResolvedValue({});
-    sendCustomerDispatchEmail.mockRejectedValueOnce(new Error("SMTP down"));
+    notifyOrderDispatched.mockRejectedValueOnce(new Error("dispatcher down"));
 
     const res = await dispatchManually("o1", "RX-9");
 
@@ -403,7 +408,8 @@ describe("dispatchManually", () => {
       where: { id: "o1" },
       data: { trackingCode: "RX-777", status: "DISPATCHED", deliveryCompany: "Royal Express" },
     });
-    expect(sendCustomerDispatchEmail).not.toHaveBeenCalled();
+    // The dispatcher is now always invoked — it decides the email skip internally.
+    expect(notifyOrderDispatched).toHaveBeenCalledTimes(1);
     // No email was ever sent, so the "sent" timestamp update must not happen either.
     expect(orderUpdate).not.toHaveBeenCalledWith({
       where: { id: "o1" },
@@ -421,7 +427,7 @@ describe("updateTrackingNumber", () => {
     const res = await updateTrackingNumber("o1", "RX-NEW");
 
     expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { trackingCode: "RX-NEW" } });
-    expect(sendCustomerDispatchEmail).not.toHaveBeenCalled();
+    expect(notifyOrderDispatched).not.toHaveBeenCalled();
     expect(res).toEqual({ success: true });
   });
 

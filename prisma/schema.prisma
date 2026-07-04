@@ -135,6 +135,10 @@ model Order {
   guestName             String?
   guestEmail            String?
   customerPhone         String
+  alternatePhone        String?   // optional secondary delivery phone; courier-only, order-scoped
+  confirmationSmsSentAt DateTime? // idempotency stamp — customer order-confirmation SMS
+  dispatchSmsSentAt     DateTime? // idempotency stamp — customer dispatch SMS
+  cancellationSmsSentAt DateTime? // idempotency stamp — customer cancellation SMS
   shippingLine1         String
   shippingLine2         String?
   shippingCity          String

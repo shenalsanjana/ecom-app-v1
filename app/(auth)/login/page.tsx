@@ -83,14 +83,14 @@ function LoginInner({
       <form action={formAction} className="space-y-4">
         <input type="hidden" name="callbackUrl" value={params.callbackUrl ?? "/"} />
         <div className="space-y-2">
-          <Label htmlFor="identifier">Phone or email</Label>
+          <Label htmlFor="identifier">Email or Mobile Number</Label>
           <Input
             id="identifier"
             name="identifier"
             type="text"
             required
             autoComplete="username"
-            placeholder="0771234567 or you@email.com"
+            placeholder="you@email.com or 0771234567"
             disabled={busy}
             data-testid="login-identifier"
           />

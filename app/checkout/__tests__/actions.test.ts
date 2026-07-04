@@ -45,12 +45,14 @@ vi.mock("@/app/_lib/mailer", async (orig) => {
     sendPendingPrepaidNotificationEmail: vi.fn(async () => undefined),
   };
 });
+vi.mock("@/app/_lib/order-notifications", () => ({ notifyOrderConfirmed: vi.fn(async () => undefined) }));
 
 import { bookCourierAndNotify } from "@/app/checkout/book-courier";
 import {
   sendOrderConfirmationEmail,
   sendPendingPrepaidNotificationEmail,
 } from "@/app/_lib/mailer";
+import { notifyOrderConfirmed } from "@/app/_lib/order-notifications";
 import { auth } from "@/app/_lib/auth";
 import { processOrder, type ProcessOrderInput } from "../actions";
 
@@ -70,6 +72,7 @@ beforeEach(() => {
   vi.mocked(bookCourierAndNotify).mockClear();
   vi.mocked(sendOrderConfirmationEmail).mockClear();
   vi.mocked(sendPendingPrepaidNotificationEmail).mockClear();
+  vi.mocked(notifyOrderConfirmed).mockClear();
   txOrderCreate.mockClear();
 });
 
@@ -79,7 +82,7 @@ describe("processOrder — COD path", () => {
     const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
     expect(result.success).toBe(true);
     expect(bookCourierAndNotify).not.toHaveBeenCalled();
-    expect(sendOrderConfirmationEmail).toHaveBeenCalledOnce();
+    expect(notifyOrderConfirmed).toHaveBeenCalledOnce();
     expect(sendPendingPrepaidNotificationEmail).not.toHaveBeenCalled();
   });
 
@@ -106,7 +109,7 @@ describe("processOrder — prepaid paths", () => {
       expect(sendPendingPrepaidNotificationEmail).toHaveBeenCalledOnce();
       // Customer confirmation email must NOT be sent here — it is sent by the
       // webhook handler only after payment is successfully verified.
-      expect(sendOrderConfirmationEmail).not.toHaveBeenCalled();
+      expect(notifyOrderConfirmed).not.toHaveBeenCalled();
     },
   );
 
@@ -149,7 +152,7 @@ describe("processOrder — prepaid paths", () => {
 
 describe("processOrder — never throws downstream failures back to the customer", () => {
   it("returns success even if customer-confirmation email fails", async () => {
-    vi.mocked(sendOrderConfirmationEmail).mockRejectedValueOnce(new Error("smtp down"));
+    vi.mocked(notifyOrderConfirmed).mockRejectedValueOnce(new Error("dispatcher down"));
     const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
     expect(result.success).toBe(true);
   });
@@ -182,26 +185,13 @@ describe("processOrder — size is required", () => {
 });
 
 describe("processOrder — phone-only customer (no email)", () => {
-  it("COD checkout with no customer email: order succeeds and confirmation email is skipped", async () => {
+  it("COD checkout with no customer email: order succeeds and confirmation is dispatched", async () => {
     vi.mocked(auth).mockResolvedValueOnce({
       user: { id: "U1", name: "Phone Customer", email: null },
     } as never);
-
     const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
-
     expect(result.success).toBe(true);
-    expect(sendOrderConfirmationEmail).not.toHaveBeenCalled();
-  });
-
-  it("COD checkout WITH a customer email still sends the confirmation (companion case)", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
-      user: { id: "U1", name: "Email Customer", email: "customer@example.com" },
-    } as never);
-
-    const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
-
-    expect(result.success).toBe(true);
-    expect(sendOrderConfirmationEmail).toHaveBeenCalledOnce();
+    expect(notifyOrderConfirmed).toHaveBeenCalledOnce();
   });
 });
 
@@ -225,5 +215,42 @@ describe("processOrder — customer name requirement", () => {
 
     const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("processOrder — contact details", () => {
+  it("guest checkout without an email succeeds (email now optional)", async () => {
+    const result = await processOrder({
+      ...baseInput,
+      guestInfo: { name: "Jane Doe", phone: "+94770000000" },
+      paymentMethod: "COD",
+    });
+    expect(result.success).toBe(true);
+    expect(txOrderCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ guestEmail: null }) }),
+    );
+  });
+
+  it("stores the primary contact number in canonical +94 form", async () => {
+    await processOrder({ ...baseInput, contactPhone: "0770000000", paymentMethod: "COD" });
+    expect(txOrderCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ customerPhone: "+94770000000" }),
+      }),
+    );
+  });
+
+  it("rejects a landline primary number (the SMS target must be mobile)", async () => {
+    const result = await processOrder({ ...baseInput, contactPhone: "0112345678", paymentMethod: "COD" });
+    expect(result.success).toBe(false);
+  });
+
+  it("persists the alternate phone on the order (courier-only; profile untouched)", async () => {
+    await processOrder({ ...baseInput, alternatePhone: "0712223333", paymentMethod: "COD" });
+    expect(txOrderCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ alternatePhone: "0712223333" }),
+      }),
+    );
   });
 });

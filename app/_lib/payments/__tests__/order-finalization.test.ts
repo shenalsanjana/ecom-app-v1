@@ -40,6 +40,9 @@ vi.mock("@/app/_lib/mailer", () => ({
   logMailerError: vi.fn(),
 }));
 
+const { notifyOrderConfirmed } = vi.hoisted(() => ({ notifyOrderConfirmed: vi.fn() }));
+vi.mock("@/app/_lib/order-notifications", () => ({ notifyOrderConfirmed }));
+
 vi.mock("@/app/checkout/book-courier", () => ({ bookCourierAndNotify }));
 
 import { finalizeFailedPayment, finalizePaidPayment } from "../order-finalization";
@@ -85,7 +88,7 @@ describe("order finalization", () => {
       where: { id: "ORD-1", paymentStatus: { not: "PAID" } },
       data: { paymentStatus: "PAID" },
     });
-    expect(sendOrderConfirmationEmail).toHaveBeenCalledOnce();
+    expect(notifyOrderConfirmed).toHaveBeenCalledOnce();
   });
 
   it("marks failed, cancels order, and restores stock once", async () => {
@@ -105,7 +108,7 @@ describe("order finalization", () => {
       where: { id: "P1" },
       data: { stock: { increment: 2 } },
     });
-    expect(sendOrderConfirmationEmail).not.toHaveBeenCalled();
+    expect(notifyOrderConfirmed).not.toHaveBeenCalled();
   });
 
   it("does not restore stock when already failed", async () => {
@@ -131,7 +134,7 @@ describe("order finalization", () => {
     const result = await finalizePaidPayment("ORD-1", "KOKO");
 
     expect(bookCourierAndNotify).not.toHaveBeenCalled();
-    expect(sendOrderConfirmationEmail).toHaveBeenCalledOnce();
+    expect(notifyOrderConfirmed).toHaveBeenCalledOnce();
     expect(result).toEqual({ status: "success" });
 
     process.env.ROYAL_EXPRESS_ENABLED = "false";

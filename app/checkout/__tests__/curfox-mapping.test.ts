@@ -26,6 +26,7 @@ vi.mock("@/app/_lib/prisma", () => ({
     },
   },
 }));
+vi.mock("@/app/_lib/order-notifications", () => ({ notifyOrderDispatched: vi.fn() }));
 
 import { createCurfoxOrder } from "@/app/_lib/courier/curfox-client";
 import { bookCourierAndNotify } from "../book-courier";
@@ -82,6 +83,18 @@ describe("Curfox payload mirrors customer-entered details", () => {
     it("strips spaces and dashes from noisy inputs", async () => {
       const item = await callAndGetItem({ ...ORDER, customerPhone: "+94 77-000-0000" });
       expect(item.customer_phone).toBe("0770000000");
+    });
+  });
+
+  describe("customer_secondary_phone (alternate delivery number)", () => {
+    it("maps a provided alternate phone to the normalized local form", async () => {
+      const item = await callAndGetItem({ ...ORDER, alternatePhone: "+94712223333" });
+      expect(item.customer_secondary_phone).toBe("0712223333");
+    });
+
+    it("is null when no alternate phone is provided", async () => {
+      const item = await callAndGetItem({ ...ORDER, alternatePhone: null });
+      expect(item.customer_secondary_phone).toBeNull();
     });
   });
 

@@ -9,13 +9,16 @@ import { prisma } from "../../app/_lib/prisma";
 const EMAIL = "ordertest@example.com";
 const PASSWORD = "TestPass123!";
 const NAME = "Order Test";
+// Distinctive test-only mobile so the pre-fill assertion below has a known
+// value. User.phone is @unique — no other fixture in this suite sets it.
+const SAVED_PHONE = "+94779998888";
 
 test.beforeAll(async () => {
   const passwordHash = await bcrypt.hash(PASSWORD, 10);
   await prisma.user.upsert({
     where: { email: EMAIL },
-    update: { passwordHash, name: NAME },
-    create: { name: NAME, email: EMAIL, passwordHash },
+    update: { passwordHash, name: NAME, phone: SAVED_PHONE },
+    create: { name: NAME, email: EMAIL, passwordHash, phone: SAVED_PHONE },
   });
   // Ensure all products have enough stock so the test is idempotent across runs.
   await prisma.product.updateMany({
@@ -42,7 +45,7 @@ test.afterAll(async () => {
 test("COD order shows RB number and payment-status badge on /account/orders", async ({ page }) => {
   // Log in.
   await page.goto("/login");
-  await page.getByLabel("Phone or email").fill(EMAIL);
+  await page.getByLabel("Email or Mobile Number").fill(EMAIL);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: /Sign in/i }).click();
   await page.waitForURL("**/", { timeout: 10_000 });
@@ -79,7 +82,13 @@ test("COD order shows RB number and payment-status badge on /account/orders", as
 
   // Go to checkout and fill the form.
   await page.goto("/checkout");
-  await page.getByLabel(/Phone Number/i).fill("0771234567");
+
+  // Registered checkout: the saved account's mobile number pre-fills the
+  // contact field, and the optional alternate-mobile field is present.
+  await expect(page.locator('[data-testid="contact-phone"]')).toHaveValue(SAVED_PHONE);
+  await expect(page.locator('[data-testid="alternate-phone"]')).toBeVisible();
+
+  await page.locator('[data-testid="contact-phone"]').fill("0771234567");
   await page.getByLabel(/Address Line 1/i).fill("123 Test St");
   await page.locator("#city").selectOption("Colombo");
 

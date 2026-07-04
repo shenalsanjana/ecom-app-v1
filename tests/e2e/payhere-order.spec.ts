@@ -71,7 +71,7 @@ test("PayHere checkout creates order with PENDING payment status", async ({ page
   await page.goto("/");
   // Log in.
   await page.goto("/login");
-  await page.getByLabel("Phone or email").fill(EMAIL);
+  await page.getByLabel("Email or Mobile Number").fill(EMAIL);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: /Sign in/i }).click();
   await page.waitForURL("**/", { timeout: 10_000 });
@@ -98,7 +98,7 @@ test("PayHere checkout creates order with PENDING payment status", async ({ page
 
   // Go to checkout and fill the form.
   await page.goto("/checkout");
-  await page.getByLabel(/Phone Number/i).fill("0771234567");
+  await page.locator('[data-testid="contact-phone"]').fill("0771234567");
   await page.getByLabel(/Address Line 1/i).fill("123 Test St");
   await page.locator("#city").selectOption("Colombo");
 
@@ -348,7 +348,7 @@ test("PayHere order shows Paid badge on /account/orders after webhook", async ({
 
   // Log in.
   await page.goto("/login");
-  await page.getByLabel("Phone or email").fill(EMAIL);
+  await page.getByLabel("Email or Mobile Number").fill(EMAIL);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: /Sign in/i }).click();
   await page.waitForURL("**/", { timeout: 10_000 });

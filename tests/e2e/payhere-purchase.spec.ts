@@ -170,7 +170,7 @@ test("guest checkout with PayHere creates PENDING order", async ({ page }) => {
   // Fill guest details.
   await page.getByLabel(/Full Name/i).fill("Guest Buyer");
   await page.getByLabel(/Email/i).fill("guest-buyer@example.com");
-  await page.getByLabel(/Phone Number/i).fill("0779876543");
+  await page.locator('[data-testid="contact-phone"]').fill("0779876543");
   await page.getByLabel(/Address Line 1/i).fill("789 Guest Road");
   await page.locator("#city").selectOption("Colombo");
 
@@ -205,7 +205,7 @@ test("guest checkout with PayHere creates PENDING order", async ({ page }) => {
 test("full PayHere checkout creates PENDING order, then verified state confirms", async ({ page }) => {
   // Log in.
   await page.goto("/login");
-  await page.getByLabel("Phone or email").fill(EMAIL);
+  await page.getByLabel("Email or Mobile Number").fill(EMAIL);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: /Sign in/i }).click();
   await page.waitForURL("**/", { timeout: 10_000 });
@@ -232,7 +232,7 @@ test("full PayHere checkout creates PENDING order, then verified state confirms"
 
   // Checkout with PayHere.
   await page.goto("/checkout");
-  await page.getByLabel(/Phone Number/i).fill("0771234567");
+  await page.locator('[data-testid="contact-phone"]').fill("0771234567");
   await page.getByLabel(/Address Line 1/i).fill("123 Loop St");
   await page.locator("#city").selectOption("Colombo");
   await page.getByRole("radio", { name: /PayHere/i }).check();

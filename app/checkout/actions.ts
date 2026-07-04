@@ -2,17 +2,16 @@
 "use server";
 
 import { z } from "zod";
-import { LkPhoneSchema } from "@/app/_lib/validation";
+import { LkPhoneSchema, LkMobileSchema } from "@/app/_lib/validation";
 import { auth } from "@/app/_lib/auth";
 import {
-  sendOrderConfirmationEmail,
   sendPendingPrepaidNotificationEmail,
   sendAdminFailureAlertEmail,
   logMailerError,
   type OrderItem,
   type OrderDetails,
 } from "@/app/_lib/mailer";
-import { shouldEmailCustomer } from "@/app/_lib/mailer-guard";
+import { notifyOrderConfirmed } from "@/app/_lib/order-notifications";
 import { prisma } from "@/app/_lib/prisma";
 import { calculateDelivery } from "@/app/_lib/checkout-config";
 import { getDeliveryConfig } from "@/app/_lib/store-settings";
@@ -50,15 +49,16 @@ const AddressSchema = z.object({
 
 const GuestInfoSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
-  email: z.string().trim().email("Valid email is required"),
-  phone: LkPhoneSchema,
+  email: z.string().trim().email("Enter a valid email").optional().or(z.literal("")),
+  phone: LkMobileSchema,
 });
 
 const ProcessOrderSchema = z.object({
   items: z.array(ItemInputSchema).min(1, "Cart is empty"),
   shippingAddress: AddressSchema,
   paymentMethod: z.enum(["COD", "PAYHERE", "KOKO", "MINTPAY"]),
-  contactPhone: LkPhoneSchema,
+  contactPhone: LkMobileSchema,
+  alternatePhone: LkPhoneSchema.optional(),
   guestInfo: GuestInfoSchema.optional(),
   idempotencyKey: z.string().min(8).max(128).optional(),
   notes: z.string().trim().max(500).optional(),
@@ -125,7 +125,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
     const first = parsed.error.issues[0];
     return { success: false, error: first?.message ?? "Invalid order data" };
   }
-  const { items, shippingAddress, paymentMethod, contactPhone, guestInfo, idempotencyKey, notes } =
+  const { items, shippingAddress, paymentMethod, contactPhone, alternatePhone, guestInfo, idempotencyKey, notes } =
     parsed.data;
 
   const session = await auth();
@@ -148,10 +148,11 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
     customerName = sessionName;
     customerEmail = session.user.email ?? "";
   } else if (guestInfo) {
+    const email = guestInfo.email && guestInfo.email.length > 0 ? guestInfo.email : null;
     customerName = guestInfo.name;
-    customerEmail = guestInfo.email;
+    customerEmail = email ?? "";
     guestName = guestInfo.name;
-    guestEmail = guestInfo.email;
+    guestEmail = email;
   } else {
     return {
       success: false,
@@ -243,6 +244,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
           guestName,
           guestEmail,
           customerPhone: contactPhone,
+          alternatePhone: alternatePhone ?? null,
           shippingLine1: shippingAddress.line1,
           shippingLine2: shippingAddress.line2 ?? null,
           shippingCity: shippingAddress.city,
@@ -287,6 +289,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
     customerName,
     customerEmail,
     customerPhone: contactPhone,
+    alternatePhone: alternatePhone ?? null,
     items: orderItems,
     subtotal,
     shipping: shippingCost,
@@ -306,25 +309,10 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
   // For prepaid (PAYHERE/KOKO/MINTPAY): confirmation email is sent by the
   // webhook handler only after payment is verified — do NOT send it here.
   if (paymentMethod === "COD") {
-    if (shouldEmailCustomer(orderDetailsForEmail.customerEmail)) {
-      try {
-        await sendOrderConfirmationEmail({
-          ...orderDetailsForEmail,
-          trackingCode,
-        });
-        await prisma.order.update({
-          where: { id: orderId },
-          data: { emailSent: true },
-        });
-      } catch (error) {
-        logMailerError(
-          "order-confirmation",
-          { orderId, webNumber: created.webNumber },
-          error,
-        );
-      }
-    } else {
-      console.log(`[Checkout] order ${orderId}: no customer email — confirmation email skipped`);
+    try {
+      await notifyOrderConfirmed({ ...orderDetailsForEmail, trackingCode });
+    } catch (error) {
+      logMailerError("order-confirmation", { orderId, webNumber: created.webNumber }, error);
     }
   }
 

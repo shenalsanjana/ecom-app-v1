@@ -149,7 +149,7 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   });
   if (!parsed.success) {
     console.warn("[Login Action]: Validation failed");
-    return { error: "Invalid phone/email or password" };
+    return { error: "Invalid email/mobile or password" };
   }
 
   const callbackUrl = safeCallbackUrl(formData.get("callbackUrl") as string | null);
@@ -179,7 +179,7 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   } catch (error) {
     if (error instanceof AuthError) {
       console.warn("[Login Action]: AuthError during signIn", error.type);
-      return { error: "Invalid phone/email or password" };
+      return { error: "Invalid email/mobile or password" };
     }
     console.error("[Login Action]: Unexpected error during signIn", error);
     throw error;
@@ -194,7 +194,7 @@ const NEUTRAL_EMAIL_SENT = "If an account with that email exists, you'll receive
 
 export async function requestResetAction(_prev: ResetState, formData: FormData): Promise<ResetState> {
   const parsed = RequestResetSchema.safeParse({ identifier: formData.get("identifier") });
-  if (!parsed.success) return { mode: "request", error: "Enter your phone or email." };
+  if (!parsed.success) return { mode: "request", error: "Enter your email or mobile number." };
 
   const id = resolveIdentifier(parsed.data.identifier);
   if (id.kind === "email") {

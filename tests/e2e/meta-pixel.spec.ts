@@ -102,10 +102,11 @@ test("fires Purchase exactly once on COD order placement", async ({ page }) => {
   await page.getByRole("button", { name: /^Add to cart$/i }).first().click();
 
   await page.goto("/checkout");
-  // Guest checkout requires name + email.
+  // Guest checkout requires a name; email is optional but this order supplies
+  // one so the guestEmail cleanup query in afterAll can find it.
   await page.getByLabel(/Full Name/i).fill("E2E Meta Tester");
   await page.getByLabel(/Email/i).fill(COD_GUEST_EMAIL);
-  await page.getByLabel(/Phone Number/i).fill("0771234567");
+  await page.locator('[data-testid="contact-phone"]').fill("0771234567");
   await page.getByLabel(/Address Line 1/i).fill("123 Test St");
   // City is a combobox (not a <select>): focus, type to filter, pick the option.
   const cityInput = page.locator("#city");
