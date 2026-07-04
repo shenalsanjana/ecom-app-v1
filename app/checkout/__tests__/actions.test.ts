@@ -226,6 +226,9 @@ describe("processOrder — contact details", () => {
       paymentMethod: "COD",
     });
     expect(result.success).toBe(true);
+    expect(txOrderCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ guestEmail: null }) }),
+    );
   });
 
   it("stores the primary contact number in canonical +94 form", async () => {

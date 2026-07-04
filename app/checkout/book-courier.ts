@@ -215,7 +215,11 @@ export async function bookCourierAndNotify(params: {
   // the portal so the merchant prints from there. (See docs/spec/admin-email-overhaul.md
   // for the broader rationale and the previously-attempted PDF probe history.)
   await tryDispatchEmail(order, waybillNumber, undefined);
-  await notifyOrderDispatched(order, waybillNumber);
+  try {
+    await notifyOrderDispatched(order, waybillNumber);
+  } catch (err) {
+    logMailerError("dispatch", { orderId: order.orderId, webNumber: order.webNumber, rbNumber: order.rbNumber }, err);
+  }
 
   return waybillNumber;
 }

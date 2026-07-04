@@ -26,6 +26,7 @@ vi.mock("@/app/_lib/prisma", () => ({
     },
   },
 }));
+vi.mock("@/app/_lib/order-notifications", () => ({ notifyOrderDispatched: vi.fn() }));
 
 import { createCurfoxOrder } from "@/app/_lib/courier/curfox-client";
 import { bookCourierAndNotify } from "../book-courier";

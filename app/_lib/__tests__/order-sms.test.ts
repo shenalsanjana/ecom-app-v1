@@ -39,5 +39,6 @@ describe("order SMS templates", () => {
     await sendOrderCancelledSms({ phone: "+94771234567", ref: "WEB1001" });
     expect(captured[0].message).toContain("WEB1001");
     expect(captured[0].message).toMatch(/cancel/i);
+    expect(captured[0].message).toMatch(/call/i);
   });
 });
