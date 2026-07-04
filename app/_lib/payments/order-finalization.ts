@@ -3,9 +3,9 @@ import { prisma } from "@/app/_lib/prisma";
 import {
   logMailerError,
   sendAdminFailureAlertEmail,
-  sendOrderConfirmationEmail,
   type OrderDetails,
 } from "@/app/_lib/mailer";
+import { notifyOrderConfirmed } from "@/app/_lib/order-notifications";
 
 type OrderWithUser = Prisma.OrderGetPayload<{ include: { user: { select: { name: true; email: true } } } }>;
 
@@ -71,16 +71,14 @@ export async function finalizePaidPayment(orderId: string, expectedMethod: strin
     const items = await prisma.orderItem.findMany({ where: { orderId } });
     const details = paidDetails(updated, items);
 
-    // NOTE: emailSent is a best-effort dedup hint for the mailer; the atomic
-    // claim (updateMany above) is the real idempotency gate — do not remove the
-    // claim assuming this flag alone suffices.
-    if (!updated.emailSent) {
-      try {
-        await sendOrderConfirmationEmail(details);
-        await prisma.order.update({ where: { id: orderId }, data: { emailSent: true } });
-      } catch (err) {
-        logMailerError("order-confirmation", { orderId, webNumber: updated.webNumber }, err);
-      }
+    // NOTE: notifyOrderConfirmed owns its own per-channel idempotency claims
+    // (emailSent, confirmationSmsSentAt); the outer atomic paymentStatus claim
+    // above is the real idempotency gate for this function — do not remove it
+    // assuming the dispatcher's internal claims alone suffice.
+    try {
+      await notifyOrderConfirmed(details);
+    } catch (err) {
+      logMailerError("order-confirmation", { orderId, webNumber: updated.webNumber }, err);
     }
   } catch (err) {
     // Safety net: findMany or paidDetails threw after the order was already
