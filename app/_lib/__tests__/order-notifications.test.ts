@@ -96,6 +96,12 @@ describe("notifyOrderDispatched", () => {
     expect(sendOrderDispatchedSms).toHaveBeenCalledOnce();
     expect(sendOrderDispatchedSms.mock.calls[0][0]).toMatchObject({ trackingCode: "RA999" });
   });
+
+  it("phone-only (no email) → SMS only, dispatch email skipped, no throw", async () => {
+    await expect(notifyOrderDispatched(phoneOnly, "RA999")).resolves.toBeUndefined();
+    expect(sendCustomerDispatchEmail).not.toHaveBeenCalled();
+    expect(sendOrderDispatchedSms).toHaveBeenCalledOnce();
+  });
 });
 
 describe("notifyOrderCancelled", () => {
