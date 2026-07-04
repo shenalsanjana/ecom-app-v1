@@ -59,6 +59,7 @@ const VariantSizeInputSchema = z.object({
 });
 
 const VariantInputSchema = z.object({
+  id: z.string().optional(),
   color: z.string().trim().min(1),
   colorSlug: z.string().trim().min(1),
   swatchHex: z.string().trim().nullable().optional(),
@@ -136,6 +137,65 @@ async function writeVariants(
   }
 }
 
+// UPDATE path: preserve ProductVariant row identity so OrderItem.variantId
+// (onDelete: SetNull) survives edits. Existing variants are updated in place;
+// new ones created; removed ones ARCHIVED (not deleted) so historical order
+// stock-restore still resolves their (variantId,size) cell. Images and size
+// cells have no incoming order FK, so they're safe to rebuild.
+async function reconcileVariants(
+  tx: Prisma.TransactionClient,
+  productId: string,
+  variants: VariantInput[],
+): Promise<void> {
+  const existing = await tx.productVariant.findMany({ where: { productId }, select: { id: true } });
+  const existingIds = new Set(existing.map((v) => v.id));
+  const keptIds = new Set<string>();
+
+  for (let i = 0; i < variants.length; i++) {
+    const v = variants[i];
+    const data = {
+      color: v.color,
+      colorSlug: slugify(v.colorSlug || v.color),
+      swatchHex: v.swatchHex?.trim() || null,
+      sku: v.sku?.trim() || null,
+      price: v.price ?? null,
+      originalPrice: v.originalPrice ?? null,
+      sortOrder: i,
+      archived: false,
+    };
+    let variantId: string;
+    if (v.id && existingIds.has(v.id)) {
+      await tx.productVariant.update({ where: { id: v.id }, data });
+      variantId = v.id;
+    } else {
+      const created = await tx.productVariant.create({ data: { productId, ...data } });
+      variantId = created.id;
+    }
+    keptIds.add(variantId);
+    await tx.variantImage.deleteMany({ where: { variantId } });
+    await tx.variantImage.createMany({
+      data: [
+        ...v.cardImages.map((url, j) => ({ variantId, url, role: "CARD", sortOrder: j })),
+        ...v.detailImages.map((url, j) => ({ variantId, url, role: "DETAIL", sortOrder: j })),
+      ],
+    });
+    await tx.variantSizeStock.deleteMany({ where: { variantId } });
+    await tx.variantSizeStock.createMany({
+      data: v.sizeStocks.map((s) => ({ variantId, size: s.size, stock: s.stock })),
+    });
+  }
+
+  // Archive removed variants; free their unique colorSlug/sku so those values
+  // can be reused by a future variant without a unique-constraint collision.
+  const removed = [...existingIds].filter((id) => !keptIds.has(id));
+  for (const rid of removed) {
+    await tx.productVariant.update({
+      where: { id: rid },
+      data: { archived: true, colorSlug: `archived-${rid}`, sku: null },
+    });
+  }
+}
+
 export async function createProduct(input: ProductInput): Promise<ActionResult> {
   await requireAdmin();
   const parsed = ProductInputSchema.safeParse(input);
@@ -197,7 +257,7 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
             description: d.description,
           },
         });
-        await writeVariants(tx, id, d.variants);
+        await reconcileVariants(tx, id, d.variants);
       });
     } catch {
       return { success: false, error: "Could not save product (check the category and that SKUs are unique)." };
@@ -222,7 +282,7 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
           description: d.description,
         },
       });
-      await writeVariants(tx, newSlug, d.variants);
+      await reconcileVariants(tx, newSlug, d.variants);
       await tx.productSlugHistory.upsert({
         where: { oldSlug: id },
         update: { currentId: newSlug },

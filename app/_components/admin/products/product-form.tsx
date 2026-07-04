@@ -33,6 +33,7 @@ export function ProductForm({ mode, categories, initial }: { mode: "create" | "e
       price: Number(f.price), originalPrice: toNum(f.originalPrice),
       description: f.description.trim(),
       variants: f.variants.map((v) => ({
+        id: v.id,
         color: v.color.trim(),
         colorSlug: v.colorSlug.trim(),
         swatchHex: v.swatchHex.trim() || null,

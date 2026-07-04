@@ -4,15 +4,18 @@ const { requireAdmin } = vi.hoisted(() => ({ requireAdmin: vi.fn() }));
 const {
   productUpdate, productFindUnique, productFindFirst, productCreate, productDelete, orderItemCount,
   categoryCreate, categoryFindUnique,
-  variantDeleteMany, variantCreate, variantImageCreateMany, variantSizeStockCreateMany,
+  variantDeleteMany, variantCreate, variantFindMany, variantUpdate,
+  variantImageCreateMany, variantImageDeleteMany,
+  variantSizeStockCreateMany, variantSizeStockDeleteMany,
   historyUpsert, historyDeleteMany, txn,
 } =
   vi.hoisted(() => ({
     productUpdate: vi.fn(), productFindUnique: vi.fn(), productFindFirst: vi.fn(), productCreate: vi.fn(),
     productDelete: vi.fn(), orderItemCount: vi.fn(),
     categoryCreate: vi.fn(), categoryFindUnique: vi.fn(),
-    variantDeleteMany: vi.fn(), variantCreate: vi.fn(),
-    variantImageCreateMany: vi.fn(), variantSizeStockCreateMany: vi.fn(),
+    variantDeleteMany: vi.fn(), variantCreate: vi.fn(), variantFindMany: vi.fn(), variantUpdate: vi.fn(),
+    variantImageCreateMany: vi.fn(), variantImageDeleteMany: vi.fn(),
+    variantSizeStockCreateMany: vi.fn(), variantSizeStockDeleteMany: vi.fn(),
     historyUpsert: vi.fn(), historyDeleteMany: vi.fn(), txn: vi.fn(),
   }));
 
@@ -20,9 +23,9 @@ function buildClient() {
   return {
     product: { update: productUpdate, findUnique: productFindUnique, findFirst: productFindFirst, create: productCreate, delete: productDelete },
     category: { create: categoryCreate, findUnique: categoryFindUnique },
-    productVariant: { deleteMany: variantDeleteMany, create: variantCreate },
-    variantImage: { createMany: variantImageCreateMany },
-    variantSizeStock: { createMany: variantSizeStockCreateMany },
+    productVariant: { deleteMany: variantDeleteMany, create: variantCreate, findMany: variantFindMany, update: variantUpdate },
+    variantImage: { createMany: variantImageCreateMany, deleteMany: variantImageDeleteMany },
+    variantSizeStock: { createMany: variantSizeStockCreateMany, deleteMany: variantSizeStockDeleteMany },
     productSlugHistory: { upsert: historyUpsert, deleteMany: historyDeleteMany },
     orderItem: { count: orderItemCount },
   };
@@ -43,7 +46,9 @@ beforeEach(() => {
   productDelete.mockReset(); orderItemCount.mockReset();
   categoryCreate.mockReset(); categoryFindUnique.mockReset();
   variantDeleteMany.mockReset(); variantCreate.mockReset().mockResolvedValue({ id: "variant-1" });
-  variantImageCreateMany.mockReset(); variantSizeStockCreateMany.mockReset();
+  variantFindMany.mockReset().mockResolvedValue([]); variantUpdate.mockReset().mockResolvedValue({});
+  variantImageCreateMany.mockReset(); variantImageDeleteMany.mockReset();
+  variantSizeStockCreateMany.mockReset(); variantSizeStockDeleteMany.mockReset();
   historyUpsert.mockReset(); historyDeleteMany.mockReset();
   txn.mockReset().mockImplementation(async (fn: (c: unknown) => unknown) => fn(buildClient()));
 });
@@ -164,8 +169,65 @@ describe("updateProduct", () => {
     expect(updArg.where).toEqual({ id: "cat-white" });
     expect(updArg.data.name).toBe("Cat White v2");
     expect(updArg.data.id).toBeUndefined(); // slug/id never updated on field-only path
-    expect(variantDeleteMany).toHaveBeenCalledWith({ where: { productId: "cat-white" } });
+    // reconcileVariants never bulk-deletes ProductVariant rows (preserves identity
+    // for OrderItem.variantId); an incoming variant with no id is newly created.
+    expect(variantDeleteMany).not.toHaveBeenCalled();
+    expect(variantFindMany).toHaveBeenCalledWith({ where: { productId: "cat-white" }, select: { id: true } });
     expect(variantCreate.mock.calls[0][0].data.productId).toBe("cat-white");
+    expect(res).toEqual({ success: true, slug: "cat-white" });
+  });
+
+  it("reconciles: an incoming variant carrying an existing id is updated in place, not deleted+recreated", async () => {
+    productFindUnique.mockResolvedValueOnce({ id: "cat-white" });
+    productUpdate.mockResolvedValueOnce({});
+    variantFindMany.mockResolvedValueOnce([{ id: "variant-existing" }]);
+
+    const res = await updateProduct("cat-white", {
+      ...NEW_INPUT,
+      variants: [{ ...NEW_INPUT.variants[0], id: "variant-existing" }],
+    });
+
+    expect(variantDeleteMany).not.toHaveBeenCalled();
+    expect(variantUpdate).toHaveBeenCalledWith({
+      where: { id: "variant-existing" },
+      data: expect.objectContaining({ color: "White", colorSlug: "white", archived: false }),
+    });
+    expect(variantCreate).not.toHaveBeenCalled();
+    expect(res).toEqual({ success: true, slug: "cat-white" });
+  });
+
+  it("reconciles: a variant with no id (or an id absent from the existing set) is created", async () => {
+    productFindUnique.mockResolvedValueOnce({ id: "cat-white" });
+    productUpdate.mockResolvedValueOnce({});
+    variantFindMany.mockResolvedValueOnce([{ id: "variant-existing" }]);
+    variantCreate.mockResolvedValueOnce({ id: "variant-new" });
+
+    const res = await updateProduct("cat-white", {
+      ...NEW_INPUT,
+      variants: [{ ...NEW_INPUT.variants[0], id: "unknown-id" }],
+    });
+
+    expect(variantCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ productId: "cat-white", color: "White" }),
+    });
+    expect(res).toEqual({ success: true, slug: "cat-white" });
+  });
+
+  it("reconciles: an existing variant absent from the incoming set is archived, not deleted", async () => {
+    productFindUnique.mockResolvedValueOnce({ id: "cat-white" });
+    productUpdate.mockResolvedValueOnce({});
+    variantFindMany.mockResolvedValueOnce([{ id: "variant-existing" }, { id: "variant-removed" }]);
+
+    const res = await updateProduct("cat-white", {
+      ...NEW_INPUT,
+      variants: [{ ...NEW_INPUT.variants[0], id: "variant-existing" }],
+    });
+
+    expect(variantDeleteMany).not.toHaveBeenCalled();
+    expect(variantUpdate).toHaveBeenCalledWith({
+      where: { id: "variant-removed" },
+      data: { archived: true, colorSlug: "archived-variant-removed", sku: null },
+    });
     expect(res).toEqual({ success: true, slug: "cat-white" });
   });
 });
@@ -184,7 +246,10 @@ describe("updateProduct rename", () => {
     const updArg = productUpdate.mock.calls[0][0];
     expect(updArg.data.id).toBe("cat-black");
     expect(updArg.data.name).toBe("Cat Black");
-    expect(variantDeleteMany).toHaveBeenCalledWith({ where: { productId: "cat-black" } });
+    // ON UPDATE CASCADE already moved existing variant rows to the new slug id;
+    // reconcileVariants looks them up under newSlug and never bulk-deletes.
+    expect(variantDeleteMany).not.toHaveBeenCalled();
+    expect(variantFindMany).toHaveBeenCalledWith({ where: { productId: "cat-black" }, select: { id: true } });
     expect(variantCreate.mock.calls[0][0].data.productId).toBe("cat-black");
     expect(historyUpsert).toHaveBeenCalledWith({
       where: { oldSlug: "cat-white" },

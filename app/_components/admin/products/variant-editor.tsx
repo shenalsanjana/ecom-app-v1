@@ -3,6 +3,7 @@ import { slugify } from "@/app/_lib/product-helpers";
 import { GalleryEditor } from "./gallery-editor";
 
 export type VariantDraft = {
+  id?: string;
   color: string;
   colorSlug: string;
   swatchHex: string;
@@ -43,7 +44,7 @@ export function VariantEditor({
   };
   const duplicate = (i: number) => {
     const src = value[i];
-    const copy: VariantDraft = { ...src, color: "", colorSlug: "", sku: "",
+    const copy: VariantDraft = { ...src, id: undefined, color: "", colorSlug: "", sku: "",
       cardImages: [...src.cardImages], detailImages: [...src.detailImages],
       sizeStocks: src.sizeStocks.map((s) => ({ ...s })) };
     onChange([...value.slice(0, i + 1), copy, ...value.slice(i + 1)]);

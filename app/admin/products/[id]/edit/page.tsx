@@ -14,6 +14,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         originalPrice: product.originalPrice != null ? String(product.originalPrice) : "",
         description: product.description, archived: product.archived,
         variants: product.variants.map((v) => ({
+          id: v.id,
           color: v.color, colorSlug: v.colorSlug, swatchHex: v.swatchHex ?? "",
           sku: v.sku ?? "",
           price: v.price != null ? String(v.price) : "",
