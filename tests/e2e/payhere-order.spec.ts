@@ -98,7 +98,7 @@ test("PayHere checkout creates order with PENDING payment status", async ({ page
 
   // Go to checkout and fill the form.
   await page.goto("/checkout");
-  await page.getByLabel(/Phone Number/i).fill("0771234567");
+  await page.locator('[data-testid="contact-phone"]').fill("0771234567");
   await page.getByLabel(/Address Line 1/i).fill("123 Test St");
   await page.locator("#city").selectOption("Colombo");
 

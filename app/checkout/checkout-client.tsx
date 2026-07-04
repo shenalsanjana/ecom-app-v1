@@ -28,8 +28,9 @@ import {
   submitPaymentCheckoutForm,
 } from "./payhere-client";
 import { PaymentMethodIcon } from "@/app/_components/shared/payment-method-icon";
+import { type CheckoutPrefill } from "./checkout-prefill";
 
-type CheckoutUser = { name: string; email: string } | null;
+type CheckoutUser = CheckoutPrefill | null;
 
 type Props = {
   user: CheckoutUser;
@@ -67,12 +68,13 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
     email: "",
   });
 
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(user?.phone ?? "");
+  const [alternatePhone, setAlternatePhone] = useState("");
 
   const [address, setAddress] = useState({
-    line1: "",
-    line2: "",
-    city: "",
+    line1: user?.address?.line1 ?? "",
+    line2: user?.address?.line2 ?? "",
+    city: user?.address?.city ?? "",
     country: "Sri Lanka",
   });
 
@@ -229,6 +231,7 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
         shippingAddress: normalizedAddress,
         paymentMethod,
         contactPhone: phone,
+        alternatePhone: alternatePhone.trim() || undefined,
         guestInfo: isGuest ? { name: guest.name, email: guest.email, phone } : undefined,
         idempotencyKey,
         notes: notes.trim() || undefined,
@@ -339,7 +342,7 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
                       </div>
                       <div>
                         <label htmlFor="guestEmail" className="block text-sm font-medium mb-1">
-                          Email *
+                          Email (optional)
                         </label>
                         <Input
                           id="guestEmail"
@@ -348,8 +351,8 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
                           autoComplete="email"
                           value={guest.email}
                           onChange={(e) => setGuest({ ...guest, email: e.target.value })}
-                          required
                           placeholder="you@example.com"
+                          data-testid="guest-email"
                         />
                       </div>
                     </div>
@@ -365,21 +368,40 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
                   <div className="space-y-4">
                     <div>
                       <label htmlFor="phone" className="block text-sm font-medium mb-1">
-                        Phone Number *
+                        Mobile Number *
                       </label>
                       <Input
                         id="phone"
                         type="tel"
                         inputMode="tel"
                         autoComplete="tel"
-                        pattern="^(?:\+?94|0)?[1-9]\d{8}$"
+                        pattern="^(?:\+?94|0)?7\d{8}$"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         required
-                        placeholder="+94 7X XXX XXXX"
+                        placeholder="0771234567"
+                        data-testid="contact-phone"
                       />
                       <p className="mt-1 text-xs text-muted-foreground">
-                        For delivery contact.
+                        Order confirmations and delivery updates will be sent to this mobile number.
+                      </p>
+                    </div>
+                    <div>
+                      <label htmlFor="alternatePhone" className="block text-sm font-medium mb-1">
+                        Alternate Mobile Number
+                      </label>
+                      <Input
+                        id="alternatePhone"
+                        type="tel"
+                        inputMode="tel"
+                        autoComplete="tel"
+                        value={alternatePhone}
+                        onChange={(e) => setAlternatePhone(e.target.value)}
+                        placeholder="Optional"
+                        data-testid="alternate-phone"
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Optional — an extra number the courier can call for delivery.
                       </p>
                     </div>
                     <div>
