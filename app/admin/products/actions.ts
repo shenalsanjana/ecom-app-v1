@@ -147,10 +147,21 @@ async function reconcileVariants(
   productId: string,
   variants: VariantInput[],
 ): Promise<void> {
-  const existing = await tx.productVariant.findMany({ where: { productId }, select: { id: true } });
+  // Only ACTIVE variants are managed by the edit form; archived rows are left alone.
+  const existing = await tx.productVariant.findMany({
+    where: { productId, archived: false },
+    select: { id: true },
+  });
   const existingIds = new Set(existing.map((v) => v.id));
-  const keptIds = new Set<string>();
 
+  // Release every active variant's unique slots first (colorSlug + sku) so the
+  // reassignments below can't collide mid-transaction on the immediate unique
+  // checks — handles color renames, swaps, and remove+re-add of the same color.
+  for (const { id } of existing) {
+    await tx.productVariant.update({ where: { id }, data: { colorSlug: `tmp-${id}`, sku: null } });
+  }
+
+  const keptIds = new Set<string>();
   for (let i = 0; i < variants.length; i++) {
     const v = variants[i];
     const data = {

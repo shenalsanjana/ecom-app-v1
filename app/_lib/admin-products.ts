@@ -85,6 +85,7 @@ export async function getProduct(id: string) {
     include: {
       category: true,
       variants: {
+        where: { archived: false },
         orderBy: { sortOrder: "asc" },
         include: {
           images: { orderBy: { sortOrder: "asc" } },

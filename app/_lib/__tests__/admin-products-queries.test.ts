@@ -56,6 +56,7 @@ describe("getProduct", () => {
     const arg = productFindUnique.mock.calls[0][0];
     expect(arg.where).toEqual({ id: "cat-white" });
     expect(arg.include.category).toBe(true);
+    expect(arg.include.variants.where).toEqual({ archived: false });
     expect(arg.include.variants.orderBy).toEqual({ sortOrder: "asc" });
     expect(arg.include.variants.include.images.orderBy).toEqual({ sortOrder: "asc" });
     expect(arg.include.variants.include.sizeStocks.orderBy).toEqual({ size: "asc" });

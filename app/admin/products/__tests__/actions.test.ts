@@ -172,7 +172,7 @@ describe("updateProduct", () => {
     // reconcileVariants never bulk-deletes ProductVariant rows (preserves identity
     // for OrderItem.variantId); an incoming variant with no id is newly created.
     expect(variantDeleteMany).not.toHaveBeenCalled();
-    expect(variantFindMany).toHaveBeenCalledWith({ where: { productId: "cat-white" }, select: { id: true } });
+    expect(variantFindMany).toHaveBeenCalledWith({ where: { productId: "cat-white", archived: false }, select: { id: true } });
     expect(variantCreate.mock.calls[0][0].data.productId).toBe("cat-white");
     expect(res).toEqual({ success: true, slug: "cat-white" });
   });
@@ -213,6 +213,28 @@ describe("updateProduct", () => {
     expect(res).toEqual({ success: true, slug: "cat-white" });
   });
 
+  it("reconciles: vacates every active variant's colorSlug/sku up front, before reassigning, to avoid immediate unique-constraint collisions on rename/swap/remove+re-add", async () => {
+    productFindUnique.mockResolvedValueOnce({ id: "cat-white" });
+    productUpdate.mockResolvedValueOnce({});
+    variantFindMany.mockResolvedValueOnce([{ id: "v-a" }, { id: "v-b" }]);
+
+    const res = await updateProduct("cat-white", {
+      ...NEW_INPUT,
+      variants: [
+        { ...NEW_INPUT.variants[0], id: "v-a", color: "Black", colorSlug: "black" },
+        { ...NEW_INPUT.variants[0], id: "v-b", color: "White", colorSlug: "white", sku: "OTHER-SKU" },
+      ],
+    });
+
+    // The vacate pass runs for every active existing variant, freeing colorSlug + sku,
+    // so the mock (which doesn't enforce Postgres' immediate unique checks) still
+    // demonstrates the collision-avoidance step the real DB depends on.
+    const vacateCalls = variantUpdate.mock.calls.filter((c) => /^tmp-/.test(c[0].data.colorSlug ?? ""));
+    expect(vacateCalls.map((c) => c[0].where.id).sort()).toEqual(["v-a", "v-b"]);
+    expect(vacateCalls.every((c) => c[0].data.sku === null)).toBe(true);
+    expect(res).toEqual({ success: true, slug: "cat-white" });
+  });
+
   it("reconciles: an existing variant absent from the incoming set is archived, not deleted", async () => {
     productFindUnique.mockResolvedValueOnce({ id: "cat-white" });
     productUpdate.mockResolvedValueOnce({});
@@ -249,7 +271,7 @@ describe("updateProduct rename", () => {
     // ON UPDATE CASCADE already moved existing variant rows to the new slug id;
     // reconcileVariants looks them up under newSlug and never bulk-deletes.
     expect(variantDeleteMany).not.toHaveBeenCalled();
-    expect(variantFindMany).toHaveBeenCalledWith({ where: { productId: "cat-black" }, select: { id: true } });
+    expect(variantFindMany).toHaveBeenCalledWith({ where: { productId: "cat-black", archived: false }, select: { id: true } });
     expect(variantCreate.mock.calls[0][0].data.productId).toBe("cat-black");
     expect(historyUpsert).toHaveBeenCalledWith({
       where: { oldSlug: "cat-white" },
