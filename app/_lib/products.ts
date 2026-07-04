@@ -2,7 +2,8 @@
 import { unstable_cache } from "next/cache";
 
 import { prisma } from "@/app/_lib/prisma";
-import type { Category, Prisma, Product, ProductImage, Review } from "@prisma/client";
+import type { Category, Prisma, Product, Review } from "@prisma/client";
+import { effectivePrice, effectiveOriginalPrice } from "@/app/_lib/variants";
 
 export type ProductView = {
   id: string;
@@ -125,8 +126,21 @@ export const getProductById = unstable_cache(
   { tags: ["catalog", "product"], revalidate: 300 }
 );
 
+export type VariantDetail = {
+  id: string;
+  color: string;
+  colorSlug: string;
+  swatchHex: string | null;
+  sku: string | null;
+  price: number;                       // effective
+  originalPrice: number | null;        // effective
+  detailImages: string[];              // sorted DETAIL urls
+  sizeStocks: { size: string; stock: number }[];
+};
+
 export type ProductDetail = {
-  product: Product & { category: Category; images: ProductImage[] };
+  product: Product & { category: Category };
+  variants: VariantDetail[];
   ratingAvg: number;
   ratingCount: number;
   related: ProductView[];
@@ -138,10 +152,29 @@ export const getProductDetail = unstable_cache(
       where: { id, archived: false },
       include: {
         category: true,
-        images: { orderBy: { sortOrder: "asc" } },
+        variants: {
+          where: { archived: false },
+          orderBy: { sortOrder: "asc" },
+          include: {
+            images: { where: { role: "DETAIL" }, orderBy: { sortOrder: "asc" } },
+            sizeStocks: { orderBy: { size: "asc" } },
+          },
+        },
       },
     });
-    if (!product) return null;
+    if (!product || product.variants.length === 0) return null;
+
+    const variants: VariantDetail[] = product.variants.map((v) => ({
+      id: v.id,
+      color: v.color,
+      colorSlug: v.colorSlug,
+      swatchHex: v.swatchHex,
+      sku: v.sku,
+      price: effectivePrice(v, product),
+      originalPrice: effectiveOriginalPrice(v, product),
+      detailImages: v.images.map((im) => im.url),
+      sizeStocks: v.sizeStocks.map((s) => ({ size: s.size, stock: s.stock })),
+    }));
 
     const [agg, relatedRows] = await Promise.all([
       prisma.review.aggregate({
@@ -160,13 +193,17 @@ export const getProductDetail = unstable_cache(
       }),
     ]);
 
-    const related = await attachAggregates(relatedRows);
+    // `product` still carries a variants relation; strip it from the returned
+    // shape so the type stays Product & { category }.
+    const { variants: _drop, ...productScalars } = product;
+    void _drop;
 
     return {
-      product,
+      product: productScalars,
+      variants,
       ratingAvg: agg._avg.rating ?? 0,
       ratingCount: agg._count._all,
-      related,
+      related: await attachAggregates(relatedRows),
     };
   },
   ["product-detail"],

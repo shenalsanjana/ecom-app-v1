@@ -109,20 +109,18 @@ export default async function ProductPage({
         <section className="mx-auto max-w-7xl px-4 pb-10 sm:px-6 lg:px-8">
           <div className="grid gap-8 lg:grid-cols-[1.6fr_1fr] lg:gap-12">
             <ImageGallery
-              images={detail.product.images}
+              variants={detail.variants.map((v) => ({ colorSlug: v.colorSlug, detailImages: v.detailImages }))}
+              defaultColorSlug={detail.variants[0].colorSlug}
               productName={detail.product.name}
               fallbackImage={detail.product.image}
             />
             <BuyBoxClient
               productId={detail.product.id}
               name={detail.product.name}
-              price={detail.product.price}
-              originalPrice={detail.product.originalPrice}
-              image={detail.product.image}
+              variants={detail.variants}
+              defaultColorSlug={detail.variants[0].colorSlug}
               ratingAvg={detail.ratingAvg}
               ratingCount={detail.ratingCount}
-              stock={detail.product.stock}
-              sizes={detail.product.sizes}
               shareUrl={absoluteUrl(`/products/${detail.product.id}`)}
             />
           </div>
