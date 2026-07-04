@@ -13,10 +13,9 @@ for (const file of [".env", ".env.local"]) {
 
 const prisma = new PrismaClient();
 
-// Resolve a product image path. Prefers real photos at
-// public/products/<id>/main.jpg + 1.jpg..4.jpg when present and falls back to
-// the demo SVG (main.svg) otherwise. Generate demos with:
-//   npx tsx scripts/generate-demo-images.ts
+// Join path segments under public/. Used by resolveVariantImages() below to
+// probe for real product photos before falling back to a demo SVG. Generate
+// demos with: npx tsx scripts/generate-demo-images.ts
 function publicPath(...parts: string[]): string {
   return join(process.cwd(), "public", ...parts);
 }
