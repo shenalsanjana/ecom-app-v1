@@ -1,7 +1,7 @@
 // app/(auth)/reset-password/page.tsx
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { use, useActionState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,17 +12,15 @@ import { resetPasswordAction, type ActionState } from "@/app/(auth)/actions";
 type Props = { searchParams: Promise<{ token?: string }> };
 
 export default function ResetPasswordPage({ searchParams }: Props) {
+  // Read the token DURING render (like login/signup do). This is a dynamic API,
+  // so it opts the route into dynamic rendering and the real `?token=…` is
+  // available. Reading it only in a useEffect (the previous approach) let the
+  // page be statically prerendered, so `searchParams` resolved empty in
+  // production and every reset link rendered "invalid or has expired".
+  const { token } = use(searchParams);
   const [state, formAction, pending] = useActionState<ActionState, FormData>(resetPasswordAction, null);
-  const [token, setToken] = useState<string | undefined>();
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => {
-    searchParams.then((p) => {
-      setToken(p.token);
-      setLoaded(true);
-    });
-  }, [searchParams]);
 
-  if (loaded && !token) {
+  if (!token) {
     return (
       <main className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center px-4 py-10">
         <Alert variant="destructive">
@@ -44,7 +42,7 @@ export default function ResetPasswordPage({ searchParams }: Props) {
         </Alert>
       ) : null}
       <form action={formAction} className="space-y-4">
-        <input type="hidden" name="token" value={token ?? ""} />
+        <input type="hidden" name="token" value={token} />
         <div className="space-y-2">
           <Label htmlFor="newPassword">New password</Label>
           <Input id="newPassword" name="newPassword" type="password" required autoComplete="new-password" />
@@ -53,7 +51,7 @@ export default function ResetPasswordPage({ searchParams }: Props) {
           <Label htmlFor="confirmPassword">Confirm new password</Label>
           <Input id="confirmPassword" name="confirmPassword" type="password" required autoComplete="new-password" />
         </div>
-        <Button type="submit" className="w-full" disabled={pending || !token}>
+        <Button type="submit" className="w-full" disabled={pending}>
           {pending ? "Saving…" : "Save new password"}
         </Button>
       </form>
