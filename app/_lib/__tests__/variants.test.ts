@@ -8,6 +8,7 @@ import {
   stockForSize,
   resolveDefaultVariant,
   pickVariantBySlug,
+  sortSizeStocks,
 } from "../variants";
 
 describe("effectivePrice", () => {
@@ -72,5 +73,23 @@ describe("pickVariantBySlug", () => {
     expect(pickVariantBySlug(vs, "ivory")?.colorSlug).toBe("ivory");
     expect(pickVariantBySlug(vs, "green")).toBeUndefined();
     expect(pickVariantBySlug(vs, undefined)).toBeUndefined();
+  });
+});
+
+describe("sortSizeStocks", () => {
+  it("orders known sizes S,M,L,XL regardless of input order", () => {
+    const out = sortSizeStocks([
+      { size: "XL", stock: 1 }, { size: "S", stock: 2 }, { size: "L", stock: 3 }, { size: "M", stock: 4 },
+    ]);
+    expect(out.map((c) => c.size)).toEqual(["S", "M", "L", "XL"]);
+  });
+  it("places unknown sizes after known ones, keeping their input order", () => {
+    const out = sortSizeStocks([
+      { size: "Custom-A", stock: 1 }, { size: "M", stock: 2 }, { size: "Custom-B", stock: 3 },
+    ]);
+    expect(out.map((c) => c.size)).toEqual(["M", "Custom-A", "Custom-B"]);
+  });
+  it("is case-insensitive on known sizes", () => {
+    expect(sortSizeStocks([{ size: "xl", stock: 1 }, { size: "s", stock: 2 }]).map((c) => c.size)).toEqual(["s", "xl"]);
   });
 });

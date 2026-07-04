@@ -3,7 +3,7 @@ import { unstable_cache } from "next/cache";
 
 import { prisma } from "@/app/_lib/prisma";
 import type { Category, Prisma, Product, Review } from "@prisma/client";
-import { effectivePrice, effectiveOriginalPrice } from "@/app/_lib/variants";
+import { effectivePrice, effectiveOriginalPrice, sortSizeStocks } from "@/app/_lib/variants";
 
 export type ProductView = {
   id: string;
@@ -173,7 +173,7 @@ export const getProductDetail = unstable_cache(
       price: effectivePrice(v, product),
       originalPrice: effectiveOriginalPrice(v, product),
       detailImages: v.images.map((im) => im.url),
-      sizeStocks: v.sizeStocks.map((s) => ({ size: s.size, stock: s.stock })),
+      sizeStocks: sortSizeStocks(v.sizeStocks).map((s) => ({ size: s.size, stock: s.stock })),
     }));
 
     const [agg, relatedRows] = await Promise.all([
