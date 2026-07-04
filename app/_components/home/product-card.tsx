@@ -71,6 +71,8 @@ export function ProductCard({
         <div className="flex w-full flex-col gap-2">
           <AddToCartDialog
             productId={id}
+            variantId={variant.id}
+            color={variant.color}
             name={name}
             price={price}
             image={image}

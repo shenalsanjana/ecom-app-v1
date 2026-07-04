@@ -9,6 +9,8 @@ import { useState } from "react";
 
 type Props = {
   productId: string;
+  variantId: string;
+  color?: string | null;
   name: string;
   price: number;
   image: string;
@@ -22,6 +24,8 @@ type Props = {
 
 export function AddToCartButton({
   productId,
+  variantId,
+  color = null,
   name,
   price,
   image,
@@ -35,7 +39,7 @@ export function AddToCartButton({
   const router = useRouter();
   const [added, setAdded] = useState(false);
 
-  const cartKey = size ? `${productId}::${size}` : productId;
+  const cartKey = size ? `${variantId}::${size}` : variantId;
   const existing = items.find((i) => i.key === cartKey);
   const inCart = existing ? existing.quantity : 0;
 
@@ -44,7 +48,7 @@ export function AddToCartButton({
 
   function handleAdd() {
     if (sizeMissing) return;
-    addItem({ productId, name, price, image, size }, quantity);
+    addItem({ productId, variantId, color, name, price, image, size }, quantity);
     trackAddToCart(productId, price * quantity, quantity);
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);

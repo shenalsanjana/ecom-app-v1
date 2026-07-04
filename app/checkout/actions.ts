@@ -3,6 +3,7 @@
 
 import { z } from "zod";
 import { LkPhoneSchema } from "@/app/_lib/validation";
+import { validateCartItems, type VariantStock } from "@/app/_lib/order-validation";
 import { auth } from "@/app/_lib/auth";
 import {
   sendOrderConfirmationEmail,
@@ -35,6 +36,8 @@ const PAYMENT_METHOD_DISPLAY: Record<PaymentMethod, string> = {
 
 const ItemInputSchema = z.object({
   productId: z.string().min(1),
+  variantId: z.string().min(1),
+  color: z.string().nullable().optional(),
   name: z.string().min(1),
   price: z.number().nonnegative(),
   quantity: z.number().int().positive(),
@@ -181,42 +184,20 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
   const total = subtotal + shippingCost;
   const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-  // Validate: products that offer sizes must be checked out with a size, and
-  // that size must be one the product actually offers (size is required at
-  // add-to-cart). Products with no sizes need no size.
-  const productIds = Array.from(new Set(items.map((i) => i.productId)));
-  const dbProducts = await prisma.product.findMany({
-    where: { id: { in: productIds } },
-    select: { id: true, sizes: true },
+  // Validate each line against its variant's size-stock grid.
+  const variantIds = Array.from(new Set(items.map((i) => i.variantId)));
+  const dbVariants = await prisma.productVariant.findMany({
+    where: { id: { in: variantIds } },
+    select: { id: true, sku: true, sizeStocks: { select: { size: true, stock: true } } },
   });
-  const sizesByProduct = new Map(dbProducts.map((p) => [p.id, p.sizes]));
-
-  for (const item of items) {
-    const sizesCsv = sizesByProduct.get(item.productId);
-    if (!sizesCsv) {
-      return { success: false, error: `Unknown product "${item.name}"` };
-    }
-    const allowedSizes = sizesCsv
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    // Size is required at add-to-cart for sized products, so it's required at
-    // checkout too: reject a missing size, and reject one that isn't offered.
-    if (allowedSizes.length > 0) {
-      if (!item.size) {
-        return {
-          success: false,
-          error: `Please select a size for "${item.name}"`,
-        };
-      }
-      if (!allowedSizes.includes(item.size)) {
-        return {
-          success: false,
-          error: `Size "${item.size}" is not available for "${item.name}"`,
-        };
-      }
-    }
-  }
+  const variantMap = new Map<string, VariantStock & { sku: string | null }>(
+    dbVariants.map((v) => [v.id, v]),
+  );
+  const validationError = validateCartItems(
+    items.map((item) => ({ ...item, size: item.size ?? null })),
+    variantMap,
+  );
+  if (validationError) return { success: false, error: validationError };
 
   // Create the order + decrement stock atomically. Stock decrement uses a
   // conditional update so concurrent purchases of the last unit can't oversell.
@@ -224,8 +205,9 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
   try {
     created = await prisma.$transaction(async (tx) => {
       for (const item of items) {
-        const result = await tx.product.updateMany({
-          where: { id: item.productId, stock: { gte: item.quantity } },
+        if (!item.size) continue; // sizeless variants carry no per-size stock
+        const result = await tx.variantSizeStock.updateMany({
+          where: { variantId: item.variantId, size: item.size, stock: { gte: item.quantity } },
           data: { stock: { decrement: item.quantity } },
         });
         if (result.count === 0) {
@@ -260,6 +242,9 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
           items: {
             create: items.map((item) => ({
               productId: item.productId,
+              variantId: item.variantId,
+              color: item.color ?? null,
+              sku: variantMap.get(item.variantId)?.sku ?? null,
               name: item.name,
               size: item.size ?? null,
               price: item.price,

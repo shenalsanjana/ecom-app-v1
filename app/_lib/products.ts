@@ -6,6 +6,7 @@ import type { Category, Prisma, Product, Review } from "@prisma/client";
 import { effectivePrice, effectiveOriginalPrice, availableSizes, sortSizeStocks } from "@/app/_lib/variants";
 
 export type ProductCardVariant = {
+  id: string;
   colorSlug: string;
   color: string;
   swatchHex: string | null;
@@ -39,7 +40,7 @@ const cardSelect = {
     where: { archived: false },
     orderBy: { sortOrder: "asc" },
     select: {
-      colorSlug: true, color: true, swatchHex: true, price: true, originalPrice: true, sortOrder: true,
+      id: true, colorSlug: true, color: true, swatchHex: true, price: true, originalPrice: true, sortOrder: true,
       images: { where: { role: "CARD" }, orderBy: { sortOrder: "asc" }, select: { url: true } },
       sizeStocks: { select: { size: true, stock: true } },
     },
@@ -71,6 +72,7 @@ async function attachAggregates(rows: ProductRow[]): Promise<ProductView[]> {
   return usable.map((p) => {
     const agg = map.get(p.id) ?? { avg: 0, count: 0 };
     const variants: ProductCardVariant[] = p.variants.map((v) => ({
+      id: v.id,
       colorSlug: v.colorSlug,
       color: v.color,
       swatchHex: v.swatchHex,

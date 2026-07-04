@@ -221,6 +221,8 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
       const result = await processOrder({
         items: items.map((it) => ({
           productId: it.productId,
+          variantId: it.variantId,
+          color: it.color,
           name: it.name,
           price: it.price,
           quantity: it.quantity,

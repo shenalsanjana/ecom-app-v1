@@ -133,9 +133,7 @@ export function BuyBoxClient({
   function handleBuyNow() {
     if (sizeList.length > 0 && !selectedSize) { nudgeSizePicker(); return; }
     setIsBuying(true);
-    // Phase 6 adds variantId/color to this payload; for now it uses the current
-    // color-blind cart signature (productId::size).
-    addItem({ productId, name, price, image, size: selectedSize || null }, quantity);
+    addItem({ productId, variantId: selectedVariant.id, color: selectedVariant.color, name, price, image, size: selectedSize || null }, quantity);
     trackAddToCart(productId, price * quantity, quantity);
     router.push("/checkout");
   }
@@ -225,6 +223,8 @@ export function BuyBoxClient({
         <div className="flex items-stretch gap-2">
           <AddToCartButton
             productId={productId}
+            variantId={selectedVariant.id}
+            color={selectedVariant.color}
             name={name}
             price={price}
             image={image}
@@ -270,7 +270,7 @@ export function BuyBoxClient({
               {sizeList.length > 0 && !selectedSize ? (
                 <Button className="h-12 px-6" onClick={nudgeSizePicker}>Add to cart</Button>
               ) : (
-                <AddToCartButton productId={productId} name={name} price={price} image={image} size={selectedSize || null} quantity={quantity} requiresSize={true} disabled={!inStock} className="h-12 px-6" />
+                <AddToCartButton productId={productId} variantId={selectedVariant.id} color={selectedVariant.color} name={name} price={price} image={image} size={selectedSize || null} quantity={quantity} requiresSize={true} disabled={!inStock} className="h-12 px-6" />
               )}
             </div>
           </div>
