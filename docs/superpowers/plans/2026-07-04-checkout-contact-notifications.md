@@ -663,11 +663,10 @@ git commit -m "refactor(payments): send prepaid confirmation via notification di
 
 In `app/checkout/__tests__/actions.test.ts`:
 
-1. Add the dispatcher mock (after the mailer mock, ~line 47) and import:
+1. Add the dispatcher mock (after the mailer mock, ~line 47) and import it. Mirror how this file already mocks the mailer — an inline `vi.fn` in the mock factory (do NOT also declare a `vi.hoisted` const of the same name; a hoisted const **plus** a same-named import is a duplicate identifier and won't parse), then import the name and assert via `vi.mocked(...)`:
 
 ```ts
-const { notifyOrderConfirmed } = vi.hoisted(() => ({ notifyOrderConfirmed: vi.fn(async () => undefined) }));
-vi.mock("@/app/_lib/order-notifications", () => ({ notifyOrderConfirmed }));
+vi.mock("@/app/_lib/order-notifications", () => ({ notifyOrderConfirmed: vi.fn(async () => undefined) }));
 ```
 
 ```ts
