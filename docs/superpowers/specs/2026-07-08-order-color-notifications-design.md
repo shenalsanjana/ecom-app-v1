@@ -79,9 +79,9 @@ Cat Tee (Color White, Size M) x2 - Rs 4,000
 
 ### Confirmation SMS
 
-The confirmation SMS will retain the order reference and total, and add a compact item summary. The summary contains at most the first two order lines as `Product (Color)` pairs. If more lines exist, it appends `+N more`.
+The confirmation SMS will retain the order reference and total, and add a compact item summary. The summary contains at most the first two order lines as `Product (Color)` pairs. If more order lines exist, it appends `+N more`; `N` counts omitted lines, not units.
 
-Product names may be shortened to fit the configured one-segment character budget, but a present color must not be truncated away. The formatter calculates the available summary budget from the fixed message text so the full message remains within one SMS segment.
+The application will enforce a 160-character body budget. The formatter calculates the summary's available space after composing the order reference, total, and fixed message text. It shortens product names before color names and preserves each included color whenever it fits. This bounds ordinary GSM-7 messages to one segment; Notify.lk may segment non-GSM product or color text differently.
 
 Example:
 
@@ -109,7 +109,7 @@ This applies to dispatch-booking notifications, pending-payment notifications, a
 
 ### Orders list
 
-The existing Items column will replace its count-only value with up to two compact lines in the form `Product · Color ×quantity`. When an order has more than two lines, the cell appends `+N more`. The order query will select the item fields needed for this summary rather than only `_count.items`.
+The existing Items column will replace its count-only value with up to two compact lines in the form `Product - Color xquantity`. When an order has more than two lines, the cell appends `+N more`. The order query will select the item fields needed for this summary rather than only `_count.items`.
 
 This keeps the table scannable while letting staff identify common single- and two-line orders without opening each order.
 
@@ -161,4 +161,4 @@ Any environment-only failure, such as an unavailable local PostgreSQL database d
 
 ## Success criteria
 
-The change is complete when a newly placed order always stores the selected database variant's color, customer confirmation messages identify the ordered colors, and admins can see the saved color and full item details in itemized emails, the compact orders list, and the full order page without breaking legacy orders.
+The change is complete when a newly placed order always stores the selected database variant's color, the confirmation email identifies every ordered color, the bounded SMS identifies the colors in its compact item summary, and admins can see the saved color and full item details in itemized emails, the compact orders list, and the full order page without breaking legacy orders.
