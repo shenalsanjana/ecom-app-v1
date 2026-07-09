@@ -1,8 +1,8 @@
 ## 1. Checkout snapshots
 
-- [ ] 1.1 Update `app/checkout/__tests__/actions.test.ts` to expose the product variant mock and cover database color/SKU snapshots, prepaid notification details, and product/variant mismatch rejection.
-- [ ] 1.2 Update `app/checkout/actions.ts` to select variant `productId`, `color`, and `sku`, reject mismatched product/variant pairs before writes, and create order items from the database variant snapshot.
-- [ ] 1.3 Run `npm.cmd run test -- app/checkout/__tests__/actions.test.ts` and confirm the checkout snapshot tests pass.
+- [x] 1.1 Update `app/checkout/__tests__/actions.test.ts` to expose the product variant mock and cover database color/SKU snapshots, prepaid notification details, and product/variant mismatch rejection.
+- [x] 1.2 Update `app/checkout/actions.ts` to select variant `productId`, `color`, and `sku`, reject mismatched product/variant pairs before writes, and create order items from the database variant snapshot.
+- [x] 1.3 Run `npm.cmd run test -- app/checkout/__tests__/actions.test.ts` and confirm the checkout snapshot tests pass.
 
 ## 2. Order detail propagation
 

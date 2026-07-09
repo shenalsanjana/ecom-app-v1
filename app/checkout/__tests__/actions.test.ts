@@ -1,7 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { txOrderCreate } = vi.hoisted(() => ({
+const { txOrderCreate, productVariantFindMany } = vi.hoisted(() => ({
   txOrderCreate: vi.fn(async () => ({})),
+  productVariantFindMany: vi.fn(async () => [
+    {
+      id: "V1",
+      productId: "P1",
+      color: "White",
+      sku: "DB-TEE-WHT-M",
+      sizeStocks: [
+        { size: "S", stock: 5 },
+        { size: "M", stock: 5 },
+        { size: "L", stock: 5 },
+      ],
+    },
+  ]),
 }));
 
 vi.mock("@/app/_lib/auth", () => ({
@@ -15,17 +28,7 @@ vi.mock("@/app/_lib/prisma", () => ({
       update: vi.fn(async () => ({})),
     },
     productVariant: {
-      findMany: vi.fn(async () => [
-        {
-          id: "V1",
-          sku: null,
-          sizeStocks: [
-            { size: "S", stock: 5 },
-            { size: "M", stock: 5 },
-            { size: "L", stock: 5 },
-          ],
-        },
-      ]),
+      findMany: productVariantFindMany,
     },
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
       fn({
@@ -83,6 +86,20 @@ beforeEach(() => {
   vi.mocked(sendPendingPrepaidNotificationEmail).mockClear();
   vi.mocked(notifyOrderConfirmed).mockClear();
   txOrderCreate.mockClear();
+  productVariantFindMany.mockReset();
+  productVariantFindMany.mockResolvedValue([
+    {
+      id: "V1",
+      productId: "P1",
+      color: "White",
+      sku: "DB-TEE-WHT-M",
+      sizeStocks: [
+        { size: "S", stock: 5 },
+        { size: "M", stock: 5 },
+        { size: "L", stock: 5 },
+      ],
+    },
+  ]);
 });
 
 describe("processOrder — COD path", () => {
@@ -261,5 +278,74 @@ describe("processOrder — contact details", () => {
         data: expect.objectContaining({ alternatePhone: "0712223333" }),
       }),
     );
+  });
+});
+
+describe("processOrder — variant color snapshots", () => {
+  it("stores database variant color/SKU instead of the cart color and passes them to COD notifications", async () => {
+    await processOrder({
+      ...baseInput,
+      items: [
+        {
+          ...baseInput.items[0],
+          color: "Spoofed Client Color",
+        },
+      ],
+      paymentMethod: "COD",
+    });
+
+    const createArg = txOrderCreate.mock.calls[0][0] as {
+      data: { items: { create: Array<Record<string, unknown>> } };
+    };
+    expect(createArg.data.items.create[0]).toMatchObject({
+      color: "White",
+      sku: "DB-TEE-WHT-M",
+    });
+
+    const notifyArg = vi.mocked(notifyOrderConfirmed).mock.calls[0][0];
+    expect(notifyArg.items[0]).toMatchObject({
+      color: "White",
+      sku: "DB-TEE-WHT-M",
+    });
+  });
+
+  it("passes database variant color/SKU to pending prepaid admin notification details", async () => {
+    await processOrder({
+      ...baseInput,
+      items: [
+        {
+          ...baseInput.items[0],
+          color: "Spoofed Client Color",
+        },
+      ],
+      paymentMethod: "PAYHERE",
+    });
+
+    const pendingArg = vi.mocked(sendPendingPrepaidNotificationEmail).mock.calls[0][0];
+    expect(pendingArg.order.items[0]).toMatchObject({
+      color: "White",
+      sku: "DB-TEE-WHT-M",
+    });
+  });
+
+  it("rejects a cart line when the selected variant belongs to another product", async () => {
+    productVariantFindMany.mockResolvedValueOnce([
+      {
+        id: "V1",
+        productId: "OTHER-PRODUCT",
+        color: "White",
+        sku: "DB-TEE-WHT-M",
+        sizeStocks: [{ size: "M", stock: 5 }],
+      },
+    ]);
+
+    const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/variant/i);
+    }
+    expect(txOrderCreate).not.toHaveBeenCalled();
+    expect(notifyOrderConfirmed).not.toHaveBeenCalled();
   });
 });

@@ -189,11 +189,24 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
   const variantIds = Array.from(new Set(items.map((i) => i.variantId)));
   const dbVariants = await prisma.productVariant.findMany({
     where: { id: { in: variantIds } },
-    select: { id: true, sku: true, sizeStocks: { select: { size: true, stock: true } } },
+    select: {
+      id: true,
+      productId: true,
+      color: true,
+      sku: true,
+      sizeStocks: { select: { size: true, stock: true } },
+    },
   });
-  const variantMap = new Map<string, VariantStock & { sku: string | null }>(
-    dbVariants.map((v) => [v.id, v]),
-  );
+  const variantMap = new Map<
+    string,
+    VariantStock & { productId: string; color: string; sku: string | null }
+  >(dbVariants.map((v) => [v.id, v]));
+  for (const item of items) {
+    const variant = variantMap.get(item.variantId);
+    if (variant && variant.productId !== item.productId) {
+      return { success: false, error: `Selected variant does not belong to "${item.name}"` };
+    }
+  }
   const validationError = validateCartItems(
     items.map((item) => ({ ...item, size: item.size ?? null })),
     variantMap,
@@ -245,7 +258,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
             create: items.map((item) => ({
               productId: item.productId,
               variantId: item.variantId,
-              color: item.color ?? null,
+              color: variantMap.get(item.variantId)?.color ?? null,
               sku: variantMap.get(item.variantId)?.sku ?? null,
               name: item.name,
               size: item.size ?? null,
@@ -262,12 +275,17 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
   }
 
   // ── Branch on payment method (Option B2) ────────────────────────────
-  const orderItems: OrderItem[] = items.map((item) => ({
-    name: item.name,
-    size: item.size ?? null,
-    price: item.price,
-    quantity: item.quantity,
-  }));
+  const orderItems: OrderItem[] = items.map((item) => {
+    const variant = variantMap.get(item.variantId);
+    return {
+      name: item.name,
+      color: variant?.color ?? null,
+      sku: variant?.sku ?? null,
+      size: item.size ?? null,
+      price: item.price,
+      quantity: item.quantity,
+    };
+  });
 
   const orderDetailsForEmail: OrderDetails = {
     orderId,
