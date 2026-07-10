@@ -27,10 +27,17 @@ describe("review-content", () => {
   });
 
   it("each category template mentions its own keyword", () => {
+    // Hyphenated slugs won't appear as a literal substring in natural review
+    // text, so map them to the keyword we actually expect to see instead.
+    const KEYWORD_OVERRIDES: Record<string, string> = {
+      "just-grow": "grow",
+      "sea-lovers": "sea",
+    };
     for (const [slug, templates] of Object.entries(CATEGORY_REVIEWS)) {
+      const keyword = KEYWORD_OVERRIDES[slug] ?? slug;
       for (const t of templates) {
         const text = `${t.title ?? ""} ${t.body}`.toLowerCase();
-        expect(text).toContain(slug); // cat / dino / stitch
+        expect(text).toContain(keyword); // cat / dino / stitch / ...
       }
     }
   });
