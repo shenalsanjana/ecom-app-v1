@@ -235,7 +235,7 @@ export async function editItems(orderId: string, changes: ItemChange[]): Promise
 
 const ORDER_INCLUDE = {
   user: { select: { name: true, email: true } },
-  items: { select: { name: true, size: true, price: true, quantity: true } },
+  items: { select: { name: true, color: true, sku: true, size: true, price: true, quantity: true } },
 } satisfies Prisma.OrderInclude;
 
 type DbOrderForDetails = Prisma.OrderGetPayload<{ include: typeof ORDER_INCLUDE }>;
@@ -247,7 +247,14 @@ function toOrderDetails(order: DbOrderForDetails): OrderDetails {
     customerEmail: order.user?.email ?? order.guestEmail ?? "",
     customerPhone: order.customerPhone,
     alternatePhone: order.alternatePhone,
-    items: order.items.map((i) => ({ name: i.name, size: i.size, price: i.price, quantity: i.quantity })),
+    items: order.items.map((i) => ({
+      name: i.name,
+      color: i.color,
+      sku: i.sku,
+      size: i.size,
+      price: i.price,
+      quantity: i.quantity,
+    })),
     subtotal: order.subtotal,
     shipping: order.shippingCost,
     total: order.total,
@@ -270,7 +277,17 @@ function toOrderDetails(order: DbOrderForDetails): OrderDetails {
 // toOrderDetails (which ignores it).
 const CANCEL_INCLUDE = {
   user: { select: { name: true, email: true } },
-  items: { select: { variantId: true, name: true, size: true, price: true, quantity: true } },
+  items: {
+    select: {
+      variantId: true,
+      name: true,
+      color: true,
+      sku: true,
+      size: true,
+      price: true,
+      quantity: true,
+    },
+  },
 } satisfies Prisma.OrderInclude;
 
 /** Customer cancellation notifications (email when present + SMS). Never throws. */

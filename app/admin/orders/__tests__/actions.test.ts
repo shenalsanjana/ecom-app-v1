@@ -324,7 +324,7 @@ const FULL_ORDER = {
   paymentMethod: "KOKO", paymentMethodDisplay: "Koko", paymentStatus: "PAID",
   webNumber: "DB-1", rbNumber: null, notes: null, trackingCode: null,
   user: null,
-  items: [{ name: "Dress", size: "M", price: 6500, quantity: 1 }],
+  items: [{ name: "Dress", color: "Black", sku: "DB-DRESS-BLK-M", size: "M", price: 6500, quantity: 1 }],
 };
 
 describe("bookCourier", () => {
@@ -448,6 +448,10 @@ describe("resendConfirmationEmail", () => {
     const arg = sendOrderConfirmationEmail.mock.calls[0][0];
     expect(arg.trackingCode).toBe("CF-88213");
     expect(arg.customerEmail).toBe("n@x.test");
+    expect(arg.items[0]).toMatchObject({
+      color: "Black",
+      sku: "DB-DRESS-BLK-M",
+    });
     expect(res).toEqual({ success: true, warning: undefined });
   });
 

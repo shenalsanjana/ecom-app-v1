@@ -87,6 +87,8 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string): Prom
 
 export type OrderItem = {
   name: string;
+  color?: string | null;
+  sku?: string | null;
   size?: string | null;
   price: number;
   quantity: number;

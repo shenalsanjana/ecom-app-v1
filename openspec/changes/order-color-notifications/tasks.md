@@ -6,10 +6,10 @@
 
 ## 2. Order detail propagation
 
-- [ ] 2.1 Extend the shared `OrderItem` notification type in `app/_lib/mailer.ts` with nullable `color` and `sku`.
-- [ ] 2.2 Update `app/_lib/payments/__tests__/order-finalization.test.ts` and `app/admin/orders/__tests__/actions.test.ts` to assert color/SKU survive prepaid finalization and admin resend details.
-- [ ] 2.3 Update `app/_lib/payments/order-finalization.ts` and `app/admin/orders/actions.ts` so every `OrderDetails.items` mapper preserves `color` and `sku`.
-- [ ] 2.4 Run `npm.cmd run test -- app/_lib/payments/__tests__/order-finalization.test.ts app/admin/orders/__tests__/actions.test.ts` and confirm mapper propagation tests pass.
+- [x] 2.1 Extend the shared `OrderItem` notification type in `app/_lib/mailer.ts` with nullable `color` and `sku`.
+- [x] 2.2 Update `app/_lib/payments/__tests__/order-finalization.test.ts` and `app/admin/orders/__tests__/actions.test.ts` to assert color/SKU survive prepaid finalization and admin resend details.
+- [x] 2.3 Update `app/_lib/payments/order-finalization.ts` and `app/admin/orders/actions.ts` so every `OrderDetails.items` mapper preserves `color` and `sku`.
+- [x] 2.4 Run `npm.cmd run test -- app/_lib/payments/__tests__/order-finalization.test.ts app/admin/orders/__tests__/actions.test.ts` and confirm mapper propagation tests pass.
 
 ## 3. Customer confirmation notifications
 
