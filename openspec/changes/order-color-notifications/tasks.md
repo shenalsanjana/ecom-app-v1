@@ -13,12 +13,12 @@
 
 ## 3. Customer confirmation notifications
 
-- [ ] 3.1 Add `app/_lib/__tests__/mailer-confirmation.test.ts` to verify customer confirmation email includes color, includes size, omits SKU, and handles legacy missing color/size.
-- [ ] 3.2 Update `app/_lib/__tests__/order-sms.test.ts` and `app/_lib/__tests__/order-notifications.test.ts` to verify SMS item summaries and notification dispatcher item passing.
-- [ ] 3.3 Update `app/_lib/mailer.ts` customer confirmation formatting to render color/size attributes while omitting SKU.
-- [ ] 3.4 Update `app/_lib/sms.ts` to support bounded confirmation item summaries with at most two product-color pairs and `+N more`.
-- [ ] 3.5 Update `app/_lib/order-notifications.ts` to pass `{ name, color }` items into `sendOrderConfirmationSms` without changing idempotency.
-- [ ] 3.6 Run `npm.cmd run test -- app/_lib/__tests__/mailer-confirmation.test.ts app/_lib/__tests__/order-sms.test.ts app/_lib/__tests__/order-notifications.test.ts` and confirm customer notification tests pass.
+- [x] 3.1 Add `app/_lib/__tests__/mailer-confirmation.test.ts` to verify customer confirmation email includes color, includes size, omits SKU, and handles legacy missing color/size.
+- [x] 3.2 Update `app/_lib/__tests__/order-sms.test.ts` and `app/_lib/__tests__/order-notifications.test.ts` to verify SMS item summaries and notification dispatcher item passing.
+- [x] 3.3 Update `app/_lib/mailer.ts` customer confirmation formatting to render color/size attributes while omitting SKU.
+- [x] 3.4 Update `app/_lib/sms.ts` to support bounded confirmation item summaries with at most two product-color pairs and `+N more`.
+- [x] 3.5 Update `app/_lib/order-notifications.ts` to pass `{ name, color }` items into `sendOrderConfirmationSms` without changing idempotency.
+- [x] 3.6 Run `npm.cmd run test -- app/_lib/__tests__/mailer-confirmation.test.ts app/_lib/__tests__/order-sms.test.ts app/_lib/__tests__/order-notifications.test.ts` and confirm customer notification tests pass.
 
 ## 4. Admin email item snapshots
 

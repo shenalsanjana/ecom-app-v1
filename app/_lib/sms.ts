@@ -48,11 +48,47 @@ export function sendAccountExistsSms(phone: string): Promise<void> {
   );
 }
 
-export function sendOrderConfirmationSms(p: { phone: string; ref: string; total: number }): Promise<void> {
-  return sendSms(
-    p.phone,
-    `Dressing Bear: order ${p.ref} confirmed. Total Rs ${Math.round(p.total)}. We'll text you when it ships.`,
-  );
+export type SmsOrderItem = { name: string; color?: string | null };
+const CONFIRMATION_SMS_LIMIT = 160;
+
+function cleanPart(value: string | null | undefined): string {
+  return value?.replace(/\s+/g, " ").trim() ?? "";
+}
+
+function shorten(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value;
+  if (maxLength <= 1) return value.slice(0, Math.max(0, maxLength));
+  return `${value.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
+function formatSmsItem(item: SmsOrderItem, maxLength: number): string {
+  const name = cleanPart(item.name);
+  const color = cleanPart(item.color);
+  if (!color) return shorten(name, maxLength);
+  const colorSuffix = ` (${color})`;
+  if (colorSuffix.length >= maxLength) return shorten(`${name}${colorSuffix}`, maxLength);
+  return `${shorten(name, maxLength - colorSuffix.length)}${colorSuffix}`;
+}
+
+export function buildConfirmationItemSummary(items: SmsOrderItem[] | undefined, maxLength: number): string {
+  const visible = (items ?? []).slice(0, 2);
+  if (visible.length === 0 || maxLength <= 0) return "";
+  const omitted = Math.max(0, (items?.length ?? 0) - visible.length);
+  const moreText = omitted > 0 ? ` +${omitted} more` : "";
+  const separatorLength = visible.length > 1 ? 2 : 0;
+  const availableForItems = Math.max(0, maxLength - moreText.length - separatorLength);
+  const perItemBudget = Math.max(1, Math.floor(availableForItems / visible.length));
+  const summary = `${visible.map((item) => formatSmsItem(item, perItemBudget)).join(", ")}${moreText}`;
+  return shorten(summary, maxLength);
+}
+
+export function sendOrderConfirmationSms(p: { phone: string; ref: string; total: number; items?: SmsOrderItem[] }): Promise<void> {
+  const prefix = `Dressing Bear: order ${p.ref} confirmed.`;
+  const suffix = `Total Rs ${Math.round(p.total)}. We'll text you when it ships.`;
+  const fixed = `${prefix} ${suffix}`;
+  const summary = buildConfirmationItemSummary(p.items, Math.max(0, CONFIRMATION_SMS_LIMIT - fixed.length - 2));
+  const message = summary ? `${prefix} ${summary}. ${suffix}` : fixed;
+  return sendSms(p.phone, shorten(message, CONFIRMATION_SMS_LIMIT));
 }
 
 export function sendOrderDispatchedSms(p: {

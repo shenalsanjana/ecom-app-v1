@@ -119,31 +119,37 @@ export type OrderDetails = {
   paymentStatus?: string | null;  // e.g. "Awaiting payment", "Paid", "Cash on delivery"
 };
 
+function customerItemAttributes(item: OrderItem): string[] {
+  return [item.color ? `Color ${item.color}` : null, item.size ? `Size ${item.size}` : null]
+    .filter((value): value is string => Boolean(value));
+}
+
+function formatCustomerItemText(item: OrderItem): string {
+  const attrs = customerItemAttributes(item);
+  const attrText = attrs.length > 0 ? ` (${attrs.join(", ")})` : "";
+  return `${item.name}${attrText} x${item.quantity} - ${formatPrice(item.price * item.quantity)}`;
+}
+
+function formatCustomerItemHtml(item: OrderItem): string {
+  const attrs = customerItemAttributes(item);
+  const attrHtml = attrs.length > 0
+    ? ` <span style="color:#666;font-size:0.9em;">(${attrs.map(escapeHtml).join(", ")})</span>`
+    : "";
+  return `
+        <div class="item">
+          <span>${escapeHtml(item.name)}${attrHtml} &times; ${item.quantity}</span>
+          <span>${formatPrice(item.price * item.quantity)}</span>
+        </div>`;
+}
+
 export async function sendOrderConfirmationEmail(order: OrderDetails): Promise<void> {
   const transport = getTransport();
   const brandEmail = requireBrandEmail();
   const from = requireFrom();
   const paymentDisplay = order.paymentMethodDisplay ?? "Cash on Delivery";
 
-  const itemsListText = order.items
-    .map((item) => {
-      const sizeStr = item.size ? ` (Size ${item.size})` : "";
-      return `${item.name}${sizeStr} x${item.quantity} - ${formatPrice(item.price * item.quantity)}`;
-    })
-    .join("\n");
-
-  const itemsListHtml = order.items
-    .map(
-      (item) => {
-        const sizeStr = item.size ? ` <span style="color:#666;font-size:0.9em;">(Size ${escapeHtml(item.size)})</span>` : "";
-        return `
-        <div class="item">
-          <span>${escapeHtml(item.name)}${sizeStr} × ${item.quantity}</span>
-          <span>${formatPrice(item.price * item.quantity)}</span>
-        </div>`;
-      },
-    )
-    .join("");
+  const itemsListText = order.items.map(formatCustomerItemText).join("\n");
+  const itemsListHtml = order.items.map(formatCustomerItemHtml).join("");
 
   const paymentLabel = paymentStatusLabel(order.paymentStatus);
 
