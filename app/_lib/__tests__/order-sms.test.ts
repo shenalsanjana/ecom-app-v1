@@ -3,6 +3,7 @@ import {
   sendOrderConfirmationSms,
   sendOrderDispatchedSms,
   sendOrderCancelledSms,
+  buildConfirmationItemSummary,
   __setTestSmsSender,
 } from "../sms";
 
@@ -15,6 +16,27 @@ beforeEach(() => {
 });
 
 describe("order SMS templates", () => {
+  it("summary: gives color suffixes priority over colorless product-name expansion", () => {
+    const summary = buildConfirmationItemSummary([
+      { name: "Colorless Long Product Name", color: null },
+      { name: "Premium Shirt", color: "Iridescent Purple" },
+    ], 24);
+
+    expect(summary.length).toBeLessThanOrEqual(24);
+    expect(summary).toBe("C, P (Iridescent Purple)");
+  });
+
+  it("summary: never exceeds a tiny budget or emits partial item structure", () => {
+    const summary = buildConfirmationItemSummary([
+      { name: "Cat Tee", color: "Red" },
+      { name: "Dino Tee", color: "Blue" },
+      { name: "Bear Cap", color: "Green" },
+    ], 5);
+
+    expect(summary.length).toBeLessThanOrEqual(5);
+    expect(summary).not.toMatch(/[()]/);
+  });
+
   it("confirmation: strips +, names the ref and total, promises a shipping text", async () => {
     await sendOrderConfirmationSms({ phone: "+94771234567", ref: "WEB1001", total: 2440, items: [{ name: "Cat Tee", color: "White" }] });
     expect(captured[0].to).toBe("94771234567");
