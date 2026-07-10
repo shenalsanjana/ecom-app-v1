@@ -333,10 +333,30 @@ Submitted from ${BRAND_NAME} website
 
 // ── Dispatch / admin emails ─────────────────────────────────────────────
 
+const EM_DASH = "—";
+
+/** Admin views show every attribute (unlike customer copy, which omits missing ones);
+ *  a missing color/size/SKU renders as an em dash so staff see a stable column, not a gap. */
+function adminItemAttributes(item: OrderItem): string {
+  return `Color: ${item.color ?? EM_DASH}, Size: ${item.size ?? EM_DASH}, SKU: ${item.sku ?? EM_DASH}`;
+}
+
+function formatAdminItemText(item: OrderItem): string {
+  const lineTotal = formatPrice(item.price * item.quantity);
+  return `  • ${item.name} — ${adminItemAttributes(item)} — ${item.quantity} × ${formatPrice(item.price)} = ${lineTotal}`;
+}
+
 function formatItemsList(items: OrderItem[]): string {
+  return items.map(formatAdminItemText).join("\n");
+}
+
+function formatAdminItemsHtml(items: OrderItem[]): string {
   return items
-    .map((it) => `  • ${it.name}${it.size ? ` (${it.size})` : ""} × ${it.quantity}`)
-    .join("\n");
+    .map((it) => {
+      const lineTotal = formatPrice(it.price * it.quantity);
+      return `<li>${escapeHtml(it.name)} — ${escapeHtml(adminItemAttributes(it))} — ${it.quantity} &times; ${formatPrice(it.price)} = ${lineTotal}</li>`;
+    })
+    .join("");
 }
 
 /** Amount the courier should collect at delivery. Zero for any prepaid method;
@@ -432,9 +452,7 @@ PRINT THE WAYBILL:
 Dressing Bear · automated dispatch
 `.trim();
 
-  const itemsHtml = order.items
-    .map((it) => `<li>${escapeHtml(it.name)}${it.size ? ` (${escapeHtml(it.size)})` : ""} &times; ${it.quantity}</li>`)
-    .join("");
+  const itemsHtml = formatAdminItemsHtml(order.items);
 
   const html = `
 <!DOCTYPE html>
@@ -702,9 +720,7 @@ the courier booking will need to be triggered.
 Dressing Bear · automated dispatch
 `.trim();
 
-  const itemsHtml = order.items
-    .map((it) => `<li>${escapeHtml(it.name)}${it.size ? ` (${escapeHtml(it.size)})` : ""} &times; ${it.quantity}</li>`)
-    .join("");
+  const itemsHtml = formatAdminItemsHtml(order.items);
 
   const html = `
 <!DOCTYPE html>
@@ -846,9 +862,7 @@ ${nextAction}
 Dressing Bear · automated alert
 `.trim();
 
-  const itemsHtml = order.items
-    .map((it) => `<li>${escapeHtml(it.name)}${it.size ? ` (${escapeHtml(it.size)})` : ""} &times; ${it.quantity}</li>`)
-    .join("");
+  const itemsHtml = formatAdminItemsHtml(order.items);
 
   const html = `
 <!DOCTYPE html>

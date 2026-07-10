@@ -22,9 +22,9 @@
 
 ## 4. Admin email item snapshots
 
-- [ ] 4.1 Update `app/_lib/__tests__/mailer-dispatch.test.ts` to assert dispatch, pending-payment, and failure-alert emails show product, color, size, SKU, quantity, unit price, and line total.
-- [ ] 4.2 Update `app/_lib/mailer.ts` admin item text/HTML helpers so dispatch, pending-payment, and failure-alert emails share full snapshot formatting.
-- [ ] 4.3 Run `npm.cmd run test -- app/_lib/__tests__/mailer-dispatch.test.ts` and confirm admin email tests pass.
+- [x] 4.1 Update `app/_lib/__tests__/mailer-dispatch.test.ts` to assert dispatch, pending-payment, and failure-alert emails show product, color, size, SKU, quantity, unit price, and line total.
+- [x] 4.2 Update `app/_lib/mailer.ts` admin item text/HTML helpers so dispatch, pending-payment, and failure-alert emails share full snapshot formatting.
+- [x] 4.3 Run `npm.cmd run test -- app/_lib/__tests__/mailer-dispatch.test.ts` and confirm admin email tests pass.
 
 ## 5. Admin order views
 

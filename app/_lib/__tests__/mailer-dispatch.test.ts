@@ -7,6 +7,7 @@ import {
   __setTestTransport,
 } from "../mailer";
 import type { OrderDetails } from "../mailer";
+import { formatPrice } from "../format";
 
 const originalEnv = { ...process.env };
 
@@ -16,8 +17,11 @@ const SAMPLE_ORDER: OrderDetails = {
   customerName: "Jane Doe",
   customerEmail: "jane@example.com",
   customerPhone: "+94770000000",
-  items: [{ name: "Cotton T-Shirt", size: "M", price: 1200, quantity: 2 }],
-  subtotal: 2400,
+  items: [
+    { name: "Cotton T-Shirt", color: "White", sku: "DB-TEE-WHT-M", size: "M", price: 1200, quantity: 2 },
+    { name: "Bear Cap", color: null, sku: null, size: null, price: 800, quantity: 1 },
+  ],
+  subtotal: 3200,
   shipping: 40,
   total: 2440,
   shippingAddress: {
@@ -233,5 +237,51 @@ describe("sendAdminFailureAlertEmail", () => {
     });
     const opts = sendMailSpy.mock.calls[0][0];
     expect(opts.subject).toContain("[URGENT]");
+  });
+});
+
+describe("admin itemized snapshots", () => {
+  const unitPrice = formatPrice(1200);
+  const lineTotal = formatPrice(2400);
+
+  it("dispatch email shows product, color, size, SKU, quantity, unit price, and line total", async () => {
+    await sendDispatchNotificationEmail({ order: SAMPLE_ORDER, waybillNumber: "RA03870247" });
+    const opts = sendMailSpy.mock.calls[0][0];
+    for (const value of ["Cotton T-Shirt", "White", "M", "DB-TEE-WHT-M", "2", unitPrice, lineTotal]) {
+      expect(opts.text).toContain(value);
+      expect(opts.html).toContain(value.replace(/&/g, "&amp;"));
+    }
+    // Legacy item with no color/size/SKU renders an em dash placeholder, not blank/broken punctuation.
+    expect(opts.text).toMatch(/Bear Cap.*—.*—.*—/);
+    expect(opts.html).toMatch(/Bear Cap.*—.*—.*—/);
+  });
+
+  it("pending-payment email shows product, color, size, SKU, quantity, unit price, and line total", async () => {
+    await sendPendingPrepaidNotificationEmail({
+      order: { ...SAMPLE_ORDER, paymentMethod: "PAYHERE", paymentMethodDisplay: "PayHere" },
+    });
+    const opts = sendMailSpy.mock.calls[0][0];
+    for (const value of ["Cotton T-Shirt", "White", "M", "DB-TEE-WHT-M", "2", unitPrice, lineTotal]) {
+      expect(opts.text).toContain(value);
+      expect(opts.html).toContain(value.replace(/&/g, "&amp;"));
+    }
+    expect(opts.text).toMatch(/Bear Cap.*—.*—.*—/);
+    expect(opts.html).toMatch(/Bear Cap.*—.*—.*—/);
+  });
+
+  it("failure-alert email shows product, color, size, SKU, quantity, unit price, and line total", async () => {
+    await sendAdminFailureAlertEmail({
+      orderId: "ORD-TEST-1",
+      step: "curfox-create",
+      reason: "HTTP 422 — address too long",
+      order: SAMPLE_ORDER,
+    });
+    const opts = sendMailSpy.mock.calls[0][0];
+    for (const value of ["Cotton T-Shirt", "White", "M", "DB-TEE-WHT-M", "2", unitPrice, lineTotal]) {
+      expect(opts.text).toContain(value);
+      expect(opts.html).toContain(value.replace(/&/g, "&amp;"));
+    }
+    expect(opts.text).toMatch(/Bear Cap.*—.*—.*—/);
+    expect(opts.html).toMatch(/Bear Cap.*—.*—.*—/);
   });
 });

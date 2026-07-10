@@ -294,9 +294,11 @@ describe("processOrder — variant color snapshots", () => {
       paymentMethod: "COD",
     });
 
-    const createArg = txOrderCreate.mock.calls[0][0] as {
-      data: { items: { create: Array<Record<string, unknown>> } };
-    };
+    const createCalls = vi.mocked(txOrderCreate).mock.calls as unknown as [
+      [{ data: { items: { create: Array<Record<string, unknown>> } } }],
+      ...[{ data: { items: { create: Array<Record<string, unknown>> } } }][],
+    ];
+    const createArg = createCalls[0][0];
     expect(createArg.data.items.create[0]).toMatchObject({
       color: "White",
       sku: "DB-TEE-WHT-M",
