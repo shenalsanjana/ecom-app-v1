@@ -33,6 +33,20 @@ describe("listOrders", () => {
     expect(arg.orderBy).toEqual({ createdAt: "desc" });
     expect(res).toEqual({ rows: [{ id: "o1" }], total: 42 });
   });
+
+  it("selects only the first two item snapshots plus the total item count", async () => {
+    findMany.mockResolvedValueOnce([{ id: "o1" }]);
+    count.mockResolvedValueOnce(1);
+
+    await listOrders({ page: 1, pageSize: 25 });
+
+    const arg = findMany.mock.calls[0][0];
+    expect(arg.include.items).toEqual({
+      take: 2,
+      select: { name: true, color: true, quantity: true },
+    });
+    expect(arg.include._count).toEqual({ select: { items: true } });
+  });
 });
 
 describe("getOrderDetail", () => {

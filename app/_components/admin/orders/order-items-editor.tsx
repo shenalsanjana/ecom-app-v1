@@ -5,7 +5,10 @@ import { editItems } from "@/app/admin/orders/actions";
 import { formatPrice } from "@/app/_lib/format";
 import type { ItemChange } from "@/app/_lib/admin-orders";
 
-type Item = { id: string; name: string; size: string | null; price: number; quantity: number; sizes: string };
+type Item = {
+  id: string; name: string; size: string | null; color: string | null; sku: string | null;
+  price: number; quantity: number; sizes: string;
+};
 
 export function OrderItemsEditor({ orderId, items, editable }: { orderId: string; items: Item[]; editable: boolean }) {
   const [editing, setEditing] = useState(false);
@@ -38,7 +41,10 @@ export function OrderItemsEditor({ orderId, items, editable }: { orderId: string
       <ul className="mt-2 space-y-2">
         {draft.map((it) => (
           <li key={it.id} className="flex items-center justify-between gap-2">
-            <span>{it.name}{it.size ? ` · ${it.size}` : ""}</span>
+            <span>
+              <span className="block">{it.name}{it.size ? ` · ${it.size}` : ""}</span>
+              <span className="block text-xs text-muted-foreground">Color: {it.color ?? "—"} · SKU: {it.sku ?? "—"}</span>
+            </span>
             {editing ? (
               <span className="flex items-center gap-2">
                 {(() => {

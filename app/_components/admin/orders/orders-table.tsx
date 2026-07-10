@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { formatPrice } from "@/app/_lib/format";
 import { paymentStatusLabel } from "@/app/_lib/order-status";
+import { formatOrderItemLine, omittedItemCount } from "@/app/_lib/order-item-display";
 import { Badge } from "@/components/ui/badge";
 import { RowActions } from "./row-actions";
 import { bulkConfirm, bulkDispatch, bulkCancel, bulkDelete, type BulkResult } from "@/app/admin/orders/actions";
@@ -14,6 +15,7 @@ type Row = {
   guestName: string | null; user: { name: string | null } | null;
   total: number; paymentMethod: string; paymentStatus: string | null; status: string;
   courierBookedAt: Date | null; courierWaybillNumber: string | null;
+  items: { name: string; color: string | null; quantity: number }[];
   _count: { items: number };
 };
 
@@ -145,7 +147,12 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
               </td>
               <td className="p-2">{o.createdAt.toLocaleString("en-GB", { timeZone: "Asia/Colombo" })}</td>
               <td className="p-2">{o.user?.name ?? o.guestName ?? "—"}<br /><span className="text-muted-foreground">{o.customerPhone}</span></td>
-              <td className="p-2">{o._count.items}</td>
+              <td className="p-2">
+                {o.items.map((it, i) => <div key={i}>{formatOrderItemLine(it)}</div>)}
+                {omittedItemCount(o._count.items, o.items.length) > 0 && (
+                  <span className="text-muted-foreground">+{omittedItemCount(o._count.items, o.items.length)} more</span>
+                )}
+              </td>
               <td className="p-2 font-medium">{formatPrice(o.total)}</td>
               <td className="p-2">
                 <Badge variant="secondary">{paymentStatusLabel(o.paymentStatus) ?? "—"}</Badge>

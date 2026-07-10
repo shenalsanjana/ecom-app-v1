@@ -28,11 +28,11 @@
 
 ## 5. Admin order views
 
-- [ ] 5.1 Add `app/_lib/order-item-display.ts` and `app/_lib/__tests__/order-item-display.test.ts` for compact admin item summaries and em-dash fallback formatting.
-- [ ] 5.2 Update `app/_lib/__tests__/admin-orders-queries.test.ts` and `app/_lib/admin-orders.ts` so `listOrders()` selects the first two item snapshots plus `_count.items`.
-- [ ] 5.3 Update `app/_components/admin/orders/orders-table.tsx` to render compact `Product - Color xquantity` item lines and `+N more`.
-- [ ] 5.4 Update `app/_components/admin/orders/order-items-editor.tsx` and `app/admin/orders/[id]/page.tsx` to show each item's saved color and SKU as read-only detail fields.
-- [ ] 5.5 Run `npm.cmd run test -- app/_lib/__tests__/order-item-display.test.ts app/_lib/__tests__/admin-orders-queries.test.ts` and confirm admin view tests pass.
+- [x] 5.1 Add `app/_lib/order-item-display.ts` and `app/_lib/__tests__/order-item-display.test.ts` for compact admin item summaries and em-dash fallback formatting.
+- [x] 5.2 Update `app/_lib/__tests__/admin-orders-queries.test.ts` and `app/_lib/admin-orders.ts` so `listOrders()` selects the first two item snapshots plus `_count.items`.
+- [x] 5.3 Update `app/_components/admin/orders/orders-table.tsx` to render compact `Product - Color xquantity` item lines and `+N more`.
+- [x] 5.4 Update `app/_components/admin/orders/order-items-editor.tsx` and `app/admin/orders/[id]/page.tsx` to show each item's saved color and SKU as read-only detail fields.
+- [x] 5.5 Run `npm.cmd run test -- app/_lib/__tests__/order-item-display.test.ts app/_lib/__tests__/admin-orders-queries.test.ts` and confirm admin view tests pass.
 
 ## 6. Validation
 
