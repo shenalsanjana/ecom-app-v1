@@ -62,6 +62,26 @@ describe("order SMS templates", () => {
     expect(captured[0].message).not.toContain("Extremely Long Premium Cotton Cat T-Shirt");
   });
 
+  it("confirmation: keeps long-color summaries structurally valid and preserves omitted count", async () => {
+    await sendOrderConfirmationSms({
+      phone: "+94771234567",
+      ref: "WEB1001",
+      total: 987654,
+      items: [
+        { name: "Premium Cat Shirt", color: "Extraordinary Limited Edition Iridescent Purple and Gold" },
+        { name: "Premium Dino Shirt", color: "Exclusive Hand Dyed Fluorescent Turquoise and Magenta" },
+        { name: "Bear Cap", color: "Blue" },
+      ],
+    });
+
+    const message = captured[0].message;
+    expect(message.length).toBeLessThanOrEqual(160);
+    expect(message).toContain("+1 more");
+    expect(message.match(/\(/g)?.length).toBe(2);
+    expect(message.match(/\)/g)?.length).toBe(2);
+    expect(message).toMatch(/confirmed\. [^()]+ \([^()]+\), [^()]+ \([^()]+\) \+1 more\./);
+  });
+
   it("dispatched: names the ref, carrier, and tracking code", async () => {
     await sendOrderDispatchedSms({
       phone: "+94771234567",

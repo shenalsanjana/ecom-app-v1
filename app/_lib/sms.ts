@@ -65,14 +65,33 @@ function formatSmsItem(item: SmsOrderItem, maxLength: number): string {
   const name = cleanPart(item.name);
   const color = cleanPart(item.color);
   if (!color) return shorten(name, maxLength);
+  if (maxLength < 4) return shorten(name, maxLength);
   const colorSuffix = ` (${color})`;
-  if (colorSuffix.length >= maxLength) return shorten(`${name}${colorSuffix}`, maxLength);
+  if (colorSuffix.length >= maxLength) {
+    const colorBudget = Math.max(0, maxLength - 4);
+    return `${shorten(name, 1)} (${shorten(color, colorBudget)})`;
+  }
   return `${shorten(name, maxLength - colorSuffix.length)}${colorSuffix}`;
 }
 
-function minimumSmsItemLength(item: SmsOrderItem): number {
-  const color = cleanPart(item.color);
-  return 1 + (color ? ` (${color})`.length : 0);
+function allocateSmsItemBudgets(items: SmsOrderItem[], available: number): number[] {
+  const colors = items.map((item) => cleanPart(item.color));
+  const budgets = colors.map((color) => color ? 4 : 1);
+  let remaining = Math.max(0, available - budgets.reduce((sum, budget) => sum + budget, 0));
+
+  while (remaining > 0 && colors.some((color, index) => color.length > budgets[index] - 4)) {
+    for (let index = 0; index < colors.length && remaining > 0; index += 1) {
+      if (colors[index].length > budgets[index] - 4) {
+        budgets[index] += 1;
+        remaining -= 1;
+      }
+    }
+  }
+  for (let index = 0; remaining > 0; index = (index + 1) % budgets.length) {
+    budgets[index] += 1;
+    remaining -= 1;
+  }
+  return budgets;
 }
 
 export function buildConfirmationItemSummary(items: SmsOrderItem[] | undefined, maxLength: number): string {
@@ -82,14 +101,8 @@ export function buildConfirmationItemSummary(items: SmsOrderItem[] | undefined, 
   const moreText = omitted > 0 ? ` +${omitted} more` : "";
   const separatorLength = visible.length > 1 ? 2 : 0;
   const availableForItems = Math.max(0, maxLength - moreText.length - separatorLength);
-  const minimumLengths = visible.map(minimumSmsItemLength);
-  const remaining = Math.max(0, availableForItems - minimumLengths.reduce((sum, length) => sum + length, 0));
-  const extraPerItem = Math.floor(remaining / visible.length);
-  const remainder = remaining % visible.length;
-  const summary = `${visible.map((item, index) =>
-    formatSmsItem(item, minimumLengths[index] + extraPerItem + (index < remainder ? 1 : 0)),
-  ).join(", ")}${moreText}`;
-  return shorten(summary, maxLength);
+  const budgets = allocateSmsItemBudgets(visible, availableForItems);
+  return `${visible.map((item, index) => formatSmsItem(item, budgets[index])).join(", ")}${moreText}`;
 }
 
 export function sendOrderConfirmationSms(p: { phone: string; ref: string; total: number; items?: SmsOrderItem[] }): Promise<void> {
