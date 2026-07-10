@@ -70,6 +70,11 @@ function formatSmsItem(item: SmsOrderItem, maxLength: number): string {
   return `${shorten(name, maxLength - colorSuffix.length)}${colorSuffix}`;
 }
 
+function minimumSmsItemLength(item: SmsOrderItem): number {
+  const color = cleanPart(item.color);
+  return 1 + (color ? ` (${color})`.length : 0);
+}
+
 export function buildConfirmationItemSummary(items: SmsOrderItem[] | undefined, maxLength: number): string {
   const visible = (items ?? []).slice(0, 2);
   if (visible.length === 0 || maxLength <= 0) return "";
@@ -77,8 +82,13 @@ export function buildConfirmationItemSummary(items: SmsOrderItem[] | undefined, 
   const moreText = omitted > 0 ? ` +${omitted} more` : "";
   const separatorLength = visible.length > 1 ? 2 : 0;
   const availableForItems = Math.max(0, maxLength - moreText.length - separatorLength);
-  const perItemBudget = Math.max(1, Math.floor(availableForItems / visible.length));
-  const summary = `${visible.map((item) => formatSmsItem(item, perItemBudget)).join(", ")}${moreText}`;
+  const minimumLengths = visible.map(minimumSmsItemLength);
+  const remaining = Math.max(0, availableForItems - minimumLengths.reduce((sum, length) => sum + length, 0));
+  const extraPerItem = Math.floor(remaining / visible.length);
+  const remainder = remaining % visible.length;
+  const summary = `${visible.map((item, index) =>
+    formatSmsItem(item, minimumLengths[index] + extraPerItem + (index < remainder ? 1 : 0)),
+  ).join(", ")}${moreText}`;
   return shorten(summary, maxLength);
 }
 
