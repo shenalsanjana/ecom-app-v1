@@ -15,7 +15,7 @@ type Row = {
   guestName: string | null; user: { name: string | null } | null;
   total: number; paymentMethod: string; paymentStatus: string | null; status: string;
   courierBookedAt: Date | null; courierWaybillNumber: string | null;
-  items: { name: string; color: string | null; quantity: number }[];
+  items: { id: string; name: string; color: string | null; quantity: number }[];
   _count: { items: number };
 };
 
@@ -148,7 +148,7 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
               <td className="p-2">{o.createdAt.toLocaleString("en-GB", { timeZone: "Asia/Colombo" })}</td>
               <td className="p-2">{o.user?.name ?? o.guestName ?? "—"}<br /><span className="text-muted-foreground">{o.customerPhone}</span></td>
               <td className="p-2">
-                {o.items.map((it, i) => <div key={i}>{formatOrderItemLine(it)}</div>)}
+                {o.items.map((it) => <div key={it.id}>{formatOrderItemLine(it)}</div>)}
                 {omittedItemCount(o._count.items, o.items.length) > 0 && (
                   <span className="text-muted-foreground">+{omittedItemCount(o._count.items, o.items.length)} more</span>
                 )}

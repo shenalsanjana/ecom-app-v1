@@ -43,7 +43,8 @@ describe("listOrders", () => {
     const arg = findMany.mock.calls[0][0];
     expect(arg.include.items).toEqual({
       take: 2,
-      select: { name: true, color: true, quantity: true },
+      orderBy: { id: "asc" },
+      select: { id: true, name: true, color: true, quantity: true },
     });
     expect(arg.include._count).toEqual({ select: { items: true } });
   });

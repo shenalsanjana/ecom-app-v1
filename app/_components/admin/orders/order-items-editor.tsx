@@ -64,7 +64,7 @@ export function OrderItemsEditor({ orderId, items, editable }: { orderId: string
                 <button className="text-destructive" onClick={() => setDraft((d) => d.filter((x) => x.id !== it.id))}>✕</button>
               </span>
             ) : (
-              <span>×{it.quantity} · {formatPrice(it.price * it.quantity)}</span>
+              <span>×{it.quantity} @ {formatPrice(it.price)} = {formatPrice(it.price * it.quantity)}</span>
             )}
           </li>
         ))}
