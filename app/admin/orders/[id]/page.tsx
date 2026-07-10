@@ -37,7 +37,8 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
               orderId={order.id}
               editable={canEditOrder}
               items={order.items.map((i) => ({
-                id: i.id, name: i.name, size: i.size, price: i.price, quantity: i.quantity,
+                id: i.id, name: i.name, size: i.size, color: i.color, sku: i.sku,
+                price: i.price, quantity: i.quantity,
                 sizes: i.variant ? i.variant.sizeStocks.map((s) => s.size).join(",") : (i.size ?? ""),
               }))}
             />

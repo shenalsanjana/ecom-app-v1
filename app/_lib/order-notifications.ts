@@ -79,6 +79,7 @@ export async function notifyOrderConfirmed(details: OrderDetails): Promise<void>
         phone: details.customerPhone,
         ref: orderReference(details),
         total: details.total,
+        items: details.items.map((item) => ({ name: item.name, color: item.color ?? null })),
       });
     } catch (err) {
       await releaseOnce(orderId, { confirmationSmsSentAt: null });

@@ -18,6 +18,8 @@ function paidDetails(order: OrderWithUser, items: OrderItem[]): OrderDetails {
     alternatePhone: order.alternatePhone,
     items: items.map((it) => ({
       name: it.name,
+      color: it.color,
+      sku: it.sku,
       size: it.size,
       price: it.price,
       quantity: it.quantity,

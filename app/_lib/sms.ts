@@ -48,11 +48,112 @@ export function sendAccountExistsSms(phone: string): Promise<void> {
   );
 }
 
-export function sendOrderConfirmationSms(p: { phone: string; ref: string; total: number }): Promise<void> {
-  return sendSms(
-    p.phone,
-    `Dressing Bear: order ${p.ref} confirmed. Total Rs ${Math.round(p.total)}. We'll text you when it ships.`,
-  );
+export type SmsOrderItem = { name: string; color?: string | null };
+const CONFIRMATION_SMS_LIMIT = 160;
+
+function cleanPart(value: string | null | undefined): string {
+  return value?.replace(/\s+/g, " ").trim() ?? "";
+}
+
+function shorten(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value;
+  if (maxLength <= 1) return value.slice(0, Math.max(0, maxLength));
+  return `${value.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
+/** Minimum budget that can hold a balanced "X (Y)" structure: 1 name char + " (" + 1 color char + ")". */
+const MIN_COLOR_STRUCTURE_LENGTH = 5;
+
+function formatSmsItem(item: SmsOrderItem, maxLength: number): string {
+  const name = cleanPart(item.name);
+  const color = cleanPart(item.color);
+  if (maxLength <= 0) return "";
+  if (!color || maxLength < MIN_COLOR_STRUCTURE_LENGTH) return shorten(name, maxLength);
+  const fullLength = name.length + color.length + 3; // "name (color)"
+  if (fullLength <= maxLength) return `${name} (${color})`;
+  const colorBudget = maxLength - 4; // reserve exactly 1 name char + " (" + ")"
+  if (color.length <= colorBudget) {
+    return `${shorten(name, maxLength - color.length - 3)} (${color})`;
+  }
+  return `${shorten(name, 1)} (${shorten(color, colorBudget)})`;
+}
+
+/**
+ * Distributes `available` characters across items in priority order: every item first gets 1
+ * char (so it appears at all), then colored items grow toward "1-char name + full color" before
+ * any item's name grows further. This keeps colors intact ahead of colorless product-name
+ * expansion, and never assigns more than `available` total so callers stay within their budget.
+ */
+function allocateSmsItemBudgets(items: SmsOrderItem[], available: number): number[] {
+  const n = items.length;
+  const budgets = items.map(() => 0);
+  if (n === 0 || available <= 0) return budgets;
+
+  const colors = items.map((item) => cleanPart(item.color));
+  const names = items.map((item) => cleanPart(item.name));
+
+  let remaining = available;
+  for (let index = 0; index < n && remaining > 0; index += 1) {
+    budgets[index] = 1;
+    remaining -= 1;
+  }
+
+  let progress = true;
+  while (remaining > 0 && progress) {
+    progress = false;
+    for (let index = 0; index < n && remaining > 0; index += 1) {
+      if (!colors[index]) continue;
+      const minNeed = colors[index].length + 4;
+      if (budgets[index] < minNeed) {
+        budgets[index] += 1;
+        remaining -= 1;
+        progress = true;
+      }
+    }
+  }
+
+  progress = true;
+  while (remaining > 0 && progress) {
+    progress = false;
+    for (let index = 0; index < n && remaining > 0; index += 1) {
+      const maxNeed = colors[index] ? names[index].length + colors[index].length + 3 : names[index].length;
+      if (budgets[index] < maxNeed) {
+        budgets[index] += 1;
+        remaining -= 1;
+        progress = true;
+      }
+    }
+  }
+  return budgets;
+}
+
+export function buildConfirmationItemSummary(items: SmsOrderItem[] | undefined, maxLength: number): string {
+  const visible = (items ?? []).slice(0, 2);
+  if (visible.length === 0 || maxLength <= 0) return "";
+  const omitted = Math.max(0, (items?.length ?? 0) - visible.length);
+  const moreText = omitted > 0 ? ` +${omitted} more` : "";
+  const separatorLength = visible.length > 1 ? 2 : 0;
+
+  let effectiveMoreText = moreText;
+  let availableForItems = maxLength - effectiveMoreText.length - separatorLength;
+  if (effectiveMoreText && availableForItems < visible.length) {
+    effectiveMoreText = "";
+    availableForItems = maxLength - separatorLength;
+  }
+  availableForItems = Math.max(0, availableForItems);
+
+  const budgets = allocateSmsItemBudgets(visible, availableForItems);
+  const formatted = visible.map((item, index) => formatSmsItem(item, budgets[index])).filter(Boolean);
+  return `${formatted.join(", ")}${effectiveMoreText}`;
+}
+
+export function sendOrderConfirmationSms(p: { phone: string; ref: string; total: number; items?: SmsOrderItem[] }): Promise<void> {
+  const prefix = `Dressing Bear: order ${p.ref} confirmed.`;
+  const suffix = `Total Rs ${Math.round(p.total)}. We'll text you when it ships.`;
+  const fixed = `${prefix} ${suffix}`;
+  const summary = buildConfirmationItemSummary(p.items, Math.max(0, CONFIRMATION_SMS_LIMIT - fixed.length - 2));
+  const message = summary ? `${prefix} ${summary}. ${suffix}` : fixed;
+  return sendSms(p.phone, shorten(message, CONFIRMATION_SMS_LIMIT));
 }
 
 export function sendOrderDispatchedSms(p: {

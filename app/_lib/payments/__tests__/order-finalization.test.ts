@@ -69,7 +69,17 @@ const ORDER = {
   emailSent: false,
 };
 
-const ITEMS = [{ variantId: "V1", name: "Tee", size: "M", price: 1000, quantity: 2 }];
+const ITEMS = [
+  {
+    variantId: "V1",
+    color: "White",
+    sku: "DB-TEE-WHT-M",
+    name: "Tee",
+    size: "M",
+    price: 1000,
+    quantity: 2,
+  },
+];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -89,6 +99,10 @@ describe("order finalization", () => {
       data: { paymentStatus: "PAID" },
     });
     expect(notifyOrderConfirmed).toHaveBeenCalledOnce();
+    expect(notifyOrderConfirmed.mock.calls[0][0].items[0]).toMatchObject({
+      color: "White",
+      sku: "DB-TEE-WHT-M",
+    });
   });
 
   it("marks failed, cancels order, and restores stock once", async () => {

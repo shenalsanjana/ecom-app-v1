@@ -38,7 +38,7 @@ const withEmail: OrderDetails = {
   customerName: "Jane",
   customerEmail: "jane@example.com",
   customerPhone: "+94771234567",
-  items: [{ name: "Tee", size: "M", price: 1000, quantity: 1 }],
+  items: [{ name: "Tee", color: "White", sku: "DB-TEE-WHT-M", size: "M", price: 1000, quantity: 1 }],
   subtotal: 1000,
   shipping: 0,
   total: 1000,
@@ -62,6 +62,7 @@ describe("notifyOrderConfirmed", () => {
       phone: "+94771234567",
       ref: "WEB1001",
       total: 1000,
+      items: [{ name: "Tee", color: "White" }],
     });
   });
 

@@ -87,6 +87,8 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string): Prom
 
 export type OrderItem = {
   name: string;
+  color?: string | null;
+  sku?: string | null;
   size?: string | null;
   price: number;
   quantity: number;
@@ -117,31 +119,37 @@ export type OrderDetails = {
   paymentStatus?: string | null;  // e.g. "Awaiting payment", "Paid", "Cash on delivery"
 };
 
+function customerItemAttributes(item: OrderItem): string[] {
+  return [item.color ? `Color ${item.color}` : null, item.size ? `Size ${item.size}` : null]
+    .filter((value): value is string => Boolean(value));
+}
+
+function formatCustomerItemText(item: OrderItem): string {
+  const attrs = customerItemAttributes(item);
+  const attrText = attrs.length > 0 ? ` (${attrs.join(", ")})` : "";
+  return `${item.name}${attrText} x${item.quantity} - ${formatPrice(item.price * item.quantity)}`;
+}
+
+function formatCustomerItemHtml(item: OrderItem): string {
+  const attrs = customerItemAttributes(item);
+  const attrHtml = attrs.length > 0
+    ? ` <span style="color:#666;font-size:0.9em;">(${attrs.map(escapeHtml).join(", ")})</span>`
+    : "";
+  return `
+        <div class="item">
+          <span>${escapeHtml(item.name)}${attrHtml} &times; ${item.quantity}</span>
+          <span>${formatPrice(item.price * item.quantity)}</span>
+        </div>`;
+}
+
 export async function sendOrderConfirmationEmail(order: OrderDetails): Promise<void> {
   const transport = getTransport();
   const brandEmail = requireBrandEmail();
   const from = requireFrom();
   const paymentDisplay = order.paymentMethodDisplay ?? "Cash on Delivery";
 
-  const itemsListText = order.items
-    .map((item) => {
-      const sizeStr = item.size ? ` (Size ${item.size})` : "";
-      return `${item.name}${sizeStr} x${item.quantity} - ${formatPrice(item.price * item.quantity)}`;
-    })
-    .join("\n");
-
-  const itemsListHtml = order.items
-    .map(
-      (item) => {
-        const sizeStr = item.size ? ` <span style="color:#666;font-size:0.9em;">(Size ${escapeHtml(item.size)})</span>` : "";
-        return `
-        <div class="item">
-          <span>${escapeHtml(item.name)}${sizeStr} × ${item.quantity}</span>
-          <span>${formatPrice(item.price * item.quantity)}</span>
-        </div>`;
-      },
-    )
-    .join("");
+  const itemsListText = order.items.map(formatCustomerItemText).join("\n");
+  const itemsListHtml = order.items.map(formatCustomerItemHtml).join("");
 
   const paymentLabel = paymentStatusLabel(order.paymentStatus);
 
@@ -325,10 +333,30 @@ Submitted from ${BRAND_NAME} website
 
 // ── Dispatch / admin emails ─────────────────────────────────────────────
 
+const EM_DASH = "—";
+
+/** Admin views show every attribute (unlike customer copy, which omits missing ones);
+ *  a missing color/size/SKU renders as an em dash so staff see a stable column, not a gap. */
+function adminItemAttributes(item: OrderItem): string {
+  return `Color: ${item.color ?? EM_DASH}, Size: ${item.size ?? EM_DASH}, SKU: ${item.sku ?? EM_DASH}`;
+}
+
+function formatAdminItemText(item: OrderItem): string {
+  const lineTotal = formatPrice(item.price * item.quantity);
+  return `  • ${item.name} — ${adminItemAttributes(item)} — ${item.quantity} × ${formatPrice(item.price)} = ${lineTotal}`;
+}
+
 function formatItemsList(items: OrderItem[]): string {
+  return items.map(formatAdminItemText).join("\n");
+}
+
+function formatAdminItemsHtml(items: OrderItem[]): string {
   return items
-    .map((it) => `  • ${it.name}${it.size ? ` (${it.size})` : ""} × ${it.quantity}`)
-    .join("\n");
+    .map((it) => {
+      const lineTotal = formatPrice(it.price * it.quantity);
+      return `<li>${escapeHtml(it.name)} — ${escapeHtml(adminItemAttributes(it))} — ${it.quantity} &times; ${formatPrice(it.price)} = ${lineTotal}</li>`;
+    })
+    .join("");
 }
 
 /** Amount the courier should collect at delivery. Zero for any prepaid method;
@@ -424,9 +452,7 @@ PRINT THE WAYBILL:
 Dressing Bear · automated dispatch
 `.trim();
 
-  const itemsHtml = order.items
-    .map((it) => `<li>${escapeHtml(it.name)}${it.size ? ` (${escapeHtml(it.size)})` : ""} &times; ${it.quantity}</li>`)
-    .join("");
+  const itemsHtml = formatAdminItemsHtml(order.items);
 
   const html = `
 <!DOCTYPE html>
@@ -694,9 +720,7 @@ the courier booking will need to be triggered.
 Dressing Bear · automated dispatch
 `.trim();
 
-  const itemsHtml = order.items
-    .map((it) => `<li>${escapeHtml(it.name)}${it.size ? ` (${escapeHtml(it.size)})` : ""} &times; ${it.quantity}</li>`)
-    .join("");
+  const itemsHtml = formatAdminItemsHtml(order.items);
 
   const html = `
 <!DOCTYPE html>
@@ -838,9 +862,7 @@ ${nextAction}
 Dressing Bear · automated alert
 `.trim();
 
-  const itemsHtml = order.items
-    .map((it) => `<li>${escapeHtml(it.name)}${it.size ? ` (${escapeHtml(it.size)})` : ""} &times; ${it.quantity}</li>`)
-    .join("");
+  const itemsHtml = formatAdminItemsHtml(order.items);
 
   const html = `
 <!DOCTYPE html>
