@@ -44,7 +44,7 @@ describe("listOrders", () => {
     expect(arg.include.items).toEqual({
       take: 2,
       orderBy: { id: "asc" },
-      select: { id: true, name: true, color: true, quantity: true },
+      select: { id: true, name: true, color: true, size: true, quantity: true },
     });
     expect(arg.include._count).toEqual({ select: { items: true } });
   });
