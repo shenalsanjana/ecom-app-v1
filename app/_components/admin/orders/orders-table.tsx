@@ -15,7 +15,7 @@ type Row = {
   guestName: string | null; user: { name: string | null } | null;
   total: number; paymentMethod: string; paymentStatus: string | null; status: string;
   courierBookedAt: Date | null; courierWaybillNumber: string | null;
-  items: { id: string; name: string; color: string | null; quantity: number }[];
+  items: { id: string; name: string; color: string | null; size: string | null; quantity: number }[];
   _count: { items: number };
 };
 
