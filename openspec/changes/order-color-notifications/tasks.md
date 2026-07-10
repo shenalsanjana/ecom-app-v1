@@ -36,8 +36,8 @@
 
 ## 6. Validation
 
-- [ ] 6.1 Run the focused Vitest command from `docs/superpowers/plans/2026-07-09-order-color-notifications.md` Task 6 and confirm all targeted files pass.
-- [ ] 6.2 Run `npm.cmd run test` and confirm the full Vitest suite passes.
-- [ ] 6.3 Run `npm.cmd run build`; if restricted font/network behavior or another environment-only condition blocks completion, capture the exact output.
-- [ ] 6.4 Run `npm.cmd run test:e2e -- tests/e2e/order-confirmation.spec.ts tests/e2e/admin-orders.spec.ts`; if local environment requirements are missing, capture the exact output.
-- [ ] 6.5 Run `git diff --check` and `git status --short`; confirm only intentional feature files and pre-existing unrelated files remain.
+- [x] 6.1 Run the focused Vitest command from `docs/superpowers/plans/2026-07-09-order-color-notifications.md` Task 6 and confirm all targeted files pass.
+- [x] 6.2 Run `npm.cmd run test` and confirm the full Vitest suite passes.
+- [x] 6.3 Run `npm.cmd run build`; if restricted font/network behavior or another environment-only condition blocks completion, capture the exact output.
+- [x] 6.4 Run `npm.cmd run test:e2e -- tests/e2e/order-confirmation.spec.ts tests/e2e/admin-orders.spec.ts`; if local environment requirements are missing, capture the exact output.
+- [x] 6.5 Run `git diff --check` and `git status --short`; confirm only intentional feature files and pre-existing unrelated files remain.
