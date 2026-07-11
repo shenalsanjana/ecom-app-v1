@@ -5,9 +5,9 @@ is the source of truth for HOW; this file tracks WHICH of its 21 tasks are done.
 
 ## 1. Schema and shared helpers
 
-- [ ] 1.1 Add `PlainTshirtStock`, `DtfDesign`, `Product.dtfDesignId`, `OrderItem.plainTshirtStockId`/`dtfDesignId` to `prisma/schema.prisma`; write hand-authored Migration A (Plan Task 1)
-- [ ] 1.2 Add shared `acquireItemPools`/`restoreItemPools` transaction helpers in `app/_lib/inventory-pools.ts` (Plan Task 2)
-- [ ] 1.3 Rewrite `app/_lib/variants.ts` derived-availability helpers on the two-pool model (Plan Task 3)
+- [x] 1.1 Add `PlainTshirtStock`, `DtfDesign`, `Product.dtfDesignId`, `OrderItem.plainTshirtStockId`/`dtfDesignId` to `prisma/schema.prisma`; write hand-authored Migration A (Plan Task 1)
+- [x] 1.2 Add shared `acquireItemPools`/`restoreItemPools` transaction helpers in `app/_lib/inventory-pools.ts` (Plan Task 2)
+- [x] 1.3 Rewrite `app/_lib/variants.ts` derived-availability helpers on the two-pool model (Plan Task 3)
 
 ## 2. Checkout and order-lifecycle restore paths
 
