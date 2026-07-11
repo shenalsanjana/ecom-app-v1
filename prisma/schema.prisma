@@ -134,8 +134,9 @@ model VariantSizeStock {
 
 model PlainTshirtStock {
   id        String   @id @default(cuid())
-  color     String                     // display, e.g. "White"
-  colorSlug String                     // matches ProductVariant.colorSlug
+  // color: display, e.g. "White"; colorSlug: matches ProductVariant.colorSlug
+  color     String
+  colorSlug String
   size      String
   quantity  Int      @default(0)
   createdAt DateTime @default(now())
@@ -241,19 +242,19 @@ model Order {
 }
 
 model OrderItem {
-  id        String  @id @default(cuid())
-  orderId   String
+  id                 String  @id @default(cuid())
+  orderId            String
   // Nullable: a product may be hard-deleted while its order history lives on.
   // The line item keeps its own name/size/price/quantity snapshot, so deleting
   // the product (onDelete: SetNull) preserves the historical record.
-  productId String?
-  variantId String?
-  color     String?
-  sku       String?
-  name      String
-  size      String?
-  price     Float
-  quantity  Int
+  productId          String?
+  variantId          String?
+  color              String?
+  sku                String?
+  name               String
+  size               String?
+  price              Float
+  quantity           Int
   plainTshirtStockId String?
   dtfDesignId        String?
 
