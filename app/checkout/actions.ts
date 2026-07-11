@@ -19,6 +19,8 @@ import { getDeliveryConfig } from "@/app/_lib/store-settings";
 import { zoneForCity } from "@/app/_lib/delivery-zones";
 import { initialPaymentStatus } from "@/app/_lib/order-status";
 import { nextWebNumber } from "@/app/_lib/web-number";
+import { acquireItemPools } from "@/app/_lib/inventory-pools";
+import { buildPlainStockMap, buildDesignStockMap, plainStockKey } from "@/app/_lib/variants";
 
 export type PaymentMethod = "COD" | "PAYHERE" | "KOKO" | "MINTPAY";
 
@@ -185,7 +187,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
   const total = subtotal + shippingCost;
   const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-  // Validate each line against its variant's size-stock grid.
+  // Validate each line against the two raw-material pools its variant/design draw from.
   const variantIds = Array.from(new Set(items.map((i) => i.variantId)));
   const dbVariants = await prisma.productVariant.findMany({
     where: { id: { in: variantIds } },
@@ -193,40 +195,63 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
       id: true,
       productId: true,
       color: true,
+      colorSlug: true,
       sku: true,
-      sizeStocks: { select: { size: true, stock: true } },
+      sizeStocks: { select: { size: true } },
+      product: { select: { dtfDesignId: true } },
     },
   });
   const variantMap = new Map<
     string,
-    VariantStock & { productId: string; color: string; sku: string | null }
-  >(dbVariants.map((v) => [v.id, v]));
+    VariantStock & { productId: string; color: string; colorSlug: string; sku: string | null }
+  >(
+    dbVariants.map((v) => [
+      v.id,
+      {
+        productId: v.productId,
+        color: v.color,
+        colorSlug: v.colorSlug,
+        sku: v.sku,
+        dtfDesignId: v.product.dtfDesignId,
+        sizes: v.sizeStocks,
+      },
+    ]),
+  );
   for (const item of items) {
     const variant = variantMap.get(item.variantId);
     if (variant && variant.productId !== item.productId) {
       return { success: false, error: `Selected variant does not belong to "${item.name}"` };
     }
   }
+  const [plainStockRows, designStockRows] = await Promise.all([
+    prisma.plainTshirtStock.findMany({ select: { id: true, colorSlug: true, size: true, quantity: true } }),
+    prisma.dtfDesign.findMany({ select: { id: true, quantity: true } }),
+  ]);
+  const plainStock = buildPlainStockMap(plainStockRows);
+  const designStock = buildDesignStockMap(designStockRows);
   const validationError = validateCartItems(
     items.map((item) => ({ ...item, size: item.size ?? null })),
     variantMap,
+    plainStock,
+    designStock,
   );
   if (validationError) return { success: false, error: validationError };
 
-  // Create the order + decrement stock atomically. Stock decrement uses a
-  // conditional update so concurrent purchases of the last unit can't oversell.
+  // Create the order + acquire both raw-material pools atomically. Each
+  // guarded decrement re-checks the row's current quantity, so concurrent
+  // purchases of the last unit can't oversell.
   let created: { webNumber: string | null; paymentStatus: string | null };
   try {
     created = await prisma.$transaction(async (tx) => {
-      for (const item of items) {
-        if (!item.size) continue; // sizeless variants carry no per-size stock
-        const result = await tx.variantSizeStock.updateMany({
-          where: { variantId: item.variantId, size: item.size, stock: { gte: item.quantity } },
-          data: { stock: { decrement: item.quantity } },
-        });
-        if (result.count === 0) {
-          throw new Error(`Insufficient stock for "${item.name}"`);
-        }
+      const poolByIndex = new Map<number, { plainTshirtStockId: string | null; dtfDesignId: string | null }>();
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (!item.size) continue; // sizeless variants carry no per-size pool
+        const variant = variantMap.get(item.variantId)!;
+        const plainEntry = plainStock.get(plainStockKey(variant.colorSlug, item.size));
+        const pool = { plainTshirtStockId: plainEntry?.id ?? null, dtfDesignId: variant.dtfDesignId };
+        await acquireItemPools(tx, { ...pool, quantity: item.quantity, name: item.name });
+        poolByIndex.set(i, pool);
       }
 
       const webNumber = await nextWebNumber(tx);
@@ -255,7 +280,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
           idempotencyKey: idempotencyKey ?? null,
           notes: notes && notes.length > 0 ? notes : null,
           items: {
-            create: items.map((item) => ({
+            create: items.map((item, i) => ({
               productId: item.productId,
               variantId: item.variantId,
               color: variantMap.get(item.variantId)?.color ?? null,
@@ -264,6 +289,8 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
               size: item.size ?? null,
               price: item.price,
               quantity: item.quantity,
+              plainTshirtStockId: poolByIndex.get(i)?.plainTshirtStockId ?? null,
+              dtfDesignId: poolByIndex.get(i)?.dtfDesignId ?? null,
             })),
           },
         },
