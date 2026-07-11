@@ -2,10 +2,14 @@ import { describe, it, expect } from "vitest";
 import {
   effectivePrice,
   effectiveOriginalPrice,
+  plainStockKey,
+  buildPlainStockMap,
+  buildDesignStockMap,
+  stockForSize,
+  designAvailable,
+  availableSizes,
   variantInStock,
   productInStock,
-  availableSizes,
-  stockForSize,
   resolveDefaultVariant,
   pickVariantBySlug,
   sortSizeStocks,
@@ -28,26 +32,82 @@ describe("effectiveOriginalPrice", () => {
   });
 });
 
-describe("stock helpers", () => {
-  const grid = [
-    { size: "S", stock: 0 },
-    { size: "M", stock: 4 },
-    { size: "L", stock: 0 },
-  ];
-  it("variantInStock is true when any cell > 0", () => {
-    expect(variantInStock(grid)).toBe(true);
-    expect(variantInStock([{ size: "S", stock: 0 }])).toBe(false);
+describe("plainStockKey / buildPlainStockMap / buildDesignStockMap", () => {
+  it("keys plain stock by colorSlug::size", () => {
+    expect(plainStockKey("white", "M")).toBe("white::M");
   });
-  it("availableSizes returns only sizes with stock", () => {
-    expect(availableSizes(grid)).toEqual(["M"]);
+  it("builds a map from rows keyed by colorSlug::size, carrying id + quantity", () => {
+    const map = buildPlainStockMap([{ id: "ps1", colorSlug: "white", size: "M", quantity: 4 }]);
+    expect(map.get("white::M")).toEqual({ id: "ps1", quantity: 4 });
   });
-  it("stockForSize returns the cell count, or 0 when absent", () => {
-    expect(stockForSize(grid, "M")).toBe(4);
-    expect(stockForSize(grid, "XL")).toBe(0);
+  it("builds a design map keyed by id", () => {
+    const map = buildDesignStockMap([{ id: "d1", quantity: 3 }]);
+    expect(map.get("d1")).toBe(3);
   });
-  it("productInStock is true when any variant has stock", () => {
-    expect(productInStock([{ sizeStocks: [{ size: "S", stock: 0 }] }, { sizeStocks: grid }])).toBe(true);
-    expect(productInStock([{ sizeStocks: [{ size: "S", stock: 0 }] }])).toBe(false);
+});
+
+describe("stockForSize (two-pool derived quantity)", () => {
+  const plainStock = buildPlainStockMap([
+    { id: "ps-white-s", colorSlug: "white", size: "S", quantity: 0 },
+    { id: "ps-white-m", colorSlug: "white", size: "M", quantity: 4 },
+  ]);
+  const designStock = buildDesignStockMap([{ id: "d-cats", quantity: 2 }]);
+
+  it("is zero when the design pool is missing or zero", () => {
+    expect(stockForSize("white", "M", null, plainStock, designStock)).toBe(0);
+    expect(stockForSize("white", "M", "unknown-design", plainStock, designStock)).toBe(0);
+    expect(stockForSize("white", "M", "d-cats", plainStock, buildDesignStockMap([{ id: "d-cats", quantity: 0 }]))).toBe(0);
+  });
+  it("is zero when the plain pool is missing or zero", () => {
+    expect(stockForSize("white", "S", "d-cats", plainStock, designStock)).toBe(0);
+    expect(stockForSize("white", "XL", "d-cats", plainStock, designStock)).toBe(0);
+  });
+  it("is the minimum of the two pools when both are available", () => {
+    expect(stockForSize("white", "M", "d-cats", plainStock, designStock)).toBe(2); // min(4, 2)
+  });
+});
+
+describe("designAvailable", () => {
+  const designStock = buildDesignStockMap([{ id: "d-cats", quantity: 2 }, { id: "d-empty", quantity: 0 }]);
+  it("false for null, unknown, or zero-quantity design ids", () => {
+    expect(designAvailable(null, designStock)).toBe(false);
+    expect(designAvailable("unknown", designStock)).toBe(false);
+    expect(designAvailable("d-empty", designStock)).toBe(false);
+  });
+  it("true when the design has quantity > 0", () => {
+    expect(designAvailable("d-cats", designStock)).toBe(true);
+  });
+});
+
+describe("availableSizes / variantInStock / productInStock (two-pool)", () => {
+  const plainStock = buildPlainStockMap([
+    { id: "ps1", colorSlug: "white", size: "S", quantity: 0 },
+    { id: "ps2", colorSlug: "white", size: "M", quantity: 4 },
+    { id: "ps3", colorSlug: "pink", size: "M", quantity: 3 },
+  ]);
+  const designStock = buildDesignStockMap([{ id: "d-cats", quantity: 2 }]);
+
+  it("availableSizes returns only sizes with stock in both pools", () => {
+    expect(availableSizes([{ size: "S" }, { size: "M" }], "white", "d-cats", plainStock, designStock)).toEqual(["M"]);
+  });
+  it("availableSizes is empty when the design is unavailable, regardless of plain stock", () => {
+    expect(availableSizes([{ size: "M" }], "white", null, plainStock, designStock)).toEqual([]);
+  });
+  it("variantInStock is true iff at least one size clears both pools", () => {
+    expect(variantInStock([{ size: "S" }, { size: "M" }], "white", "d-cats", plainStock, designStock)).toBe(true);
+    expect(variantInStock([{ size: "S" }], "white", "d-cats", plainStock, designStock)).toBe(false);
+  });
+  it("productInStock is true iff any variant has an available size", () => {
+    const variants = [
+      { colorSlug: "white", sizes: [{ size: "S" }] },  // out of plain stock
+      { colorSlug: "pink", sizes: [{ size: "M" }] },   // in stock
+    ];
+    expect(productInStock(variants, "d-cats", plainStock, designStock)).toBe(true);
+    expect(productInStock([variants[0]], "d-cats", plainStock, designStock)).toBe(false);
+  });
+  it("productInStock is false for every variant when the design is unavailable", () => {
+    const variants = [{ colorSlug: "pink", sizes: [{ size: "M" }] }];
+    expect(productInStock(variants, null, plainStock, designStock)).toBe(false);
   });
 });
 
