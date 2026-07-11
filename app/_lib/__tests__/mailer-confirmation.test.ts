@@ -28,6 +28,15 @@ beforeEach(() => {
 });
 afterEach(() => { __setTestTransport(null); process.env = { ...originalEnv }; });
 
+describe("sendOrderConfirmationEmail", () => {
+  it("emails the customer with the brand bcc'd for a record", async () => {
+    await sendOrderConfirmationEmail(ORDER);
+    const opts = sendMailSpy.mock.calls[0][0];
+    expect(opts.to).toBe("jane@example.com");
+    expect(opts.bcc).toBe("dressingbear@gmail.com");
+  });
+});
+
 describe("sendOrderConfirmationEmail item snapshots", () => {
   it("renders color in text and HTML item lines and omits customer-facing SKU", async () => {
     await sendOrderConfirmationEmail(ORDER);
