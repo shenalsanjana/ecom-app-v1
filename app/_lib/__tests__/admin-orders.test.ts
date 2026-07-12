@@ -69,87 +69,57 @@ describe("recomputeTotals", () => {
 import { applyItemChanges } from "../admin-orders";
 
 const makeItems = () => [
-  { id: "i1", variantId: "v1", name: "Dress", size: "M", price: 6500, quantity: 1 },
-  { id: "i2", variantId: "v2", name: "Scarf", size: "S", price: 2000, quantity: 2 },
+  { id: "i1", variantId: "v1", name: "Dress", size: "M", price: 6500, quantity: 1, plainTshirtStockId: "ps1", dtfDesignId: "d1" },
+  { id: "i2", variantId: "v2", name: "Scarf", size: "S", price: 2000, quantity: 2, plainTshirtStockId: "ps2", dtfDesignId: "d2" },
 ];
 
 describe("applyItemChanges", () => {
-  it("decreasing quantity restores stock (positive delta)", () => {
-    const { nextItems, stockDeltas } = applyItemChanges(makeItems(), [{ id: "i2", quantity: 1 }]);
-    expect(nextItems.find((i) => i.id === "i2")!.quantity).toBe(1);
-    expect(stockDeltas).toEqual([{ variantId: "v2", size: "S", delta: 1 }]);
+  it("changes quantity in place, unflagged as a size change", () => {
+    const { nextItems } = applyItemChanges(makeItems(), [{ id: "i2", quantity: 1 }]);
+    const i2 = nextItems.find((i) => i.id === "i2")!;
+    expect(i2.quantity).toBe(1);
+    expect(i2.sizeChanged).toBe(false);
+    expect(i2.plainTshirtStockId).toBe("ps2"); // frozen id carried through unchanged
   });
 
-  it("increasing quantity decrements stock (negative delta)", () => {
-    const { stockDeltas } = applyItemChanges(makeItems(), [{ id: "i1", quantity: 3 }]);
-    expect(stockDeltas).toEqual([{ variantId: "v1", size: "M", delta: -2 }]);
-  });
-
-  it("removing an item restores its full quantity and drops it", () => {
-    const { nextItems, stockDeltas } = applyItemChanges(makeItems(), [{ id: "i2", remove: true }]);
+  it("removing an item drops it from nextItems", () => {
+    const { nextItems } = applyItemChanges(makeItems(), [{ id: "i2", remove: true }]);
     expect(nextItems.map((i) => i.id)).toEqual(["i1"]);
-    expect(stockDeltas).toEqual([{ variantId: "v2", size: "S", delta: 2 }]);
   });
 
-  it("size-only change moves the whole line between (variant,size) cells", () => {
-    const { nextItems, stockDeltas } = applyItemChanges(makeItems(), [{ id: "i1", size: "L" }]);
-    expect(nextItems.find((i) => i.id === "i1")!.size).toBe("L");
-    // Old cell (v1,M) restored by the full old quantity; new cell (v1,L) taken by
-    // the full (unchanged) quantity — never left as a no-op.
-    expect(stockDeltas).toEqual([
-      { variantId: "v1", size: "M", delta: 1 },
-      { variantId: "v1", size: "L", delta: -1 },
-    ]);
+  it("a size-only change flags sizeChanged and carries the frozen plainTshirtStockId forward for the caller to re-resolve", () => {
+    const { nextItems } = applyItemChanges(makeItems(), [{ id: "i1", size: "L" }]);
+    const i1 = nextItems.find((i) => i.id === "i1")!;
+    expect(i1.size).toBe("L");
+    expect(i1.sizeChanged).toBe(true);
+    expect(i1.plainTshirtStockId).toBe("ps1"); // still the OLD id — caller resolves the new one
   });
 
-  it("combined size+quantity change moves the new quantity into the new cell", () => {
-    const { nextItems, stockDeltas } = applyItemChanges(makeItems(), [{ id: "i1", size: "L", quantity: 3 }]);
-    expect(nextItems.find((i) => i.id === "i1")!.size).toBe("L");
-    expect(nextItems.find((i) => i.id === "i1")!.quantity).toBe(3);
-    expect(stockDeltas).toEqual([
-      { variantId: "v1", size: "M", delta: 1 }, // full old quantity restored to the old cell
-      { variantId: "v1", size: "L", delta: -3 }, // full new quantity taken from the new cell
-    ]);
+  it("a combined size+quantity change applies both and still flags sizeChanged", () => {
+    const { nextItems } = applyItemChanges(makeItems(), [{ id: "i1", size: "L", quantity: 3 }]);
+    const i1 = nextItems.find((i) => i.id === "i1")!;
+    expect(i1.size).toBe("L");
+    expect(i1.quantity).toBe(3);
+    expect(i1.sizeChanged).toBe(true);
   });
 
-  it("a size change on a hard-deleted (null variantId) item emits no delta", () => {
-    // No variant to key a stock cell on, old or new — nothing to restore or decrement.
-    const items = [{ id: "i1", variantId: null, name: "Gone", size: "M", price: 6500, quantity: 2 }];
-    const { nextItems, stockDeltas } = applyItemChanges(items, [{ id: "i1", size: "L" }]);
-    expect(nextItems.find((i) => i.id === "i1")!.size).toBe("L");
-    expect(stockDeltas).toEqual([]);
-  });
-
-  it("moving a sizeless item (null size) onto a real size only decrements the new cell", () => {
-    // Old cell has no size, so nothing to restore there; the new cell is a real
-    // (variant,size) pair and must be decremented like any other size change.
-    const items = [{ id: "i2", variantId: "v2", name: "Scarf", size: null, price: 2000, quantity: 2 }];
-    const { nextItems, stockDeltas } = applyItemChanges(items, [{ id: "i2", size: "M" }]);
-    expect(nextItems.find((i) => i.id === "i2")!.size).toBe("M");
-    expect(stockDeltas).toEqual([{ variantId: "v2", size: "M", delta: -2 }]);
+  it("no size change leaves sizeChanged false even when quantity also changes", () => {
+    const { nextItems } = applyItemChanges(makeItems(), [{ id: "i1", quantity: 5 }]);
+    expect(nextItems.find((i) => i.id === "i1")!.sizeChanged).toBe(false);
   });
 
   it("rejects reducing quantity to zero (use remove instead)", () => {
     expect(() => applyItemChanges(makeItems(), [{ id: "i1", quantity: 0 }])).toThrow();
   });
 
-  it("skips stock deltas for an item with no variant (hard-deleted) or no size (sizeless)", () => {
-    // Variant hard-deleted while the order is still live → variantId is null.
-    // A sizeless variant has no size-stock cell at all. Neither can be
-    // restored/decremented, so they must never enter deltas (a null/undefined
-    // key would later try updateMany({ variantId: null }) and mis-fire).
-    const items = [
-      { id: "i1", variantId: null, name: "Gone", size: "M", price: 6500, quantity: 2 },
-      { id: "i2", variantId: "v2", name: "Scarf", size: null, price: 2000, quantity: 2 },
-      { id: "i3", variantId: "v3", name: "Live", size: "M", price: 3000, quantity: 1 },
-    ];
-    const { nextItems, stockDeltas } = applyItemChanges(items, [
-      { id: "i1", remove: true },
-      { id: "i2", quantity: 1 },
-      { id: "i3", quantity: 2 },
-    ]);
-    expect(nextItems.map((i) => i.id)).toEqual(["i2", "i3"]);
-    expect(stockDeltas).toEqual([{ variantId: "v3", size: "M", delta: -1 }]); // only the live variant+size
+  it("rejects an unknown item id", () => {
+    expect(() => applyItemChanges(makeItems(), [{ id: "does-not-exist", quantity: 1 }])).toThrow("Unknown order item: does-not-exist");
+  });
+
+  it("an unchanged item passes through with sizeChanged false", () => {
+    const { nextItems } = applyItemChanges(makeItems(), [{ id: "i2", quantity: 2 }]);
+    const i1 = nextItems.find((i) => i.id === "i1")!;
+    expect(i1).toMatchObject({ size: "M", quantity: 1, sizeChanged: false });
   });
 });
 
