@@ -308,6 +308,44 @@ describe("editItems", () => {
     expect(res).toEqual({ success: false, error: 'Size "XXL" is not available for "Dress"' });
     expect(orderItemUpdate).not.toHaveBeenCalled();
   });
+
+  it("restores every original line's pool before reacquiring any surviving line's pool (cross-item netting)", async () => {
+    // Two lines share one plain-tee pool row (same color+size, two different
+    // designs) with zero headroom above what this order already holds. An
+    // interleaved restore/acquire-per-item loop would fail here even though
+    // total demand is unchanged; the correct restore-all-then-reacquire-all
+    // ordering must succeed.
+    const SHARED_ORDER = {
+      id: "o1", status: "CONFIRMED", paymentStatus: "PENDING", shippingCity: "Colombo",
+      items: [
+        { id: "i1", variantId: "v1", name: "A", size: "M", price: 1000, quantity: 2, plainTshirtStockId: "ps-shared", dtfDesignId: "d1" },
+        { id: "i2", variantId: "v2", name: "B", size: "M", price: 1000, quantity: 3, plainTshirtStockId: "ps-shared", dtfDesignId: "d2" },
+      ],
+    };
+    orderFindUnique.mockResolvedValueOnce(SHARED_ORDER);
+    orderUpdate.mockResolvedValueOnce({});
+    orderItemUpdate.mockResolvedValue({});
+
+    let poolQty = 0; // fully consumed by the original order (2 + 3 = 5, no free headroom)
+    plainStockUpdateMany.mockReset().mockImplementation(async ({ data }: { data: { quantity: { increment?: number; decrement?: number } } }) => {
+      if (data.quantity.increment !== undefined) {
+        poolQty += data.quantity.increment;
+        return { count: 1 };
+      }
+      const dec = data.quantity.decrement!;
+      if (poolQty < dec) return { count: 0 };
+      poolQty -= dec;
+      return { count: 1 };
+    });
+
+    // Swap quantities (net pool demand unchanged: 3+2 === 2+3).
+    const res = await editItems("o1", [
+      { id: "i1", quantity: 3 },
+      { id: "i2", quantity: 2 },
+    ]);
+
+    expect(res).toEqual({ success: true });
+  });
 });
 
 import { editAddress } from "../actions";

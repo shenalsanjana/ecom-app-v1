@@ -299,9 +299,9 @@ function toOrderDetails(order: DbOrderForDetails): OrderDetails {
   };
 }
 
-// Like ORDER_INCLUDE but also pulls each item's variantId, which the
-// stock-restore in cancelOrderTx needs. The extra field is harmless to
-// toOrderDetails (which ignores it).
+// Like ORDER_INCLUDE but also pulls each item's plainTshirtStockId/dtfDesignId,
+// which the stock-restore in cancelOrderTx needs. The extra variantId field is
+// harmless to toOrderDetails (which ignores it).
 const CANCEL_INCLUDE = {
   user: { select: { name: true, email: true } },
   items: {
