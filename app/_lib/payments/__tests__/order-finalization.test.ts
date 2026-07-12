@@ -4,7 +4,8 @@ const {
   orderFindUnique,
   orderUpdate,
   orderUpdateMany,
-  variantSizeStockUpdateMany,
+  plainStockUpdateMany,
+  dtfDesignUpdateMany,
   orderItemFindMany,
   sendOrderConfirmationEmail,
   sendAdminFailureAlertEmail,
@@ -13,7 +14,8 @@ const {
   orderFindUnique: vi.fn(),
   orderUpdate: vi.fn(),
   orderUpdateMany: vi.fn(),
-  variantSizeStockUpdateMany: vi.fn(),
+  plainStockUpdateMany: vi.fn(),
+  dtfDesignUpdateMany: vi.fn(),
   orderItemFindMany: vi.fn(),
   sendOrderConfirmationEmail: vi.fn(),
   sendAdminFailureAlertEmail: vi.fn(),
@@ -24,11 +26,13 @@ vi.mock("@/app/_lib/prisma", () => ({
   prisma: {
     order: { findUnique: orderFindUnique, update: orderUpdate, updateMany: orderUpdateMany },
     orderItem: { findMany: orderItemFindMany },
-    variantSizeStock: { updateMany: variantSizeStockUpdateMany },
+    plainTshirtStock: { updateMany: plainStockUpdateMany },
+    dtfDesign: { updateMany: dtfDesignUpdateMany },
     $transaction: vi.fn(async (fn) =>
       fn({
         order: { findUnique: orderFindUnique, update: orderUpdate, updateMany: orderUpdateMany },
-        variantSizeStock: { updateMany: variantSizeStockUpdateMany },
+        plainTshirtStock: { updateMany: plainStockUpdateMany },
+        dtfDesign: { updateMany: dtfDesignUpdateMany },
       }),
     ),
   },
@@ -72,6 +76,8 @@ const ORDER = {
 const ITEMS = [
   {
     variantId: "V1",
+    plainTshirtStockId: "PS1",
+    dtfDesignId: "D1",
     color: "White",
     sku: "DB-TEE-WHT-M",
     name: "Tee",
@@ -105,7 +111,7 @@ describe("order finalization", () => {
     });
   });
 
-  it("marks failed, cancels order, and restores stock once", async () => {
+  it("marks failed, cancels order, and restores both pools once", async () => {
     orderFindUnique.mockResolvedValueOnce({ ...ORDER, items: ITEMS });
 
     await finalizeFailedPayment("ORD-1", "KOKO", "cancelled");
@@ -118,9 +124,11 @@ describe("order finalization", () => {
       },
       data: { paymentStatus: "PAYMENT_FAILED", status: "CANCELLED" },
     });
-    expect(variantSizeStockUpdateMany).toHaveBeenCalledWith({
-      where: { variantId: "V1", size: "M" },
-      data: { stock: { increment: 2 } },
+    expect(plainStockUpdateMany).toHaveBeenCalledWith({
+      where: { id: "PS1" }, data: { quantity: { increment: 2 } },
+    });
+    expect(dtfDesignUpdateMany).toHaveBeenCalledWith({
+      where: { id: "D1" }, data: { quantity: { increment: 2 } },
     });
     expect(notifyOrderConfirmed).not.toHaveBeenCalled();
   });
@@ -130,7 +138,7 @@ describe("order finalization", () => {
 
     await finalizeFailedPayment("ORD-1", "KOKO", "cancelled");
 
-    expect(variantSizeStockUpdateMany).not.toHaveBeenCalled();
+    expect(plainStockUpdateMany).not.toHaveBeenCalled();
   });
 
   it("ignores failure when already paid", async () => {
@@ -139,7 +147,7 @@ describe("order finalization", () => {
     await finalizeFailedPayment("ORD-1", "KOKO", "cancelled");
 
     expect(orderUpdateMany).not.toHaveBeenCalled();
-    expect(variantSizeStockUpdateMany).not.toHaveBeenCalled();
+    expect(plainStockUpdateMany).not.toHaveBeenCalled();
   });
 
   it("never books the courier on payment, even when RoyalExpress is enabled", async () => {
@@ -176,6 +184,6 @@ describe("order finalization", () => {
     const result = await finalizeFailedPayment("ORD-1", "KOKO", "duplicate callback");
 
     expect(result).toEqual({ status: "already_failed" });
-    expect(variantSizeStockUpdateMany).not.toHaveBeenCalled();
+    expect(plainStockUpdateMany).not.toHaveBeenCalled();
   });
 });

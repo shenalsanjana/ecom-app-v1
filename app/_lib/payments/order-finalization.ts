@@ -6,6 +6,7 @@ import {
   type OrderDetails,
 } from "@/app/_lib/mailer";
 import { notifyOrderConfirmed } from "@/app/_lib/order-notifications";
+import { restoreItemPools } from "@/app/_lib/inventory-pools";
 
 type OrderWithUser = Prisma.OrderGetPayload<{ include: { user: { select: { name: true; email: true } } } }>;
 
@@ -126,11 +127,7 @@ export async function finalizeFailedPayment(orderId: string, expectedMethod: str
     if (claim.count !== 1) return;
     claimed = true;
     for (const item of order.items) {
-      if (!item.variantId || !item.size) continue; // variant hard-deleted or sizeless — nothing to restore
-      await tx.variantSizeStock.updateMany({
-        where: { variantId: item.variantId, size: item.size },
-        data: { stock: { increment: item.quantity } },
-      });
+      await restoreItemPools(tx, item);
     }
   });
 
