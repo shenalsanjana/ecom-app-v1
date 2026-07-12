@@ -20,7 +20,7 @@ is the source of truth for HOW; this file tracks WHICH of its 21 tasks are done.
 ## 3. Admin Inventory section
 
 - [x] 3.1 Add `app/_lib/admin-inventory.ts` read queries (Plan Task 9)
-- [ ] 3.2 Add `app/admin/inventory/actions.ts` CRUD server actions (Plan Task 10)
+- [x] 3.2 Add `app/admin/inventory/actions.ts` CRUD server actions (Plan Task 10)
 - [ ] 3.3 Build the `/admin/inventory` page and its Plain T-Shirt Stock grid + DTF Designs table components (Plan Task 11)
 - [ ] 3.4 Add "Inventory" to the admin nav (Plan Task 12)
 
