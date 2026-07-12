@@ -15,7 +15,7 @@ is the source of truth for HOW; this file tracks WHICH of its 21 tasks are done.
 - [x] 2.2 Rewire `app/checkout/actions.ts` to acquire both pools and snapshot pool ids onto `OrderItem` (Plan Task 5)
 - [x] 2.3 Simplify `applyItemChanges` in `app/_lib/admin-orders.ts` to pure item math (Plan Task 6)
 - [x] 2.4 Rewire `cancelOrderTx`/`editItems` in `app/admin/orders/actions.ts` onto the shared pool helpers (Plan Task 7)
-- [ ] 2.5 Rewire `finalizeFailedPayment` in `app/_lib/payments/order-finalization.ts` onto the shared pool helpers (Plan Task 8)
+- [x] 2.5 Rewire `finalizeFailedPayment` in `app/_lib/payments/order-finalization.ts` onto the shared pool helpers (Plan Task 8)
 
 ## 3. Admin Inventory section
 
