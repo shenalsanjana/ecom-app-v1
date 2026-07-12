@@ -320,6 +320,20 @@ describe("processOrder — variant color snapshots", () => {
     });
   });
 
+  it("snapshots the exact raw-material pool rows the line drew from", async () => {
+    await processOrder({ ...baseInput, paymentMethod: "COD" });
+
+    const createCalls = vi.mocked(txOrderCreate).mock.calls as unknown as [
+      [{ data: { items: { create: Array<Record<string, unknown>> } } }],
+      ...[{ data: { items: { create: Array<Record<string, unknown>> } } }][],
+    ];
+    const createArg = createCalls[0][0];
+    expect(createArg.data.items.create[0]).toMatchObject({
+      plainTshirtStockId: "PS2",
+      dtfDesignId: "D1",
+    });
+  });
+
   it("passes database variant color/SKU to pending prepaid admin notification details", async () => {
     await processOrder({
       ...baseInput,
