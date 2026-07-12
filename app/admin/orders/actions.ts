@@ -7,6 +7,7 @@ import { prisma } from "@/app/_lib/prisma";
 import { requireAdmin } from "@/app/_lib/admin-auth";
 import { nextStatuses, applyItemChanges, recomputeTotals, canEdit, canConfirm, type ItemChange } from "@/app/_lib/admin-orders";
 import { getDeliveryConfig } from "@/app/_lib/store-settings";
+import { restoreItemPools, acquireItemPools } from "@/app/_lib/inventory-pools";
 import { bookCourierAndNotify } from "@/app/checkout/book-courier";
 import { sendOrderConfirmationEmail, logMailerError, type OrderDetails } from "@/app/_lib/mailer";
 import { notifyOrderDispatched, notifyOrderCancelled } from "@/app/_lib/order-notifications";
@@ -96,15 +97,10 @@ const PAID = new Set(["PAID", "COD_COLLECTED"]);
 async function cancelOrderTx(
   tx: Prisma.TransactionClient,
   orderId: string,
-  items: { variantId: string | null; size: string | null; quantity: number }[],
+  items: { plainTshirtStockId: string | null; dtfDesignId: string | null; quantity: number }[],
 ): Promise<void> {
   for (const it of items) {
-    // Skip items with no variant (hard-deleted) or no size (sizeless) — nothing to restore.
-    if (!it.variantId || !it.size) continue;
-    await tx.variantSizeStock.updateMany({
-      where: { variantId: it.variantId, size: it.size },
-      data: { stock: { increment: it.quantity } },
-    });
+    await restoreItemPools(tx, it);
   }
   await tx.order.update({ where: { id: orderId }, data: { status: "CANCELLED" } });
 }
@@ -172,6 +168,26 @@ export async function editAddress(
   return { success: true };
 }
 
+// Resolves the pool row for a NEW size, using the OLD pool row's frozen
+// colorSlug (not the variant's current color) — the same freeze-at-order-time
+// principle that motivates the OrderItem snapshot columns. Returns null when
+// there's nothing to resolve from (sizeless/pre-migration item) or no pool
+// row exists for that color+size.
+async function resolveNewPlainPool(
+  tx: Prisma.TransactionClient,
+  oldPlainTshirtStockId: string | null,
+  newSize: string,
+): Promise<string | null> {
+  if (!oldPlainTshirtStockId) return null;
+  const oldRow = await tx.plainTshirtStock.findUnique({ where: { id: oldPlainTshirtStockId }, select: { colorSlug: true } });
+  if (!oldRow) return null;
+  const newRow = await tx.plainTshirtStock.findUnique({
+    where: { colorSlug_size: { colorSlug: oldRow.colorSlug, size: newSize } },
+    select: { id: true },
+  });
+  return newRow?.id ?? null;
+}
+
 export async function editItems(orderId: string, changes: ItemChange[]): Promise<ActionResult> {
   await requireAdmin();
   const order = await prisma.order.findUnique({
@@ -184,7 +200,10 @@ export async function editItems(orderId: string, changes: ItemChange[]): Promise
   let next;
   try {
     next = applyItemChanges(
-      order.items.map((i) => ({ id: i.id, variantId: i.variantId, name: i.name, size: i.size, price: i.price, quantity: i.quantity })),
+      order.items.map((i) => ({
+        id: i.id, variantId: i.variantId, name: i.name, size: i.size, price: i.price, quantity: i.quantity,
+        plainTshirtStockId: i.plainTshirtStockId, dtfDesignId: i.dtfDesignId,
+      })),
       changes,
     );
   } catch (e) {
@@ -192,21 +211,14 @@ export async function editItems(orderId: string, changes: ItemChange[]): Promise
   }
 
   const totals = recomputeTotals(next.nextItems, order.shippingCity, await getDeliveryConfig());
-  const nameByVariant = new Map(order.items.map((i) => [i.variantId, i.name]));
 
   try {
     await prisma.$transaction(async (tx) => {
-      for (const { variantId, size, delta } of next.stockDeltas) {
-        if (delta > 0) {
-          await tx.variantSizeStock.updateMany({ where: { variantId, size }, data: { stock: { increment: delta } } });
-        } else if (delta < 0) {
-          const dec = -delta;
-          const r = await tx.variantSizeStock.updateMany({
-            where: { variantId, size, stock: { gte: dec } },
-            data: { stock: { decrement: dec } },
-          });
-          if (r.count === 0) throw new Error(`Insufficient stock for "${nameByVariant.get(variantId) ?? variantId}" (size ${size})`);
-        }
+      // Restore every original line's pools, then reacquire every surviving
+      // line's pools at its new quantity/size. Unchanged lines net to zero; a
+      // failed reacquire rolls back every restore/acquire in this transaction.
+      for (const original of order.items) {
+        await restoreItemPools(tx, original);
       }
 
       const keptIds = new Set(next.nextItems.map((i) => i.id));
@@ -215,9 +227,24 @@ export async function editItems(orderId: string, changes: ItemChange[]): Promise
           await tx.orderItem.delete({ where: { id: original.id } });
         }
       }
+
       for (const item of next.nextItems) {
-        await tx.orderItem.update({ where: { id: item.id }, data: { quantity: item.quantity, size: item.size } });
+        let plainTshirtStockId = item.plainTshirtStockId;
+        if (item.sizeChanged) {
+          plainTshirtStockId = item.size ? await resolveNewPlainPool(tx, item.plainTshirtStockId, item.size) : null;
+          if (item.size && item.plainTshirtStockId && !plainTshirtStockId) {
+            throw new Error(`Size "${item.size}" is not available for "${item.name}"`);
+          }
+        }
+        await acquireItemPools(tx, {
+          plainTshirtStockId, dtfDesignId: item.dtfDesignId, quantity: item.quantity, name: item.name,
+        });
+        await tx.orderItem.update({
+          where: { id: item.id },
+          data: { quantity: item.quantity, size: item.size, plainTshirtStockId },
+        });
       }
+
       await tx.order.update({
         where: { id: orderId },
         data: { subtotal: totals.subtotal, shippingCost: totals.shippingCost, total: totals.total },
@@ -280,6 +307,8 @@ const CANCEL_INCLUDE = {
   items: {
     select: {
       variantId: true,
+      plainTshirtStockId: true,
+      dtfDesignId: true,
       name: true,
       color: true,
       sku: true,
