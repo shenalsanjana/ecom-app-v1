@@ -1,6 +1,4 @@
 // Pure variant domain helpers. No DB, no React — unit-tested in isolation.
-export type SizeStock = { size: string; stock: number };
-
 export function effectivePrice(
   variant: { price: number | null },
   product: { price: number },
