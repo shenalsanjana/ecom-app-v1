@@ -174,7 +174,7 @@ export type ProductDetail = {
   // Raw pool rows, not Maps — Maps aren't serializable across the Server→Client
   // Component boundary. Client consumers (buy-box-client, product-jsonld isn't
   // one but shares the type) rebuild the maps via buildPlainStockMap/buildDesignStockMap.
-  plainStockRows: { colorSlug: string; size: string; quantity: number }[];
+  plainStockRows: { id: string; colorSlug: string; size: string; quantity: number }[];
   designStockRows: { id: string; quantity: number }[];
   ratingAvg: number;
   ratingCount: number;
@@ -200,7 +200,7 @@ export const getProductDetail = unstable_cache(
     if (!product || product.variants.length === 0) return null;
 
     const [plainStockRows, designStockRows] = await Promise.all([
-      prisma.plainTshirtStock.findMany({ select: { colorSlug: true, size: true, quantity: true } }),
+      prisma.plainTshirtStock.findMany({ select: { id: true, colorSlug: true, size: true, quantity: true } }),
       prisma.dtfDesign.findMany({ select: { id: true, quantity: true } }),
     ]);
 
