@@ -31,7 +31,7 @@ is the source of truth for HOW; this file tracks WHICH of its 21 tasks are done.
 
 ## 5. Admin dashboard and product list
 
-- [ ] 5.1 Recompute the dashboard low-stock KPI from the two pools in `app/_lib/admin-kpis.ts` (Plan Task 15)
+- [x] 5.1 Recompute the dashboard low-stock KPI from the two pools in `app/_lib/admin-kpis.ts` (Plan Task 15)
 - [ ] 5.2 Rework the admin products low-stock tab (`getLowStockProductIds`/`resolveProductWhere`) and the "Total stock" column → "Available" badge (Plan Task 16)
 
 ## 6. Storefront
