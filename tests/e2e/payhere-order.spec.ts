@@ -39,10 +39,8 @@ test.beforeAll(async () => {
     update: { passwordHash, name: NAME },
     create: { name: NAME, email: EMAIL, passwordHash },
   });
-  await prisma.variantSizeStock.updateMany({
-    where: { stock: { lt: 10 } },
-    data: { stock: 20 },
-  });
+  await prisma.plainTshirtStock.updateMany({ where: { quantity: { lt: 10 } }, data: { quantity: 20 } });
+  await prisma.dtfDesign.updateMany({ where: { quantity: { lt: 10 } }, data: { quantity: 20 } });
   // Fetch an existing product to satisfy FK constraint on orderItems.
   const firstProduct = await prisma.product.findFirst({ select: { id: true } });
   seedProductId = firstProduct?.id ?? null;
@@ -57,10 +55,8 @@ test.afterAll(async () => {
   // Delete webhook test orders created with guestEmail (no userId).
   await prisma.order.deleteMany({ where: { guestEmail: EMAIL } });
   await prisma.user.deleteMany({ where: { email: EMAIL } });
-  await prisma.variantSizeStock.updateMany({
-    where: { stock: { lt: 10 } },
-    data: { stock: 20 },
-  });
+  await prisma.plainTshirtStock.updateMany({ where: { quantity: { lt: 10 } }, data: { quantity: 20 } });
+  await prisma.dtfDesign.updateMany({ where: { quantity: { lt: 10 } }, data: { quantity: 20 } });
   await prisma.$disconnect();
 });
 

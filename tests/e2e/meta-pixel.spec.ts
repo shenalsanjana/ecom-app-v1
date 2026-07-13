@@ -9,38 +9,33 @@ import { prisma } from "../../app/_lib/prisma";
 const COD_GUEST_EMAIL = "e2e-meta-purchase@example.com";
 
 // Resolve a real in-stock, non-archived product id from the seeded catalog
-// (the demo "p1" id does not exist in every environment). Stock now lives per
-// color-variant/size, so we snapshot the whole size-stock grid of one in-stock
-// variant and restore every cell afterward (the UI may pick any size button).
+// (the demo "p1" id does not exist in every environment). Stock now lives in
+// two shared raw-material pools rather than per-variant, so instead of
+// snapshotting one variant we top up both pools above the floor (mirroring
+// the other e2e specs' idempotency pattern) — any non-archived product with
+// a design assigned is then guaranteed in stock, whichever size the UI picks.
 let productId: string;
-let restoreVariantId: string;
-let originalSizeStocks: { size: string; stock: number }[];
 
 test.beforeAll(async () => {
-  const variant = await prisma.productVariant.findFirst({
-    where: { archived: false, product: { archived: false }, sizeStocks: { some: { stock: { gt: 0 } } } },
-    orderBy: { productId: "asc" },
-    select: { productId: true, id: true, sizeStocks: { select: { size: true, stock: true } } },
+  await prisma.plainTshirtStock.updateMany({ where: { quantity: { lt: 10 } }, data: { quantity: 20 } });
+  await prisma.dtfDesign.updateMany({ where: { quantity: { lt: 10 } }, data: { quantity: 20 } });
+
+  const product = await prisma.product.findFirst({
+    where: { archived: false, dtfDesignId: { not: null }, variants: { some: { archived: false } } },
+    orderBy: { id: "asc" },
+    select: { id: true },
   });
-  if (!variant) throw new Error("No in-stock product found to drive e2e");
-  productId = variant.productId;
-  restoreVariantId = variant.id;
-  originalSizeStocks = variant.sizeStocks;
+  if (!product) throw new Error("No in-stock product found to drive e2e");
+  productId = product.id;
 });
 
 test.afterAll(async () => {
-  // Leave the DB exactly as we found it: remove the guest COD order(s) this
-  // suite created (items cascade on delete) and restore the size-stock cells
-  // that order placement decremented.
+  // Leave the DB close to how we found it: remove the guest COD order(s) this
+  // suite created (items cascade on delete) and top the pools back up above
+  // the floor in case order placement decremented either below it.
   await prisma.order.deleteMany({ where: { guestEmail: COD_GUEST_EMAIL } });
-  await Promise.all(
-    originalSizeStocks.map((s) =>
-      prisma.variantSizeStock.updateMany({
-        where: { variantId: restoreVariantId, size: s.size },
-        data: { stock: s.stock },
-      }),
-    ),
-  );
+  await prisma.plainTshirtStock.updateMany({ where: { quantity: { lt: 10 } }, data: { quantity: 20 } });
+  await prisma.dtfDesign.updateMany({ where: { quantity: { lt: 10 } }, data: { quantity: 20 } });
   await prisma.$disconnect();
 });
 
