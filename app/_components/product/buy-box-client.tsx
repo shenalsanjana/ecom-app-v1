@@ -1,7 +1,7 @@
 // app/_components/product/buy-box-client.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Heart, Star, Loader2, Truck, RotateCcw, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,7 @@ import { useDeliveryConfig } from "@/app/_components/delivery/delivery-config-pr
 import { trackViewContent, trackAddToCart } from "@/app/_lib/meta-pixel";
 import { useCart } from "@/app/_lib/cart-context";
 import { ShareButtons } from "@/app/_components/product/share-buttons";
-import { variantInStock, availableSizes, stockForSize } from "@/app/_lib/variants";
+import { variantInStock, availableSizes, stockForSize, buildPlainStockMap, buildDesignStockMap } from "@/app/_lib/variants";
 
 export type VariantDetail = {
   id: string;
@@ -28,13 +28,16 @@ export type VariantDetail = {
   price: number;
   originalPrice: number | null;
   detailImages: string[];
-  sizeStocks: { size: string; stock: number }[];
+  dtfDesignId: string | null;
+  sizeStocks: { size: string }[];
 };
 
 type Props = {
   productId: string;
   name: string;
   variants: VariantDetail[];
+  plainStockRows: { id: string; colorSlug: string; size: string; quantity: number }[];
+  designStockRows: { id: string; quantity: number }[];
   defaultColorSlug: string;
   ratingAvg: number;
   ratingCount: number;
@@ -46,7 +49,7 @@ function discountPct(price: number, original: number): number {
 }
 
 export function BuyBoxClient({
-  productId, name, variants, defaultColorSlug, ratingAvg, ratingCount, shareUrl,
+  productId, name, variants, plainStockRows, designStockRows, defaultColorSlug, ratingAvg, ratingCount, shareUrl,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -55,6 +58,9 @@ export function BuyBoxClient({
   const { freeThreshold: FREE_DELIVERY_THRESHOLD } = useDeliveryConfig();
   const { has: isWishlisted, toggle: toggleWishlist } = useWishlist();
   const wishlisted = isWishlisted(productId);
+
+  const plainStock = useMemo(() => buildPlainStockMap(plainStockRows), [plainStockRows]);
+  const designStock = useMemo(() => buildDesignStockMap(designStockRows), [designStockRows]);
 
   const colorParam = searchParams.get("color");
   const buyNowIntent = searchParams.get("action") === "buy-now";
@@ -73,10 +79,10 @@ export function BuyBoxClient({
   const price = selectedVariant.price;
   const originalPrice = selectedVariant.originalPrice;
   const image = selectedVariant.detailImages[0] ?? "";
-  const inStock = variantInStock(selectedVariant.sizeStocks);
+  const inStock = variantInStock(selectedVariant.sizeStocks, selectedVariant.colorSlug, selectedVariant.dtfDesignId, plainStock, designStock);
   const sizeList = selectedVariant.sizeStocks.map((s) => s.size);
-  const inStockSizes = new Set(availableSizes(selectedVariant.sizeStocks));
-  const sizeStock = selectedSize ? stockForSize(selectedVariant.sizeStocks, selectedSize) : 0;
+  const inStockSizes = new Set(availableSizes(selectedVariant.sizeStocks, selectedVariant.colorSlug, selectedVariant.dtfDesignId, plainStock, designStock));
+  const sizeStock = selectedSize ? stockForSize(selectedVariant.colorSlug, selectedSize, selectedVariant.dtfDesignId, plainStock, designStock) : 0;
   const qtyMax = Math.min(selectedSize ? sizeStock : 10, 10);
   // Show the exact per-size count only once a size is chosen; before that, a
   // generic "in stock" (a value above the low-stock threshold) so we never
