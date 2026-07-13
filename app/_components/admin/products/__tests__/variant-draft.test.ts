@@ -10,8 +10,7 @@ describe("variant-draft", () => {
   it("emptyVariant() returns a blank draft with the standard sizes", () => {
     const v = emptyVariant();
     expect(v).toMatchObject({ color: "", colorSlug: "", sku: "", cardImages: [], detailImages: [] });
-    expect(v.sizeStocks.map((s) => s.size)).toEqual(["S", "M", "L", "XL"]);
-    expect(v.sizeStocks.every((s) => s.stock === "0")).toBe(true);
+    expect(v.sizeStocks).toEqual([{ size: "S" }, { size: "M" }, { size: "L" }, { size: "XL" }]);
     expect(v.id).toBeUndefined();
   });
 
