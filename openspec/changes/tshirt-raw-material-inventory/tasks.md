@@ -27,7 +27,7 @@ is the source of truth for HOW; this file tracks WHICH of its 21 tasks are done.
 ## 4. Product editor
 
 - [x] 4.1 Add required `dtfDesignId` to product create/update; drop `stock` from the size-input schema in `app/admin/products/actions.ts` (Plan Task 13)
-- [ ] 4.2 Add the DTF Design dropdown, drop the per-size stock input, add a color datalist across `variant-draft.ts`/`variant-editor.tsx`/`product-form.tsx`/the new+edit pages (Plan Task 14)
+- [x] 4.2 Add the DTF Design dropdown, drop the per-size stock input, add a color datalist across `variant-draft.ts`/`variant-editor.tsx`/`product-form.tsx`/the new+edit pages (Plan Task 14)
 
 ## 5. Admin dashboard and product list
 
