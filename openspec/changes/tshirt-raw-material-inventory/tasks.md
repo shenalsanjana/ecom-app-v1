@@ -36,7 +36,7 @@ is the source of truth for HOW; this file tracks WHICH of its 21 tasks are done.
 
 ## 6. Storefront
 
-- [ ] 6.1 Rewire `app/_lib/products.ts` (`cardSelect`, `attachAggregates`, `getProductDetail`, `getProducts`) onto the two pools (Plan Task 17)
+- [x] 6.1 Rewire `app/_lib/products.ts` (`cardSelect`, `attachAggregates`, `getProductDetail`, `getProducts`) onto the two pools (Plan Task 17)
 - [ ] 6.2 Wire `buy-box-client.tsx`, `product-jsonld.tsx`, and the PDP page onto the two pools (Plan Task 18)
 - [ ] 6.3 Wire the Meta catalog feed route onto the two pools (Plan Task 19)
 
