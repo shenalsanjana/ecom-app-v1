@@ -42,8 +42,8 @@ is the source of truth for HOW; this file tracks WHICH of its 21 tasks are done.
 
 ## 7. Seed data and cleanup migration
 
-- [ ] 7.1 Seed demo raw-material pools and per-product design assignment in `prisma/seed.ts` / `app/_data/mock.ts` (Plan Task 20)
-- [ ] 7.2 Full-project `tsc --noEmit` and `npm run test` pass with zero errors/failures (Plan Task 20, Step 3-4)
+- [x] 7.1 Seed demo raw-material pools and per-product design assignment in `prisma/seed.ts` / `app/_data/mock.ts` (Plan Task 20)
+- [x] 7.2 Full-project `tsc --noEmit` and `npm run test` pass with zero errors/failures (Plan Task 20, Step 3-4)
 - [ ] 7.3 Write Migration B (drop `VariantSizeStock.stock`) — do not apply until Tasks 1–20's app code is deployed and confirmed live (Plan Task 21)
 
 ## 8. Rollout (post-merge, outside this codebase change)
