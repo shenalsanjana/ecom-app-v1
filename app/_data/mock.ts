@@ -4,7 +4,7 @@ export type Category = {
   image: string;
 };
 
-export type MockSize = { size: string; stock?: number };
+export type MockSize = { size: string };
 
 export type MockVariant = {
   color: string;
@@ -13,8 +13,10 @@ export type MockVariant = {
   sku?: string;
   price?: number;        // optional override; default is the product base price
   originalPrice?: number;
-  sizes: MockSize[];     // stock omitted => deterministic seed default
+  sizes: MockSize[];
 };
+
+export type MockDesign = { name: string; slug: string };
 
 export type MockProduct = {
   id: string;            // product-level slug/id, color-free
@@ -22,6 +24,7 @@ export type MockProduct = {
   price: number;
   originalPrice?: number;
   category: string;
+  design: MockDesign;    // the DTF print design this product is built on
   variants: MockVariant[];
 };
 
@@ -49,6 +52,6 @@ function variantsFor(productId: string): MockVariant[] {
 }
 
 export const catalogProducts: MockProduct[] = [
-  { id: "oversize-cat-tshirt",  name: "Oversize Cat T-Shirt",  price: 2190, category: "cat",  variants: variantsFor("oversize-cat-tshirt") },
-  { id: "oversize-dino-tshirt", name: "Oversize Dino T-Shirt", price: 2190, category: "dino", variants: variantsFor("oversize-dino-tshirt") },
+  { id: "oversize-cat-tshirt",  name: "Oversize Cat T-Shirt",  price: 2190, category: "cat",  design: { name: "Cat", slug: "cat" },   variants: variantsFor("oversize-cat-tshirt") },
+  { id: "oversize-dino-tshirt", name: "Oversize Dino T-Shirt", price: 2190, category: "dino", design: { name: "Dino", slug: "dino" }, variants: variantsFor("oversize-dino-tshirt") },
 ];
