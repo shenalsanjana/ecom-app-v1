@@ -130,7 +130,7 @@ export async function bookCourierAndNotify(params: {
     customer_address: buildAddressLine(order.shippingAddress),
     customer_phone: toLocalSriLankaPhone(order.customerPhone),
     customer_secondary_phone: order.alternatePhone ? toLocalSriLankaPhone(order.alternatePhone) : null,
-    customer_email: order.customerEmail ?? null,
+    customer_email: order.customerEmail || null,
     weight: DEFAULT_WEIGHT(),
     cod: order.paymentMethod === "COD" ? order.total : 0,
     description: buildDescription(order.items),

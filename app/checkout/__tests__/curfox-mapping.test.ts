@@ -167,6 +167,11 @@ describe("Curfox payload mirrors customer-entered details", () => {
       const item = await callAndGetItem();
       expect(item.customer_email).toBe("jane@example.com");
     });
+
+    it("is null when no email is provided (guest checkout, empty-string convention)", async () => {
+      const item = await callAndGetItem({ ...ORDER, customerEmail: "" });
+      expect(item.customer_email).toBeNull();
+    });
   });
 
   describe("cod amount", () => {
