@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { listProducts, listCategories, buildProductWhere, PRODUCT_TABS, PAGE_SIZE, type ProductTab } from "@/app/_lib/admin-products";
+import { listProducts, listCategories, resolveProductWhere, PRODUCT_TABS, PAGE_SIZE, type ProductTab } from "@/app/_lib/admin-products";
 import { prisma } from "@/app/_lib/prisma";
 import { ProductsToolbar } from "@/app/_components/admin/products/products-toolbar";
 import { ProductsTable } from "@/app/_components/admin/products/products-table";
@@ -11,11 +11,11 @@ export default async function AdminProductsPage({
   const tab = (sp.tab as ProductTab) || "active";
   const page = Number(sp.page ?? "1") || 1;
 
-  const [{ rows, total }, categories, counts] = await Promise.all([
+  const [{ rows, total, plainStock, designStock }, categories, counts] = await Promise.all([
     listProducts({ tab, category: sp.category, q: sp.q, page }),
     listCategories(),
     Promise.all(
-      PRODUCT_TABS.map(async (t) => [t, await prisma.product.count({ where: buildProductWhere({ tab: t }) })] as const),
+      PRODUCT_TABS.map(async (t) => [t, await prisma.product.count({ where: await resolveProductWhere({ tab: t }) })] as const),
     ).then((entries) => Object.fromEntries(entries) as Record<ProductTab, number>),
   ]);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -34,7 +34,7 @@ export default async function AdminProductsPage({
     <section>
       <h1 className="mb-6 text-2xl font-semibold tracking-tight">Products</h1>
       <ProductsToolbar categories={categories.map((c) => ({ slug: c.slug, name: c.name }))} counts={counts} />
-      <ProductsTable rows={rows} />
+      <ProductsTable rows={rows} plainStock={plainStock} designStock={designStock} />
       <div className="mt-4 flex items-center gap-3 text-sm text-muted-foreground">
         {page > 1
           ? <Link href={pageHref(page - 1)} className="rounded-md border px-3 py-1 hover:bg-secondary">← Prev</Link>

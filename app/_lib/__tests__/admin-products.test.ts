@@ -35,11 +35,8 @@ describe("buildProductWhere", () => {
   it("active tab → archived:false", () => {
     expect(buildProductWhere({ tab: "active" })).toEqual({ archived: false });
   });
-  it("low-stock tab → archived:false + any LIVE variant size cell at/below threshold", () => {
-    expect(buildProductWhere({ tab: "low-stock" })).toEqual({
-      archived: false,
-      variants: { some: { archived: false, sizeStocks: { some: { stock: { lte: 5 } } } } },
-    });
+  it("low-stock tab behaves like active (archived:false) — id filtering is layered on by resolveProductWhere, not this function", () => {
+    expect(buildProductWhere({ tab: "low-stock" })).toEqual({ archived: false });
   });
   it("archived tab → archived:true", () => {
     expect(buildProductWhere({ tab: "archived" })).toEqual({ archived: true });
