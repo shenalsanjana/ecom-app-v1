@@ -346,6 +346,26 @@ describe("editItems", () => {
 
     expect(res).toEqual({ success: true });
   });
+
+  it("is blocked once the courier is booked", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...ORDER, courierBookedAt: new Date() });
+    const res = await editItems("o1", [{ id: "i1", quantity: 1 }]);
+    expect(res).toEqual({ success: false, error: "Order already sent to Curfox — cancel/rebook there to make changes." });
+    expect(orderUpdate).not.toHaveBeenCalled();
+  });
+
+  it("includes existing adjustments when recomputing totals", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...ORDER, adjustments: [{ id: "a1", amount: 500 }] });
+    orderUpdate.mockResolvedValueOnce({});
+    orderItemUpdate.mockResolvedValueOnce({});
+    const res = await editItems("o1", [{ id: "i1", quantity: 1 }]);
+    // subtotal 2000 (qty 1 @ 2000), Colombo shipping 350, +500 adjustment = 2850
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "o1" },
+      data: expect.objectContaining({ subtotal: 2000, shippingCost: 350, total: 2850 }),
+    }));
+    expect(res).toEqual({ success: true });
+  });
 });
 
 import { editAddress } from "../actions";
@@ -373,6 +393,22 @@ describe("editAddress", () => {
         shippingCost: 450, total: 1450,
       }),
     });
+    expect(res).toEqual({ success: true });
+  });
+
+  it("includes existing adjustments when recomputing totals for the new city", async () => {
+    orderFindUnique.mockResolvedValueOnce({
+      id: "o1", status: "CONFIRMED", courierBookedAt: null,
+      items: [{ price: 1000, quantity: 1 }],
+      adjustments: [{ amount: -200 }],
+    });
+    orderUpdate.mockResolvedValueOnce({});
+    const res = await editAddress("o1", ADDR);
+    // subtotal 1000, Kandy shipping 450, -200 adjustment = 1250
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "o1" },
+      data: expect.objectContaining({ shippingCost: 450, total: 1250 }),
+    }));
     expect(res).toEqual({ success: true });
   });
 });

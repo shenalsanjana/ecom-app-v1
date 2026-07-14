@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/app/_lib/prisma";
 import { requireAdmin } from "@/app/_lib/admin-auth";
-import { nextStatuses, applyItemChanges, recomputeTotals, canEdit, canConfirm, type ItemChange } from "@/app/_lib/admin-orders";
+import { nextStatuses, applyItemChanges, recomputeTotals, canEdit, canConfirm, courierBookedError, type ItemChange } from "@/app/_lib/admin-orders";
 import { getDeliveryConfig } from "@/app/_lib/store-settings";
 import { restoreItemPools, acquireItemPools } from "@/app/_lib/inventory-pools";
 import { bookCourierAndNotify } from "@/app/checkout/book-courier";
@@ -144,11 +144,11 @@ export async function editAddress(
   const parsed = AddressSchema.safeParse(address);
   if (!parsed.success) return { success: false, error: "Invalid address" };
 
-  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
+  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true, adjustments: true } });
   if (!order) return { success: false, error: "Order not found" };
   if (order.courierBookedAt) return { success: false, error: "Address already sent to Curfox — cancel/rebook there." };
 
-  const totals = recomputeTotals(order.items, parsed.data.city, await getDeliveryConfig());
+  const totals = recomputeTotals(order.items, parsed.data.city, await getDeliveryConfig(), order.adjustments);
   try {
     await prisma.order.update({
       where: { id: orderId },
@@ -192,10 +192,12 @@ export async function editItems(orderId: string, changes: ItemChange[]): Promise
   await requireAdmin();
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: { items: true },
+    include: { items: true, adjustments: true },
   });
   if (!order) return { success: false, error: "Order not found" };
   if (!canEdit(order)) return { success: false, error: "This order can no longer be edited" };
+  const courierError = courierBookedError(order);
+  if (courierError) return { success: false, error: courierError };
 
   let next;
   try {
@@ -210,7 +212,7 @@ export async function editItems(orderId: string, changes: ItemChange[]): Promise
     return { success: false, error: e instanceof Error ? e.message : "Invalid change" };
   }
 
-  const totals = recomputeTotals(next.nextItems, order.shippingCity, await getDeliveryConfig());
+  const totals = recomputeTotals(next.nextItems, order.shippingCity, await getDeliveryConfig(), order.adjustments);
 
   try {
     await prisma.$transaction(async (tx) => {
