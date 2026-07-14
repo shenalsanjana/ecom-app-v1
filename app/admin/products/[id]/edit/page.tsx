@@ -9,7 +9,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
     getProduct(id), listCategories(), listDtfDesigns(), listPlainTshirtStock(),
   ]);
   if (!product) notFound();
-  const plainTeeColors = [...new Set(plainStock.map((s) => s.color))];
+  const plainTeeColors = [...new Map(plainStock.map((s) => [s.colorSlug, { color: s.color, colorSlug: s.colorSlug }])).values()];
   return (
     <ProductForm
       mode="edit"

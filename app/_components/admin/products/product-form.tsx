@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { createProduct, updateProduct, archiveProduct, unarchiveProduct } from "@/app/admin/products/actions";
 import { slugify } from "@/app/_lib/product-helpers";
 import { CategorySelect } from "./category-select";
-import { VariantEditor } from "./variant-editor";
+import { VariantEditor, type KnownColor } from "./variant-editor";
 import { emptyVariant, type VariantDraft } from "./variant-draft";
 
 type Cat = { slug: string; name: string };
@@ -24,7 +24,7 @@ function toNum(s: string): number | null {
 export function ProductForm({
   mode, categories, designs, plainTeeColors, initial,
 }: {
-  mode: "create" | "edit"; categories: Cat[]; designs: Design[]; plainTeeColors: string[]; initial: Initial;
+  mode: "create" | "edit"; categories: Cat[]; designs: Design[]; plainTeeColors: KnownColor[]; initial: Initial;
 }) {
   const router = useRouter();
   const [f, setF] = useState(initial);

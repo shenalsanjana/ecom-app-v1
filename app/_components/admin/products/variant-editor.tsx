@@ -1,5 +1,4 @@
 "use client";
-import { slugify } from "@/app/_lib/product-helpers";
 import { GalleryEditor } from "./gallery-editor";
 import { emptyVariant, type VariantDraft } from "./variant-draft";
 
@@ -8,6 +7,8 @@ import { emptyVariant, type VariantDraft } from "./variant-draft";
 export { emptyVariant };
 export type { VariantDraft };
 
+export type KnownColor = { color: string; colorSlug: string };
+
 export function VariantEditor({
   value,
   onChange,
@@ -15,7 +16,11 @@ export function VariantEditor({
 }: {
   value: VariantDraft[];
   onChange: (v: VariantDraft[]) => void;
-  knownColors?: string[]; // Plain T-Shirt Stock colors — suggested, not enforced.
+  // Plain T-Shirt Stock colors. This is the only source of colors a variant
+  // can use — new colors are created in /admin/inventory, not here, so a
+  // variant's colorSlug always matches a real PlainTshirtStock row instead
+  // of a free-typed value that silently fails to join with stock.
+  knownColors?: KnownColor[];
 }) {
   const update = (i: number, patch: Partial<VariantDraft>) =>
     onChange(value.map((v, j) => (j === i ? { ...v, ...patch } : v)));
@@ -44,9 +49,6 @@ export function VariantEditor({
 
   return (
     <div className="space-y-4">
-      <datalist id="known-plain-tee-colors">
-        {knownColors.map((c) => <option key={c} value={c} />)}
-      </datalist>
       {value.map((v, i) => (
         <div key={i} className="rounded-lg border p-4 space-y-3">
           <div className="flex items-center gap-2">
@@ -61,12 +63,22 @@ export function VariantEditor({
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div>
-              <label className="text-xs text-muted-foreground">Color name</label>
-              <input list="known-plain-tee-colors" value={v.color} onChange={(e) => update(i, { color: e.target.value, colorSlug: v.colorSlug || slugify(e.target.value) })} className="w-full rounded border px-2 py-1 text-sm" />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Color slug</label>
-              <input value={v.colorSlug} onChange={(e) => update(i, { colorSlug: slugify(e.target.value) })} className="w-full rounded border px-2 py-1 text-sm" />
+              <label className="text-xs text-muted-foreground">Color</label>
+              <select
+                value={v.colorSlug}
+                onChange={(e) => {
+                  const known = knownColors.find((k) => k.colorSlug === e.target.value);
+                  update(i, { colorSlug: e.target.value, color: known?.color ?? "" });
+                }}
+                className="w-full rounded border px-2 py-1 text-sm"
+              >
+                <option value="">Select a color…</option>
+                {/* Keep the currently-saved color selectable even if it's since been removed from Inventory, so existing data doesn't silently blank out. */}
+                {v.colorSlug && !knownColors.some((k) => k.colorSlug === v.colorSlug) && (
+                  <option value={v.colorSlug}>{v.color || v.colorSlug} (not in Inventory)</option>
+                )}
+                {knownColors.map((k) => <option key={k.colorSlug} value={k.colorSlug}>{k.color}</option>)}
+              </select>
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Swatch color</label>

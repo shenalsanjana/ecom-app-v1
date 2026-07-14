@@ -7,7 +7,7 @@ export default async function NewProductPage() {
   const [categories, designs, plainStock] = await Promise.all([
     listCategories(), listDtfDesigns(), listPlainTshirtStock(),
   ]);
-  const plainTeeColors = [...new Set(plainStock.map((s) => s.color))];
+  const plainTeeColors = [...new Map(plainStock.map((s) => [s.colorSlug, { color: s.color, colorSlug: s.colorSlug }])).values()];
   return (
     <ProductForm
       mode="create"
