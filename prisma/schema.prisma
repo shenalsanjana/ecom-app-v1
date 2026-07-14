@@ -65,8 +65,10 @@ model Product {
   description   String
   categorySlug  String
   archived      Boolean  @default(false)
+  dtfDesignId   String?
 
   category      Category       @relation(fields: [categorySlug], references: [slug])
+  dtfDesign     DtfDesign?     @relation(fields: [dtfDesignId], references: [id], onDelete: Restrict)
   wishlistItems WishlistItem[]
   reviews       Review[]
   orderItems    OrderItem[]
@@ -75,6 +77,7 @@ model Product {
 
   @@index([categorySlug])
   @@index([archived])
+  @@index([dtfDesignId])
 }
 
 model ProductSlugHistory {
@@ -122,12 +125,38 @@ model VariantSizeStock {
   id        String @id @default(cuid())
   variantId String
   size      String
-  stock     Int    @default(0)
 
   variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
   @@unique([variantId, size])
   @@index([variantId])
+}
+
+model PlainTshirtStock {
+  id        String   @id @default(cuid())
+  // color: display, e.g. "White"; colorSlug: matches ProductVariant.colorSlug
+  color     String
+  colorSlug String
+  size      String
+  quantity  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orderItems OrderItem[]
+
+  @@unique([colorSlug, size])
+}
+
+model DtfDesign {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  quantity  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products   Product[]
+  orderItems OrderItem[]
 }
 
 model Review {
@@ -213,27 +242,33 @@ model Order {
 }
 
 model OrderItem {
-  id        String  @id @default(cuid())
-  orderId   String
+  id                 String  @id @default(cuid())
+  orderId            String
   // Nullable: a product may be hard-deleted while its order history lives on.
   // The line item keeps its own name/size/price/quantity snapshot, so deleting
   // the product (onDelete: SetNull) preserves the historical record.
-  productId String?
-  variantId String?
-  color     String?
-  sku       String?
-  name      String
-  size      String?
-  price     Float
-  quantity  Int
+  productId          String?
+  variantId          String?
+  color              String?
+  sku                String?
+  name               String
+  size               String?
+  price              Float
+  quantity           Int
+  plainTshirtStockId String?
+  dtfDesignId        String?
 
-  order     Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product   Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
-  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product          Product?          @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variant          ProductVariant?   @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  plainTshirtStock PlainTshirtStock? @relation(fields: [plainTshirtStockId], references: [id], onDelete: SetNull)
+  dtfDesign        DtfDesign?        @relation(fields: [dtfDesignId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
   @@index([productId])
   @@index([variantId])
+  @@index([plainTshirtStockId])
+  @@index([dtfDesignId])
 }
 
 model OrderNote {

@@ -3,7 +3,7 @@ import { unstable_cache } from "next/cache";
 
 import { prisma } from "@/app/_lib/prisma";
 import type { Category, Prisma, Product, Review } from "@prisma/client";
-import { effectivePrice, effectiveOriginalPrice, availableSizes, sortSizeStocks } from "@/app/_lib/variants";
+import { effectivePrice, effectiveOriginalPrice, availableSizes, sortSizeStocks, buildPlainStockMap, buildDesignStockMap } from "@/app/_lib/variants";
 
 export type ProductCardVariant = {
   id: string;
@@ -35,14 +35,14 @@ export type CategoryView = {
 // Shared select for every product-card list read. `satisfies` keeps the literal
 // types so `ProductGetPayload` below infers the exact row shape.
 const cardSelect = {
-  id: true, name: true, price: true, originalPrice: true, categorySlug: true,
+  id: true, name: true, price: true, originalPrice: true, categorySlug: true, dtfDesignId: true,
   variants: {
     where: { archived: false },
     orderBy: { sortOrder: "asc" },
     select: {
       id: true, colorSlug: true, color: true, swatchHex: true, price: true, originalPrice: true, sortOrder: true,
       images: { where: { role: "CARD" }, orderBy: { sortOrder: "asc" }, select: { url: true } },
-      sizeStocks: { select: { size: true, stock: true } },
+      sizeStocks: { select: { size: true } },
     },
   },
 } satisfies Prisma.ProductSelect;
@@ -60,12 +60,18 @@ async function attachAggregates(rows: ProductRow[]): Promise<ProductView[]> {
   const usable = rows.filter((r) => r.variants.length > 0);
   if (usable.length === 0) return [];
   const ids = usable.map((r) => r.id);
-  const grouped = await prisma.review.groupBy({
-    by: ["productId"],
-    where: { productId: { in: ids }, approved: true },
-    _avg: { rating: true },
-    _count: { _all: true },
-  });
+  const [grouped, plainStockRows, designStockRows] = await Promise.all([
+    prisma.review.groupBy({
+      by: ["productId"],
+      where: { productId: { in: ids }, approved: true },
+      _avg: { rating: true },
+      _count: { _all: true },
+    }),
+    prisma.plainTshirtStock.findMany({ select: { id: true, colorSlug: true, size: true, quantity: true } }),
+    prisma.dtfDesign.findMany({ select: { id: true, quantity: true } }),
+  ]);
+  const plainStock = buildPlainStockMap(plainStockRows);
+  const designStock = buildDesignStockMap(designStockRows);
   const map = new Map(
     grouped.map((g) => [g.productId, { avg: g._avg.rating ?? 0, count: g._count._all }]),
   );
@@ -79,7 +85,7 @@ async function attachAggregates(rows: ProductRow[]): Promise<ProductView[]> {
       price: effectivePrice(v, p),
       originalPrice: effectiveOriginalPrice(v, p),
       cardImages: v.images.map((im) => im.url),
-      sizes: availableSizes(sortSizeStocks(v.sizeStocks)),
+      sizes: availableSizes(sortSizeStocks(v.sizeStocks), v.colorSlug, p.dtfDesignId, plainStock, designStock),
     }));
     return {
       id: p.id,
@@ -158,12 +164,18 @@ export type VariantDetail = {
   price: number;                       // effective
   originalPrice: number | null;        // effective
   detailImages: string[];              // sorted DETAIL urls
-  sizeStocks: { size: string; stock: number }[];
+  dtfDesignId: string | null;
+  sizeStocks: { size: string }[];
 };
 
 export type ProductDetail = {
   product: Product & { category: Category };
   variants: VariantDetail[];
+  // Raw pool rows, not Maps — Maps aren't serializable across the Server→Client
+  // Component boundary. Client consumers (buy-box-client, product-jsonld isn't
+  // one but shares the type) rebuild the maps via buildPlainStockMap/buildDesignStockMap.
+  plainStockRows: { id: string; colorSlug: string; size: string; quantity: number }[];
+  designStockRows: { id: string; quantity: number }[];
   ratingAvg: number;
   ratingCount: number;
   related: ProductView[];
@@ -187,6 +199,11 @@ export const getProductDetail = unstable_cache(
     });
     if (!product || product.variants.length === 0) return null;
 
+    const [plainStockRows, designStockRows] = await Promise.all([
+      prisma.plainTshirtStock.findMany({ select: { id: true, colorSlug: true, size: true, quantity: true } }),
+      prisma.dtfDesign.findMany({ select: { id: true, quantity: true } }),
+    ]);
+
     const variants: VariantDetail[] = product.variants.map((v) => ({
       id: v.id,
       color: v.color,
@@ -196,7 +213,8 @@ export const getProductDetail = unstable_cache(
       price: effectivePrice(v, product),
       originalPrice: effectiveOriginalPrice(v, product),
       detailImages: v.images.map((im) => im.url),
-      sizeStocks: sortSizeStocks(v.sizeStocks).map((s) => ({ size: s.size, stock: s.stock })),
+      dtfDesignId: product.dtfDesignId,
+      sizeStocks: sortSizeStocks(v.sizeStocks).map((s) => ({ size: s.size })),
     }));
 
     const [agg, relatedRows] = await Promise.all([
@@ -221,6 +239,8 @@ export const getProductDetail = unstable_cache(
     return {
       product: productScalars,
       variants,
+      plainStockRows,
+      designStockRows,
       ratingAvg: agg._avg.rating ?? 0,
       ratingCount: agg._count._all,
       related: await attachAggregates(relatedRows),
@@ -329,10 +349,8 @@ export async function getProducts(opts: GetProductsOptions = {}): Promise<Produc
     where.price = priceFilter;
   }
 
-  // In stock only filter
-  if (inStockOnly) {
-    where.variants = { some: { sizeStocks: { some: { stock: { gt: 0 } } } } };
-  }
+  // In stock only filter moves below, after attachAggregates — quantity no
+  // longer lives on the product/variant row, so it can't be a where-clause.
 
   // Sort order
   let orderBy: Prisma.ProductOrderByWithRelationInput;
@@ -362,7 +380,14 @@ export async function getProducts(opts: GetProductsOptions = {}): Promise<Produc
     select: cardSelect,
   });
 
-  const views = await attachAggregates(rows);
+  let views = await attachAggregates(rows);
+
+  // attachAggregates already computed each variant's real available sizes
+  // (both pools checked); "in stock" is simply "at least one variant has at
+  // least one available size".
+  if (inStockOnly) {
+    views = views.filter((v) => v.variants.some((variant) => variant.sizes.length > 0));
+  }
 
   // If sorting by rating, do it client-side
   if (sortBy === "rating") {

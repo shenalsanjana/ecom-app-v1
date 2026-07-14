@@ -90,6 +90,8 @@ export default async function ProductPage({
       <ProductJsonLd
         product={{ id: detail.product.id, name: detail.product.name, description: detail.product.description }}
         variants={detail.variants}
+        plainStockRows={detail.plainStockRows}
+        designStockRows={detail.designStockRows}
         ratingAvg={detail.ratingAvg}
         ratingCount={detail.ratingCount}
       />
@@ -115,6 +117,8 @@ export default async function ProductPage({
               productId={detail.product.id}
               name={detail.product.name}
               variants={detail.variants}
+              plainStockRows={detail.plainStockRows}
+              designStockRows={detail.designStockRows}
               defaultColorSlug={detail.variants[0].colorSlug}
               ratingAvg={detail.ratingAvg}
               ratingCount={detail.ratingCount}

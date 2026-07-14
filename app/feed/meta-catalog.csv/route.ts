@@ -5,27 +5,34 @@
 // out of stock) so ad history is retained. One row per color variant.
 import { prisma } from "@/app/_lib/prisma";
 import { variantToFeedRow, feedRowsToCsv, type FeedVariant } from "@/app/_lib/meta-feed";
+import { variantInStock, buildPlainStockMap, buildDesignStockMap } from "@/app/_lib/variants";
 
 export const runtime = "nodejs";
 export const revalidate = 3600;
 
 export async function GET() {
-  const products = await prisma.product.findMany({
-    where: { archived: false },
-    orderBy: { id: "asc" },
-    select: {
-      id: true, name: true, description: true, price: true, originalPrice: true,
-      variants: {
-        where: { archived: false },
-        orderBy: { sortOrder: "asc" },
-        select: {
-          color: true, colorSlug: true, sku: true, price: true, originalPrice: true,
-          images: { where: { role: "CARD" }, orderBy: { sortOrder: "asc" }, select: { url: true }, take: 1 },
-          sizeStocks: { select: { stock: true } },
+  const [products, plainStockRows, designStockRows] = await Promise.all([
+    prisma.product.findMany({
+      where: { archived: false },
+      orderBy: { id: "asc" },
+      select: {
+        id: true, name: true, description: true, price: true, originalPrice: true, dtfDesignId: true,
+        variants: {
+          where: { archived: false },
+          orderBy: { sortOrder: "asc" },
+          select: {
+            color: true, colorSlug: true, sku: true, price: true, originalPrice: true,
+            images: { where: { role: "CARD" }, orderBy: { sortOrder: "asc" }, select: { url: true }, take: 1 },
+            sizeStocks: { select: { size: true } },
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.plainTshirtStock.findMany({ select: { id: true, colorSlug: true, size: true, quantity: true } }),
+    prisma.dtfDesign.findMany({ select: { id: true, quantity: true } }),
+  ]);
+  const plainStock = buildPlainStockMap(plainStockRows);
+  const designStock = buildDesignStockMap(designStockRows);
 
   const rows = products.flatMap((p) =>
     p.variants.map((v) =>
@@ -38,7 +45,7 @@ export async function GET() {
         sku: v.sku,
         price: v.price ?? p.price,
         originalPrice: v.originalPrice ?? p.originalPrice,
-        inStock: v.sizeStocks.some((s) => s.stock > 0),
+        inStock: variantInStock(v.sizeStocks, v.colorSlug, p.dtfDesignId, plainStock, designStock),
         image: v.images[0]?.url ?? "",
       } satisfies FeedVariant),
     ),

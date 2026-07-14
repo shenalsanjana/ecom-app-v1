@@ -5,19 +5,23 @@ vi.mock("next/cache", () => ({
 }));
 
 const {
-  reviewGroupBy, reviewAggregate, reviewFindMany, productFindUnique, productFindMany,
+  reviewGroupBy, reviewAggregate, reviewFindMany, productFindUnique, productFindMany, plainFindMany, designFindMany,
 } = vi.hoisted(() => ({
   reviewGroupBy: vi.fn(),
   reviewAggregate: vi.fn(),
   reviewFindMany: vi.fn(),
   productFindUnique: vi.fn(),
   productFindMany: vi.fn(),
+  plainFindMany: vi.fn(),
+  designFindMany: vi.fn(),
 }));
 
 vi.mock("@/app/_lib/prisma", () => ({
   prisma: {
     review: { groupBy: reviewGroupBy, aggregate: reviewAggregate, findMany: reviewFindMany },
     product: { findUnique: productFindUnique, findMany: productFindMany },
+    plainTshirtStock: { findMany: plainFindMany },
+    dtfDesign: { findMany: designFindMany },
   },
 }));
 
@@ -29,9 +33,11 @@ beforeEach(() => {
   reviewGroupBy.mockReset().mockResolvedValue([]);
   reviewAggregate.mockReset().mockResolvedValue({ _avg: { rating: null }, _count: { _all: 0 } });
   reviewFindMany.mockReset().mockResolvedValue([]);
+  plainFindMany.mockReset().mockResolvedValue([]);
+  designFindMany.mockReset().mockResolvedValue([]);
   productFindUnique.mockReset().mockResolvedValue({
     id: "cat-white", name: "Cat", price: 2190, originalPrice: null,
-    description: "d", categorySlug: "cat", archived: false,
+    description: "d", categorySlug: "cat", archived: false, dtfDesignId: "d1",
     category: { slug: "cat", name: "Cat", image: "/x.jpg" },
     variants: [{
       id: "var-1", productId: "cat-white", color: "White", colorSlug: "white",
@@ -60,10 +66,10 @@ describe("review readers only see approved reviews", () => {
 
   it("list-rating aggregate filters approved:true", async () => {
     productFindMany.mockResolvedValueOnce([{
-      id: "cat-white", name: "Cat", price: 2190, originalPrice: null, categorySlug: "cat",
+      id: "cat-white", name: "Cat", price: 2190, originalPrice: null, categorySlug: "cat", dtfDesignId: "d1",
       variants: [{
         colorSlug: "white", color: "White", swatchHex: "#ffffff", price: null, originalPrice: null,
-        sortOrder: 0, images: [{ url: "/x.jpg" }], sizeStocks: [{ size: "M", stock: 5 }],
+        sortOrder: 0, images: [{ url: "/x.jpg" }], sizeStocks: [{ size: "M" }],
       }],
     }]);
     await getFeaturedProducts();

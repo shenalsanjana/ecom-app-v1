@@ -61,7 +61,6 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
 
 const VariantSizeInputSchema = z.object({
   size: z.string().trim().min(1),
-  stock: z.number().int().min(0),
 });
 
 const VariantInputSchema = z.object({
@@ -84,6 +83,7 @@ const ProductInputSchema = z.object({
   price: z.number().positive(),
   originalPrice: z.number().positive().nullable().optional(),
   description: z.string().trim().min(1),
+  dtfDesignId: z.string().trim().min(1, "Choose a DTF design"),
   variants: z.array(VariantInputSchema).min(1, "Add at least one color variant"),
 });
 export type VariantInput = z.infer<typeof VariantInputSchema>;
@@ -138,7 +138,7 @@ async function writeVariants(
       ],
     });
     await tx.variantSizeStock.createMany({
-      data: v.sizeStocks.map((s) => ({ variantId: variant.id, size: s.size, stock: s.stock })),
+      data: v.sizeStocks.map((s) => ({ variantId: variant.id, size: s.size })),
     });
   }
 }
@@ -193,7 +193,7 @@ async function reconcileVariants(
     keptIds.add(variantId);
     v.cardImages.forEach((url, j) => imageRows.push({ variantId, url, role: "CARD", sortOrder: j }));
     v.detailImages.forEach((url, j) => imageRows.push({ variantId, url, role: "DETAIL", sortOrder: j }));
-    v.sizeStocks.forEach((s) => sizeRows.push({ variantId, size: s.size, stock: s.stock }));
+    v.sizeStocks.forEach((s) => sizeRows.push({ variantId, size: s.size }));
   }
 
   // Rebuild every kept variant's images + size cells with one delete + one insert
@@ -237,7 +237,7 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
     await prisma.$transaction(async (tx) => {
       await tx.product.create({
         data: {
-          id: slug, name: d.name, categorySlug: d.categorySlug,
+          id: slug, name: d.name, categorySlug: d.categorySlug, dtfDesignId: d.dtfDesignId,
           price: d.price, originalPrice: d.originalPrice ?? null,
           description: d.description, archived: false,
         },
@@ -274,7 +274,7 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
         await tx.product.update({
           where: { id },
           data: {
-            name: d.name, categorySlug: d.categorySlug,
+            name: d.name, categorySlug: d.categorySlug, dtfDesignId: d.dtfDesignId,
             price: d.price, originalPrice: d.originalPrice ?? null,
             description: d.description,
           },
@@ -300,7 +300,7 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
       await tx.product.update({
         where: { id },
         data: {
-          id: newSlug, name: d.name, categorySlug: d.categorySlug,
+          id: newSlug, name: d.name, categorySlug: d.categorySlug, dtfDesignId: d.dtfDesignId,
           price: d.price, originalPrice: d.originalPrice ?? null,
           description: d.description,
         },

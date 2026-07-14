@@ -11,9 +11,11 @@ export type { VariantDraft };
 export function VariantEditor({
   value,
   onChange,
+  knownColors = [],
 }: {
   value: VariantDraft[];
   onChange: (v: VariantDraft[]) => void;
+  knownColors?: string[]; // Plain T-Shirt Stock colors — suggested, not enforced.
 }) {
   const update = (i: number, patch: Partial<VariantDraft>) =>
     onChange(value.map((v, j) => (j === i ? { ...v, ...patch } : v)));
@@ -33,10 +35,8 @@ export function VariantEditor({
     onChange([...value.slice(0, i + 1), copy, ...value.slice(i + 1)]);
   };
 
-  const setSizeStock = (vi: number, si: number, stock: string) =>
-    update(vi, { sizeStocks: value[vi].sizeStocks.map((s, j) => (j === si ? { ...s, stock } : s)) });
   const addSize = (vi: number) =>
-    update(vi, { sizeStocks: [...value[vi].sizeStocks, { size: "", stock: "0" }] });
+    update(vi, { sizeStocks: [...value[vi].sizeStocks, { size: "" }] });
   const setSizeName = (vi: number, si: number, size: string) =>
     update(vi, { sizeStocks: value[vi].sizeStocks.map((s, j) => (j === si ? { ...s, size } : s)) });
   const removeSize = (vi: number, si: number) =>
@@ -44,6 +44,9 @@ export function VariantEditor({
 
   return (
     <div className="space-y-4">
+      <datalist id="known-plain-tee-colors">
+        {knownColors.map((c) => <option key={c} value={c} />)}
+      </datalist>
       {value.map((v, i) => (
         <div key={i} className="rounded-lg border p-4 space-y-3">
           <div className="flex items-center gap-2">
@@ -59,7 +62,7 @@ export function VariantEditor({
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div>
               <label className="text-xs text-muted-foreground">Color name</label>
-              <input value={v.color} onChange={(e) => update(i, { color: e.target.value, colorSlug: v.colorSlug || slugify(e.target.value) })} className="w-full rounded border px-2 py-1 text-sm" />
+              <input list="known-plain-tee-colors" value={v.color} onChange={(e) => update(i, { color: e.target.value, colorSlug: v.colorSlug || slugify(e.target.value) })} className="w-full rounded border px-2 py-1 text-sm" />
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Color slug</label>
@@ -95,12 +98,11 @@ export function VariantEditor({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs text-muted-foreground">Size stock</label>
+            <label className="mb-1 block text-xs text-muted-foreground">Sizes offered (quantities are managed in Inventory)</label>
             <div className="space-y-1">
               {v.sizeStocks.map((s, si) => (
                 <div key={si} className="flex items-center gap-2">
                   <input value={s.size} onChange={(e) => setSizeName(i, si, e.target.value)} placeholder="Size" className="w-20 rounded border px-2 py-1 text-sm" />
-                  <input type="number" min={0} value={s.stock} onChange={(e) => setSizeStock(i, si, e.target.value)} className="w-24 rounded border px-2 py-1 text-sm" />
                   <button type="button" onClick={() => removeSize(i, si)} className="px-1 text-destructive">✕</button>
                 </div>
               ))}

@@ -20,11 +20,9 @@ test.beforeAll(async () => {
     update: { passwordHash, name: NAME, phone: SAVED_PHONE },
     create: { name: NAME, email: EMAIL, passwordHash, phone: SAVED_PHONE },
   });
-  // Ensure all variant size-stock cells have enough stock so the test is idempotent across runs.
-  await prisma.variantSizeStock.updateMany({
-    where: { stock: { lt: 10 } },
-    data: { stock: 20 },
-  });
+  // Ensure both raw-material pools have enough quantity so the test is idempotent across runs.
+  await prisma.plainTshirtStock.updateMany({ where: { quantity: { lt: 10 } }, data: { quantity: 20 } });
+  await prisma.dtfDesign.updateMany({ where: { quantity: { lt: 10 } }, data: { quantity: 20 } });
 });
 
 test.afterAll(async () => {
@@ -34,11 +32,9 @@ test.afterAll(async () => {
     await prisma.order.deleteMany({ where: { userId: user.id } });
   }
   await prisma.user.deleteMany({ where: { email: EMAIL } });
-  // Restore stock that may have been decremented during the test.
-  await prisma.variantSizeStock.updateMany({
-    where: { stock: { lt: 10 } },
-    data: { stock: 20 },
-  });
+  // Restore quantity that may have been decremented during the test.
+  await prisma.plainTshirtStock.updateMany({ where: { quantity: { lt: 10 } }, data: { quantity: 20 } });
+  await prisma.dtfDesign.updateMany({ where: { quantity: { lt: 10 } }, data: { quantity: 20 } });
   await prisma.$disconnect();
 });
 

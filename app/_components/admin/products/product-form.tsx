@@ -8,9 +8,10 @@ import { VariantEditor } from "./variant-editor";
 import { emptyVariant, type VariantDraft } from "./variant-draft";
 
 type Cat = { slug: string; name: string };
+type Design = { id: string; name: string };
 type Initial = {
   id?: string; name: string; categorySlug: string; price: string; originalPrice: string;
-  description: string; archived: boolean; variants: VariantDraft[];
+  description: string; archived: boolean; dtfDesignId: string; variants: VariantDraft[];
 };
 
 function toNum(s: string): number | null {
@@ -20,7 +21,11 @@ function toNum(s: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function ProductForm({ mode, categories, initial }: { mode: "create" | "edit"; categories: Cat[]; initial: Initial }) {
+export function ProductForm({
+  mode, categories, designs, plainTeeColors, initial,
+}: {
+  mode: "create" | "edit"; categories: Cat[]; designs: Design[]; plainTeeColors: string[]; initial: Initial;
+}) {
   const router = useRouter();
   const [f, setF] = useState(initial);
   const [slugTouched, setSlugTouched] = useState(false);
@@ -33,6 +38,7 @@ export function ProductForm({ mode, categories, initial }: { mode: "create" | "e
       name: f.name.trim(), slug, categorySlug: f.categorySlug,
       price: Number(f.price), originalPrice: toNum(f.originalPrice),
       description: f.description.trim(),
+      dtfDesignId: f.dtfDesignId,
       variants: f.variants.map((v) => ({
         id: v.id,
         color: v.color.trim(),
@@ -43,9 +49,7 @@ export function ProductForm({ mode, categories, initial }: { mode: "create" | "e
         originalPrice: toNum(v.originalPrice),
         cardImages: v.cardImages.map((u) => u.trim()).filter(Boolean),
         detailImages: v.detailImages.map((u) => u.trim()).filter(Boolean),
-        sizeStocks: v.sizeStocks
-          .map((s) => ({ size: s.size.trim(), stock: Math.max(0, Math.trunc(Number(s.stock) || 0)) }))
-          .filter((s) => s.size),
+        sizeStocks: v.sizeStocks.map((s) => ({ size: s.size.trim() })).filter((s) => s.size),
       })),
     };
     start(async () => {
@@ -81,6 +85,12 @@ export function ProductForm({ mode, categories, initial }: { mode: "create" | "e
             <input value={slug} onChange={(e) => { setSlugTouched(true); setSlug(slugify(e.target.value)); }} className="w-full rounded border px-2 py-1.5 text-sm" /></div>
           <div><label className="text-xs text-muted-foreground">Category</label>
             <CategorySelect categories={categories} value={f.categorySlug} onChange={(s) => set("categorySlug", s)} /></div>
+          <div><label className="text-xs text-muted-foreground">DTF design</label>
+            <select value={f.dtfDesignId} onChange={(e) => set("dtfDesignId", e.target.value)} className="w-full rounded border px-2 py-1.5 text-sm">
+              <option value="">Select a design…</option>
+              {designs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </div>
         </div>
 
         <div className="rounded-lg border p-4 grid grid-cols-2 gap-3">
@@ -95,7 +105,7 @@ export function ProductForm({ mode, categories, initial }: { mode: "create" | "e
 
         <div>
           <h2 className="mb-2 text-sm font-semibold">Color variants</h2>
-          <VariantEditor value={f.variants} onChange={(v) => set("variants", v)} />
+          <VariantEditor value={f.variants} onChange={(v) => set("variants", v)} knownColors={plainTeeColors} />
         </div>
       </div>
     </section>

@@ -1,20 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { txOrderCreate, productVariantFindMany } = vi.hoisted(() => ({
+const { txOrderCreate, productVariantFindMany, plainStockFindMany, designFindMany } = vi.hoisted(() => ({
   txOrderCreate: vi.fn(async () => ({})),
   productVariantFindMany: vi.fn(async () => [
     {
       id: "V1",
       productId: "P1",
       color: "White",
+      colorSlug: "white",
       sku: "DB-TEE-WHT-M",
-      sizeStocks: [
-        { size: "S", stock: 5 },
-        { size: "M", stock: 5 },
-        { size: "L", stock: 5 },
-      ],
+      sizeStocks: [{ size: "S" }, { size: "M" }, { size: "L" }],
+      product: { dtfDesignId: "D1" },
     },
   ]),
+  plainStockFindMany: vi.fn(async () => [
+    { id: "PS1", colorSlug: "white", size: "S", quantity: 5 },
+    { id: "PS2", colorSlug: "white", size: "M", quantity: 5 },
+    { id: "PS3", colorSlug: "white", size: "L", quantity: 5 },
+  ]),
+  designFindMany: vi.fn(async () => [{ id: "D1", quantity: 5 }]),
 }));
 
 vi.mock("@/app/_lib/auth", () => ({
@@ -30,9 +34,14 @@ vi.mock("@/app/_lib/prisma", () => ({
     productVariant: {
       findMany: productVariantFindMany,
     },
+    plainTshirtStock: { findMany: plainStockFindMany },
+    dtfDesign: { findMany: designFindMany },
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
       fn({
-        variantSizeStock: {
+        plainTshirtStock: {
+          updateMany: async () => ({ count: 1 }),
+        },
+        dtfDesign: {
           updateMany: async () => ({ count: 1 }),
         },
         order: {
@@ -89,17 +98,17 @@ beforeEach(() => {
   productVariantFindMany.mockReset();
   productVariantFindMany.mockResolvedValue([
     {
-      id: "V1",
-      productId: "P1",
-      color: "White",
-      sku: "DB-TEE-WHT-M",
-      sizeStocks: [
-        { size: "S", stock: 5 },
-        { size: "M", stock: 5 },
-        { size: "L", stock: 5 },
-      ],
+      id: "V1", productId: "P1", color: "White", colorSlug: "white", sku: "DB-TEE-WHT-M",
+      sizeStocks: [{ size: "S" }, { size: "M" }, { size: "L" }],
+      product: { dtfDesignId: "D1" },
     },
   ]);
+  plainStockFindMany.mockReset().mockResolvedValue([
+    { id: "PS1", colorSlug: "white", size: "S", quantity: 5 },
+    { id: "PS2", colorSlug: "white", size: "M", quantity: 5 },
+    { id: "PS3", colorSlug: "white", size: "L", quantity: 5 },
+  ]);
+  designFindMany.mockReset().mockResolvedValue([{ id: "D1", quantity: 5 }]);
 });
 
 describe("processOrder — COD path", () => {
@@ -311,6 +320,20 @@ describe("processOrder — variant color snapshots", () => {
     });
   });
 
+  it("snapshots the exact raw-material pool rows the line drew from", async () => {
+    await processOrder({ ...baseInput, paymentMethod: "COD" });
+
+    const createCalls = vi.mocked(txOrderCreate).mock.calls as unknown as [
+      [{ data: { items: { create: Array<Record<string, unknown>> } } }],
+      ...[{ data: { items: { create: Array<Record<string, unknown>> } } }][],
+    ];
+    const createArg = createCalls[0][0];
+    expect(createArg.data.items.create[0]).toMatchObject({
+      plainTshirtStockId: "PS2",
+      dtfDesignId: "D1",
+    });
+  });
+
   it("passes database variant color/SKU to pending prepaid admin notification details", async () => {
     await processOrder({
       ...baseInput,
@@ -333,11 +356,9 @@ describe("processOrder — variant color snapshots", () => {
   it("rejects a cart line when the selected variant belongs to another product", async () => {
     productVariantFindMany.mockResolvedValueOnce([
       {
-        id: "V1",
-        productId: "OTHER-PRODUCT",
-        color: "White",
-        sku: "DB-TEE-WHT-M",
-        sizeStocks: [{ size: "M", stock: 5 }],
+        id: "V1", productId: "OTHER-PRODUCT", color: "White", colorSlug: "white", sku: "DB-TEE-WHT-M",
+        sizeStocks: [{ size: "M" }],
+        product: { dtfDesignId: "D1" },
       },
     ]);
 

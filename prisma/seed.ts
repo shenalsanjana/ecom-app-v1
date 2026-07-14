@@ -62,9 +62,14 @@ function resolveVariantImages(productId: string, colorSlug: string, role: "card"
   return urls;
 }
 
-function stockFor(seedKey: string): number {
-  const rng = rngFromId(seedKey + ":stock");
+function plainStockFor(colorSlug: string, size: string): number {
+  const rng = rngFromId(`plain:${colorSlug}:${size}`);
   return 5 + Math.floor(rng() * 21); // 5..25
+}
+
+function designStockFor(slug: string): number {
+  const rng = rngFromId(`design:${slug}`);
+  return 10 + Math.floor(rng() * 41); // 10..50 — a print batch typically covers many units
 }
 
 async function main() {
@@ -92,16 +97,49 @@ async function main() {
     });
   }
 
+  // DTF designs — one row per distinct design the catalog uses. Quantity is
+  // set only on first create; a reseed never overwrites an admin-edited count.
+  const designIdBySlug = new Map<string, string>();
+  const distinctDesigns = new Map(catalogProducts.map((p) => [p.design.slug, p.design]));
+  for (const d of distinctDesigns.values()) {
+    const row = await prisma.dtfDesign.upsert({
+      where: { slug: d.slug },
+      update: { name: d.name },
+      create: { name: d.name, slug: d.slug, quantity: designStockFor(d.slug) },
+    });
+    designIdBySlug.set(d.slug, row.id);
+  }
+
+  // Plain T-shirt stock — one row per distinct (colorSlug,size) the catalog
+  // offers. Same create-only quantity rule as designs above.
+  const distinctPlainCells = new Map<string, { color: string; colorSlug: string; size: string }>();
+  for (const p of catalogProducts) {
+    for (const v of p.variants) {
+      for (const s of v.sizes) {
+        distinctPlainCells.set(`${v.colorSlug}::${s.size}`, { color: v.color, colorSlug: v.colorSlug, size: s.size });
+      }
+    }
+  }
+  for (const cell of distinctPlainCells.values()) {
+    await prisma.plainTshirtStock.upsert({
+      where: { colorSlug_size: { colorSlug: cell.colorSlug, size: cell.size } },
+      update: { color: cell.color },
+      create: { color: cell.color, colorSlug: cell.colorSlug, size: cell.size, quantity: plainStockFor(cell.colorSlug, cell.size) },
+    });
+  }
+
   for (const p of catalogProducts) {
     await prisma.product.upsert({
       where: { id: p.id },
       update: {
         name: p.name, price: p.price, originalPrice: p.originalPrice ?? null,
         description: DEFAULT_DESCRIPTION, categorySlug: p.category,
+        dtfDesignId: designIdBySlug.get(p.design.slug)!,
       },
       create: {
         id: p.id, name: p.name, price: p.price, originalPrice: p.originalPrice ?? null,
         description: DEFAULT_DESCRIPTION, categorySlug: p.category,
+        dtfDesignId: designIdBySlug.get(p.design.slug)!,
       },
     });
 
@@ -132,11 +170,7 @@ async function main() {
       await prisma.variantImage.createMany({ data: imageRows });
 
       await prisma.variantSizeStock.createMany({
-        data: v.sizes.map((s) => ({
-          variantId: variant.id,
-          size: s.size,
-          stock: s.stock ?? stockFor(`${p.id}:${v.colorSlug}:${s.size}`),
-        })),
+        data: v.sizes.map((s) => ({ variantId: variant.id, size: s.size })),
       });
     }
 

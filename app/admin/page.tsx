@@ -16,7 +16,7 @@ export default async function AdminDashboardPage() {
       </div>
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <KpiTile label="Today's orders" value={kpis.todaysOrders} />
-        <KpiTile label="Low-stock products" value={kpis.lowStock} />
+        <KpiTile label="Low-stock materials" value={kpis.lowStock} />
       </div>
     </section>
   );

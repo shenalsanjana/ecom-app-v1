@@ -1,14 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { orderCount, productCount } = vi.hoisted(() => ({
+const { orderCount, plainStockCount, dtfDesignCount } = vi.hoisted(() => ({
   orderCount: vi.fn(),
-  productCount: vi.fn(),
+  plainStockCount: vi.fn(),
+  dtfDesignCount: vi.fn(),
 }));
 
 vi.mock("@/app/_lib/prisma", () => ({
   prisma: {
     order: { count: orderCount },
-    product: { count: productCount },
+    plainTshirtStock: { count: plainStockCount },
+    dtfDesign: { count: dtfDesignCount },
   },
 }));
 
@@ -21,13 +23,15 @@ import { getDashboardKpis } from "../admin-kpis";
 
 beforeEach(() => {
   orderCount.mockReset();
-  productCount.mockReset();
+  plainStockCount.mockReset();
+  dtfDesignCount.mockReset();
 });
 
 describe("getDashboardKpis", () => {
   it("queries orders-to-confirm with status=PENDING", async () => {
     orderCount.mockResolvedValueOnce(5).mockResolvedValueOnce(0).mockResolvedValueOnce(0);
-    productCount.mockResolvedValueOnce(0);
+    plainStockCount.mockResolvedValueOnce(0);
+    dtfDesignCount.mockResolvedValueOnce(0);
 
     const result = await getDashboardKpis();
 
@@ -37,7 +41,8 @@ describe("getDashboardKpis", () => {
 
   it("queries orders-to-dispatch with status=CONFIRMED and courierBookedAt=null", async () => {
     orderCount.mockResolvedValueOnce(0).mockResolvedValueOnce(7).mockResolvedValueOnce(0);
-    productCount.mockResolvedValueOnce(0);
+    plainStockCount.mockResolvedValueOnce(0);
+    dtfDesignCount.mockResolvedValueOnce(0);
 
     const result = await getDashboardKpis();
 
@@ -49,7 +54,8 @@ describe("getDashboardKpis", () => {
 
   it("queries today's orders using startOfTodaySLT as the gte boundary", async () => {
     orderCount.mockResolvedValueOnce(0).mockResolvedValueOnce(0).mockResolvedValueOnce(12);
-    productCount.mockResolvedValueOnce(0);
+    plainStockCount.mockResolvedValueOnce(0);
+    dtfDesignCount.mockResolvedValueOnce(0);
 
     const result = await getDashboardKpis();
 
@@ -59,21 +65,22 @@ describe("getDashboardKpis", () => {
     expect(result.todaysOrders).toBe(12);
   });
 
-  it("queries low-stock via variants whose size-stock cells are <=5", async () => {
+  it("sums low-stock counts from both raw-material pools (threshold <=5)", async () => {
     orderCount.mockResolvedValueOnce(0).mockResolvedValueOnce(0).mockResolvedValueOnce(0);
-    productCount.mockResolvedValueOnce(2);
+    plainStockCount.mockResolvedValueOnce(2);
+    dtfDesignCount.mockResolvedValueOnce(1);
 
     const result = await getDashboardKpis();
 
-    expect(productCount).toHaveBeenCalledWith({
-      where: { variants: { some: { sizeStocks: { some: { stock: { lte: 5 } } } } } },
-    });
-    expect(result.lowStock).toBe(2);
+    expect(plainStockCount).toHaveBeenCalledWith({ where: { quantity: { lte: 5 } } });
+    expect(dtfDesignCount).toHaveBeenCalledWith({ where: { quantity: { lte: 5 } } });
+    expect(result.lowStock).toBe(3);
   });
 
   it("returns all four KPIs in the expected shape", async () => {
     orderCount.mockResolvedValueOnce(5).mockResolvedValueOnce(7).mockResolvedValueOnce(12);
-    productCount.mockResolvedValueOnce(2);
+    plainStockCount.mockResolvedValueOnce(2);
+    dtfDesignCount.mockResolvedValueOnce(1);
 
     const result = await getDashboardKpis();
 
@@ -81,7 +88,7 @@ describe("getDashboardKpis", () => {
       ordersToConfirm: 5,
       ordersToDispatch: 7,
       todaysOrders: 12,
-      lowStock: 2,
+      lowStock: 3,
     });
   });
 });

@@ -74,13 +74,14 @@ const NEW_INPUT = {
   name: "Cat White", slug: "cat-white", categorySlug: "cat",
   price: 2190, originalPrice: null,
   description: "Soft tee",
+  dtfDesignId: "d1",
   variants: [
     {
       color: "White", colorSlug: "white", swatchHex: "#FFFFFF", sku: "CAT-WHITE",
       price: null, originalPrice: null,
       cardImages: ["/products/cat-white/card/1.jpg"],
       detailImages: ["/products/cat-white/detail/1.jpg", "/products/cat-white/detail/2.jpg"],
-      sizeStocks: [{ size: "S", stock: 5 }, { size: "M", stock: 10 }],
+      sizeStocks: [{ size: "S" }, { size: "M" }],
     },
   ],
 };
@@ -122,7 +123,7 @@ describe("createProduct", () => {
 
     const createArg = productCreate.mock.calls[0][0];
     expect(createArg.data).toMatchObject({
-      id: "cat-white", name: "Cat White", categorySlug: "cat",
+      id: "cat-white", name: "Cat White", categorySlug: "cat", dtfDesignId: "d1",
       price: 2190, originalPrice: null, description: "Soft tee", archived: false,
     });
     expect(createArg.data).not.toHaveProperty("image");
@@ -144,11 +145,17 @@ describe("createProduct", () => {
     });
     expect(variantSizeStockCreateMany).toHaveBeenCalledWith({
       data: [
-        { variantId: "variant-1", size: "S", stock: 5 },
-        { variantId: "variant-1", size: "M", stock: 10 },
+        { variantId: "variant-1", size: "S" },
+        { variantId: "variant-1", size: "M" },
       ],
     });
     expect(res).toEqual({ success: true, slug: "cat-white" });
+  });
+
+  it("rejects a missing dtfDesignId", async () => {
+    const res = await createProduct({ ...NEW_INPUT, dtfDesignId: "" });
+    expect(res.success).toBe(false);
+    expect(productCreate).not.toHaveBeenCalled();
   });
 });
 

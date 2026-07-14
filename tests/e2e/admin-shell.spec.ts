@@ -40,7 +40,7 @@ test.describe("Spec #2: admin UI shell", () => {
         "Pending dispatch",
         "Today's orders",
         "Pending COD",
-        "Low-stock products",
+        "Low-stock materials",
       ];
       for (const label of labels) {
         const labelEl = page.getByText(label, { exact: true });

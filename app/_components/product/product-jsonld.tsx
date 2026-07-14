@@ -1,6 +1,6 @@
 import { absoluteUrl } from "@/app/_lib/absolute-url";
 import { stripMarkdown } from "@/app/_lib/strip-markdown";
-import { variantInStock } from "@/app/_lib/variants";
+import { variantInStock, buildPlainStockMap, buildDesignStockMap } from "@/app/_lib/variants";
 import type { VariantDetail } from "@/app/_lib/products";
 
 // Emits Product JSON-LD with one Offer per color variant (shared design, many
@@ -8,14 +8,20 @@ import type { VariantDetail } from "@/app/_lib/products";
 export function ProductJsonLd({
   product,
   variants,
+  plainStockRows,
+  designStockRows,
   ratingAvg,
   ratingCount,
 }: {
   product: { id: string; name: string; description: string };
   variants: VariantDetail[];
+  plainStockRows: { id: string; colorSlug: string; size: string; quantity: number }[];
+  designStockRows: { id: string; quantity: number }[];
   ratingAvg: number;
   ratingCount: number;
 }) {
+  const plainStock = buildPlainStockMap(plainStockRows);
+  const designStock = buildDesignStockMap(designStockRows);
   const primary = variants[0];
   const images = variants.flatMap((v) => v.detailImages).slice(0, 6).map((u) => absoluteUrl(u));
   const json: Record<string, unknown> = {
@@ -33,7 +39,7 @@ export function ProductJsonLd({
       priceCurrency: "LKR",
       price: v.price.toFixed(2),
       sku: v.sku ?? `${product.id}-${v.colorSlug}`,
-      availability: variantInStock(v.sizeStocks)
+      availability: variantInStock(v.sizeStocks, v.colorSlug, v.dtfDesignId, plainStock, designStock)
         ? "https://schema.org/InStock"
         : "https://schema.org/OutOfStock",
     })),

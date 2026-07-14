@@ -1,12 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const { requireAdmin } = vi.hoisted(() => ({ requireAdmin: vi.fn() }));
-const { orderFindUnique, orderUpdate, orderDelete, noteCreate, variantSizeStockUpdateMany, txn } = vi.hoisted(() => ({
+const { orderFindUnique, orderUpdate, orderDelete, noteCreate, plainStockUpdateMany, plainStockFindUnique, dtfDesignUpdateMany, txn } = vi.hoisted(() => ({
   orderFindUnique: vi.fn(),
   orderUpdate: vi.fn(),
   orderDelete: vi.fn(),
   noteCreate: vi.fn(),
-  variantSizeStockUpdateMany: vi.fn(),
+  plainStockUpdateMany: vi.fn(),
+  plainStockFindUnique: vi.fn(),
+  dtfDesignUpdateMany: vi.fn(),
   txn: vi.fn(),
 }));
 const { orderItemUpdate, orderItemDelete } = vi.hoisted(() => ({
@@ -40,7 +42,8 @@ vi.mock("@/app/_lib/prisma", () => {
   const client = {
     order: { findUnique: orderFindUnique, update: orderUpdate, delete: orderDelete },
     orderNote: { create: noteCreate },
-    variantSizeStock: { updateMany: variantSizeStockUpdateMany },
+    plainTshirtStock: { updateMany: plainStockUpdateMany, findUnique: plainStockFindUnique },
+    dtfDesign: { updateMany: dtfDesignUpdateMany },
     orderItem: { update: orderItemUpdate, delete: orderItemDelete },
   };
   return { prisma: { ...client, $transaction: txn.mockImplementation(async (fn: (c: unknown) => unknown) => fn(client)) } };
@@ -55,14 +58,17 @@ beforeEach(() => {
   orderUpdate.mockReset();
   orderDelete.mockReset();
   noteCreate.mockReset();
-  variantSizeStockUpdateMany.mockReset();
+  plainStockUpdateMany.mockReset().mockResolvedValue({ count: 1 });
+  plainStockFindUnique.mockReset();
+  dtfDesignUpdateMany.mockReset().mockResolvedValue({ count: 1 });
   orderItemUpdate.mockReset();
   orderItemDelete.mockReset();
   txn.mockReset().mockImplementation(async (fn: (c: unknown) => unknown) => {
     const client = {
       order: { findUnique: orderFindUnique, update: orderUpdate, delete: orderDelete },
       orderNote: { create: noteCreate },
-      variantSizeStock: { updateMany: variantSizeStockUpdateMany },
+      plainTshirtStock: { updateMany: plainStockUpdateMany, findUnique: plainStockFindUnique },
+      dtfDesign: { updateMany: dtfDesignUpdateMany },
       orderItem: { update: orderItemUpdate, delete: orderItemDelete },
     };
     return fn(client);
@@ -168,33 +174,32 @@ describe("cancelOrder", () => {
     expect(res).toEqual({ success: false, error: "Delivered orders cannot be cancelled" });
   });
 
-  it("restores stock and warns when the order was paid", async () => {
+  it("restores both pools and warns when the order was paid", async () => {
     orderFindUnique.mockResolvedValueOnce({
       id: "o1", status: "CONFIRMED", paymentStatus: "PAID",
-      items: [{ variantId: "v1", size: "M", quantity: 2 }],
+      items: [{ plainTshirtStockId: "ps1", dtfDesignId: "d1", quantity: 2 }],
     });
     const res = await cancelOrder("o1");
-    expect(variantSizeStockUpdateMany).toHaveBeenCalledWith({
-      where: { variantId: "v1", size: "M" }, data: { stock: { increment: 2 } },
-    });
+    expect(plainStockUpdateMany).toHaveBeenCalledWith({ where: { id: "ps1" }, data: { quantity: { increment: 2 } } });
+    expect(dtfDesignUpdateMany).toHaveBeenCalledWith({ where: { id: "d1" }, data: { quantity: { increment: 2 } } });
     expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CANCELLED" } });
     expect(res).toEqual({ success: true, warning: "Order was paid — refund must be handled manually." });
   });
 
-  it("skips stock restore for an item with no variant (hard-deleted) or no size (sizeless)", async () => {
+  it("skips a pool whose id is null (sizeless item, or an order predating this feature)", async () => {
     orderFindUnique.mockResolvedValueOnce({
       id: "o1", status: "CONFIRMED", paymentStatus: "PENDING",
       guestName: null, guestEmail: null, user: null,
       items: [
-        { variantId: null, name: "Gone", size: "M", price: 6500, quantity: 2 },
-        { variantId: "v2", name: "Scarf", size: null, price: 2000, quantity: 3 },
-        { variantId: "v1", name: "Dress", size: "M", price: 1000, quantity: 1 },
+        { plainTshirtStockId: null, dtfDesignId: null, name: "Gone", size: "M", price: 6500, quantity: 2 },
+        { plainTshirtStockId: null, dtfDesignId: "d2", name: "Scarf", size: null, price: 2000, quantity: 3 },
+        { plainTshirtStockId: "ps1", dtfDesignId: "d1", name: "Dress", size: "M", price: 1000, quantity: 1 },
       ],
     });
     const res = await cancelOrder("o1");
-    // only the surviving variant+size is restored; the null variant and the sizeless item are skipped
-    expect(variantSizeStockUpdateMany).toHaveBeenCalledTimes(1);
-    expect(variantSizeStockUpdateMany).toHaveBeenCalledWith({ where: { variantId: "v1", size: "M" }, data: { stock: { increment: 1 } } });
+    expect(plainStockUpdateMany).toHaveBeenCalledTimes(1);
+    expect(plainStockUpdateMany).toHaveBeenCalledWith({ where: { id: "ps1" }, data: { quantity: { increment: 1 } } });
+    expect(dtfDesignUpdateMany).toHaveBeenCalledTimes(2); // items 2 and 3 both carry a dtfDesignId
     expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CANCELLED" } });
     expect(res).toEqual({ success: true });
   });
@@ -204,7 +209,7 @@ describe("cancelOrder", () => {
       id: "o1", status: "CONFIRMED", paymentStatus: "COD_PENDING",
       guestName: "Nimali", guestEmail: "n@x.test", user: null,
       webNumber: "WEB1", rbNumber: null, trackingCode: null,
-      items: [{ variantId: "v1", name: "Dress", size: "M", price: 1000, quantity: 1 }],
+      items: [{ plainTshirtStockId: "ps1", dtfDesignId: "d1", name: "Dress", size: "M", price: 1000, quantity: 1 }],
     });
     const res = await cancelOrder("o1");
     expect(notifyOrderCancelled).toHaveBeenCalledTimes(1);
@@ -216,10 +221,9 @@ describe("cancelOrder", () => {
     orderFindUnique.mockResolvedValueOnce({
       id: "o1", status: "CONFIRMED", paymentStatus: "COD_PENDING",
       guestName: null, guestEmail: null, user: null,
-      items: [{ variantId: "v1", name: "Dress", size: "M", price: 1000, quantity: 1 }],
+      items: [{ plainTshirtStockId: "ps1", dtfDesignId: "d1", name: "Dress", size: "M", price: 1000, quantity: 1 }],
     });
     await cancelOrder("o1");
-    // The dispatcher is now always invoked — it decides the email skip internally.
     expect(notifyOrderCancelled).toHaveBeenCalledTimes(1);
   });
 });
@@ -230,7 +234,7 @@ describe("editItems", () => {
   const ORDER = {
     id: "o1", status: "CONFIRMED", paymentStatus: "PENDING", shippingCity: "Colombo",
     items: [
-      { id: "i1", variantId: "v1", name: "Dress", size: "M", price: 2000, quantity: 2 },
+      { id: "i1", variantId: "v1", name: "Dress", size: "M", price: 2000, quantity: 2, plainTshirtStockId: "ps1", dtfDesignId: "d1" },
     ],
   };
 
@@ -240,17 +244,15 @@ describe("editItems", () => {
     expect(res).toEqual({ success: false, error: "This order can no longer be edited" });
   });
 
-  it("decreasing quantity restores stock and recomputes totals", async () => {
+  it("decreasing quantity restores the full original quantity then reacquires the new one, recomputing totals", async () => {
     orderFindUnique.mockResolvedValueOnce(ORDER);
-    variantSizeStockUpdateMany.mockResolvedValue({ count: 1 });
     orderUpdate.mockResolvedValueOnce({});
     orderItemUpdate.mockResolvedValueOnce({});
     const res = await editItems("o1", [{ id: "i1", quantity: 1 }]);
-    // restore 1 unit of v1/M
-    expect(variantSizeStockUpdateMany).toHaveBeenCalledWith({ where: { variantId: "v1", size: "M" }, data: { stock: { increment: 1 } } });
-    // item updated to new quantity
-    expect(orderItemUpdate).toHaveBeenCalledWith({ where: { id: "i1" }, data: { quantity: 1, size: "M" } });
-    // subtotal 2000 (qty 2→1), Colombo, below the 5000 free-shipping threshold → 350 shipping
+    expect(plainStockUpdateMany).toHaveBeenNthCalledWith(1, { where: { id: "ps1" }, data: { quantity: { increment: 2 } } });
+    expect(plainStockUpdateMany).toHaveBeenNthCalledWith(2, { where: { id: "ps1", quantity: { gte: 1 } }, data: { quantity: { decrement: 1 } } });
+    expect(orderItemUpdate).toHaveBeenCalledWith({ where: { id: "i1" }, data: { quantity: 1, size: "M", plainTshirtStockId: "ps1" } });
+    // subtotal 2000 (qty 2→1 at price 2000), Colombo, below the 5000 free-shipping threshold → 350 shipping
     expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "o1" },
       data: expect.objectContaining({ subtotal: 2000, shippingCost: 350, total: 2350 }),
@@ -258,17 +260,14 @@ describe("editItems", () => {
     expect(res).toEqual({ success: true });
   });
 
-  it("remove path: deletes item, restores stock, recomputes totals to zero subtotal", async () => {
+  it("remove path: deletes the item and restores its full quantity, recomputing totals to zero subtotal", async () => {
     orderFindUnique.mockResolvedValueOnce(ORDER);
-    variantSizeStockUpdateMany.mockResolvedValue({ count: 1 });
     orderUpdate.mockResolvedValueOnce({});
     orderItemDelete.mockResolvedValueOnce({});
     const res = await editItems("o1", [{ id: "i1", remove: true }]);
-    // restore 2 units of v1/M
-    expect(variantSizeStockUpdateMany).toHaveBeenCalledWith({ where: { variantId: "v1", size: "M" }, data: { stock: { increment: 2 } } });
-    // item deleted
+    expect(plainStockUpdateMany).toHaveBeenCalledWith({ where: { id: "ps1" }, data: { quantity: { increment: 2 } } });
+    expect(dtfDesignUpdateMany).toHaveBeenCalledWith({ where: { id: "d1" }, data: { quantity: { increment: 2 } } });
     expect(orderItemDelete).toHaveBeenCalledWith({ where: { id: "i1" } });
-    // totals recomputed for empty item set: subtotal 0
     expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "o1" },
       data: expect.objectContaining({ subtotal: 0 }),
@@ -276,12 +275,76 @@ describe("editItems", () => {
     expect(res).toEqual({ success: true });
   });
 
-  it("fails the increase when stock is insufficient", async () => {
+  it("fails the increase when the reacquire has insufficient plain-tee stock", async () => {
     orderFindUnique.mockResolvedValueOnce(ORDER);
-    variantSizeStockUpdateMany.mockResolvedValueOnce({ count: 0 }); // decrement guard fails
-    const res = await editItems("o1", [{ id: "i1", quantity: 5 }]);
-    expect(res).toEqual({ success: false, error: "Insufficient stock for \"Dress\" (size M)" });
-    expect(orderUpdate).not.toHaveBeenCalled();
+    plainStockUpdateMany
+      .mockResolvedValueOnce({ count: 1 }) // the restore call always succeeds
+      .mockResolvedValueOnce({ count: 0 }); // the reacquire at the higher quantity fails
+    const res = await editItems("o1", [{ id: "i1", quantity: 10 }]);
+    expect(res).toEqual({ success: false, error: 'Insufficient stock for "Dress"' });
+    expect(orderItemUpdate).not.toHaveBeenCalled();
+  });
+
+  it("a size change resolves the new color+size pool from the frozen row's colorSlug, not the variant's current color", async () => {
+    orderFindUnique.mockResolvedValueOnce(ORDER);
+    plainStockFindUnique
+      .mockResolvedValueOnce({ colorSlug: "white" }) // lookup of the OLD pool row's colorSlug, by id "ps1"
+      .mockResolvedValueOnce({ id: "ps-white-l" });   // lookup of the NEW (white, L) pool row
+    orderUpdate.mockResolvedValueOnce({});
+    orderItemUpdate.mockResolvedValueOnce({});
+    const res = await editItems("o1", [{ id: "i1", size: "L" }]);
+    expect(plainStockFindUnique).toHaveBeenNthCalledWith(1, { where: { id: "ps1" }, select: { colorSlug: true } });
+    expect(plainStockFindUnique).toHaveBeenNthCalledWith(2, { where: { colorSlug_size: { colorSlug: "white", size: "L" } }, select: { id: true } });
+    expect(orderItemUpdate).toHaveBeenCalledWith({ where: { id: "i1" }, data: { quantity: 2, size: "L", plainTshirtStockId: "ps-white-l" } });
+    expect(res).toEqual({ success: true });
+  });
+
+  it("rejects a size change when the target color+size has no matching pool row", async () => {
+    orderFindUnique.mockResolvedValueOnce(ORDER);
+    plainStockFindUnique
+      .mockResolvedValueOnce({ colorSlug: "white" })
+      .mockResolvedValueOnce(null); // no (white, XXL) pool row exists
+    const res = await editItems("o1", [{ id: "i1", size: "XXL" }]);
+    expect(res).toEqual({ success: false, error: 'Size "XXL" is not available for "Dress"' });
+    expect(orderItemUpdate).not.toHaveBeenCalled();
+  });
+
+  it("restores every original line's pool before reacquiring any surviving line's pool (cross-item netting)", async () => {
+    // Two lines share one plain-tee pool row (same color+size, two different
+    // designs) with zero headroom above what this order already holds. An
+    // interleaved restore/acquire-per-item loop would fail here even though
+    // total demand is unchanged; the correct restore-all-then-reacquire-all
+    // ordering must succeed.
+    const SHARED_ORDER = {
+      id: "o1", status: "CONFIRMED", paymentStatus: "PENDING", shippingCity: "Colombo",
+      items: [
+        { id: "i1", variantId: "v1", name: "A", size: "M", price: 1000, quantity: 2, plainTshirtStockId: "ps-shared", dtfDesignId: "d1" },
+        { id: "i2", variantId: "v2", name: "B", size: "M", price: 1000, quantity: 3, plainTshirtStockId: "ps-shared", dtfDesignId: "d2" },
+      ],
+    };
+    orderFindUnique.mockResolvedValueOnce(SHARED_ORDER);
+    orderUpdate.mockResolvedValueOnce({});
+    orderItemUpdate.mockResolvedValue({});
+
+    let poolQty = 0; // fully consumed by the original order (2 + 3 = 5, no free headroom)
+    plainStockUpdateMany.mockReset().mockImplementation(async ({ data }: { data: { quantity: { increment?: number; decrement?: number } } }) => {
+      if (data.quantity.increment !== undefined) {
+        poolQty += data.quantity.increment;
+        return { count: 1 };
+      }
+      const dec = data.quantity.decrement!;
+      if (poolQty < dec) return { count: 0 };
+      poolQty -= dec;
+      return { count: 1 };
+    });
+
+    // Swap quantities (net pool demand unchanged: 3+2 === 2+3).
+    const res = await editItems("o1", [
+      { id: "i1", quantity: 3 },
+      { id: "i2", quantity: 2 },
+    ]);
+
+    expect(res).toEqual({ success: true });
   });
 });
 
@@ -542,19 +605,17 @@ describe("bulkDispatch", () => {
 });
 
 describe("bulkCancel", () => {
-  it("cancels eligible orders, restores stock, and skips terminal ones", async () => {
-    // o1: CONFIRMED → cancel + restore; o2: already CANCELLED → skip; o3: DELIVERED → skip
+  it("cancels eligible orders, restores both pools, and skips terminal ones", async () => {
     orderFindUnique
-      .mockResolvedValueOnce({ id: "o1", status: "CONFIRMED", paymentStatus: "PENDING", items: [{ variantId: "v1", size: "M", quantity: 2 }] })
+      .mockResolvedValueOnce({ id: "o1", status: "CONFIRMED", paymentStatus: "PENDING", items: [{ plainTshirtStockId: "ps1", dtfDesignId: "d1", quantity: 2 }] })
       .mockResolvedValueOnce({ id: "o2", status: "CANCELLED", paymentStatus: "PENDING", items: [] })
-      .mockResolvedValueOnce({ id: "o3", status: "DELIVERED", paymentStatus: "PAID", items: [{ variantId: "v9", size: "S", quantity: 1 }] });
+      .mockResolvedValueOnce({ id: "o3", status: "DELIVERED", paymentStatus: "PAID", items: [{ plainTshirtStockId: "ps9", dtfDesignId: "d9", quantity: 1 }] });
     orderUpdate.mockResolvedValue({});
-    variantSizeStockUpdateMany.mockResolvedValue({ count: 1 });
 
     const res = await bulkCancel(["o1", "o2", "o3"]);
 
-    expect(variantSizeStockUpdateMany).toHaveBeenCalledTimes(1);
-    expect(variantSizeStockUpdateMany).toHaveBeenCalledWith({ where: { variantId: "v1", size: "M" }, data: { stock: { increment: 2 } } });
+    expect(plainStockUpdateMany).toHaveBeenCalledTimes(1);
+    expect(plainStockUpdateMany).toHaveBeenCalledWith({ where: { id: "ps1" }, data: { quantity: { increment: 2 } } });
     expect(orderUpdate).toHaveBeenCalledTimes(1);
     expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CANCELLED" } });
     expect(res.okCount).toBe(1);
@@ -575,7 +636,8 @@ describe("deleteOrder", () => {
     orderDelete.mockResolvedValueOnce({});
     const res = await deleteOrder("o1");
     expect(orderDelete).toHaveBeenCalledWith({ where: { id: "o1" } });
-    expect(variantSizeStockUpdateMany).not.toHaveBeenCalled();
+    expect(plainStockUpdateMany).not.toHaveBeenCalled();
+    expect(dtfDesignUpdateMany).not.toHaveBeenCalled();
     expect(res).toEqual({ success: true });
   });
 
@@ -585,7 +647,8 @@ describe("deleteOrder", () => {
     const res = await deleteOrder("o1");
     expect(orderDelete).toHaveBeenCalledWith({ where: { id: "o1" } });
     // delivered goods shipped — deletion must NOT return them to inventory
-    expect(variantSizeStockUpdateMany).not.toHaveBeenCalled();
+    expect(plainStockUpdateMany).not.toHaveBeenCalled();
+    expect(dtfDesignUpdateMany).not.toHaveBeenCalled();
     expect(res).toEqual({ success: true });
   });
 
@@ -608,7 +671,8 @@ describe("bulkDelete", () => {
     expect(orderDelete).toHaveBeenCalledTimes(2);
     expect(orderDelete).toHaveBeenCalledWith({ where: { id: "o1" } });
     expect(orderDelete).toHaveBeenCalledWith({ where: { id: "o2" } });
-    expect(variantSizeStockUpdateMany).not.toHaveBeenCalled(); // delete must never restore stock
+    expect(plainStockUpdateMany).not.toHaveBeenCalled(); // delete must never restore stock
+    expect(dtfDesignUpdateMany).not.toHaveBeenCalled(); // delete must never restore stock
     expect(res.okCount).toBe(2);
     expect(res.skippedCount).toBe(1);
     expect(res.results).toEqual([

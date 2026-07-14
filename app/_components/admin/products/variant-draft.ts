@@ -15,7 +15,7 @@ export type VariantDraft = {
   originalPrice: string; // "" => no override
   cardImages: string[];
   detailImages: string[];
-  sizeStocks: { size: string; stock: string }[];
+  sizeStocks: { size: string }[];
 };
 
 export const STD_SIZES = ["S", "M", "L", "XL"];
@@ -24,6 +24,6 @@ export function emptyVariant(): VariantDraft {
   return {
     color: "", colorSlug: "", swatchHex: "", sku: "", price: "", originalPrice: "",
     cardImages: [], detailImages: [],
-    sizeStocks: STD_SIZES.map((size) => ({ size, stock: "0" })),
+    sizeStocks: STD_SIZES.map((size) => ({ size })),
   };
 }
