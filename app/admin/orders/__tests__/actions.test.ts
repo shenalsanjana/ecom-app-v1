@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const { requireAdmin } = vi.hoisted(() => ({ requireAdmin: vi.fn() }));
-const { orderFindUnique, orderUpdate, orderDelete, noteCreate, plainStockUpdateMany, plainStockFindUnique, dtfDesignUpdateMany, txn } = vi.hoisted(() => ({
+const {
+  orderFindUnique, orderUpdate, orderDelete, noteCreate, plainStockUpdateMany, plainStockFindUnique,
+  dtfDesignUpdateMany, txn, orderAdjustmentCreate, orderAdjustmentDelete,
+} = vi.hoisted(() => ({
   orderFindUnique: vi.fn(),
   orderUpdate: vi.fn(),
   orderDelete: vi.fn(),
@@ -10,6 +13,8 @@ const { orderFindUnique, orderUpdate, orderDelete, noteCreate, plainStockUpdateM
   plainStockFindUnique: vi.fn(),
   dtfDesignUpdateMany: vi.fn(),
   txn: vi.fn(),
+  orderAdjustmentCreate: vi.fn(),
+  orderAdjustmentDelete: vi.fn(),
 }));
 const { orderItemUpdate, orderItemDelete } = vi.hoisted(() => ({
   orderItemUpdate: vi.fn(),
@@ -45,6 +50,7 @@ vi.mock("@/app/_lib/prisma", () => {
     plainTshirtStock: { updateMany: plainStockUpdateMany, findUnique: plainStockFindUnique },
     dtfDesign: { updateMany: dtfDesignUpdateMany },
     orderItem: { update: orderItemUpdate, delete: orderItemDelete },
+    orderAdjustment: { create: orderAdjustmentCreate, delete: orderAdjustmentDelete },
   };
   return { prisma: { ...client, $transaction: txn.mockImplementation(async (fn: (c: unknown) => unknown) => fn(client)) } };
 });
@@ -63,6 +69,8 @@ beforeEach(() => {
   dtfDesignUpdateMany.mockReset().mockResolvedValue({ count: 1 });
   orderItemUpdate.mockReset();
   orderItemDelete.mockReset();
+  orderAdjustmentCreate.mockReset();
+  orderAdjustmentDelete.mockReset();
   txn.mockReset().mockImplementation(async (fn: (c: unknown) => unknown) => {
     const client = {
       order: { findUnique: orderFindUnique, update: orderUpdate, delete: orderDelete },
@@ -70,6 +78,7 @@ beforeEach(() => {
       plainTshirtStock: { updateMany: plainStockUpdateMany, findUnique: plainStockFindUnique },
       dtfDesign: { updateMany: dtfDesignUpdateMany },
       orderItem: { update: orderItemUpdate, delete: orderItemDelete },
+      orderAdjustment: { create: orderAdjustmentCreate, delete: orderAdjustmentDelete },
     };
     return fn(client);
   });
@@ -410,6 +419,63 @@ describe("editAddress", () => {
       data: expect.objectContaining({ shippingCost: 450, total: 1250 }),
     }));
     expect(res).toEqual({ success: true });
+  });
+});
+
+import { addAdjustment } from "../actions";
+
+describe("addAdjustment", () => {
+  const BASE = { id: "o1", status: "CONFIRMED", courierBookedAt: null, paymentStatus: "PENDING",
+    shippingCity: "Colombo", items: [{ price: 1000, quantity: 1 }], adjustments: [] };
+
+  it("rejects a blank label", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    const res = await addAdjustment("o1", { label: "  ", amount: 500, kind: "CHARGE" });
+    expect(res).toEqual({ success: false, error: "Enter a label and a positive amount" });
+    expect(orderAdjustmentCreate).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-positive amount", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    const res = await addAdjustment("o1", { label: "Rush fee", amount: 0, kind: "CHARGE" });
+    expect(res.success).toBe(false);
+    expect(orderAdjustmentCreate).not.toHaveBeenCalled();
+  });
+
+  it("is blocked once the courier is booked", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...BASE, courierBookedAt: new Date() });
+    const res = await addAdjustment("o1", { label: "Rush fee", amount: 500, kind: "CHARGE" });
+    expect(res).toEqual({ success: false, error: "Order already sent to Curfox — cancel/rebook there to make changes." });
+  });
+
+  it("stores a charge as a positive amount and recomputes total", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    orderAdjustmentCreate.mockResolvedValueOnce({});
+    orderUpdate.mockResolvedValueOnce({});
+    const res = await addAdjustment("o1", { label: "Rush fee", amount: 500, kind: "CHARGE" });
+    expect(orderAdjustmentCreate).toHaveBeenCalledWith({ data: { orderId: "o1", label: "Rush fee", amount: 500 } });
+    // subtotal 1000, Colombo shipping 350, +500 = 1850
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "o1" }, data: expect.objectContaining({ total: 1850 }),
+    }));
+    expect(res).toEqual({ success: true });
+  });
+
+  it("stores a discount as a negative amount", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    orderAdjustmentCreate.mockResolvedValueOnce({});
+    orderUpdate.mockResolvedValueOnce({});
+    const res = await addAdjustment("o1", { label: "Loyalty discount", amount: 200, kind: "DISCOUNT" });
+    expect(orderAdjustmentCreate).toHaveBeenCalledWith({ data: { orderId: "o1", label: "Loyalty discount", amount: -200 } });
+    expect(res).toEqual({ success: true });
+  });
+
+  it("warns when the order was already paid", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...BASE, paymentStatus: "PAID" });
+    orderAdjustmentCreate.mockResolvedValueOnce({});
+    orderUpdate.mockResolvedValueOnce({});
+    const res = await addAdjustment("o1", { label: "Rush fee", amount: 500, kind: "CHARGE" });
+    expect(res).toEqual({ success: true, warning: "Order was paid — any price difference must be settled manually." });
   });
 });
 

@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/app/_lib/prisma";
 import { requireAdmin } from "@/app/_lib/admin-auth";
-import { nextStatuses, applyItemChanges, recomputeTotals, canEdit, canConfirm, courierBookedError, type ItemChange } from "@/app/_lib/admin-orders";
+import { nextStatuses, applyItemChanges, recomputeTotals, canEdit, canConfirm, courierBookedError, signedAdjustmentAmount, type ItemChange, type AdjustmentKind } from "@/app/_lib/admin-orders";
 import { getDeliveryConfig } from "@/app/_lib/store-settings";
 import { restoreItemPools, acquireItemPools } from "@/app/_lib/inventory-pools";
 import { bookCourierAndNotify } from "@/app/checkout/book-courier";
@@ -256,6 +256,46 @@ export async function editItems(orderId: string, changes: ItemChange[]): Promise
     return { success: false, error: e instanceof Error ? e.message : "Edit failed" };
   }
 
+  revalidate(orderId);
+  return PAID.has(order.paymentStatus ?? "")
+    ? { success: true, warning: "Order was paid — any price difference must be settled manually." }
+    : { success: true };
+}
+
+const AdjustmentSchema = z.object({
+  label: z.string().trim().min(1).max(80),
+  amount: z.number().finite().positive(),
+  kind: z.enum(["CHARGE", "DISCOUNT"]),
+});
+
+export async function addAdjustment(
+  orderId: string,
+  input: { label: string; amount: number; kind: AdjustmentKind },
+): Promise<ActionResult> {
+  await requireAdmin();
+  const parsed = AdjustmentSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Enter a label and a positive amount" };
+
+  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true, adjustments: true } });
+  if (!order) return { success: false, error: "Order not found" };
+  if (!canEdit(order)) return { success: false, error: "This order can no longer be edited" };
+  const courierError = courierBookedError(order);
+  if (courierError) return { success: false, error: courierError };
+
+  const amount = signedAdjustmentAmount(parsed.data.kind, parsed.data.amount);
+  const totals = recomputeTotals(order.items, order.shippingCity, await getDeliveryConfig(), [...order.adjustments, { amount }]);
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.orderAdjustment.create({ data: { orderId, label: parsed.data.label, amount } });
+      await tx.order.update({
+        where: { id: orderId },
+        data: { subtotal: totals.subtotal, shippingCost: totals.shippingCost, total: totals.total },
+      });
+    });
+  } catch {
+    return { success: false, error: "Something went wrong. Please try again." };
+  }
   revalidate(orderId);
   return PAID.has(order.paymentStatus ?? "")
     ? { success: true, warning: "Order was paid — any price difference must be settled manually." }
