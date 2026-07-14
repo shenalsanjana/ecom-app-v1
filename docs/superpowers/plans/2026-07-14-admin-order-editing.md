@@ -640,87 +640,15 @@ git commit -m "feat(admin-orders): add removeAdjustment action"
 
 ---
 
-## Task 6: `ORDER_INCLUDE`/`toOrderDetails` carry adjustments through
-
-**Files:**
-- Modify: `app/admin/orders/actions.ts`
-- Test: `app/admin/orders/__tests__/actions.test.ts`
-
-**Interfaces:**
-- Consumes: nothing new.
-- Produces: `toOrderDetails(order)` now populates `OrderDetails.adjustments` (the field itself is added to `OrderDetails` in Task 7 — this task only wires the mapping; TypeScript will show an error on the `adjustments:` key until Task 7 adds the field, so do Task 7 immediately after this one, before running `tsc`).
-
-- [ ] **Step 1: Write the failing test**
-
-In `describe("resendConfirmationEmail", ...)`, add:
-
-```ts
-  it("passes adjustments through to the email", async () => {
-    orderFindUnique.mockResolvedValueOnce({
-      ...FULL_ORDER, trackingCode: "CF-88213",
-      adjustments: [{ label: "Rush fee", amount: 500 }, { label: "Loyalty discount", amount: -100 }],
-    });
-    sendOrderConfirmationEmail.mockResolvedValueOnce(undefined);
-    await resendConfirmationEmail("o1");
-    const arg = sendOrderConfirmationEmail.mock.calls[0][0];
-    expect(arg.adjustments).toEqual([{ label: "Rush fee", amount: 500 }, { label: "Loyalty discount", amount: -100 }]);
-  });
-```
-
-- [ ] **Step 2: Run the test to verify it fails**
-
-Run: `npm run test -- app/admin/orders/__tests__/actions.test.ts`
-Expected: FAIL — `arg.adjustments` is `undefined`.
-
-- [ ] **Step 3: Implement in `app/admin/orders/actions.ts`**
-
-Update `ORDER_INCLUDE`:
-
-```ts
-const ORDER_INCLUDE = {
-  user: { select: { name: true, email: true } },
-  items: { select: { name: true, color: true, sku: true, size: true, price: true, quantity: true } },
-  adjustments: { select: { label: true, amount: true } },
-} satisfies Prisma.OrderInclude;
-```
-
-Update `toOrderDetails` to add the mapped field (insert right after the `items:` mapping):
-
-```ts
-    items: order.items.map((i) => ({
-      name: i.name,
-      color: i.color,
-      sku: i.sku,
-      size: i.size,
-      price: i.price,
-      quantity: i.quantity,
-    })),
-    adjustments: order.adjustments.map((a) => ({ label: a.label, amount: a.amount })),
-```
-
-- [ ] **Step 4: Run the test — expect it still fails on the type/field until Task 7**
-
-Run: `npm run test -- app/admin/orders/__tests__/actions.test.ts`
-Expected: PASS at the Vitest level (mocks are plain JS objects, not type-checked) — the test itself should now pass. `npx tsc --noEmit` will show an error for the `adjustments` key not existing on `OrderDetails` until Task 7; that's expected and resolved next.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add app/admin/orders/actions.ts app/admin/orders/__tests__/actions.test.ts
-git commit -m "feat(admin-orders): carry adjustments through to OrderDetails"
-```
-
----
-
-## Task 7: Mailer — render adjustments in the confirmation email
+## Task 6: Mailer — render adjustments in the confirmation email
 
 **Files:**
 - Modify: `app/_lib/mailer.ts`
 - Test: `app/_lib/__tests__/mailer-confirmation.test.ts`
 
 **Interfaces:**
-- Consumes: `OrderDetails` (extended here).
-- Produces: `OrderDetails.adjustments?: { label: string; amount: number }[]`; confirmation email (text + HTML) renders one line per adjustment between the item list and Subtotal/Delivery/Total.
+- Consumes: nothing new.
+- Produces: `OrderDetails.adjustments?: { label: string; amount: number }[]` (optional — this task's changes compile and pass standalone with no caller populating it yet); confirmation email (text + HTML) renders one line per adjustment between the item list and Subtotal/Delivery/Total.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -809,19 +737,93 @@ ${formatAdjustmentsListHtml(order.adjustments)}
 Run: `npm run test -- app/_lib/__tests__/mailer-confirmation.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Run the full suite once (Tasks 6+7 together resolve the `adjustments` type)**
+- [ ] **Step 5: Type-check**
 
 Run: `npx tsc --noEmit`
-Expected: exit 0 — the `toOrderDetails` mapping from Task 6 now type-checks against the `OrderDetails.adjustments` field added here.
-
-Run: `npm run test`
-Expected: PASS, full suite.
+Expected: exit 0 — `adjustments` is optional on `OrderDetails`, so every existing caller (none of which set it yet) still type-checks.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add app/_lib/mailer.ts app/_lib/__tests__/mailer-confirmation.test.ts
 git commit -m "feat(mailer): render order adjustments in the confirmation email"
+```
+
+---
+
+## Task 7: `ORDER_INCLUDE`/`toOrderDetails` carry adjustments through
+
+**Files:**
+- Modify: `app/admin/orders/actions.ts`
+- Test: `app/admin/orders/__tests__/actions.test.ts`
+
+**Interfaces:**
+- Consumes: `OrderDetails.adjustments` (Task 6 — already exists on the type, so this task's mapping type-checks immediately).
+- Produces: `toOrderDetails(order)` now populates `OrderDetails.adjustments`.
+
+- [ ] **Step 1: Write the failing test**
+
+In `describe("resendConfirmationEmail", ...)`, add:
+
+```ts
+  it("passes adjustments through to the email", async () => {
+    orderFindUnique.mockResolvedValueOnce({
+      ...FULL_ORDER, trackingCode: "CF-88213",
+      adjustments: [{ label: "Rush fee", amount: 500 }, { label: "Loyalty discount", amount: -100 }],
+    });
+    sendOrderConfirmationEmail.mockResolvedValueOnce(undefined);
+    await resendConfirmationEmail("o1");
+    const arg = sendOrderConfirmationEmail.mock.calls[0][0];
+    expect(arg.adjustments).toEqual([{ label: "Rush fee", amount: 500 }, { label: "Loyalty discount", amount: -100 }]);
+  });
+```
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `npm run test -- app/admin/orders/__tests__/actions.test.ts`
+Expected: FAIL — `arg.adjustments` is `undefined`.
+
+- [ ] **Step 3: Implement in `app/admin/orders/actions.ts`**
+
+Update `ORDER_INCLUDE`:
+
+```ts
+const ORDER_INCLUDE = {
+  user: { select: { name: true, email: true } },
+  items: { select: { name: true, color: true, sku: true, size: true, price: true, quantity: true } },
+  adjustments: { select: { label: true, amount: true } },
+} satisfies Prisma.OrderInclude;
+```
+
+Update `toOrderDetails` to add the mapped field (insert right after the `items:` mapping):
+
+```ts
+    items: order.items.map((i) => ({
+      name: i.name,
+      color: i.color,
+      sku: i.sku,
+      size: i.size,
+      price: i.price,
+      quantity: i.quantity,
+    })),
+    adjustments: order.adjustments.map((a) => ({ label: a.label, amount: a.amount })),
+```
+
+- [ ] **Step 4: Run the test to verify it passes**
+
+Run: `npm run test -- app/admin/orders/__tests__/actions.test.ts`
+Expected: PASS.
+
+- [ ] **Step 5: Type-check**
+
+Run: `npx tsc --noEmit`
+Expected: exit 0 — `toOrderDetails`'s object literal now satisfies `OrderDetails` (the `adjustments` field already exists on the type from Task 6).
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add app/admin/orders/actions.ts app/admin/orders/__tests__/actions.test.ts
+git commit -m "feat(admin-orders): carry adjustments through to OrderDetails"
 ```
 
 ---
