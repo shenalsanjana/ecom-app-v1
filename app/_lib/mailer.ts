@@ -114,6 +114,7 @@ export type OrderDetails = {
   paymentMethodDisplay?: string;
   trackingCode?: string;
   notes?: string;
+  adjustments?: { label: string; amount: number }[];
   webNumber?: string | null;      // Customer-facing order code (new); preferred when set
   rbNumber?: string | null;       // Legacy receipt book / invoice reference
   paymentStatus?: string | null;  // e.g. "Awaiting payment", "Paid", "Cash on delivery"
@@ -142,6 +143,24 @@ function formatCustomerItemHtml(item: OrderItem): string {
         </div>`;
 }
 
+function formatAdjustmentText(a: { label: string; amount: number }): string {
+  const sign = a.amount < 0 ? "−" : "+";
+  return `${a.label}: ${sign}${formatPrice(Math.abs(a.amount))}`;
+}
+
+function formatAdjustmentsListText(adjustments: OrderDetails["adjustments"]): string {
+  if (!adjustments || adjustments.length === 0) return "";
+  return `\n${adjustments.map(formatAdjustmentText).join("\n")}\n`;
+}
+
+function formatAdjustmentsListHtml(adjustments: OrderDetails["adjustments"]): string {
+  if (!adjustments || adjustments.length === 0) return "";
+  return adjustments.map((a) => {
+    const sign = a.amount < 0 ? "−" : "+";
+    return `<p>${escapeHtml(a.label)}: <strong>${sign}${formatPrice(Math.abs(a.amount))}</strong></p>`;
+  }).join("");
+}
+
 export async function sendOrderConfirmationEmail(order: OrderDetails): Promise<void> {
   const transport = getTransport();
   const brandEmail = requireBrandEmail();
@@ -164,7 +183,7 @@ ${paymentLabel ? `Payment Status: ${paymentLabel}\n` : ""}${order.trackingCode ?
 
 Items:
 ${itemsListText}
-
+${formatAdjustmentsListText(order.adjustments)}
 Subtotal: ${formatPrice(order.subtotal)}
 Delivery: ${order.shipping === 0 ? "Free" : formatPrice(order.shipping)}
 Total: ${formatPrice(order.total)}
@@ -215,7 +234,7 @@ ${BRAND_NAME}
       <h3 style="margin-top: 0;">Items</h3>
       ${itemsListHtml}
     </div>
-
+${formatAdjustmentsListHtml(order.adjustments)}
     <p><strong>Subtotal:</strong> ${formatPrice(order.subtotal)}</p>
     <p><strong>Delivery:</strong> ${order.shipping === 0 ? "Free" : formatPrice(order.shipping)}</p>
     <p class="total"><strong>Total:</strong> ${formatPrice(order.total)}</p>
