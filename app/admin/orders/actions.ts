@@ -302,6 +302,36 @@ export async function addAdjustment(
     : { success: true };
 }
 
+export async function removeAdjustment(orderId: string, adjustmentId: string): Promise<ActionResult> {
+  await requireAdmin();
+  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true, adjustments: true } });
+  if (!order) return { success: false, error: "Order not found" };
+  if (!canEdit(order)) return { success: false, error: "This order can no longer be edited" };
+  const courierError = courierBookedError(order);
+  if (courierError) return { success: false, error: courierError };
+
+  const target = order.adjustments.find((a) => a.id === adjustmentId);
+  if (!target) return { success: false, error: "Adjustment not found" };
+  const remaining = order.adjustments.filter((a) => a.id !== adjustmentId);
+  const totals = recomputeTotals(order.items, order.shippingCity, await getDeliveryConfig(), remaining);
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.orderAdjustment.delete({ where: { id: adjustmentId } });
+      await tx.order.update({
+        where: { id: orderId },
+        data: { subtotal: totals.subtotal, shippingCost: totals.shippingCost, total: totals.total },
+      });
+    });
+  } catch {
+    return { success: false, error: "Something went wrong. Please try again." };
+  }
+  revalidate(orderId);
+  return PAID.has(order.paymentStatus ?? "")
+    ? { success: true, warning: "Order was paid — any price difference must be settled manually." }
+    : { success: true };
+}
+
 const ORDER_INCLUDE = {
   user: { select: { name: true, email: true } },
   items: { select: { name: true, color: true, sku: true, size: true, price: true, quantity: true } },

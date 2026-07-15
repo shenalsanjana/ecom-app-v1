@@ -479,6 +479,40 @@ describe("addAdjustment", () => {
   });
 });
 
+import { removeAdjustment } from "../actions";
+
+describe("removeAdjustment", () => {
+  const BASE = { id: "o1", status: "CONFIRMED", courierBookedAt: null, paymentStatus: "PENDING",
+    shippingCity: "Colombo", items: [{ price: 1000, quantity: 1 }],
+    adjustments: [{ id: "a1", amount: 500 }, { id: "a2", amount: -100 }] };
+
+  it("rejects an unknown adjustment id", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    const res = await removeAdjustment("o1", "does-not-exist");
+    expect(res).toEqual({ success: false, error: "Adjustment not found" });
+    expect(orderAdjustmentDelete).not.toHaveBeenCalled();
+  });
+
+  it("is blocked once the courier is booked", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...BASE, courierBookedAt: new Date() });
+    const res = await removeAdjustment("o1", "a1");
+    expect(res).toEqual({ success: false, error: "Order already sent to Curfox — cancel/rebook there to make changes." });
+  });
+
+  it("deletes the row and recomputes total from the remaining adjustments", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    orderAdjustmentDelete.mockResolvedValueOnce({});
+    orderUpdate.mockResolvedValueOnce({});
+    const res = await removeAdjustment("o1", "a1");
+    expect(orderAdjustmentDelete).toHaveBeenCalledWith({ where: { id: "a1" } });
+    // subtotal 1000, Colombo shipping 350, remaining adjustment -100 = 1250
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "o1" }, data: expect.objectContaining({ total: 1250 }),
+    }));
+    expect(res).toEqual({ success: true });
+  });
+});
+
 import { bookCourier, resendConfirmationEmail } from "../actions";
 
 const FULL_ORDER = {
