@@ -15,6 +15,7 @@
     "admin:create": "tsx scripts/create-admin.ts",
     "admin:ensure": "tsx scripts/ensure-admin.ts",
     "curfox:seed": "tsx scripts/seed-curfox-cities.ts",
+    "migrate:images": "tsx scripts/migrate-images-from-blob.ts",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
