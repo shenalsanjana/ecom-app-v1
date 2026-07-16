@@ -54,14 +54,29 @@ export function buildOrderWhere(params: ListParams): Prisma.OrderWhereInput {
   return where;
 }
 
+export type AdjustmentKind = "CHARGE" | "DISCOUNT";
+
+export function signedAdjustmentAmount(kind: AdjustmentKind, amount: number): number {
+  return kind === "DISCOUNT" ? -amount : amount;
+}
+
+export function courierBookedError(order: { courierBookedAt: Date | null }): string | null {
+  return order.courierBookedAt
+    ? "Order already sent to Curfox — cancel/rebook there to make changes."
+    : null;
+}
+
 export function recomputeTotals(
   items: { price: number; quantity: number }[],
   city: string,
   config: DeliveryConfig = DEFAULT_DELIVERY_CONFIG,
+  adjustments: { amount: number }[] = [],
 ): { subtotal: number; shippingCost: number; total: number } {
   const subtotal = items.reduce((s, it) => s + it.price * it.quantity, 0);
   const shippingCost = calculateDelivery(subtotal, zoneForCity(city), config);
-  return { subtotal, shippingCost, total: subtotal + shippingCost };
+  const adjustmentTotal = adjustments.reduce((s, a) => s + a.amount, 0);
+  const total = Math.max(0, subtotal + shippingCost + adjustmentTotal);
+  return { subtotal, shippingCost, total };
 }
 
 export type OrderItemRow = {
@@ -189,6 +204,7 @@ export async function getOrderDetail(id: string) {
       user: { select: { name: true, email: true } },
       items: { include: { variant: { select: { sizeStocks: { select: { size: true } } } } } },
       notesLog: { orderBy: { createdAt: "desc" } },
+      adjustments: { orderBy: { createdAt: "asc" } },
     },
   });
 }

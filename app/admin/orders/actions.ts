@@ -5,13 +5,14 @@ import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/app/_lib/prisma";
 import { requireAdmin } from "@/app/_lib/admin-auth";
-import { nextStatuses, applyItemChanges, recomputeTotals, canEdit, canConfirm, type ItemChange } from "@/app/_lib/admin-orders";
+import { nextStatuses, applyItemChanges, recomputeTotals, canEdit, canConfirm, courierBookedError, signedAdjustmentAmount, type ItemChange, type AdjustmentKind } from "@/app/_lib/admin-orders";
 import { getDeliveryConfig } from "@/app/_lib/store-settings";
 import { restoreItemPools, acquireItemPools } from "@/app/_lib/inventory-pools";
 import { bookCourierAndNotify } from "@/app/checkout/book-courier";
 import { sendOrderConfirmationEmail, logMailerError, type OrderDetails } from "@/app/_lib/mailer";
 import { notifyOrderDispatched, notifyOrderCancelled } from "@/app/_lib/order-notifications";
 import { DELIVERY_COMPANY_NAME } from "@/app/_lib/carrier";
+import { effectivePrice } from "@/app/_lib/variants";
 
 export type ActionResult =
   | { success: true; warning?: string }
@@ -144,11 +145,11 @@ export async function editAddress(
   const parsed = AddressSchema.safeParse(address);
   if (!parsed.success) return { success: false, error: "Invalid address" };
 
-  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
+  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true, adjustments: true } });
   if (!order) return { success: false, error: "Order not found" };
   if (order.courierBookedAt) return { success: false, error: "Address already sent to Curfox — cancel/rebook there." };
 
-  const totals = recomputeTotals(order.items, parsed.data.city, await getDeliveryConfig());
+  const totals = recomputeTotals(order.items, parsed.data.city, await getDeliveryConfig(), order.adjustments);
   try {
     await prisma.order.update({
       where: { id: orderId },
@@ -192,10 +193,12 @@ export async function editItems(orderId: string, changes: ItemChange[]): Promise
   await requireAdmin();
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: { items: true },
+    include: { items: true, adjustments: true },
   });
   if (!order) return { success: false, error: "Order not found" };
   if (!canEdit(order)) return { success: false, error: "This order can no longer be edited" };
+  const courierError = courierBookedError(order);
+  if (courierError) return { success: false, error: courierError };
 
   let next;
   try {
@@ -210,7 +213,7 @@ export async function editItems(orderId: string, changes: ItemChange[]): Promise
     return { success: false, error: e instanceof Error ? e.message : "Invalid change" };
   }
 
-  const totals = recomputeTotals(next.nextItems, order.shippingCity, await getDeliveryConfig());
+  const totals = recomputeTotals(next.nextItems, order.shippingCity, await getDeliveryConfig(), order.adjustments);
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -260,9 +263,310 @@ export async function editItems(orderId: string, changes: ItemChange[]): Promise
     : { success: true };
 }
 
+const AdjustmentSchema = z.object({
+  label: z.string().trim().min(1).max(80),
+  amount: z.number().finite().positive(),
+  kind: z.enum(["CHARGE", "DISCOUNT"]),
+});
+
+export async function addAdjustment(
+  orderId: string,
+  input: { label: string; amount: number; kind: AdjustmentKind },
+): Promise<ActionResult> {
+  await requireAdmin();
+  const parsed = AdjustmentSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Enter a label and a positive amount" };
+
+  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true, adjustments: true } });
+  if (!order) return { success: false, error: "Order not found" };
+  if (!canEdit(order)) return { success: false, error: "This order can no longer be edited" };
+  const courierError = courierBookedError(order);
+  if (courierError) return { success: false, error: courierError };
+
+  const amount = signedAdjustmentAmount(parsed.data.kind, parsed.data.amount);
+  const totals = recomputeTotals(order.items, order.shippingCity, await getDeliveryConfig(), [...order.adjustments, { amount }]);
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.orderAdjustment.create({ data: { orderId, label: parsed.data.label, amount } });
+      await tx.order.update({
+        where: { id: orderId },
+        data: { subtotal: totals.subtotal, shippingCost: totals.shippingCost, total: totals.total },
+      });
+    });
+  } catch {
+    return { success: false, error: "Something went wrong. Please try again." };
+  }
+  revalidate(orderId);
+  return PAID.has(order.paymentStatus ?? "")
+    ? { success: true, warning: "Order was paid — any price difference must be settled manually." }
+    : { success: true };
+}
+
+export async function removeAdjustment(orderId: string, adjustmentId: string): Promise<ActionResult> {
+  await requireAdmin();
+  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true, adjustments: true } });
+  if (!order) return { success: false, error: "Order not found" };
+  if (!canEdit(order)) return { success: false, error: "This order can no longer be edited" };
+  const courierError = courierBookedError(order);
+  if (courierError) return { success: false, error: courierError };
+
+  const target = order.adjustments.find((a) => a.id === adjustmentId);
+  if (!target) return { success: false, error: "Adjustment not found" };
+  const remaining = order.adjustments.filter((a) => a.id !== adjustmentId);
+  const totals = recomputeTotals(order.items, order.shippingCity, await getDeliveryConfig(), remaining);
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.orderAdjustment.delete({ where: { id: adjustmentId } });
+      await tx.order.update({
+        where: { id: orderId },
+        data: { subtotal: totals.subtotal, shippingCost: totals.shippingCost, total: totals.total },
+      });
+    });
+  } catch {
+    return { success: false, error: "Something went wrong. Please try again." };
+  }
+  revalidate(orderId);
+  return PAID.has(order.paymentStatus ?? "")
+    ? { success: true, warning: "Order was paid — any price difference must be settled manually." }
+    : { success: true };
+}
+
+export type ProductSearchResult = {
+  id: string;
+  name: string;
+  price: number;
+  variants: { id: string; color: string; colorSlug: string; price: number | null; sizes: string[] }[];
+};
+
+export async function searchProductsForOrder(query: string): Promise<ProductSearchResult[]> {
+  await requireAdmin();
+  const q = query.trim();
+  if (!q) return [];
+  const products = await prisma.product.findMany({
+    where: { archived: false, name: { contains: q, mode: "insensitive" } },
+    take: 20,
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      price: true,
+      variants: {
+        where: { archived: false },
+        orderBy: { sortOrder: "asc" },
+        select: { id: true, color: true, colorSlug: true, price: true, sizeStocks: { select: { size: true } } },
+      },
+    },
+  });
+  return products.map((p) => ({
+    id: p.id,
+    name: p.name,
+    price: p.price,
+    variants: p.variants.map((v) => ({ id: v.id, color: v.color, colorSlug: v.colorSlug, price: v.price, sizes: v.sizeStocks.map((s) => s.size) })),
+  }));
+}
+
+type ResolvedOrderVariant = {
+  productId: string;
+  productName: string;
+  productPrice: number;
+  variantId: string;
+  color: string;
+  colorSlug: string;
+  sku: string | null;
+  variantPrice: number | null;
+  dtfDesignId: string | null;
+  sizes: string[];
+};
+
+async function resolveVariantForOrder(productId: string, variantId: string): Promise<ResolvedOrderVariant | null> {
+  const variant = await prisma.productVariant.findUnique({
+    where: { id: variantId },
+    select: {
+      id: true,
+      productId: true,
+      color: true,
+      colorSlug: true,
+      sku: true,
+      price: true,
+      sizeStocks: { select: { size: true } },
+      product: { select: { id: true, name: true, price: true, dtfDesignId: true, archived: true } },
+    },
+  });
+  if (!variant || variant.productId !== productId || variant.product.archived) return null;
+  return {
+    productId: variant.product.id,
+    productName: variant.product.name,
+    productPrice: variant.product.price,
+    variantId: variant.id,
+    color: variant.color,
+    colorSlug: variant.colorSlug,
+    sku: variant.sku,
+    variantPrice: variant.price,
+    dtfDesignId: variant.product.dtfDesignId,
+    sizes: variant.sizeStocks.map((s) => s.size),
+  };
+}
+
+function validateChosenSize(sizes: string[], size: string | null): string | null {
+  if (sizes.length === 0) return size ? "This color has no sizes to choose from" : null;
+  if (!size || !sizes.includes(size)) return `Size "${size ?? ""}" is not offered for this color`;
+  return null;
+}
+
+const ProductItemSchema = z.object({
+  productId: z.string().min(1),
+  variantId: z.string().min(1),
+  size: z.string().trim().min(1).nullable(),
+  quantity: z.number().int().positive(),
+});
+
+export async function addOrderItem(
+  orderId: string,
+  input: { productId: string; variantId: string; size: string | null; quantity: number },
+): Promise<ActionResult> {
+  await requireAdmin();
+  const parsed = ProductItemSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Pick a product, color, size, and quantity" };
+
+  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true, adjustments: true } });
+  if (!order) return { success: false, error: "Order not found" };
+  if (!canEdit(order)) return { success: false, error: "This order can no longer be edited" };
+  const courierError = courierBookedError(order);
+  if (courierError) return { success: false, error: courierError };
+
+  const resolved = await resolveVariantForOrder(parsed.data.productId, parsed.data.variantId);
+  if (!resolved) return { success: false, error: "Selected product/color is no longer available" };
+  const sizeError = validateChosenSize(resolved.sizes, parsed.data.size);
+  if (sizeError) return { success: false, error: sizeError };
+
+  const plainRow = parsed.data.size
+    ? await prisma.plainTshirtStock.findUnique({
+        where: { colorSlug_size: { colorSlug: resolved.colorSlug, size: parsed.data.size } },
+        select: { id: true },
+      })
+    : null;
+  const price = effectivePrice({ price: resolved.variantPrice }, { price: resolved.productPrice });
+  const totals = recomputeTotals(
+    [...order.items, { price, quantity: parsed.data.quantity }],
+    order.shippingCity,
+    await getDeliveryConfig(),
+    order.adjustments,
+  );
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await acquireItemPools(tx, {
+        plainTshirtStockId: plainRow?.id ?? null,
+        dtfDesignId: resolved.dtfDesignId,
+        quantity: parsed.data.quantity,
+        name: resolved.productName,
+      });
+      await tx.orderItem.create({
+        data: {
+          orderId,
+          productId: resolved.productId,
+          variantId: resolved.variantId,
+          color: resolved.color,
+          sku: resolved.sku,
+          name: resolved.productName,
+          size: parsed.data.size,
+          price,
+          quantity: parsed.data.quantity,
+          plainTshirtStockId: plainRow?.id ?? null,
+          dtfDesignId: resolved.dtfDesignId,
+        },
+      });
+      await tx.order.update({
+        where: { id: orderId },
+        data: { subtotal: totals.subtotal, shippingCost: totals.shippingCost, total: totals.total },
+      });
+    });
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Failed to add product" };
+  }
+  revalidate(orderId);
+  return PAID.has(order.paymentStatus ?? "")
+    ? { success: true, warning: "Order was paid — any price difference must be settled manually." }
+    : { success: true };
+}
+
+export async function swapOrderItem(
+  orderId: string,
+  itemId: string,
+  input: { productId: string; variantId: string; size: string | null; quantity: number },
+): Promise<ActionResult> {
+  await requireAdmin();
+  const parsed = ProductItemSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Pick a product, color, size, and quantity" };
+
+  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true, adjustments: true } });
+  if (!order) return { success: false, error: "Order not found" };
+  if (!canEdit(order)) return { success: false, error: "This order can no longer be edited" };
+  const courierError = courierBookedError(order);
+  if (courierError) return { success: false, error: courierError };
+
+  const original = order.items.find((i) => i.id === itemId);
+  if (!original) return { success: false, error: "Order item not found" };
+
+  const resolved = await resolveVariantForOrder(parsed.data.productId, parsed.data.variantId);
+  if (!resolved) return { success: false, error: "Selected product/color is no longer available" };
+  const sizeError = validateChosenSize(resolved.sizes, parsed.data.size);
+  if (sizeError) return { success: false, error: sizeError };
+
+  const plainRow = parsed.data.size
+    ? await prisma.plainTshirtStock.findUnique({
+        where: { colorSlug_size: { colorSlug: resolved.colorSlug, size: parsed.data.size } },
+        select: { id: true },
+      })
+    : null;
+  const price = effectivePrice({ price: resolved.variantPrice }, { price: resolved.productPrice });
+  const nextItems = order.items.map((i) => (i.id === itemId ? { price, quantity: parsed.data.quantity } : i));
+  const totals = recomputeTotals(nextItems, order.shippingCity, await getDeliveryConfig(), order.adjustments);
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await restoreItemPools(tx, original);
+      await acquireItemPools(tx, {
+        plainTshirtStockId: plainRow?.id ?? null,
+        dtfDesignId: resolved.dtfDesignId,
+        quantity: parsed.data.quantity,
+        name: resolved.productName,
+      });
+      await tx.orderItem.update({
+        where: { id: itemId },
+        data: {
+          productId: resolved.productId,
+          variantId: resolved.variantId,
+          color: resolved.color,
+          sku: resolved.sku,
+          name: resolved.productName,
+          size: parsed.data.size,
+          price,
+          quantity: parsed.data.quantity,
+          plainTshirtStockId: plainRow?.id ?? null,
+          dtfDesignId: resolved.dtfDesignId,
+        },
+      });
+      await tx.order.update({
+        where: { id: orderId },
+        data: { subtotal: totals.subtotal, shippingCost: totals.shippingCost, total: totals.total },
+      });
+    });
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Failed to change product" };
+  }
+  revalidate(orderId);
+  return PAID.has(order.paymentStatus ?? "")
+    ? { success: true, warning: "Order was paid — any price difference must be settled manually." }
+    : { success: true };
+}
+
 const ORDER_INCLUDE = {
   user: { select: { name: true, email: true } },
   items: { select: { name: true, color: true, sku: true, size: true, price: true, quantity: true } },
+  adjustments: { select: { label: true, amount: true } },
 } satisfies Prisma.OrderInclude;
 
 type DbOrderForDetails = Prisma.OrderGetPayload<{ include: typeof ORDER_INCLUDE }>;
@@ -282,6 +586,7 @@ function toOrderDetails(order: DbOrderForDetails): OrderDetails {
       price: i.price,
       quantity: i.quantity,
     })),
+    adjustments: order.adjustments.map((a) => ({ label: a.label, amount: a.amount })),
     subtotal: order.subtotal,
     shipping: order.shippingCost,
     total: order.total,
@@ -317,6 +622,7 @@ const CANCEL_INCLUDE = {
       quantity: true,
     },
   },
+  adjustments: { select: { label: true, amount: true } },
 } satisfies Prisma.OrderInclude;
 
 /** Customer cancellation notifications (email when present + SMS). Never throws. */

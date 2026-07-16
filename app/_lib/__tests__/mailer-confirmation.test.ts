@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import nodemailer from "nodemailer";
 import { __setTestTransport, sendOrderConfirmationEmail, type OrderDetails } from "../mailer";
+import { formatPrice } from "@/app/_lib/format";
 
 const originalEnv = { ...process.env };
 const ORDER: OrderDetails = {
@@ -52,5 +53,23 @@ describe("sendOrderConfirmationEmail item snapshots", () => {
     const opts = sendMailSpy.mock.calls[0][0];
     expect(opts.text).toContain("Bear Cap x1");
     expect(opts.text).not.toContain("Bear Cap ()");
+  });
+});
+
+describe("sendOrderConfirmationEmail adjustments", () => {
+  it("renders charges and discounts as their own lines with signed amounts", async () => {
+    const order: OrderDetails = { ...ORDER, adjustments: [{ label: "Rush fee", amount: 500 }, { label: "Loyalty discount", amount: -200 }] };
+    await sendOrderConfirmationEmail(order);
+    const opts = sendMailSpy.mock.calls[0][0];
+    expect(opts.text).toContain(`Rush fee: +${formatPrice(500)}`);
+    expect(opts.text).toContain(`Loyalty discount: −${formatPrice(200)}`);
+    expect(opts.html).toContain("Rush fee");
+    expect(opts.html).toContain("Loyalty discount");
+  });
+
+  it("omits the adjustments section entirely when there are none", async () => {
+    await sendOrderConfirmationEmail(ORDER);
+    const opts = sendMailSpy.mock.calls[0][0];
+    expect(opts.text).not.toContain("Rush fee");
   });
 });

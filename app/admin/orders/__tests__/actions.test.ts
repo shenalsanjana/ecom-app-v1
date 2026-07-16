@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const { requireAdmin } = vi.hoisted(() => ({ requireAdmin: vi.fn() }));
-const { orderFindUnique, orderUpdate, orderDelete, noteCreate, plainStockUpdateMany, plainStockFindUnique, dtfDesignUpdateMany, txn } = vi.hoisted(() => ({
+const {
+  orderFindUnique, orderUpdate, orderDelete, noteCreate, plainStockUpdateMany, plainStockFindUnique,
+  dtfDesignUpdateMany, txn, orderAdjustmentCreate, orderAdjustmentDelete, productFindMany, variantFindUnique,
+} = vi.hoisted(() => ({
   orderFindUnique: vi.fn(),
   orderUpdate: vi.fn(),
   orderDelete: vi.fn(),
@@ -10,10 +13,15 @@ const { orderFindUnique, orderUpdate, orderDelete, noteCreate, plainStockUpdateM
   plainStockFindUnique: vi.fn(),
   dtfDesignUpdateMany: vi.fn(),
   txn: vi.fn(),
+  orderAdjustmentCreate: vi.fn(),
+  orderAdjustmentDelete: vi.fn(),
+  productFindMany: vi.fn(),
+  variantFindUnique: vi.fn(),
 }));
-const { orderItemUpdate, orderItemDelete } = vi.hoisted(() => ({
+const { orderItemUpdate, orderItemDelete, orderItemCreate } = vi.hoisted(() => ({
   orderItemUpdate: vi.fn(),
   orderItemDelete: vi.fn(),
+  orderItemCreate: vi.fn(),
 }));
 
 vi.mock("@/app/_lib/admin-auth", () => ({ requireAdmin }));
@@ -44,7 +52,10 @@ vi.mock("@/app/_lib/prisma", () => {
     orderNote: { create: noteCreate },
     plainTshirtStock: { updateMany: plainStockUpdateMany, findUnique: plainStockFindUnique },
     dtfDesign: { updateMany: dtfDesignUpdateMany },
-    orderItem: { update: orderItemUpdate, delete: orderItemDelete },
+    orderItem: { update: orderItemUpdate, delete: orderItemDelete, create: orderItemCreate },
+    orderAdjustment: { create: orderAdjustmentCreate, delete: orderAdjustmentDelete },
+    product: { findMany: productFindMany },
+    productVariant: { findUnique: variantFindUnique },
   };
   return { prisma: { ...client, $transaction: txn.mockImplementation(async (fn: (c: unknown) => unknown) => fn(client)) } };
 });
@@ -63,13 +74,21 @@ beforeEach(() => {
   dtfDesignUpdateMany.mockReset().mockResolvedValue({ count: 1 });
   orderItemUpdate.mockReset();
   orderItemDelete.mockReset();
+  orderItemCreate.mockReset();
+  orderAdjustmentCreate.mockReset();
+  orderAdjustmentDelete.mockReset();
+  productFindMany.mockReset();
+  variantFindUnique.mockReset();
   txn.mockReset().mockImplementation(async (fn: (c: unknown) => unknown) => {
     const client = {
       order: { findUnique: orderFindUnique, update: orderUpdate, delete: orderDelete },
       orderNote: { create: noteCreate },
       plainTshirtStock: { updateMany: plainStockUpdateMany, findUnique: plainStockFindUnique },
       dtfDesign: { updateMany: dtfDesignUpdateMany },
-      orderItem: { update: orderItemUpdate, delete: orderItemDelete },
+      orderItem: { update: orderItemUpdate, delete: orderItemDelete, create: orderItemCreate },
+      orderAdjustment: { create: orderAdjustmentCreate, delete: orderAdjustmentDelete },
+      product: { findMany: productFindMany },
+      productVariant: { findUnique: variantFindUnique },
     };
     return fn(client);
   });
@@ -178,6 +197,7 @@ describe("cancelOrder", () => {
     orderFindUnique.mockResolvedValueOnce({
       id: "o1", status: "CONFIRMED", paymentStatus: "PAID",
       items: [{ plainTshirtStockId: "ps1", dtfDesignId: "d1", quantity: 2 }],
+      adjustments: [],
     });
     const res = await cancelOrder("o1");
     expect(plainStockUpdateMany).toHaveBeenCalledWith({ where: { id: "ps1" }, data: { quantity: { increment: 2 } } });
@@ -195,6 +215,7 @@ describe("cancelOrder", () => {
         { plainTshirtStockId: null, dtfDesignId: "d2", name: "Scarf", size: null, price: 2000, quantity: 3 },
         { plainTshirtStockId: "ps1", dtfDesignId: "d1", name: "Dress", size: "M", price: 1000, quantity: 1 },
       ],
+      adjustments: [],
     });
     const res = await cancelOrder("o1");
     expect(plainStockUpdateMany).toHaveBeenCalledTimes(1);
@@ -210,6 +231,7 @@ describe("cancelOrder", () => {
       guestName: "Nimali", guestEmail: "n@x.test", user: null,
       webNumber: "WEB1", rbNumber: null, trackingCode: null,
       items: [{ plainTshirtStockId: "ps1", dtfDesignId: "d1", name: "Dress", size: "M", price: 1000, quantity: 1 }],
+      adjustments: [],
     });
     const res = await cancelOrder("o1");
     expect(notifyOrderCancelled).toHaveBeenCalledTimes(1);
@@ -222,6 +244,7 @@ describe("cancelOrder", () => {
       id: "o1", status: "CONFIRMED", paymentStatus: "COD_PENDING",
       guestName: null, guestEmail: null, user: null,
       items: [{ plainTshirtStockId: "ps1", dtfDesignId: "d1", name: "Dress", size: "M", price: 1000, quantity: 1 }],
+      adjustments: [],
     });
     await cancelOrder("o1");
     expect(notifyOrderCancelled).toHaveBeenCalledTimes(1);
@@ -346,6 +369,26 @@ describe("editItems", () => {
 
     expect(res).toEqual({ success: true });
   });
+
+  it("is blocked once the courier is booked", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...ORDER, courierBookedAt: new Date() });
+    const res = await editItems("o1", [{ id: "i1", quantity: 1 }]);
+    expect(res).toEqual({ success: false, error: "Order already sent to Curfox — cancel/rebook there to make changes." });
+    expect(orderUpdate).not.toHaveBeenCalled();
+  });
+
+  it("includes existing adjustments when recomputing totals", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...ORDER, adjustments: [{ id: "a1", amount: 500 }] });
+    orderUpdate.mockResolvedValueOnce({});
+    orderItemUpdate.mockResolvedValueOnce({});
+    const res = await editItems("o1", [{ id: "i1", quantity: 1 }]);
+    // subtotal 2000 (qty 1 @ 2000), Colombo shipping 350, +500 adjustment = 2850
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "o1" },
+      data: expect.objectContaining({ subtotal: 2000, shippingCost: 350, total: 2850 }),
+    }));
+    expect(res).toEqual({ success: true });
+  });
 });
 
 import { editAddress } from "../actions";
@@ -375,6 +418,113 @@ describe("editAddress", () => {
     });
     expect(res).toEqual({ success: true });
   });
+
+  it("includes existing adjustments when recomputing totals for the new city", async () => {
+    orderFindUnique.mockResolvedValueOnce({
+      id: "o1", status: "CONFIRMED", courierBookedAt: null,
+      items: [{ price: 1000, quantity: 1 }],
+      adjustments: [{ amount: -200 }],
+    });
+    orderUpdate.mockResolvedValueOnce({});
+    const res = await editAddress("o1", ADDR);
+    // subtotal 1000, Kandy shipping 450, -200 adjustment = 1250
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "o1" },
+      data: expect.objectContaining({ shippingCost: 450, total: 1250 }),
+    }));
+    expect(res).toEqual({ success: true });
+  });
+});
+
+import { addAdjustment } from "../actions";
+
+describe("addAdjustment", () => {
+  const BASE = { id: "o1", status: "CONFIRMED", courierBookedAt: null, paymentStatus: "PENDING",
+    shippingCity: "Colombo", items: [{ price: 1000, quantity: 1 }], adjustments: [] };
+
+  it("rejects a blank label", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    const res = await addAdjustment("o1", { label: "  ", amount: 500, kind: "CHARGE" });
+    expect(res).toEqual({ success: false, error: "Enter a label and a positive amount" });
+    expect(orderAdjustmentCreate).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-positive amount", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    const res = await addAdjustment("o1", { label: "Rush fee", amount: 0, kind: "CHARGE" });
+    expect(res.success).toBe(false);
+    expect(orderAdjustmentCreate).not.toHaveBeenCalled();
+  });
+
+  it("is blocked once the courier is booked", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...BASE, courierBookedAt: new Date() });
+    const res = await addAdjustment("o1", { label: "Rush fee", amount: 500, kind: "CHARGE" });
+    expect(res).toEqual({ success: false, error: "Order already sent to Curfox — cancel/rebook there to make changes." });
+  });
+
+  it("stores a charge as a positive amount and recomputes total", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    orderAdjustmentCreate.mockResolvedValueOnce({});
+    orderUpdate.mockResolvedValueOnce({});
+    const res = await addAdjustment("o1", { label: "Rush fee", amount: 500, kind: "CHARGE" });
+    expect(orderAdjustmentCreate).toHaveBeenCalledWith({ data: { orderId: "o1", label: "Rush fee", amount: 500 } });
+    // subtotal 1000, Colombo shipping 350, +500 = 1850
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "o1" }, data: expect.objectContaining({ total: 1850 }),
+    }));
+    expect(res).toEqual({ success: true });
+  });
+
+  it("stores a discount as a negative amount", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    orderAdjustmentCreate.mockResolvedValueOnce({});
+    orderUpdate.mockResolvedValueOnce({});
+    const res = await addAdjustment("o1", { label: "Loyalty discount", amount: 200, kind: "DISCOUNT" });
+    expect(orderAdjustmentCreate).toHaveBeenCalledWith({ data: { orderId: "o1", label: "Loyalty discount", amount: -200 } });
+    expect(res).toEqual({ success: true });
+  });
+
+  it("warns when the order was already paid", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...BASE, paymentStatus: "PAID" });
+    orderAdjustmentCreate.mockResolvedValueOnce({});
+    orderUpdate.mockResolvedValueOnce({});
+    const res = await addAdjustment("o1", { label: "Rush fee", amount: 500, kind: "CHARGE" });
+    expect(res).toEqual({ success: true, warning: "Order was paid — any price difference must be settled manually." });
+  });
+});
+
+import { removeAdjustment } from "../actions";
+
+describe("removeAdjustment", () => {
+  const BASE = { id: "o1", status: "CONFIRMED", courierBookedAt: null, paymentStatus: "PENDING",
+    shippingCity: "Colombo", items: [{ price: 1000, quantity: 1 }],
+    adjustments: [{ id: "a1", amount: 500 }, { id: "a2", amount: -100 }] };
+
+  it("rejects an unknown adjustment id", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    const res = await removeAdjustment("o1", "does-not-exist");
+    expect(res).toEqual({ success: false, error: "Adjustment not found" });
+    expect(orderAdjustmentDelete).not.toHaveBeenCalled();
+  });
+
+  it("is blocked once the courier is booked", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...BASE, courierBookedAt: new Date() });
+    const res = await removeAdjustment("o1", "a1");
+    expect(res).toEqual({ success: false, error: "Order already sent to Curfox — cancel/rebook there to make changes." });
+  });
+
+  it("deletes the row and recomputes total from the remaining adjustments", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    orderAdjustmentDelete.mockResolvedValueOnce({});
+    orderUpdate.mockResolvedValueOnce({});
+    const res = await removeAdjustment("o1", "a1");
+    expect(orderAdjustmentDelete).toHaveBeenCalledWith({ where: { id: "a1" } });
+    // subtotal 1000, Colombo shipping 350, remaining adjustment -100 = 1250
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "o1" }, data: expect.objectContaining({ total: 1250 }),
+    }));
+    expect(res).toEqual({ success: true });
+  });
 });
 
 import { bookCourier, resendConfirmationEmail } from "../actions";
@@ -388,6 +538,7 @@ const FULL_ORDER = {
   webNumber: "DB-1", rbNumber: null, notes: null, trackingCode: null,
   user: null,
   items: [{ name: "Dress", color: "Black", sku: "DB-DRESS-BLK-M", size: "M", price: 6500, quantity: 1 }],
+  adjustments: [],
 };
 
 describe("bookCourier", () => {
@@ -530,6 +681,17 @@ describe("resendConfirmationEmail", () => {
     const res = await resendConfirmationEmail("o1");
     expect(res).toEqual({ success: true, warning: "Sent without a tracking code (not dispatched yet)." });
   });
+
+  it("passes adjustments through to the email", async () => {
+    orderFindUnique.mockResolvedValueOnce({
+      ...FULL_ORDER, trackingCode: "CF-88213",
+      adjustments: [{ label: "Rush fee", amount: 500 }, { label: "Loyalty discount", amount: -100 }],
+    });
+    sendOrderConfirmationEmail.mockResolvedValueOnce(undefined);
+    await resendConfirmationEmail("o1");
+    const arg = sendOrderConfirmationEmail.mock.calls[0][0];
+    expect(arg.adjustments).toEqual([{ label: "Rush fee", amount: 500 }, { label: "Loyalty discount", amount: -100 }]);
+  });
 });
 
 import { bulkConfirm, bulkDispatch } from "../actions";
@@ -607,7 +769,7 @@ describe("bulkDispatch", () => {
 describe("bulkCancel", () => {
   it("cancels eligible orders, restores both pools, and skips terminal ones", async () => {
     orderFindUnique
-      .mockResolvedValueOnce({ id: "o1", status: "CONFIRMED", paymentStatus: "PENDING", items: [{ plainTshirtStockId: "ps1", dtfDesignId: "d1", quantity: 2 }] })
+      .mockResolvedValueOnce({ id: "o1", status: "CONFIRMED", paymentStatus: "PENDING", items: [{ plainTshirtStockId: "ps1", dtfDesignId: "d1", quantity: 2 }], adjustments: [] })
       .mockResolvedValueOnce({ id: "o2", status: "CANCELLED", paymentStatus: "PENDING", items: [] })
       .mockResolvedValueOnce({ id: "o3", status: "DELIVERED", paymentStatus: "PAID", items: [{ plainTshirtStockId: "ps9", dtfDesignId: "d9", quantity: 1 }] });
     orderUpdate.mockResolvedValue({});
@@ -680,5 +842,189 @@ describe("bulkDelete", () => {
       { id: "o2", ok: true },
       { id: "o3", ok: false, error: "Not deletable" },
     ]);
+  });
+});
+
+import { searchProductsForOrder } from "../actions";
+
+describe("searchProductsForOrder", () => {
+  it("returns an empty array for a blank query without hitting the database", async () => {
+    const res = await searchProductsForOrder("   ");
+    expect(res).toEqual([]);
+    expect(productFindMany).not.toHaveBeenCalled();
+  });
+
+  it("maps products/variants/sizes into the picker shape", async () => {
+    productFindMany.mockResolvedValueOnce([
+      {
+        id: "p1", name: "Cat Tee", price: 2000,
+        variants: [
+          { id: "v1", color: "White", colorSlug: "white", price: null, sizeStocks: [{ size: "M" }, { size: "L" }] },
+        ],
+      },
+    ]);
+    const res = await searchProductsForOrder("cat");
+    expect(productFindMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { archived: false, name: { contains: "cat", mode: "insensitive" } },
+      take: 20,
+    }));
+    expect(res).toEqual([
+      { id: "p1", name: "Cat Tee", price: 2000, variants: [{ id: "v1", color: "White", colorSlug: "white", price: null, sizes: ["M", "L"] }] },
+    ]);
+  });
+});
+
+import { addOrderItem } from "../actions";
+
+describe("addOrderItem", () => {
+  const BASE = { id: "o1", status: "CONFIRMED", courierBookedAt: null, paymentStatus: "PENDING",
+    shippingCity: "Colombo", items: [{ price: 1000, quantity: 1 }], adjustments: [] };
+  const VARIANT = {
+    id: "v1", productId: "p1", color: "White", colorSlug: "white", sku: "DB-CAT-WHT", price: null,
+    sizeStocks: [{ size: "M" }, { size: "L" }],
+    product: { id: "p1", name: "Cat Tee", price: 2000, dtfDesignId: "d1", archived: false },
+  };
+
+  it("is blocked once the courier is booked", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...BASE, courierBookedAt: new Date() });
+    const res = await addOrderItem("o1", { productId: "p1", variantId: "v1", size: "M", quantity: 1 });
+    expect(res).toEqual({ success: false, error: "Order already sent to Curfox — cancel/rebook there to make changes." });
+  });
+
+  it("rejects a variant that doesn't belong to the given product", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    variantFindUnique.mockResolvedValueOnce({ ...VARIANT, productId: "other-product" });
+    const res = await addOrderItem("o1", { productId: "p1", variantId: "v1", size: "M", quantity: 1 });
+    expect(res).toEqual({ success: false, error: "Selected product/color is no longer available" });
+  });
+
+  it("rejects a size not offered by the variant", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    variantFindUnique.mockResolvedValueOnce(VARIANT);
+    const res = await addOrderItem("o1", { productId: "p1", variantId: "v1", size: "XXL", quantity: 1 });
+    expect(res).toEqual({ success: false, error: 'Size "XXL" is not offered for this color' });
+  });
+
+  it("resolves the color+size pool, acquires stock, creates the line, and recomputes totals", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    variantFindUnique.mockResolvedValueOnce(VARIANT);
+    plainStockFindUnique.mockResolvedValueOnce({ id: "ps-white-m" });
+    orderItemCreate.mockResolvedValueOnce({});
+    orderUpdate.mockResolvedValueOnce({});
+
+    const res = await addOrderItem("o1", { productId: "p1", variantId: "v1", size: "M", quantity: 2 });
+
+    expect(plainStockFindUnique).toHaveBeenCalledWith({ where: { colorSlug_size: { colorSlug: "white", size: "M" } }, select: { id: true } });
+    expect(plainStockUpdateMany).toHaveBeenCalledWith({ where: { id: "ps-white-m", quantity: { gte: 2 } }, data: { quantity: { decrement: 2 } } });
+    expect(dtfDesignUpdateMany).toHaveBeenCalledWith({ where: { id: "d1", quantity: { gte: 2 } }, data: { quantity: { decrement: 2 } } });
+    expect(orderItemCreate).toHaveBeenCalledWith({
+      data: {
+        orderId: "o1", productId: "p1", variantId: "v1", color: "White", sku: "DB-CAT-WHT",
+        name: "Cat Tee", size: "M", price: 2000, quantity: 2,
+        plainTshirtStockId: "ps-white-m", dtfDesignId: "d1",
+      },
+    });
+    // subtotal 1000 (existing) + 2000*2 (new) = 5000, at/above 5000 free-shipping threshold -> 0
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "o1" }, data: expect.objectContaining({ subtotal: 5000, shippingCost: 0, total: 5000 }),
+    }));
+    expect(res).toEqual({ success: true });
+  });
+
+  it("fails when the stock acquire has insufficient quantity, without creating the line", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    variantFindUnique.mockResolvedValueOnce(VARIANT);
+    plainStockFindUnique.mockResolvedValueOnce({ id: "ps-white-m" });
+    plainStockUpdateMany.mockResolvedValueOnce({ count: 0 });
+
+    const res = await addOrderItem("o1", { productId: "p1", variantId: "v1", size: "M", quantity: 50 });
+
+    expect(res).toEqual({ success: false, error: 'Insufficient stock for "Cat Tee"' });
+    expect(orderItemCreate).not.toHaveBeenCalled();
+  });
+
+  it("adds a sizeless item without touching the plain-tee pool", async () => {
+    const sizelessVariant = { ...VARIANT, sizeStocks: [] };
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    variantFindUnique.mockResolvedValueOnce(sizelessVariant);
+    orderItemCreate.mockResolvedValueOnce({});
+    orderUpdate.mockResolvedValueOnce({});
+
+    const res = await addOrderItem("o1", { productId: "p1", variantId: "v1", size: null, quantity: 1 });
+
+    expect(plainStockFindUnique).not.toHaveBeenCalled();
+    expect(plainStockUpdateMany).not.toHaveBeenCalled();
+    expect(orderItemCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ size: null, plainTshirtStockId: null }),
+    }));
+    expect(res).toEqual({ success: true });
+  });
+});
+
+import { swapOrderItem } from "../actions";
+
+describe("swapOrderItem", () => {
+  const BASE = {
+    id: "o1", status: "CONFIRMED", courierBookedAt: null, paymentStatus: "PENDING", shippingCity: "Colombo",
+    items: [{ id: "i1", price: 2000, quantity: 1, plainTshirtStockId: "ps-old", dtfDesignId: "d-old" }],
+    adjustments: [],
+  };
+  const VARIANT = {
+    id: "v2", productId: "p2", color: "Black", colorSlug: "black", sku: "DB-DOG-BLK", price: null,
+    sizeStocks: [{ size: "S" }, { size: "M" }],
+    product: { id: "p2", name: "Dog Tee", price: 1800, dtfDesignId: "d-new", archived: false },
+  };
+
+  it("is blocked once the courier is booked", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...BASE, courierBookedAt: new Date() });
+    const res = await swapOrderItem("o1", "i1", { productId: "p2", variantId: "v2", size: "S", quantity: 1 });
+    expect(res).toEqual({ success: false, error: "Order already sent to Curfox — cancel/rebook there to make changes." });
+  });
+
+  it("rejects an unknown order item id", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    const res = await swapOrderItem("o1", "does-not-exist", { productId: "p2", variantId: "v2", size: "S", quantity: 1 });
+    expect(res).toEqual({ success: false, error: "Order item not found" });
+  });
+
+  it("restores the old line's pools, resolves the new variant's pools fresh, and updates the row in place", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    variantFindUnique.mockResolvedValueOnce(VARIANT);
+    plainStockFindUnique.mockResolvedValueOnce({ id: "ps-black-s" });
+    orderItemUpdate.mockResolvedValueOnce({});
+    orderUpdate.mockResolvedValueOnce({});
+
+    const res = await swapOrderItem("o1", "i1", { productId: "p2", variantId: "v2", size: "S", quantity: 3 });
+
+    expect(plainStockUpdateMany).toHaveBeenNthCalledWith(1, { where: { id: "ps-old" }, data: { quantity: { increment: 1 } } });
+    expect(dtfDesignUpdateMany).toHaveBeenNthCalledWith(1, { where: { id: "d-old" }, data: { quantity: { increment: 1 } } });
+    expect(plainStockFindUnique).toHaveBeenCalledWith({ where: { colorSlug_size: { colorSlug: "black", size: "S" } }, select: { id: true } });
+    expect(plainStockUpdateMany).toHaveBeenNthCalledWith(2, { where: { id: "ps-black-s", quantity: { gte: 3 } }, data: { quantity: { decrement: 3 } } });
+    expect(orderItemUpdate).toHaveBeenCalledWith({
+      where: { id: "i1" },
+      data: {
+        productId: "p2", variantId: "v2", color: "Black", sku: "DB-DOG-BLK",
+        name: "Dog Tee", size: "S", price: 1800, quantity: 3,
+        plainTshirtStockId: "ps-black-s", dtfDesignId: "d-new",
+      },
+    });
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "o1" }, data: expect.objectContaining({ subtotal: 5400, shippingCost: 0, total: 5400 }),
+    }));
+    expect(res).toEqual({ success: true });
+  });
+
+  it("fails when the new variant has insufficient stock, leaving the original row untouched", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    variantFindUnique.mockResolvedValueOnce(VARIANT);
+    plainStockFindUnique.mockResolvedValueOnce({ id: "ps-black-s" });
+    plainStockUpdateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+
+    const res = await swapOrderItem("o1", "i1", { productId: "p2", variantId: "v2", size: "S", quantity: 3 });
+
+    expect(res).toEqual({ success: false, error: 'Insufficient stock for "Dog Tee"' });
+    expect(orderItemUpdate).not.toHaveBeenCalled();
   });
 });

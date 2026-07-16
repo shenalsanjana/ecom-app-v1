@@ -64,6 +64,31 @@ describe("recomputeTotals", () => {
     const r = recomputeTotals([{ price: 1000, quantity: 1 }], "Kandy");
     expect(r).toEqual({ subtotal: 1000, shippingCost: 450, total: 1450 });
   });
+
+  it("adds a positive adjustment (charge) on top of subtotal+shipping", () => {
+    const r = recomputeTotals([{ price: 1000, quantity: 1 }], "Colombo", undefined, [{ amount: 500 }]);
+    expect(r).toEqual({ subtotal: 1000, shippingCost: 350, total: 1850 });
+  });
+
+  it("subtracts a negative adjustment (discount)", () => {
+    const r = recomputeTotals([{ price: 1000, quantity: 1 }], "Colombo", undefined, [{ amount: -300 }]);
+    expect(r).toEqual({ subtotal: 1000, shippingCost: 350, total: 1050 });
+  });
+
+  it("sums multiple adjustments", () => {
+    const r = recomputeTotals([{ price: 1000, quantity: 1 }], "Colombo", undefined, [{ amount: 500 }, { amount: -200 }]);
+    expect(r.total).toBe(1650);
+  });
+
+  it("clamps total at 0 when discounts exceed subtotal+shipping", () => {
+    const r = recomputeTotals([{ price: 1000, quantity: 1 }], "Colombo", undefined, [{ amount: -5000 }]);
+    expect(r.total).toBe(0);
+  });
+
+  it("defaults to no adjustments when the param is omitted", () => {
+    const r = recomputeTotals([{ price: 1000, quantity: 1 }], "Colombo");
+    expect(r.total).toBe(1350);
+  });
 });
 
 import { applyItemChanges } from "../admin-orders";
@@ -164,5 +189,28 @@ describe("canConfirm", () => {
     expect(canConfirm({ paymentMethod: "KOKO", paymentStatus: "PENDING" })).toBe(false);
     expect(canConfirm({ paymentMethod: "MINTPAY", paymentStatus: null })).toBe(false);
     expect(canConfirm({ paymentMethod: "PAYHERE", paymentStatus: "PAYMENT_FAILED" })).toBe(false);
+  });
+});
+
+import { signedAdjustmentAmount } from "../admin-orders";
+
+describe("signedAdjustmentAmount", () => {
+  it("keeps a charge positive", () => {
+    expect(signedAdjustmentAmount("CHARGE", 500)).toBe(500);
+  });
+  it("negates a discount", () => {
+    expect(signedAdjustmentAmount("DISCOUNT", 500)).toBe(-500);
+  });
+});
+
+import { courierBookedError } from "../admin-orders";
+
+describe("courierBookedError", () => {
+  it("returns an error once the courier has been booked", () => {
+    expect(courierBookedError({ courierBookedAt: new Date() }))
+      .toBe("Order already sent to Curfox — cancel/rebook there to make changes.");
+  });
+  it("returns null when the courier has not been booked", () => {
+    expect(courierBookedError({ courierBookedAt: null })).toBeNull();
   });
 });

@@ -233,6 +233,7 @@ model Order {
   user                  User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
   items                 OrderItem[]
   notesLog              OrderNote[]
+  adjustments           OrderAdjustment[]
 
   @@index([userId])
   @@index([createdAt])
@@ -279,6 +280,18 @@ model OrderNote {
   createdAt   DateTime @default(now())
 
   order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model OrderAdjustment {
+  id        String   @id @default(cuid())
+  orderId   String
+  label     String
+  amount    Float
+  createdAt DateTime @default(now())
+
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
 }
