@@ -1,0 +1,106 @@
+name: dressingbear
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    # Loopback-only, not a public exposure: reachable solely from processes
+    # running on this host (never the public internet or other machines).
+    # Needed so `docker compose build app` (network: host, below) can reach
+    # Postgres during `next build`'s ISR prerendering — see the Dockerfile's
+    # `builder` stage comment for the full explanation.
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  app:
+    build:
+      context: .
+      target: runner
+      network: host
+      secrets:
+        - database_url
+      # NEXT_PUBLIC_* vars are inlined at build time, not read at runtime —
+      # `env_file` below only affects the running container, so these three
+      # must additionally be passed as build args (public values, safe as
+      # plain args). Compose resolves ${...} here from .env because
+      # scripts/deploy.sh `source`s .env into the real shell environment
+      # before calling `docker compose build` (Task 9) — verify on first
+      # deploy that the build log shows no empty-value fallback.
+      args:
+        NEXT_PUBLIC_META_PIXEL_ID: ${NEXT_PUBLIC_META_PIXEL_ID}
+        NEXT_PUBLIC_KOKO_ENABLED: ${NEXT_PUBLIC_KOKO_ENABLED}
+        NEXT_PUBLIC_DEBUG_CART: ${NEXT_PUBLIC_DEBUG_CART}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+    volumes:
+      - uploads:/app/public/uploads
+    networks:
+      - app-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # One-off tooling image (migrations, seed, admin bootstrap). Never started
+  # by `docker compose up`; only reachable via `docker compose --profile
+  # tools run --rm migrator <command>`.
+  migrator:
+    build:
+      context: .
+      target: tools
+    profiles: ["tools"]
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+    volumes:
+      - uploads:/app/public/uploads
+    networks:
+      - app-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  app-network:
+    name: dressingbear-network
+    driver: bridge
+
+volumes:
+  pgdata:
+  uploads:
+
+secrets:
+  database_url:
+    environment: DATABASE_URL
