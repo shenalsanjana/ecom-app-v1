@@ -1,18 +1,10 @@
 "use client";
 import { useRef, useState } from "react";
-import { upload } from "@vercel/blob/client";
 import { resizeImageFile, type ResizeTarget } from "@/app/_lib/resize-image";
 
-// Upload one file and return its public URL. Production goes straight to Vercel
-// Blob (bypasses the 4.5MB body cap); local dev saves into /public/uploads.
+// Upload one file to local disk (persistent Docker volume in production) and
+// return its public URL.
 async function uploadOne(file: File): Promise<string> {
-  if (process.env.NODE_ENV === "production") {
-    const blob = await upload(file.name, file, {
-      access: "public",
-      handleUploadUrl: "/api/blob/upload",
-    });
-    return blob.url;
-  }
   const fd = new FormData();
   fd.append("file", file);
   const res = await fetch("/api/admin/upload-local", { method: "POST", body: fd });

@@ -1,9 +1,10 @@
 // app/api/admin/upload-local/route.ts
-// LOCAL-DEV ONLY fallback so image upload works without provisioning Vercel
-// Blob. It accepts a multipart file and writes it into /public/uploads, which
-// `next dev` serves at /uploads/<name>. It is hard-disabled in production
-// because Vercel's runtime filesystem is read-only — production uploads go
-// through /api/blob/upload (Blob client-upload) instead.
+//
+// Admin image upload. Writes into /app/public/uploads (a persistent Docker
+// named volume in production — see docker-compose.yml), which Next's static
+// public/ handling serves at /uploads/<name>. This is the only upload path;
+// Vercel Blob (previously used in production) has been removed entirely —
+// see docs/superpowers/specs/2026-07-16-vercel-to-ovh-docker-migration-design.md.
 import { NextResponse } from "next/server";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -23,13 +24,6 @@ const ALLOWED_CONTENT_TYPES = [
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
 export async function POST(request: Request): Promise<Response> {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json(
-      { error: "Local upload is disabled in production. Configure Vercel Blob (BLOB_READ_WRITE_TOKEN)." },
-      { status: 400 },
-    );
-  }
-
   const guard = await requireAdminApi();
   if (guard instanceof Response) return guard;
 
