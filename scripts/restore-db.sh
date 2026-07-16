@@ -24,6 +24,9 @@ set -a
 source .env
 set +a
 
+: "${POSTGRES_DB:?POSTGRES_DB is empty or unset in .env}"
+: "${POSTGRES_USER:?POSTGRES_USER is empty or unset in .env}"
+
 echo "WARNING: this will overwrite the '${POSTGRES_DB}' database with the contents of ${BACKUP_FILE}."
 read -r -p "Type the database name (${POSTGRES_DB}) to confirm: " CONFIRM
 if [ "$CONFIRM" != "$POSTGRES_DB" ]; then

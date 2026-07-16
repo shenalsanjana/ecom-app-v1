@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 # scripts/backup-db.sh — dumps the postgres service to a timestamped file
 # outside the pgdata volume. Keeps the most recent N backups (default 7).
@@ -12,6 +13,9 @@ cd "$(dirname "$0")/.."
 
 BACKUP_DIR="${1:-/var/backups/dressingbear}"
 KEEP="${2:-7}"
+if [ "$KEEP" -lt 1 ]; then
+  KEEP=1
+fi
 
 if [ ! -f .env ]; then
   echo "ERROR: .env not found." >&2
@@ -22,6 +26,9 @@ set -a
 # shellcheck disable=SC1091
 source .env
 set +a
+
+: "${POSTGRES_DB:?POSTGRES_DB is empty or unset in .env}"
+: "${POSTGRES_USER:?POSTGRES_USER is empty or unset in .env}"
 
 mkdir -p "$BACKUP_DIR"
 
