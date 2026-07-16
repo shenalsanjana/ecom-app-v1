@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { editItems, addOrderItem, swapOrderItem } from "@/app/admin/orders/actions";
 import { formatPrice } from "@/app/_lib/format";
@@ -18,6 +18,10 @@ export function OrderItemsEditor({ orderId, items, editable }: { orderId: string
   const [adding, setAdding] = useState(false);
   const [pending, start] = useTransition();
   const router = useRouter();
+
+  useEffect(() => {
+    setDraft(items);
+  }, [items]);
 
   function save() {
     const changes: ItemChange[] = [];
