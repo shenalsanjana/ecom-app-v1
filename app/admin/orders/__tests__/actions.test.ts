@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const { requireAdmin } = vi.hoisted(() => ({ requireAdmin: vi.fn() }));
 const {
   orderFindUnique, orderUpdate, orderDelete, noteCreate, plainStockUpdateMany, plainStockFindUnique,
-  dtfDesignUpdateMany, txn, orderAdjustmentCreate, orderAdjustmentDelete, productFindMany,
+  dtfDesignUpdateMany, txn, orderAdjustmentCreate, orderAdjustmentDelete, productFindMany, variantFindUnique,
 } = vi.hoisted(() => ({
   orderFindUnique: vi.fn(),
   orderUpdate: vi.fn(),
@@ -16,10 +16,12 @@ const {
   orderAdjustmentCreate: vi.fn(),
   orderAdjustmentDelete: vi.fn(),
   productFindMany: vi.fn(),
+  variantFindUnique: vi.fn(),
 }));
-const { orderItemUpdate, orderItemDelete } = vi.hoisted(() => ({
+const { orderItemUpdate, orderItemDelete, orderItemCreate } = vi.hoisted(() => ({
   orderItemUpdate: vi.fn(),
   orderItemDelete: vi.fn(),
+  orderItemCreate: vi.fn(),
 }));
 
 vi.mock("@/app/_lib/admin-auth", () => ({ requireAdmin }));
@@ -50,9 +52,10 @@ vi.mock("@/app/_lib/prisma", () => {
     orderNote: { create: noteCreate },
     plainTshirtStock: { updateMany: plainStockUpdateMany, findUnique: plainStockFindUnique },
     dtfDesign: { updateMany: dtfDesignUpdateMany },
-    orderItem: { update: orderItemUpdate, delete: orderItemDelete },
+    orderItem: { update: orderItemUpdate, delete: orderItemDelete, create: orderItemCreate },
     orderAdjustment: { create: orderAdjustmentCreate, delete: orderAdjustmentDelete },
     product: { findMany: productFindMany },
+    productVariant: { findUnique: variantFindUnique },
   };
   return { prisma: { ...client, $transaction: txn.mockImplementation(async (fn: (c: unknown) => unknown) => fn(client)) } };
 });
@@ -71,18 +74,21 @@ beforeEach(() => {
   dtfDesignUpdateMany.mockReset().mockResolvedValue({ count: 1 });
   orderItemUpdate.mockReset();
   orderItemDelete.mockReset();
+  orderItemCreate.mockReset();
   orderAdjustmentCreate.mockReset();
   orderAdjustmentDelete.mockReset();
   productFindMany.mockReset();
+  variantFindUnique.mockReset();
   txn.mockReset().mockImplementation(async (fn: (c: unknown) => unknown) => {
     const client = {
       order: { findUnique: orderFindUnique, update: orderUpdate, delete: orderDelete },
       orderNote: { create: noteCreate },
       plainTshirtStock: { updateMany: plainStockUpdateMany, findUnique: plainStockFindUnique },
       dtfDesign: { updateMany: dtfDesignUpdateMany },
-      orderItem: { update: orderItemUpdate, delete: orderItemDelete },
+      orderItem: { update: orderItemUpdate, delete: orderItemDelete, create: orderItemCreate },
       orderAdjustment: { create: orderAdjustmentCreate, delete: orderAdjustmentDelete },
       product: { findMany: productFindMany },
+      productVariant: { findUnique: variantFindUnique },
     };
     return fn(client);
   });
@@ -865,5 +871,92 @@ describe("searchProductsForOrder", () => {
     expect(res).toEqual([
       { id: "p1", name: "Cat Tee", price: 2000, variants: [{ id: "v1", color: "White", colorSlug: "white", price: null, sizes: ["M", "L"] }] },
     ]);
+  });
+});
+
+import { addOrderItem } from "../actions";
+
+describe("addOrderItem", () => {
+  const BASE = { id: "o1", status: "CONFIRMED", courierBookedAt: null, paymentStatus: "PENDING",
+    shippingCity: "Colombo", items: [{ price: 1000, quantity: 1 }], adjustments: [] };
+  const VARIANT = {
+    id: "v1", productId: "p1", color: "White", colorSlug: "white", sku: "DB-CAT-WHT", price: null,
+    sizeStocks: [{ size: "M" }, { size: "L" }],
+    product: { id: "p1", name: "Cat Tee", price: 2000, dtfDesignId: "d1", archived: false },
+  };
+
+  it("is blocked once the courier is booked", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...BASE, courierBookedAt: new Date() });
+    const res = await addOrderItem("o1", { productId: "p1", variantId: "v1", size: "M", quantity: 1 });
+    expect(res).toEqual({ success: false, error: "Order already sent to Curfox — cancel/rebook there to make changes." });
+  });
+
+  it("rejects a variant that doesn't belong to the given product", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    variantFindUnique.mockResolvedValueOnce({ ...VARIANT, productId: "other-product" });
+    const res = await addOrderItem("o1", { productId: "p1", variantId: "v1", size: "M", quantity: 1 });
+    expect(res).toEqual({ success: false, error: "Selected product/color is no longer available" });
+  });
+
+  it("rejects a size not offered by the variant", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    variantFindUnique.mockResolvedValueOnce(VARIANT);
+    const res = await addOrderItem("o1", { productId: "p1", variantId: "v1", size: "XXL", quantity: 1 });
+    expect(res).toEqual({ success: false, error: 'Size "XXL" is not offered for this color' });
+  });
+
+  it("resolves the color+size pool, acquires stock, creates the line, and recomputes totals", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    variantFindUnique.mockResolvedValueOnce(VARIANT);
+    plainStockFindUnique.mockResolvedValueOnce({ id: "ps-white-m" });
+    orderItemCreate.mockResolvedValueOnce({});
+    orderUpdate.mockResolvedValueOnce({});
+
+    const res = await addOrderItem("o1", { productId: "p1", variantId: "v1", size: "M", quantity: 2 });
+
+    expect(plainStockFindUnique).toHaveBeenCalledWith({ where: { colorSlug_size: { colorSlug: "white", size: "M" } }, select: { id: true } });
+    expect(plainStockUpdateMany).toHaveBeenCalledWith({ where: { id: "ps-white-m", quantity: { gte: 2 } }, data: { quantity: { decrement: 2 } } });
+    expect(dtfDesignUpdateMany).toHaveBeenCalledWith({ where: { id: "d1", quantity: { gte: 2 } }, data: { quantity: { decrement: 2 } } });
+    expect(orderItemCreate).toHaveBeenCalledWith({
+      data: {
+        orderId: "o1", productId: "p1", variantId: "v1", color: "White", sku: "DB-CAT-WHT",
+        name: "Cat Tee", size: "M", price: 2000, quantity: 2,
+        plainTshirtStockId: "ps-white-m", dtfDesignId: "d1",
+      },
+    });
+    // subtotal 1000 (existing) + 2000*2 (new) = 5000, at/above 5000 free-shipping threshold -> 0
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "o1" }, data: expect.objectContaining({ subtotal: 5000, shippingCost: 0, total: 5000 }),
+    }));
+    expect(res).toEqual({ success: true });
+  });
+
+  it("fails when the stock acquire has insufficient quantity, without creating the line", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    variantFindUnique.mockResolvedValueOnce(VARIANT);
+    plainStockFindUnique.mockResolvedValueOnce({ id: "ps-white-m" });
+    plainStockUpdateMany.mockResolvedValueOnce({ count: 0 });
+
+    const res = await addOrderItem("o1", { productId: "p1", variantId: "v1", size: "M", quantity: 50 });
+
+    expect(res).toEqual({ success: false, error: 'Insufficient stock for "Cat Tee"' });
+    expect(orderItemCreate).not.toHaveBeenCalled();
+  });
+
+  it("adds a sizeless item without touching the plain-tee pool", async () => {
+    const sizelessVariant = { ...VARIANT, sizeStocks: [] };
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    variantFindUnique.mockResolvedValueOnce(sizelessVariant);
+    orderItemCreate.mockResolvedValueOnce({});
+    orderUpdate.mockResolvedValueOnce({});
+
+    const res = await addOrderItem("o1", { productId: "p1", variantId: "v1", size: null, quantity: 1 });
+
+    expect(plainStockFindUnique).not.toHaveBeenCalled();
+    expect(plainStockUpdateMany).not.toHaveBeenCalled();
+    expect(orderItemCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ size: null, plainTshirtStockId: null }),
+    }));
+    expect(res).toEqual({ success: true });
   });
 });
