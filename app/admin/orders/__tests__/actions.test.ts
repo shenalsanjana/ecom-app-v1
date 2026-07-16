@@ -187,6 +187,7 @@ describe("cancelOrder", () => {
     orderFindUnique.mockResolvedValueOnce({
       id: "o1", status: "CONFIRMED", paymentStatus: "PAID",
       items: [{ plainTshirtStockId: "ps1", dtfDesignId: "d1", quantity: 2 }],
+      adjustments: [],
     });
     const res = await cancelOrder("o1");
     expect(plainStockUpdateMany).toHaveBeenCalledWith({ where: { id: "ps1" }, data: { quantity: { increment: 2 } } });
@@ -204,6 +205,7 @@ describe("cancelOrder", () => {
         { plainTshirtStockId: null, dtfDesignId: "d2", name: "Scarf", size: null, price: 2000, quantity: 3 },
         { plainTshirtStockId: "ps1", dtfDesignId: "d1", name: "Dress", size: "M", price: 1000, quantity: 1 },
       ],
+      adjustments: [],
     });
     const res = await cancelOrder("o1");
     expect(plainStockUpdateMany).toHaveBeenCalledTimes(1);
@@ -219,6 +221,7 @@ describe("cancelOrder", () => {
       guestName: "Nimali", guestEmail: "n@x.test", user: null,
       webNumber: "WEB1", rbNumber: null, trackingCode: null,
       items: [{ plainTshirtStockId: "ps1", dtfDesignId: "d1", name: "Dress", size: "M", price: 1000, quantity: 1 }],
+      adjustments: [],
     });
     const res = await cancelOrder("o1");
     expect(notifyOrderCancelled).toHaveBeenCalledTimes(1);
@@ -231,6 +234,7 @@ describe("cancelOrder", () => {
       id: "o1", status: "CONFIRMED", paymentStatus: "COD_PENDING",
       guestName: null, guestEmail: null, user: null,
       items: [{ plainTshirtStockId: "ps1", dtfDesignId: "d1", name: "Dress", size: "M", price: 1000, quantity: 1 }],
+      adjustments: [],
     });
     await cancelOrder("o1");
     expect(notifyOrderCancelled).toHaveBeenCalledTimes(1);
@@ -524,6 +528,7 @@ const FULL_ORDER = {
   webNumber: "DB-1", rbNumber: null, notes: null, trackingCode: null,
   user: null,
   items: [{ name: "Dress", color: "Black", sku: "DB-DRESS-BLK-M", size: "M", price: 6500, quantity: 1 }],
+  adjustments: [],
 };
 
 describe("bookCourier", () => {
@@ -666,6 +671,17 @@ describe("resendConfirmationEmail", () => {
     const res = await resendConfirmationEmail("o1");
     expect(res).toEqual({ success: true, warning: "Sent without a tracking code (not dispatched yet)." });
   });
+
+  it("passes adjustments through to the email", async () => {
+    orderFindUnique.mockResolvedValueOnce({
+      ...FULL_ORDER, trackingCode: "CF-88213",
+      adjustments: [{ label: "Rush fee", amount: 500 }, { label: "Loyalty discount", amount: -100 }],
+    });
+    sendOrderConfirmationEmail.mockResolvedValueOnce(undefined);
+    await resendConfirmationEmail("o1");
+    const arg = sendOrderConfirmationEmail.mock.calls[0][0];
+    expect(arg.adjustments).toEqual([{ label: "Rush fee", amount: 500 }, { label: "Loyalty discount", amount: -100 }]);
+  });
 });
 
 import { bulkConfirm, bulkDispatch } from "../actions";
@@ -743,7 +759,7 @@ describe("bulkDispatch", () => {
 describe("bulkCancel", () => {
   it("cancels eligible orders, restores both pools, and skips terminal ones", async () => {
     orderFindUnique
-      .mockResolvedValueOnce({ id: "o1", status: "CONFIRMED", paymentStatus: "PENDING", items: [{ plainTshirtStockId: "ps1", dtfDesignId: "d1", quantity: 2 }] })
+      .mockResolvedValueOnce({ id: "o1", status: "CONFIRMED", paymentStatus: "PENDING", items: [{ plainTshirtStockId: "ps1", dtfDesignId: "d1", quantity: 2 }], adjustments: [] })
       .mockResolvedValueOnce({ id: "o2", status: "CANCELLED", paymentStatus: "PENDING", items: [] })
       .mockResolvedValueOnce({ id: "o3", status: "DELIVERED", paymentStatus: "PAID", items: [{ plainTshirtStockId: "ps9", dtfDesignId: "d9", quantity: 1 }] });
     orderUpdate.mockResolvedValue({});

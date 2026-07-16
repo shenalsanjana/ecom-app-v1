@@ -335,6 +335,7 @@ export async function removeAdjustment(orderId: string, adjustmentId: string): P
 const ORDER_INCLUDE = {
   user: { select: { name: true, email: true } },
   items: { select: { name: true, color: true, sku: true, size: true, price: true, quantity: true } },
+  adjustments: { select: { label: true, amount: true } },
 } satisfies Prisma.OrderInclude;
 
 type DbOrderForDetails = Prisma.OrderGetPayload<{ include: typeof ORDER_INCLUDE }>;
@@ -354,6 +355,7 @@ function toOrderDetails(order: DbOrderForDetails): OrderDetails {
       price: i.price,
       quantity: i.quantity,
     })),
+    adjustments: order.adjustments.map((a) => ({ label: a.label, amount: a.amount })),
     subtotal: order.subtotal,
     shipping: order.shippingCost,
     total: order.total,
@@ -389,6 +391,7 @@ const CANCEL_INCLUDE = {
       quantity: true,
     },
   },
+  adjustments: { select: { label: true, amount: true } },
 } satisfies Prisma.OrderInclude;
 
 /** Customer cancellation notifications (email when present + SMS). Never throws. */
