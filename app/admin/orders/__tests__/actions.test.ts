@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const { requireAdmin } = vi.hoisted(() => ({ requireAdmin: vi.fn() }));
 const {
   orderFindUnique, orderUpdate, orderDelete, noteCreate, plainStockUpdateMany, plainStockFindUnique,
-  dtfDesignUpdateMany, txn, orderAdjustmentCreate, orderAdjustmentDelete,
+  dtfDesignUpdateMany, txn, orderAdjustmentCreate, orderAdjustmentDelete, productFindMany,
 } = vi.hoisted(() => ({
   orderFindUnique: vi.fn(),
   orderUpdate: vi.fn(),
@@ -15,6 +15,7 @@ const {
   txn: vi.fn(),
   orderAdjustmentCreate: vi.fn(),
   orderAdjustmentDelete: vi.fn(),
+  productFindMany: vi.fn(),
 }));
 const { orderItemUpdate, orderItemDelete } = vi.hoisted(() => ({
   orderItemUpdate: vi.fn(),
@@ -51,6 +52,7 @@ vi.mock("@/app/_lib/prisma", () => {
     dtfDesign: { updateMany: dtfDesignUpdateMany },
     orderItem: { update: orderItemUpdate, delete: orderItemDelete },
     orderAdjustment: { create: orderAdjustmentCreate, delete: orderAdjustmentDelete },
+    product: { findMany: productFindMany },
   };
   return { prisma: { ...client, $transaction: txn.mockImplementation(async (fn: (c: unknown) => unknown) => fn(client)) } };
 });
@@ -71,6 +73,7 @@ beforeEach(() => {
   orderItemDelete.mockReset();
   orderAdjustmentCreate.mockReset();
   orderAdjustmentDelete.mockReset();
+  productFindMany.mockReset();
   txn.mockReset().mockImplementation(async (fn: (c: unknown) => unknown) => {
     const client = {
       order: { findUnique: orderFindUnique, update: orderUpdate, delete: orderDelete },
@@ -79,6 +82,7 @@ beforeEach(() => {
       dtfDesign: { updateMany: dtfDesignUpdateMany },
       orderItem: { update: orderItemUpdate, delete: orderItemDelete },
       orderAdjustment: { create: orderAdjustmentCreate, delete: orderAdjustmentDelete },
+      product: { findMany: productFindMany },
     };
     return fn(client);
   });
@@ -831,6 +835,35 @@ describe("bulkDelete", () => {
       { id: "o1", ok: true },
       { id: "o2", ok: true },
       { id: "o3", ok: false, error: "Not deletable" },
+    ]);
+  });
+});
+
+import { searchProductsForOrder } from "../actions";
+
+describe("searchProductsForOrder", () => {
+  it("returns an empty array for a blank query without hitting the database", async () => {
+    const res = await searchProductsForOrder("   ");
+    expect(res).toEqual([]);
+    expect(productFindMany).not.toHaveBeenCalled();
+  });
+
+  it("maps products/variants/sizes into the picker shape", async () => {
+    productFindMany.mockResolvedValueOnce([
+      {
+        id: "p1", name: "Cat Tee", price: 2000,
+        variants: [
+          { id: "v1", color: "White", colorSlug: "white", price: null, sizeStocks: [{ size: "M" }, { size: "L" }] },
+        ],
+      },
+    ]);
+    const res = await searchProductsForOrder("cat");
+    expect(productFindMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { archived: false, name: { contains: "cat", mode: "insensitive" } },
+      take: 20,
+    }));
+    expect(res).toEqual([
+      { id: "p1", name: "Cat Tee", price: 2000, variants: [{ id: "v1", color: "White", colorSlug: "white", price: null, sizes: ["M", "L"] }] },
     ]);
   });
 });

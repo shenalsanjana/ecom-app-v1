@@ -12,6 +12,7 @@ import { bookCourierAndNotify } from "@/app/checkout/book-courier";
 import { sendOrderConfirmationEmail, logMailerError, type OrderDetails } from "@/app/_lib/mailer";
 import { notifyOrderDispatched, notifyOrderCancelled } from "@/app/_lib/order-notifications";
 import { DELIVERY_COMPANY_NAME } from "@/app/_lib/carrier";
+import { effectivePrice } from "@/app/_lib/variants";
 
 export type ActionResult =
   | { success: true; warning?: string }
@@ -330,6 +331,88 @@ export async function removeAdjustment(orderId: string, adjustmentId: string): P
   return PAID.has(order.paymentStatus ?? "")
     ? { success: true, warning: "Order was paid — any price difference must be settled manually." }
     : { success: true };
+}
+
+export type ProductSearchResult = {
+  id: string;
+  name: string;
+  price: number;
+  variants: { id: string; color: string; colorSlug: string; price: number | null; sizes: string[] }[];
+};
+
+export async function searchProductsForOrder(query: string): Promise<ProductSearchResult[]> {
+  await requireAdmin();
+  const q = query.trim();
+  if (!q) return [];
+  const products = await prisma.product.findMany({
+    where: { archived: false, name: { contains: q, mode: "insensitive" } },
+    take: 20,
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      price: true,
+      variants: {
+        where: { archived: false },
+        orderBy: { sortOrder: "asc" },
+        select: { id: true, color: true, colorSlug: true, price: true, sizeStocks: { select: { size: true } } },
+      },
+    },
+  });
+  return products.map((p) => ({
+    id: p.id,
+    name: p.name,
+    price: p.price,
+    variants: p.variants.map((v) => ({ id: v.id, color: v.color, colorSlug: v.colorSlug, price: v.price, sizes: v.sizeStocks.map((s) => s.size) })),
+  }));
+}
+
+type ResolvedOrderVariant = {
+  productId: string;
+  productName: string;
+  productPrice: number;
+  variantId: string;
+  color: string;
+  colorSlug: string;
+  sku: string | null;
+  variantPrice: number | null;
+  dtfDesignId: string | null;
+  sizes: string[];
+};
+
+async function resolveVariantForOrder(productId: string, variantId: string): Promise<ResolvedOrderVariant | null> {
+  const variant = await prisma.productVariant.findUnique({
+    where: { id: variantId },
+    select: {
+      id: true,
+      productId: true,
+      color: true,
+      colorSlug: true,
+      sku: true,
+      price: true,
+      sizeStocks: { select: { size: true } },
+      product: { select: { id: true, name: true, price: true, dtfDesignId: true, archived: true } },
+    },
+  });
+  if (!variant || variant.productId !== productId || variant.product.archived) return null;
+  return {
+    productId: variant.product.id,
+    productName: variant.product.name,
+    productPrice: variant.product.price,
+    variantId: variant.id,
+    color: variant.color,
+    colorSlug: variant.colorSlug,
+    sku: variant.sku,
+    variantPrice: variant.price,
+    dtfDesignId: variant.product.dtfDesignId,
+    sizes: variant.sizeStocks.map((s) => s.size),
+  };
+}
+
+function validateChosenSize(sizes: string[], size: string | null): string | null {
+  if (sizes.length === 0) return size ? "This color has no sizes to choose from" : null;
+  if (!size || !sizes.includes(size)) return `Size "${size ?? ""}" is not offered for this color`;
+  return null;
 }
 
 const ORDER_INCLUDE = {
