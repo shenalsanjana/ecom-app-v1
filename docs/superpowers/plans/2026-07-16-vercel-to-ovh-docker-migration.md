@@ -762,6 +762,17 @@ RUN npx prisma generate
 
 # ---- builder: production Next.js build (needs DB access — see below) ------
 FROM tools AS builder
+# NEXT_PUBLIC_* vars are inlined into client bundles at build time by
+# Next.js, not read at runtime — they must arrive as build ARGs (they're
+# public by definition, safe as plain args, unlike DATABASE_URL below).
+# Without these, Meta Pixel and the Koko promo surfaces would silently
+# never activate even with the vars correctly set in .env at runtime.
+ARG NEXT_PUBLIC_META_PIXEL_ID
+ARG NEXT_PUBLIC_KOKO_ENABLED
+ARG NEXT_PUBLIC_DEBUG_CART
+ENV NEXT_PUBLIC_META_PIXEL_ID=$NEXT_PUBLIC_META_PIXEL_ID
+ENV NEXT_PUBLIC_KOKO_ENABLED=$NEXT_PUBLIC_KOKO_ENABLED
+ENV NEXT_PUBLIC_DEBUG_CART=$NEXT_PUBLIC_DEBUG_CART
 # Several storefront pages use ISR (`export const revalidate = N`), which
 # makes `next build` query the database at build time to prerender them.
 # DATABASE_URL is passed as a BuildKit secret (never a build ARG) so the
@@ -787,6 +798,14 @@ ENV HOSTNAME=0.0.0.0
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
+# Next's standalone file tracer (@vercel/nft) resolves Prisma's native query
+# engine binary at runtime, not via static `require()`, so it's unreliable
+# about including node_modules/.prisma in the traced output. Copy it
+# explicitly — without this, the app boots but every DB query fails,
+# /api/health returns 500, the container never reports healthy, and (since
+# nginx depends_on app: condition: service_healthy) the whole stack never
+# comes up.
+COPY --from=builder --chown=node:node /app/node_modules/.prisma ./node_modules/.prisma
 
 # Persistent upload target — a named volume is mounted here at runtime
 # (docker-compose.yml `uploads` volume). Pre-create it with correct
@@ -808,7 +827,9 @@ CMD ["node", "server.js"]
 
 Read back both files and confirm by inspection:
 - Every `COPY --from=X` stage name (`deps`, `tools`, `builder`) matches a `FROM ... AS X` declared earlier in the same file.
-- No `ARG`/`ENV` in any stage contains a literal secret value.
+- The `runner` stage's `COPY --from=builder .../node_modules/.prisma ./node_modules/.prisma` line is present — without it the app builds and boots but every Prisma query fails at runtime (Next's standalone tracer unreliably includes the native query-engine binary), which only surfaces as a health-check failure on the VPS, never locally, since there's no way to actually run this container here.
+- The three `NEXT_PUBLIC_*` `ARG`/`ENV` pairs are present in the `builder` stage, matching the `build.args` added to `docker-compose.yml`'s `app` service in Task 7 — otherwise Meta Pixel and the Koko promo UI silently never activate (these are inlined into client bundles at build time, not read at runtime).
+- No `ARG`/`ENV` in any stage contains a literal *secret* value (the `NEXT_PUBLIC_*` args are fine as plain args — they're public by definition, already shipped in client-side JS either way).
 - `.dockerignore` excludes `.env` but not `.env.example` (needed for reference, harmless either way since it has no real secrets).
 
 This cannot be validated by actually running `docker build` here — no Docker is installed in this dev environment (confirmed via `docker --version` returning "command not found"). The real build is validated on the VPS per DEPLOY_OVH.md (Task 12).
@@ -876,6 +897,17 @@ services:
       network: host
       secrets:
         - database_url
+      # NEXT_PUBLIC_* vars are inlined at build time, not read at runtime —
+      # `env_file` below only affects the running container, so these three
+      # must additionally be passed as build args (public values, safe as
+      # plain args). Compose resolves ${...} here from .env because
+      # scripts/deploy.sh `source`s .env into the real shell environment
+      # before calling `docker compose build` (Task 9) — verify on first
+      # deploy that the build log shows no empty-value fallback.
+      args:
+        NEXT_PUBLIC_META_PIXEL_ID: ${NEXT_PUBLIC_META_PIXEL_ID}
+        NEXT_PUBLIC_KOKO_ENABLED: ${NEXT_PUBLIC_KOKO_ENABLED}
+        NEXT_PUBLIC_DEBUG_CART: ${NEXT_PUBLIC_DEBUG_CART}
     restart: unless-stopped
     env_file:
       - .env
@@ -936,8 +968,9 @@ secrets:
 - [ ] **Step 2: Static review**
 
 Read the file back and confirm:
-- Every `${VAR}` reference (`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`) has a matching entry in `.env.example` (Task 5).
-- `secrets.database_url.environment: DATABASE_URL` requires Docker Compose ≥ 2.23 (documented as a preflight check in DEPLOY_OVH.md, Task 12) — this environment-sourced secret syntax is newer than file-based secrets.
+- Every `${VAR}` reference (`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `NEXT_PUBLIC_META_PIXEL_ID`, `NEXT_PUBLIC_KOKO_ENABLED`, `NEXT_PUBLIC_DEBUG_CART`) has a matching entry in `.env.example` (Task 5).
+- `secrets.database_url.environment: DATABASE_URL` requires Docker Compose ≥ 2.23 (documented as a preflight check in DEPLOY_OVH.md, Task 12) — this environment-sourced secret syntax is newer than file-based secrets. `scripts/deploy.sh` (Task 9) `source`s `.env` into the real shell environment before invoking any `docker compose build`, so both this secret source and the `NEXT_PUBLIC_*` build args resolve from actual process environment variables, not only Compose's own `.env`-file substitution — verify this isn't empty on the first real build (Task 6, Step 3).
+- `app`'s `build.args` block matches the three `ARG`/`ENV` pairs added to the Dockerfile's `builder` stage in Task 6.
 - No service other than `postgres` publishes a port yet (nginx, added in Task 8, will be the only one reaching the public interface).
 
 This cannot be validated with `docker compose config` here — no Docker installed. Validated on the VPS.
@@ -1715,6 +1748,31 @@ volume and rewrites those DB rows to the new local `/uploads/...` URL. Safe
 to re-run (already-local URLs are skipped). Do this **before** the next step
 so the app's first build prerenders pages with the new local URLs.
 
+`Category.image` and `VariantImage.url` are the only *typed* URL columns in
+the schema, but product descriptions render through `react-markdown`
+(`app/_components/product/description.tsx`), so a stray Blob URL could in
+principle be hand-authored into free-text content (a markdown image link in
+a description, for example) rather than one of the two structured columns
+the script above handles. Do a quick sanity scan before moving on:
+
+```bash
+docker compose --profile tools run --rm migrator npx tsx -e '
+import { prisma } from "@/app/_lib/prisma";
+(async () => {
+  const products = await prisma.product.findMany({ where: { description: { contains: "vercel-storage.com" } }, select: { id: true, name: true } });
+  const reviews = await prisma.review.findMany({ where: { body: { contains: "vercel-storage.com" } }, select: { id: true, productId: true } });
+  console.log("Products with a Blob URL in description:", products);
+  console.log("Reviews with a Blob URL in body:", reviews);
+  await prisma.$disconnect();
+})();
+'
+```
+
+If either list is non-empty, edit those rows manually (via `/admin`) to
+point at the migrated local URL before going live — `next/image`'s
+`remotePatterns` no longer allow-lists `*.public.blob.vercel-storage.com`
+(Task 2), so any surviving reference to it will hard-fail to render.
+
 ### 2.6 Build and start the app
 
 ```bash
@@ -2000,6 +2058,10 @@ If nothing needed fixing, skip this step — nothing to commit.
 **Placeholder scan:** no TBD/TODO markers; every code block is complete, runnable content, not a description of what to write.
 
 **Type consistency:** `isBlobUrl`/`localFilenameFor`/`BLOB_HOSTNAME_SUFFIX` (Task 4) are used with identical names and signatures in both the test file and the orchestration script. The `/api/health` route's response shape (`{ status: "ok" | "error" }`) is referenced identically in Task 1's test and in the Dockerfile/Compose healthcheck commands (Tasks 6/7) that call it.
+
+**Two defects caught by a second review pass, fixed before handoff (neither was catchable by tsc/vitest/lint, since both are build/runtime-environment behaviors that only surface when the container actually runs — impossible to verify in this Docker-less dev environment):**
+1. The `runner` stage originally omitted `node_modules/.prisma` — Next's standalone file tracer unreliably includes Prisma's native query-engine binary since it's resolved at runtime, not via static `require()`. Without the explicit `COPY` (now in Task 6), the app would boot but every DB query — including `/api/health` — would fail, and since `nginx` depends on `app` being healthy, the whole stack would never come up. This is exactly the kind of failure "verified on the VPS" was masking; it's now fixed at the source instead of deferred.
+2. `NEXT_PUBLIC_META_PIXEL_ID`/`NEXT_PUBLIC_KOKO_ENABLED`/`NEXT_PUBLIC_DEBUG_CART` are inlined into client bundles at Next.js *build* time, not read at runtime — the original compose config only passed `DATABASE_URL` to the build, so these three would have silently baked in as empty regardless of what's set in the runtime `.env`. Fixed by adding them as `build.args` (Task 7) and `ARG`/`ENV` in the `builder` stage (Task 6) — safe as plain build args since they're public by definition.
 
 ## Execution Handoff
 
