@@ -492,6 +492,77 @@ export async function addOrderItem(
     : { success: true };
 }
 
+export async function swapOrderItem(
+  orderId: string,
+  itemId: string,
+  input: { productId: string; variantId: string; size: string | null; quantity: number },
+): Promise<ActionResult> {
+  await requireAdmin();
+  const parsed = ProductItemSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Pick a product, color, size, and quantity" };
+
+  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true, adjustments: true } });
+  if (!order) return { success: false, error: "Order not found" };
+  if (!canEdit(order)) return { success: false, error: "This order can no longer be edited" };
+  const courierError = courierBookedError(order);
+  if (courierError) return { success: false, error: courierError };
+
+  const original = order.items.find((i) => i.id === itemId);
+  if (!original) return { success: false, error: "Order item not found" };
+
+  const resolved = await resolveVariantForOrder(parsed.data.productId, parsed.data.variantId);
+  if (!resolved) return { success: false, error: "Selected product/color is no longer available" };
+  const sizeError = validateChosenSize(resolved.sizes, parsed.data.size);
+  if (sizeError) return { success: false, error: sizeError };
+
+  const plainRow = parsed.data.size
+    ? await prisma.plainTshirtStock.findUnique({
+        where: { colorSlug_size: { colorSlug: resolved.colorSlug, size: parsed.data.size } },
+        select: { id: true },
+      })
+    : null;
+  const price = effectivePrice({ price: resolved.variantPrice }, { price: resolved.productPrice });
+  const nextItems = order.items.map((i) => (i.id === itemId ? { price, quantity: parsed.data.quantity } : i));
+  const totals = recomputeTotals(nextItems, order.shippingCity, await getDeliveryConfig(), order.adjustments);
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await restoreItemPools(tx, original);
+      await acquireItemPools(tx, {
+        plainTshirtStockId: plainRow?.id ?? null,
+        dtfDesignId: resolved.dtfDesignId,
+        quantity: parsed.data.quantity,
+        name: resolved.productName,
+      });
+      await tx.orderItem.update({
+        where: { id: itemId },
+        data: {
+          productId: resolved.productId,
+          variantId: resolved.variantId,
+          color: resolved.color,
+          sku: resolved.sku,
+          name: resolved.productName,
+          size: parsed.data.size,
+          price,
+          quantity: parsed.data.quantity,
+          plainTshirtStockId: plainRow?.id ?? null,
+          dtfDesignId: resolved.dtfDesignId,
+        },
+      });
+      await tx.order.update({
+        where: { id: orderId },
+        data: { subtotal: totals.subtotal, shippingCost: totals.shippingCost, total: totals.total },
+      });
+    });
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Failed to change product" };
+  }
+  revalidate(orderId);
+  return PAID.has(order.paymentStatus ?? "")
+    ? { success: true, warning: "Order was paid — any price difference must be settled manually." }
+    : { success: true };
+}
+
 const ORDER_INCLUDE = {
   user: { select: { name: true, email: true } },
   items: { select: { name: true, color: true, sku: true, size: true, price: true, quantity: true } },

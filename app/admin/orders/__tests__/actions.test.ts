@@ -960,3 +960,71 @@ describe("addOrderItem", () => {
     expect(res).toEqual({ success: true });
   });
 });
+
+import { swapOrderItem } from "../actions";
+
+describe("swapOrderItem", () => {
+  const BASE = {
+    id: "o1", status: "CONFIRMED", courierBookedAt: null, paymentStatus: "PENDING", shippingCity: "Colombo",
+    items: [{ id: "i1", price: 2000, quantity: 1, plainTshirtStockId: "ps-old", dtfDesignId: "d-old" }],
+    adjustments: [],
+  };
+  const VARIANT = {
+    id: "v2", productId: "p2", color: "Black", colorSlug: "black", sku: "DB-DOG-BLK", price: null,
+    sizeStocks: [{ size: "S" }, { size: "M" }],
+    product: { id: "p2", name: "Dog Tee", price: 1800, dtfDesignId: "d-new", archived: false },
+  };
+
+  it("is blocked once the courier is booked", async () => {
+    orderFindUnique.mockResolvedValueOnce({ ...BASE, courierBookedAt: new Date() });
+    const res = await swapOrderItem("o1", "i1", { productId: "p2", variantId: "v2", size: "S", quantity: 1 });
+    expect(res).toEqual({ success: false, error: "Order already sent to Curfox — cancel/rebook there to make changes." });
+  });
+
+  it("rejects an unknown order item id", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    const res = await swapOrderItem("o1", "does-not-exist", { productId: "p2", variantId: "v2", size: "S", quantity: 1 });
+    expect(res).toEqual({ success: false, error: "Order item not found" });
+  });
+
+  it("restores the old line's pools, resolves the new variant's pools fresh, and updates the row in place", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    variantFindUnique.mockResolvedValueOnce(VARIANT);
+    plainStockFindUnique.mockResolvedValueOnce({ id: "ps-black-s" });
+    orderItemUpdate.mockResolvedValueOnce({});
+    orderUpdate.mockResolvedValueOnce({});
+
+    const res = await swapOrderItem("o1", "i1", { productId: "p2", variantId: "v2", size: "S", quantity: 3 });
+
+    expect(plainStockUpdateMany).toHaveBeenNthCalledWith(1, { where: { id: "ps-old" }, data: { quantity: { increment: 1 } } });
+    expect(dtfDesignUpdateMany).toHaveBeenNthCalledWith(1, { where: { id: "d-old" }, data: { quantity: { increment: 1 } } });
+    expect(plainStockFindUnique).toHaveBeenCalledWith({ where: { colorSlug_size: { colorSlug: "black", size: "S" } }, select: { id: true } });
+    expect(plainStockUpdateMany).toHaveBeenNthCalledWith(2, { where: { id: "ps-black-s", quantity: { gte: 3 } }, data: { quantity: { decrement: 3 } } });
+    expect(orderItemUpdate).toHaveBeenCalledWith({
+      where: { id: "i1" },
+      data: {
+        productId: "p2", variantId: "v2", color: "Black", sku: "DB-DOG-BLK",
+        name: "Dog Tee", size: "S", price: 1800, quantity: 3,
+        plainTshirtStockId: "ps-black-s", dtfDesignId: "d-new",
+      },
+    });
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "o1" }, data: expect.objectContaining({ subtotal: 5400, shippingCost: 0, total: 5400 }),
+    }));
+    expect(res).toEqual({ success: true });
+  });
+
+  it("fails when the new variant has insufficient stock, leaving the original row untouched", async () => {
+    orderFindUnique.mockResolvedValueOnce(BASE);
+    variantFindUnique.mockResolvedValueOnce(VARIANT);
+    plainStockFindUnique.mockResolvedValueOnce({ id: "ps-black-s" });
+    plainStockUpdateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+
+    const res = await swapOrderItem("o1", "i1", { productId: "p2", variantId: "v2", size: "S", quantity: 3 });
+
+    expect(res).toEqual({ success: false, error: 'Insufficient stock for "Dog Tee"' });
+    expect(orderItemUpdate).not.toHaveBeenCalled();
+  });
+});
