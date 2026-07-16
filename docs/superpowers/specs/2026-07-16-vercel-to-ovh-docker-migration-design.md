@@ -102,15 +102,28 @@ app's actual variable names instead of the generic template names.
   images sometimes omit it — verified/installed explicitly if missing).
 - **Stages:**
   1. `deps` — `npm ci` (production + dev, needed for `next build`).
-  2. `builder` — copies source, runs `prisma generate`, then `next build`
-     with `output: "standalone"` (added to `next.config.ts`). Standalone
-     output produces a pruned `server.js` + minimal `node_modules`,
-     dramatically smaller than shipping the full `deps` tree.
-  3. `runner` — copies only `.next/standalone`, `.next/static`, `public/`
-     (including the mounted uploads volume path) from `builder`. Creates and
-     runs as a **non-root** user (`node`, uid 1000, already present in the
-     base image). Sets `NODE_ENV=production`, `HOSTNAME=0.0.0.0`,
-     `PORT=3000`. `EXPOSE 3000`. `HEALTHCHECK` hits `GET /api/health`.
+  2. `tools` — copies `deps`'s `node_modules` + full source, runs
+     `prisma generate` (schema-only, no DB access needed). This stage is
+     the target for the `migrator` Compose service (§5.3) — it can run
+     `prisma migrate deploy` / `db seed` / `admin:ensure` without ever
+     needing `next build` to have succeeded, breaking what would otherwise
+     be a circular dependency (migrating requires an image; building the
+     app image requires migrations already applied — see the Postgres
+     port-binding note in §5.3).
+  3. `builder` (from `tools`) — runs `next build` with `output: "standalone"`
+     (added to `next.config.ts`). Because several pages use ISR and query
+     the database at build time (see §5.3), this `RUN` step needs
+     `DATABASE_URL` and network access to Postgres — provided via a
+     **BuildKit secret mount** (`RUN --mount=type=secret,id=database_url`),
+     never a build `ARG`, so the connection string never lands in an image
+     layer or `docker history`. Standalone output produces a pruned
+     `server.js` + minimal `node_modules`, dramatically smaller than
+     shipping the full `deps` tree.
+  4. `runner` (final) — copies only `.next/standalone`, `.next/static`,
+     `public/` (including the mounted uploads volume path) from `builder`.
+     Runs as the base image's built-in **non-root** `node` user (uid 1000).
+     Sets `NODE_ENV=production`, `HOSTNAME=0.0.0.0`, `PORT=3000`.
+     `EXPOSE 3000`. `HEALTHCHECK` hits `GET /api/health`.
      `CMD ["node", "server.js"]`.
 - **`sharp` added as an explicit `dependencies` entry** (currently only an
   optional transitive dependency of `next`) so Next's built-in image
@@ -140,10 +153,27 @@ volume for Postgres data, one named volume for uploaded images:
 - **`postgres`** — official `postgres:16` image (version to be confirmed
   against the source Neon database before first restore — see §7). Named
   volume `pgdata` at `/var/lib/postgresql/data`. `healthcheck` via
-  `pg_isready`. **No `ports:` mapping** — reachable only inside
-  `app-network`. Env: `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
+  `pg_isready`. Env: `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
   from `.env`. `restart: unless-stopped`. Log rotation via the `json-file`
   driver with `max-size`/`max-file` limits.
+  **Port binding — deliberate, narrow exception:** `ports:
+  ["127.0.0.1:5432:5432"]`, bound to the VPS's own loopback interface only.
+  This is required because several storefront pages use Next's ISR
+  (`export const revalidate = N` in `app/page.tsx`, `app/categories/page.tsx`,
+  `app/categories/[slug]/page.tsx`, `app/products/[id]/page.tsx`,
+  `app/deals/page.tsx`), which makes `next build` query the database at
+  *build* time to prerender them — the same reason `next build` already
+  requires `DATABASE_URL` on Vercel today. The `app` image build therefore
+  needs to reach Postgres, and reaching a Docker Compose service by its
+  service name during a *build* (as opposed to at container runtime) is a
+  known-flaky, Docker-version-dependent path — so the build instead connects
+  to `127.0.0.1:5432` using `network: host` on the build step (see §5.1),
+  which is deterministic. Binding to `127.0.0.1` (not `0.0.0.0`) means the
+  port is reachable only by processes on the VPS itself — never from the
+  public internet or other machines — so this does not violate "don't
+  expose Postgres publicly," but it is a narrower guarantee than "Docker
+  internal network only," and is called out here explicitly rather than
+  left implicit.
 - **`app`** — builds from the repo `Dockerfile`. `depends_on: postgres:
   condition: service_healthy`. Named volume mounted for `public/uploads`
   (persistent across container recreation/redeploys). Reads `DATABASE_URL`
@@ -351,13 +381,24 @@ script logic) against fresh/seed data.
    VPS, the existing Vercel deployment keeps serving unaffected until DNS is
    manually pointed at the new server. No irreversible step touches
    production data before that DNS cutover is a deliberate, separate action.
-6. **What gets validated locally in this session** (fresh/seed data only):
-   stack boots via Compose, migrations apply cleanly to a fresh Postgres,
-   data persists across `docker compose up -d` after `restart`/recreation,
-   Nginx reaches the app container, health checks pass, `npm run build` /
-   `npm test` / `tsc --noEmit` succeed. **Not validated here**: the actual
-   Neon dump/restore (no credentials available), DNS cutover, or Let's
-   Encrypt issuance (no real server to issue a certificate against yet).
+6. **What gets validated in this session, corrected**: this dev environment
+   has **no Docker installed** (confirmed — `docker --version` fails) and
+   **no local Postgres** (a pre-existing, already-documented constraint in
+   this repo — `next build`'s ISR prerendering and `prisma migrate dev`
+   both require a reachable `DATABASE_URL` that isn't available here
+   either). Given that, this session validates: `npm run test` (Vitest),
+   `npx tsc --noEmit`, `npm run lint`, and careful static review of every
+   Docker/Compose/Nginx/script file (syntax, internal consistency, the
+   sequencing logic above). It does **not** run `docker build`,
+   `docker compose up`, or `npm run build` — there is no container runtime
+   or database available to run them against. **Everything Docker/DB/cutover
+   -related — image build, container boot, migration apply, persistence
+   across recreation, Nginx→app reachability, health checks, the real Neon
+   dump/restore, DNS cutover, and Let's Encrypt issuance — is validated for
+   the first time on the actual VPS**, following the exact commands in
+   `DEPLOY_OVH.md`. This is consistent with how this repo has always
+   validated DB-dependent changes (tsc + Vitest as the local gate, real
+   integration checked in the environment that actually has a database).
 
 ## 8. Backups (ongoing, post-migration)
 
