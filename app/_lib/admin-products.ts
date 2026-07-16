@@ -6,7 +6,7 @@ export { slugify, uniqueSlug, parseSizes, serializeSizes } from "@/app/_lib/prod
 import { PRODUCT_TABS, type ProductTab } from "@/app/_lib/product-helpers";
 export { PRODUCT_TABS, type ProductTab };
 
-export const LOW_STOCK_THRESHOLD = 5;
+export const LOW_STOCK_THRESHOLD = 2;
 
 export type ProductListParams = {
   tab?: ProductTab;
