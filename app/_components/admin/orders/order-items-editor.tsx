@@ -20,8 +20,8 @@ export function OrderItemsEditor({ orderId, items, editable }: { orderId: string
   const router = useRouter();
 
   useEffect(() => {
-    setDraft(items);
-  }, [items]);
+    if (!editing) setDraft(items);
+  }, [items, editing]);
 
   function save() {
     const changes: ItemChange[] = [];
