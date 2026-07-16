@@ -204,6 +204,7 @@ export async function getOrderDetail(id: string) {
       user: { select: { name: true, email: true } },
       items: { include: { variant: { select: { sizeStocks: { select: { size: true } } } } } },
       notesLog: { orderBy: { createdAt: "desc" } },
+      adjustments: { orderBy: { createdAt: "asc" } },
     },
   });
 }

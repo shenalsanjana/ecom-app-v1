@@ -5,6 +5,7 @@ import { formatPrice } from "@/app/_lib/format";
 import { paymentStatusLabel } from "@/app/_lib/order-status";
 import { OrderActions } from "@/app/_components/admin/orders/order-actions";
 import { OrderItemsEditor } from "@/app/_components/admin/orders/order-items-editor";
+import { OrderAdjustments } from "@/app/_components/admin/orders/order-adjustments";
 import { AddressEditor } from "@/app/_components/admin/orders/address-editor";
 import { OrderNotes } from "@/app/_components/admin/orders/order-notes";
 import { PrintLabelLink } from "@/app/_components/admin/orders/print-label-link";
@@ -45,8 +46,18 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
             <div className="mt-3 border-t pt-2 text-sm">
               <div className="flex justify-between"><span>Subtotal</span><span>{formatPrice(order.subtotal)}</span></div>
               <div className="flex justify-between"><span>Shipping</span><span>{formatPrice(order.shippingCost)}</span></div>
+              {order.adjustments.length > 0 && (
+                <div className="flex justify-between">
+                  <span>Adjustments</span>
+                  <span>{formatPrice(order.adjustments.reduce((s, a) => s + a.amount, 0))}</span>
+                </div>
+              )}
               <div className="flex justify-between font-semibold"><span>Total</span><span>{formatPrice(order.total)}</span></div>
             </div>
+          </div>
+          <div className="rounded-lg border p-4">
+            <OrderAdjustments orderId={order.id} editable={canEditOrder}
+              adjustments={order.adjustments.map((a) => ({ id: a.id, label: a.label, amount: a.amount }))} />
           </div>
           <div className="rounded-lg border p-4"><h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Internal notes</h4>
             <OrderNotes orderId={order.id} notes={order.notesLog} />
