@@ -83,7 +83,7 @@ Open [http://localhost:3000](http://localhost:3000)
 
 ### 5. Default Admin
 
-The admin dashboard at `/admin` is gated to users with `role = "ADMIN"`. A default admin is created automatically — both on Vercel deploys (as part of `vercel build`) and locally via a single command.
+The admin dashboard at `/admin` is gated to users with `role = "ADMIN"`. A default admin is created automatically — both on deploy (see [DEPLOY_OVH.md](./DEPLOY_OVH.md)) and locally via a single command.
 
 **Default credentials (sign in at [http://localhost:3000/login](http://localhost:3000/login) or your production URL):**
 
@@ -95,18 +95,18 @@ The admin dashboard at `/admin` is gated to users with `role = "ADMIN"`. A defau
 
 After signing in you land on `/admin` — the dashboard shows live KPI tiles (pending dispatch, today's orders, pending COD, low-stock products).
 
-#### Auto-creation on Vercel deploy
+#### Auto-creation on deploy
 
-`vercel.json`'s `buildCommand` includes `tsx scripts/ensure-admin.ts`, which runs on every deploy after `prisma migrate deploy`. The script:
+`scripts/deploy.sh` (and `make admin-ensure`) run `tsx scripts/ensure-admin.ts` via the `migrator` Docker Compose service. The script:
 
 - creates the default admin if missing → logs `Sample admin created`
 - skips if it already exists → logs `Admin already exists`
 - warns (without auto-promoting) if the email is registered as a regular customer
-- soft-fails on any error so the build continues — the admin can still be created manually with `npm run admin:create`
+- soft-fails on any error — the admin can still be created manually with `npm run admin:create`
 
 It uses bcrypt for password hashing (cost 10) and is fully idempotent — safe to run on every deploy.
 
-To override the defaults per environment (recommended for production), set these in **Vercel → Settings → Environment Variables**:
+To override the defaults per environment (recommended for production), set these in `.env` on the VPS:
 
 | Env var | Default |
 |---------|---------|
@@ -148,7 +148,7 @@ npm run admin:create -- --email "you@example.com" --password "<strong-pw>" --nam
 | `npm run db:seed` | Seed demo data |
 | `npm run db:reset` | Reset database |
 | `npm run admin:create` | Create or promote a specific admin user (see Getting Started §5) |
-| `npm run admin:ensure` | Idempotent default-admin bootstrap (auto-runs on Vercel build) |
+| `npm run admin:ensure` | Idempotent default-admin bootstrap (auto-runs via `scripts/deploy.sh` / `make admin-ensure`) |
 | `npm test` | Run unit tests (vitest) |
 | `npm run test:e2e` | Run end-to-end tests (Playwright) |
 
@@ -202,8 +202,8 @@ Phone signup and password reset send one-time codes via
   approval.
 - **SMS is pre-paid credits**, not free — top up the Notify.lk account or OTP
   delivery will fail.
-- In production, set all three vars in **Vercel → Project → Settings →
-  Environment Variables** (do not commit real values to any file).
+- In production, set all three vars in `.env` on the VPS (do not commit
+  real values to any file).
 - If a key was ever shared outside a secrets manager (e.g. pasted during a
   design discussion), regenerate it in the dashboard before using it.
 
@@ -215,36 +215,19 @@ Phone signup and password reset send one-time codes via
 - **Styling:** Tailwind CSS + shadcn/ui
 - **Email:** Nodemailer
 - **Delivery:** RoyalExpress API
+- **Hosting:** Docker Compose (app + PostgreSQL + Nginx) on an OVHcloud VPS — see [DEPLOY_OVH.md](./DEPLOY_OVH.md)
 
 ## Deployment & Migrations
 
-The Vercel build command is intentionally minimal:
+Production runs on a self-hosted Docker Compose stack (app + PostgreSQL +
+Nginx) on an OVHcloud VPS — see **[DEPLOY_OVH.md](./DEPLOY_OVH.md)** for the
+full setup and deployment procedure.
 
-```
-prisma generate && next build
-```
-
-Database work is **not** part of the build, so a paused or unreachable database
-no longer fails a frontend deploy.
-
-- **Migrations** apply automatically via the `.github/workflows/migrate.yml`
-  GitHub Action on every push to `main` that touches `prisma/`. It runs
-  `prisma migrate deploy` using the `DATABASE_URL` GitHub Actions secret. You
-  can also trigger it manually (workflow_dispatch) or run `npm run db:deploy`
-  locally against the target database.
-- **Seeding** is no longer run on every deploy (Postgres persists the catalog).
-  Run it deliberately when you need to (re)load demo/catalog data:
-  `npm run db:seed`.
-- **Admin user** is ensured manually with `npm run admin:ensure`.
-
-### Required GitHub secret
-
-The migrate workflow needs a repository secret named `DATABASE_URL` containing
-the database connection string. Set it under **Settings → Secrets and variables
-→ Actions**. Keep this value out of `vercel.json` and any committed file.
-
-Use the **direct** Postgres connection string (the same value the old build used
-for `migrate deploy`) — not a pooled / Accelerate `prisma+postgres://…` URL.
-`prisma migrate deploy` requires a direct connection. Set this secret (and
-resume the database if it is paused) **before** merging the workflow, since the
-merge commit triggers the workflow's first run.
+- **Migrations** run via `docker compose --profile tools run --rm migrator
+  npx prisma migrate deploy` (or `make migrate`), as an explicit step in
+  `scripts/deploy.sh` before the app image is rebuilt — never automatically
+  as part of the app's own build or startup.
+- **Seeding** is deliberate: `make seed` (or `npm run db:seed` locally
+  against a dev database).
+- **Admin user** is ensured via `make admin-ensure`, or manually with
+  `npm run admin:create`.
