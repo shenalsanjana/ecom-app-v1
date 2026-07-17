@@ -38,6 +38,9 @@ docker compose build migrator
 echo "==> Running database migrations"
 docker compose --profile tools run --rm migrator npx prisma migrate deploy
 
+echo "==> Ensuring default admin user exists"
+docker compose --profile tools run --rm migrator npm run admin:ensure
+
 echo "==> Building the app image (queries Postgres at build time for ISR prerendering)"
 docker compose build app
 
