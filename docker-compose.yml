@@ -38,6 +38,18 @@ services:
       network: host
       secrets:
         - database_url
+      # `network: host` (above) means this build step runs in the host's
+      # network namespace, which has no Docker embedded DNS for Compose
+      # service names — only 127.0.0.1 is reachable there. This entry makes
+      # the hostname `postgres` (as used in DATABASE_URL, both here at build
+      # time and in the running container at runtime) resolve to the
+      # loopback-published Postgres port (see the postgres service's `ports`
+      # comment) during `next build`'s ISR prerendering. Without it,
+      # `docker compose build app` fails to resolve `postgres` and the build
+      # breaks. Do not remove this thinking it's redundant with the bridge
+      # network's DNS — that DNS does not exist inside a `network: host` build.
+      extra_hosts:
+        - "postgres:127.0.0.1"
       # NEXT_PUBLIC_* vars are inlined at build time, not read at runtime —
       # `env_file` below only affects the running container, so these three
       # must additionally be passed as build args (public values, safe as

@@ -225,7 +225,17 @@ point at the migrated local URL before going live — `next/image`'s
 
 ### 2.6 Build and start the app
 
+This is the very first build, so `.env`'s variables need to be exported into
+the shell's real process environment first — the `database_url` secret is
+sourced via `environment: DATABASE_URL` in `docker-compose.yml`, which reads
+from the actual process environment `docker compose build` runs in, not just
+from Compose's own `.env`-file substitution (`scripts/deploy.sh` does this
+same step before every subsequent build):
+
 ```bash
+set -a
+source .env
+set +a
 docker compose build app
 docker compose up -d
 docker compose ps
@@ -323,7 +333,10 @@ curl -f https://dressingbear.com/api/health
 
 Commit this change to the repo (`git add nginx/conf.d/app.conf && git commit
 -m "chore: enable HTTPS after Let's Encrypt cert issuance"`) so future
-deploys don't revert to the HTTP-only bootstrap config.
+deploys don't revert to the HTTP-only bootstrap config. Then push it (`git
+push origin main`) — `scripts/deploy.sh` runs `git pull origin main` on
+every future deploy, so a commit left local-only on the VPS risks diverging
+from what those pulls expect and causing conflicts.
 
 ### 3.4 Certificate renewal
 
@@ -408,7 +421,13 @@ database name to confirm.
 Docker's systemd service is enabled (step 1.6: `systemctl enable docker`),
 and every service in `docker-compose.yml` has `restart: unless-stopped` —
 containers that were running before the reboot come back automatically once
-Docker starts, with no manual action needed.
+Docker starts, with no manual action needed. One transient exception:
+`nginx`'s upstream (`server app:3000` in `nginx/conf.d/app.conf`) resolves at
+nginx's config-load time, and `depends_on` conditions only govern ordering
+for the initial `docker compose up`, not container restarts after a reboot —
+so `nginx` may briefly restart-loop if it comes up before `app` is ready. It
+self-heals via `restart: unless-stopped` once `app` becomes healthy; no
+action needed unless it hasn't stabilized within a minute or two.
 
 ## 5. What this migration deliberately does not automate
 
