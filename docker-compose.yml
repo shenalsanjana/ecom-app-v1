@@ -131,7 +131,7 @@ services:
     image: certbot/certbot:latest
     profiles: ["tools"]
     volumes:
-      - certbot-etc:/etc/letsencrypt
+      - /etc/letsencrypt:/etc/letsencrypt
       - certbot-www:/var/www/certbot
     entrypoint: ["certbot"]
 
@@ -143,7 +143,6 @@ networks:
 volumes:
   pgdata:
   uploads:
-  certbot-etc:
   certbot-www:
 
 secrets:
