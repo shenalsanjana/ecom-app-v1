@@ -115,6 +115,9 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - certbot-www:/var/www/certbot:ro
+      # Read-only mirror of the app's upload volume so nginx can serve
+      # /uploads/* directly — see app.conf's `location /uploads/` comment.
+      - uploads:/app/public/uploads:ro
     networks:
       - app-network
     depends_on:

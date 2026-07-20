@@ -10,6 +10,7 @@ import { AddToCartDialog } from "@/app/_components/cart/add-to-cart-dialog";
 import { WishlistHeart } from "@/app/_components/wishlist/wishlist-heart";
 import { ColorSwatches } from "@/app/_components/product/color-swatches";
 import { prettifyCategory } from "@/app/_lib/category-label";
+import { isUploadedImage } from "@/app/_lib/uploaded-image";
 import { discountPct } from "@/app/_lib/pricing";
 import { Eyebrow } from "@/app/_components/ui/eyebrow";
 import { Price } from "@/app/_components/ui/price";
@@ -50,6 +51,7 @@ export function ProductCard({
             src={image}
             alt={name}
             fill
+            unoptimized={isUploadedImage(image)}
             sizes="(min-width:1024px) 33vw, (min-width:640px) 50vw, 100vw"
             className="object-cover transition-transform duration-(--duration-slow) ease-(--ease-out) group-hover:scale-105 animate-in fade-in duration-(--duration-fast)"
           />

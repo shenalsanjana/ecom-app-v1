@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { formatPrice } from "@/app/_lib/format";
+import { isUploadedImage } from "@/app/_lib/uploaded-image";
 import { Badge } from "@/components/ui/badge";
 import { DeleteProductButton } from "./delete-product-button";
 import { resolveDefaultVariant, productInStock, type PlainStockMap, type DesignStockMap } from "@/app/_lib/variants";
@@ -46,7 +47,7 @@ export function ProductsTable({
           );
           return (
             <tr key={p.id} className={"border-b hover:bg-secondary/40 " + (p.archived ? "opacity-60" : "")}>
-              <td className="p-2">{thumbnail(p) && <Image src={thumbnail(p)} alt="" width={36} height={36} className="rounded object-cover" />}</td>
+              <td className="p-2">{thumbnail(p) && <Image src={thumbnail(p)} alt="" width={36} height={36} unoptimized={isUploadedImage(thumbnail(p))} className="rounded object-cover" />}</td>
               <td className="p-2 font-medium">
                 <Link href={`/admin/products/${p.id}/edit`} className="hover:underline">{p.name}</Link>
                 <br /><span className="text-muted-foreground">{p.id}</span>

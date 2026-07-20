@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useCart } from "@/app/_lib/cart-context";
 import type { CartItem } from "@/app/_lib/cart-context";
 import { formatPrice } from "@/app/_lib/format";
+import { isUploadedImage } from "@/app/_lib/uploaded-image";
 
 type Props = {
   item: CartItem;
@@ -27,6 +28,7 @@ export function CartItemRow({ item }: Props) {
           src={item.image}
           alt={item.name}
           fill
+          unoptimized={isUploadedImage(item.image)}
           sizes="96px"
           className="object-cover"
         />

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { isUploadedImage } from "@/app/_lib/uploaded-image";
 import { DeleteCategoryButton } from "./delete-category-button";
 import { CopyAdLinkButton } from "./copy-ad-link-button";
 
@@ -18,7 +19,7 @@ export function CategoriesTable({ rows }: { rows: Row[] }) {
       <tbody>
         {rows.map((c) => (
           <tr key={c.slug} className="border-b hover:bg-secondary/40">
-            <td className="p-2"><Image src={c.image} alt="" width={36} height={36} className="rounded object-cover" /></td>
+            <td className="p-2"><Image src={c.image} alt="" width={36} height={36} unoptimized={isUploadedImage(c.image)} className="rounded object-cover" /></td>
             <td className="p-2 font-medium">
               <Link href={`/admin/categories/${c.slug}/edit`} className="hover:underline">{c.name}</Link>
             </td>

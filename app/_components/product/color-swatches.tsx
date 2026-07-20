@@ -1,5 +1,6 @@
 "use client";
 import Image from "next/image";
+import { isUploadedImage } from "@/app/_lib/uploaded-image";
 
 export type SwatchOption = {
   colorSlug: string;
@@ -39,7 +40,7 @@ export function ColorSwatches({
             style={o.swatchHex ? { backgroundColor: o.swatchHex } : undefined}
           >
             {!o.swatchHex && (
-              <Image src={o.image} alt="" fill sizes="32px" className="object-cover" />
+              <Image src={o.image} alt="" fill unoptimized={isUploadedImage(o.image)} sizes="32px" className="object-cover" />
             )}
           </button>
         );

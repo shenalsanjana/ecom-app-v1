@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
+import { isUploadedImage } from "@/app/_lib/uploaded-image";
 
 type GalleryVariant = { colorSlug: string; detailImages: string[] };
 
@@ -35,6 +36,7 @@ export function ImageGallery({ variants, defaultColorSlug, productName, fallback
           src={current}
           alt={productName}
           fill
+          unoptimized={isUploadedImage(current)}
           sizes="(min-width: 1024px) 60vw, 100vw"
           className="object-cover animate-in fade-in duration-(--duration-fast)"
           priority
@@ -56,7 +58,7 @@ export function ImageGallery({ variants, defaultColorSlug, productName, fallback
                   (isActive ? "ring-2 ring-ring ring-offset-2 ring-offset-background" : "hover:opacity-90")
                 }
               >
-                <Image src={src} alt="" fill sizes="(min-width: 1024px) 15vw, 25vw" className="object-cover" />
+                <Image src={src} alt="" fill unoptimized={isUploadedImage(src)} sizes="(min-width: 1024px) 15vw, 25vw" className="object-cover" />
               </button>
             );
           })}
