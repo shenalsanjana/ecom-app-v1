@@ -59,6 +59,13 @@ describe("review-content", () => {
     expect(reviewPoolForCategory("cats").length).toBeGreaterThan(SHARED_REVIEWS.length);
   });
 
+  it("maps the live 'sealovers' slug onto the 'sea-lovers' template set", () => {
+    expect(reviewPoolForCategory("sealovers")).toEqual(
+      reviewPoolForCategory("sea-lovers"),
+    );
+    expect(reviewPoolForCategory("sealovers").length).toBeGreaterThan(SHARED_REVIEWS.length);
+  });
+
   it("gives each category >= 15 templates (variety for 5–10 shown)", () => {
     for (const slug of Object.keys(CATEGORY_REVIEWS)) {
       expect(reviewPoolForCategory(slug).length).toBeGreaterThanOrEqual(15);
