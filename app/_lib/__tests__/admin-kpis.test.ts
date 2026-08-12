@@ -20,6 +20,7 @@ vi.mock("@/app/_lib/time", () => ({
 }));
 
 import { getDashboardKpis } from "../admin-kpis";
+import { LOW_STOCK_THRESHOLD } from "@/app/_lib/admin-products";
 
 beforeEach(() => {
   orderCount.mockReset();
@@ -65,15 +66,15 @@ describe("getDashboardKpis", () => {
     expect(result.todaysOrders).toBe(12);
   });
 
-  it("sums low-stock counts from both raw-material pools (threshold <=5)", async () => {
+  it("sums low-stock counts from both raw-material pools", async () => {
     orderCount.mockResolvedValueOnce(0).mockResolvedValueOnce(0).mockResolvedValueOnce(0);
     plainStockCount.mockResolvedValueOnce(2);
     dtfDesignCount.mockResolvedValueOnce(1);
 
     const result = await getDashboardKpis();
 
-    expect(plainStockCount).toHaveBeenCalledWith({ where: { quantity: { lte: 5 } } });
-    expect(dtfDesignCount).toHaveBeenCalledWith({ where: { quantity: { lte: 5 } } });
+    expect(plainStockCount).toHaveBeenCalledWith({ where: { quantity: { lte: LOW_STOCK_THRESHOLD } } });
+    expect(dtfDesignCount).toHaveBeenCalledWith({ where: { quantity: { lte: LOW_STOCK_THRESHOLD } } });
     expect(result.lowStock).toBe(3);
   });
 

@@ -158,7 +158,9 @@ so a leaked key can only trigger a deploy rather than open a shell.
 | SSH unreachable / key rejected | Step 1 fails; `deploy.sh` never runs. |
 | `git pull` conflicts on the VPS (local commits) | `deploy.sh` exits non-zero under `set -e`; job fails. DEPLOY_OVH.md §3.3 already warns against leaving VPS-local commits. |
 | Migration fails | `deploy.sh` exits before the app image is rebuilt; the previously running container keeps serving. |
+| Migration succeeds, then `docker compose build app` fails (e.g. a `next build` error CI's Vitest-only gate didn't catch) | Half-migrated state: the schema change is already live, but the old app container keeps serving old code against it. No auto-rollback — fix the build and redeploy promptly; see DEPLOY_OVH.md §4.1. |
 | App boots unhealthy | Health check exhausts retries and fails the job. Requires manual intervention on the VPS — by design (D4). |
+| A push wins the race against the preflight check | The newer commit lands and is deployed and migrated before the SHA-assertion step can catch it. The health check still runs and passes (it runs before the assertion so it verifies whatever is actually live). The SHA assertion then fails the job. Production is serving an unreviewed commit and needs manual intervention — see DEPLOY_OVH.md §4.1. |
 | Two pushes in quick succession | Second deploy queues behind the first (D6). |
 
 Every one of these surfaces as a failed workflow run, which triggers GitHub's
