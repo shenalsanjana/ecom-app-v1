@@ -395,7 +395,7 @@ must do the following (none of it is automatable from a workflow run):
    the host filesystem). An unrestricted key in `authorized_keys` therefore
    grants the CI key root-equivalent shell access if it ever leaks.
 
-   First, pull this branch's changes to the VPS so
+   First, once this work is merged, pull `main` on the VPS so
    `scripts/ci-deploy-dispatch.sh` exists and is executable:
    ```bash
    cd /opt/dressingbear && git pull origin main
@@ -403,8 +403,14 @@ must do the following (none of it is automatable from a workflow run):
    Then append the CI public key to `/home/deploy/.ssh/authorized_keys`,
    restricted with a forced command:
    ```
-   command="/opt/dressingbear/scripts/ci-deploy-dispatch.sh",no-port-forwarding,no-agent-forwarding,no-pty ssh-ed25519 AAAA... github-actions-deploy
+   restrict,command="/opt/dressingbear/scripts/ci-deploy-dispatch.sh" ssh-ed25519 AAAA... github-actions-deploy
    ```
+   `restrict` is OpenSSH's umbrella option: it implies `no-port-forwarding`,
+   `no-agent-forwarding`, `no-pty`, `no-X11-forwarding`, and `no-user-rc`
+   all at once, plus any equivalent restriction OpenSSH adds in a future
+   release — safer and more future-proof than listing individual `no-*`
+   options by hand.
+
    A forced command overrides **any** command the SSH client sends — but
    `.github/workflows/deploy.yml` needs this key for two different
    operations: running the deploy, and afterwards reading back the VPS's
@@ -461,6 +467,18 @@ soon as possible so the correct code reaches the already-migrated database.
 If the old code is actively erroring and a fix will take a while, consider
 taking the app offline (`docker compose stop app`) rather than serving
 broken requests until the fix lands.
+
+**Red build on "Verify the VPS deployed the reviewed commit":** this means a
+second push landed and won the race against the preflight check while this
+run was awaiting approval (or in flight) — `deploy.sh` already pulled,
+migrated, and restarted on that newer commit, and the health check earlier
+in the job passed against it. Production is live and healthy, but on a
+commit that was not the one approved. This is not a broken deploy to roll
+back; it is a decision: check what actually changed in the unreviewed
+commit and either accept it as the new production state, or manually deploy
+the originally-intended commit (`git checkout <sha> && ./scripts/deploy.sh`,
+or wait for/approve the newer run so it becomes the reviewed state going
+forward).
 
 ### 4.2 View logs
 
