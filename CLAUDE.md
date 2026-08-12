@@ -32,7 +32,7 @@ New specs go to `docs/superpowers/specs/`; the legacy `docs/spec/` folder is fro
     - **Constraint:** Never render an `async` Server Component directly inside a `"use client"` component.
 - **Auth:** NextAuth.js v5. Always ensure `secret` and `trustHost` are configured. Use standard `redirectTo` in Server Actions.
 - **Database:** Prisma with **PostgreSQL** (`prisma/schema.prisma` provider is `postgresql`). Use the `nodejs` runtime for API routes that interact with Prisma.
-- **See README for ops/domain specifics:** DB/migration/deploy details (PowerShell `$env:DATABASE_URL` invocation, the approval-gated `.github/workflows/deploy.yml` flow that runs `scripts/deploy.sh` on the OVHcloud VPS — see `DEPLOY_OVH.md`), payment providers (PayHere / Koko / MintPay), the Curfox / Royal Express courier integration, and admin bootstrap all live in `README.md` — don't duplicate them here.
+- **See README for ops/domain specifics:** DB/migration/deploy details (PowerShell `$env:DATABASE_URL` invocation, the `.github/workflows/deploy.yml` flow, approval-gated only once the `production` GitHub Environment has a required reviewer configured, that runs `scripts/deploy.sh` on the OVHcloud VPS — see `DEPLOY_OVH.md`), payment providers (PayHere / Koko / MintPay), the Curfox / Royal Express courier integration, and admin bootstrap all live in `README.md` — don't duplicate them here.
 
 ## 4. Documentation
 - **CLAUDE.md:** This file. Foundational repo guidance.

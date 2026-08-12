@@ -356,13 +356,17 @@ sudo crontab -e
 ### 4.1 Deploy an update
 
 Deploys run through GitHub Actions (`.github/workflows/deploy.yml`). Pushing
-to `main` starts a `test` job; if it passes, the `deploy` job pauses at the
-`production` environment and waits for a required reviewer. Approve it from
-the Actions tab and it SSHes into this VPS, runs `scripts/deploy.sh`, then
-verifies `https://dressingbear.com/api/health`.
+to `main` starts a `test` job; if it passes, the `deploy` job targets the
+`production` environment. Approval-gating only happens if that environment
+has been configured in repo settings with a required reviewer — that setting
+is what makes the job pause on the Actions tab until someone approves it. If
+it is not configured, the deploy proceeds unattended as soon as tests pass.
+**Verify the `production` environment has a required reviewer before the
+first push to `main`** (Settings → Environments → production).
 
-Nothing reaches production without that approval click, and deploys are
-serialized by a concurrency group so two can never apply migrations at once.
+Once that gate is in place, nothing reaches production without an approval
+click. Either way, deploys are serialized by a concurrency group so two can
+never apply migrations at once.
 
 The manual path still works and remains the fallback when GitHub is
 unavailable or you are mid-incident:
