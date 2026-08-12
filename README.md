@@ -223,6 +223,10 @@ Production runs on a self-hosted Docker Compose stack (app + PostgreSQL +
 Nginx) on an OVHcloud VPS — see **[DEPLOY_OVH.md](./DEPLOY_OVH.md)** for the
 full setup and deployment procedure.
 
+- **Deploys** run through GitHub Actions on push to `main`, gated on Vitest
+  and a required-reviewer approval — see `.github/workflows/deploy.yml` and
+  [DEPLOY_OVH.md](./DEPLOY_OVH.md) §4.1. `./scripts/deploy.sh` on the VPS
+  remains the manual fallback.
 - **Migrations** run via `docker compose --profile tools run --rm migrator
   npx prisma migrate deploy` (or `make migrate`), as an explicit step in
   `scripts/deploy.sh` before the app image is rebuilt — never automatically

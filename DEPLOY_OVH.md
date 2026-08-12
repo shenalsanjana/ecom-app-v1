@@ -355,6 +355,18 @@ sudo crontab -e
 
 ### 4.1 Deploy an update
 
+Deploys run through GitHub Actions (`.github/workflows/deploy.yml`). Pushing
+to `main` starts a `test` job; if it passes, the `deploy` job pauses at the
+`production` environment and waits for a required reviewer. Approve it from
+the Actions tab and it SSHes into this VPS, runs `scripts/deploy.sh`, then
+verifies `https://dressingbear.com/api/health`.
+
+Nothing reaches production without that approval click, and deploys are
+serialized by a concurrency group so two can never apply migrations at once.
+
+The manual path still works and remains the fallback when GitHub is
+unavailable or you are mid-incident:
+
 ```bash
 cd /opt/dressingbear
 ./scripts/deploy.sh
@@ -363,6 +375,14 @@ cd /opt/dressingbear
 
 This pulls `main`, runs migrations, rebuilds the app image, and restarts
 the stack — see `scripts/deploy.sh` for the exact sequence.
+
+**Keep this working tree clean.** `scripts/deploy.sh` runs `git pull origin
+main` under `set -e`, so a local commit or uncommitted edit on the VPS will
+fail every CI deploy until it is resolved (see §3.3).
+
+There is no automatic rollback. If a deploy fails the health check, fix it
+here on the VPS — the previous container keeps serving if the failure
+happened before `docker compose up -d`.
 
 ### 4.2 View logs
 
