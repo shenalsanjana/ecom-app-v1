@@ -11,12 +11,22 @@ concurrency:
   group: production-deploy
   cancel-in-progress: false
 
+# Default token scope for every job below: read-only. `actions/checkout@v4`
+# would otherwise persist a repo-writable GITHUB_TOKEN into .git/config,
+# readable by any malicious transitive-dependency postinstall during
+# `npm ci`. Neither job needs to write to the repo.
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
@@ -43,6 +53,31 @@ jobs:
     environment: production
     timeout-minutes: 30
     steps:
+      - name: Verify main has not moved since this run was approved
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EXPECTED_SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          # This job pauses at the `production` environment for reviewer
+          # approval (once that environment is configured — see
+          # DEPLOY_OVH.md §4.1). If a second push lands to `main` while this
+          # run is awaiting approval, approving THIS run must not deploy
+          # THAT newer, unreviewed commit. Fail fast instead: refuse to
+          # deploy unless github.sha is still the tip of origin/main.
+          latest_sha="$(curl -fsS \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/commits/main" \
+            | jq -r '.sha')"
+          if [ "$latest_sha" != "$EXPECTED_SHA" ]; then
+            echo "ERROR: main has moved since this run's commit ($EXPECTED_SHA) was tested." >&2
+            echo "main is now at $latest_sha. Approving this run would deploy an untested commit." >&2
+            echo "Do not approve this run — approve (or wait for) the run for $latest_sha instead." >&2
+            exit 1
+          fi
+          echo "OK: $EXPECTED_SHA is still the tip of main."
+
       - name: Configure SSH
         env:
           SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
@@ -68,10 +103,39 @@ jobs:
               "$VPS_USER@$VPS_HOST" \
               'cd /opt/dressingbear && ./scripts/deploy.sh'
 
+      - name: Verify the VPS deployed the reviewed commit
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          # Closes the small race between the preflight check above and
+          # deploy.sh's own `git pull origin main`: if a push landed in that
+          # window, deploy.sh may have pulled a newer commit than the one
+          # this run was approved for. Ask the VPS what it actually deployed.
+          deployed_sha="$(ssh -i ~/.ssh/id_deploy \
+              -o StrictHostKeyChecking=yes \
+              -o BatchMode=yes \
+              "$VPS_USER@$VPS_HOST" \
+              'cd /opt/dressingbear && git rev-parse HEAD')"
+          if [ "$deployed_sha" != "$EXPECTED_SHA" ]; then
+            echo "ERROR: the VPS deployed a different commit than this run approved." >&2
+            echo "Expected $EXPECTED_SHA, but the VPS is now at $deployed_sha." >&2
+            echo "A newer push likely won the race against this deploy. Investigate before trusting production." >&2
+            exit 1
+          fi
+          echo "OK: VPS is running the reviewed commit $EXPECTED_SHA."
+
       - name: Verify the site is healthy
         run: |
-          # deploy.sh returns as soon as `docker compose up -d` is issued, so
-          # the app may still be booting. Poll for up to ~2 minutes.
+          # docker-compose.yml's nginx service has `depends_on: app:
+          # condition: service_healthy` (backed by the Dockerfile
+          # HEALTHCHECK), so `docker compose up -d` in deploy.sh already
+          # blocks until the app container reports healthy before it
+          # returns — it does NOT return immediately. This loop instead
+          # covers the remaining gap: nginx itself starting up and the
+          # first real HTTPS request succeeding. Poll for up to ~6 minutes
+          # worst case (24 attempts x (10s curl timeout + 5s sleep)).
           for attempt in $(seq 1 24); do
             if curl -fsS --max-time 10 https://dressingbear.com/api/health | grep -q '"status":"ok"'; then
               echo "Health check passed on attempt $attempt."
@@ -80,7 +144,7 @@ jobs:
             echo "Attempt $attempt: not healthy yet, retrying in 5s..."
             sleep 5
           done
-          echo "Health check FAILED: /api/health did not report ok within ~2 minutes." >&2
+          echo "Health check FAILED: /api/health did not report ok within ~6 minutes (worst case)." >&2
           exit 1
 
       - name: Clean up SSH key

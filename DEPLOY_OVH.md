@@ -355,6 +355,70 @@ sudo crontab -e
 
 ### 4.1 Deploy an update
 
+#### One-time CI/CD setup
+
+Before the first push relies on the workflow below, the repository owner
+must do the following (none of it is automatable from a workflow run):
+
+1. **Create the `production` environment.** Settings → Environments → New
+   environment → `production`, then add yourself as a **required
+   reviewer**. Without this the `deploy` job runs unattended as soon as
+   tests pass.
+2. **Generate a dedicated CI keypair** — never reuse a personal key, so it
+   can be revoked independently of human access:
+   ```bash
+   ssh-keygen -t ed25519 -f ci_deploy_key -C "github-actions-deploy" -N ""
+   ```
+3. **Capture the VPS host key** so the workflow can pin it instead of
+   trusting on first connect:
+   ```bash
+   ssh-keyscan -t ed25519 <VPS_HOST> > known_hosts_ci
+   ```
+   Run this once, from a machine you trust, and verify the fingerprint out
+   of band (e.g. against the OVH control panel or a console session) before
+   using it. The workflow itself must never run `ssh-keyscan` at runtime or
+   set `StrictHostKeyChecking=no`/`accept-new` — either would accept a
+   machine-in-the-middle silently.
+4. **Add four repository secrets** (Settings → Secrets and variables →
+   Actions):
+
+   | Secret | Value |
+   |---|---|
+   | `VPS_HOST` | The VPS IP or hostname |
+   | `VPS_USER` | `deploy` |
+   | `VPS_SSH_KEY` | Contents of `ci_deploy_key` (the private half) |
+   | `VPS_SSH_KNOWN_HOSTS` | Contents of `known_hosts_ci` |
+
+5. **Restrict the CI key on the VPS — required, not optional.** The
+   `deploy` user is in both the `sudo` and `docker` groups (§1.2, §1.6), and
+   docker-group membership is root-equivalent (a container can bind-mount
+   the host filesystem). An unrestricted key in `authorized_keys` therefore
+   grants the CI key root-equivalent shell access if it ever leaks.
+
+   First, pull this branch's changes to the VPS so
+   `scripts/ci-deploy-dispatch.sh` exists and is executable:
+   ```bash
+   cd /opt/dressingbear && git pull origin main
+   ```
+   Then append the CI public key to `/home/deploy/.ssh/authorized_keys`,
+   restricted with a forced command:
+   ```
+   command="/opt/dressingbear/scripts/ci-deploy-dispatch.sh",no-port-forwarding,no-agent-forwarding,no-pty ssh-ed25519 AAAA... github-actions-deploy
+   ```
+   A forced command overrides **any** command the SSH client sends — but
+   `.github/workflows/deploy.yml` needs this key for two different
+   operations: running the deploy, and afterwards reading back the VPS's
+   current commit (`git rev-parse HEAD`) to confirm it matches the commit
+   that was approved. Pointing the forced command straight at
+   `scripts/deploy.sh` would silently break that second check. Instead,
+   point it at `scripts/ci-deploy-dispatch.sh` — a small wrapper that reads
+   the client's original command from `$SSH_ORIGINAL_COMMAND` (sshd still
+   sets this under a forced command) and allow-lists exactly those two
+   operations, rejecting anything else. Do not edit the forced-command path
+   to point at `deploy.sh` directly.
+
+#### Every deploy
+
 Deploys run through GitHub Actions (`.github/workflows/deploy.yml`). Pushing
 to `main` starts a `test` job; if it passes, the `deploy` job targets the
 `production` environment. Approval-gating only happens if that environment
@@ -384,9 +448,19 @@ the stack — see `scripts/deploy.sh` for the exact sequence.
 main` under `set -e`, so a local commit or uncommitted edit on the VPS will
 fail every CI deploy until it is resolved (see §3.3).
 
-There is no automatic rollback. If a deploy fails the health check, fix it
-here on the VPS — the previous container keeps serving if the failure
-happened before `docker compose up -d`.
+There is no automatic rollback. `scripts/deploy.sh` runs `prisma migrate
+deploy` (step before the app image is even built) BEFORE `docker compose
+build app` / `docker compose up -d`, and CI does not gate on `npm run
+build`. So a commit that passes Vitest but fails `next build` leaves
+production in a **half-migrated state**: the schema change has already been
+applied to the live database, but the old app container is still serving
+the old code against it. If the schema change is backward-compatible this
+is invisible; if not, the old code may start erroring. Recovery: do not try
+to reverse the migration — fix whatever broke `next build` and redeploy as
+soon as possible so the correct code reaches the already-migrated database.
+If the old code is actively erroring and a fix will take a while, consider
+taking the app offline (`docker compose stop app`) rather than serving
+broken requests until the fix lands.
 
 ### 4.2 View logs
 
