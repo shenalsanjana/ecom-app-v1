@@ -252,7 +252,7 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
         clearCart();
         setOrderId(result.orderId);
         setOrderReference(result.webNumber ?? result.orderId);
-        trackPurchaseOnce(result.orderId, purchaseValue, purchaseContentIds);
+        await trackPurchaseOnce(result.orderId, purchaseValue, purchaseContentIds);
       } else {
         setError(result.error);
       }

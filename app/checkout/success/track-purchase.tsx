@@ -4,7 +4,8 @@
 // Mirrors ClearCartOnPaid: it is a leaf client component nested inside the
 // server-rendered OrderDetails, so when PaymentStatusPoll calls router.refresh()
 // and `confirmed` flips to true, this re-renders and fires. Dedupe (by order id)
-// lives in trackPurchaseOnce, so refresh / back-nav never double-count.
+// lives server-side in trackPurchaseOnce's claim call, so refresh / back-nav /
+// a different browser context never double-count.
 import { useEffect } from "react";
 import { trackPurchaseOnce } from "@/app/_lib/meta-pixel";
 
@@ -21,7 +22,7 @@ export function TrackPurchase({
 }) {
   useEffect(() => {
     if (!confirmed) return;
-    trackPurchaseOnce(orderId, value, contentIds);
+    void trackPurchaseOnce(orderId, value, contentIds);
   }, [confirmed, orderId, value, contentIds]);
 
   return null;

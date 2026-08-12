@@ -12,7 +12,6 @@ export type MetaEvent =
   | "InitiateCheckout"
   | "Purchase";
 
-export const PURCHASE_DEDUPE_KEY = "db-purchase-tracked";
 const CURRENCY = "LKR" as const;
 
 type Fbq = (...args: unknown[]) => void;
@@ -98,30 +97,32 @@ export function trackInitiateCheckout(
   track("InitiateCheckout", content(contentIds, value, { num_items: numItems }));
 }
 
-export function trackPurchaseOnce(
+export async function trackPurchaseOnce(
   orderId: string,
   value: number,
   contentIds: string[],
-): void {
+): Promise<void> {
   const f = fbq();
   if (!f || typeof window === "undefined") return;
 
   // Dedupe: browser Pixel does not auto-dedupe repeated browser fires, and the
-  // success page is revisitable (refresh / back-nav). Record fired order ids.
-  let fired: string[] = [];
+  // success page is revisitable (refresh / back-nav / a different browser
+  // context entirely). The claim is atomic and server-side (Order.purchaseTrackedAt)
+  // rather than localStorage, which isn't durable across browser contexts and
+  // was allowing the same order to fire repeatedly.
+  let claimed: boolean;
   try {
-    const raw = window.localStorage?.getItem(PURCHASE_DEDUPE_KEY);
-    if (raw) fired = JSON.parse(raw) as string[];
+    const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}/claim-purchase-tracking`, {
+      method: "POST",
+    });
+    if (!res.ok) return;
+    const data = (await res.json()) as { claimed?: boolean };
+    claimed = data.claimed === true;
   } catch {
-    fired = [];
+    // Can't confirm we won the claim — skip rather than risk a duplicate fire.
+    return;
   }
-  if (fired.includes(orderId)) return;
+  if (!claimed) return;
 
   track("Purchase", content(contentIds, value), { eventID: orderId });
-
-  try {
-    window.localStorage?.setItem(PURCHASE_DEDUPE_KEY, JSON.stringify([...fired, orderId]));
-  } catch {
-    // Storage unavailable — event already fired; acceptable.
-  }
 }
