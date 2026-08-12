@@ -1,0 +1,88 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+# Two deploys must never overlap: each runs `prisma migrate deploy` against the
+# one production database. Queue instead of cancelling — a cancelled deploy
+# could be interrupted mid-migration.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Mirrors Dockerfile:24 — the suites import types from @prisma/client.
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Run tests
+        run: npm run test
+
+  deploy:
+    name: Deploy to VPS
+    needs: test
+    runs-on: ubuntu-latest
+    # Requires a `production` environment with a required reviewer configured in
+    # repo settings. That configuration is what makes this job pause for
+    # approval; without it this deploys unattended.
+    environment: production
+    timeout-minutes: 30
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          # Host key is pinned from a secret. Never substitute a runtime
+          # ssh-keyscan or StrictHostKeyChecking=no — both accept a MITM.
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Run deploy script on the VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -i ~/.ssh/id_deploy \
+              -o StrictHostKeyChecking=yes \
+              -o BatchMode=yes \
+              "$VPS_USER@$VPS_HOST" \
+              'cd /opt/dressingbear && ./scripts/deploy.sh'
+
+      - name: Verify the site is healthy
+        run: |
+          # deploy.sh returns as soon as `docker compose up -d` is issued, so
+          # the app may still be booting. Poll for up to ~2 minutes.
+          for attempt in $(seq 1 24); do
+            if curl -fsS --max-time 10 https://dressingbear.com/api/health | grep -q '"status":"ok"'; then
+              echo "Health check passed on attempt $attempt."
+              exit 0
+            fi
+            echo "Attempt $attempt: not healthy yet, retrying in 5s..."
+            sleep 5
+          done
+          echo "Health check FAILED: /api/health did not report ok within ~2 minutes." >&2
+          exit 1
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_deploy
