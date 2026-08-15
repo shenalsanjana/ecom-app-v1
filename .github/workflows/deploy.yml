@@ -121,7 +121,10 @@ jobs:
           # a mismatch would abort the job without ever confirming
           # production is serving a working site.
           for attempt in $(seq 1 24); do
-            if curl -fsS --max-time 10 https://dressingbear.com/api/health | grep -q '"status":"ok"'; then
+            # Must be the canonical host: the apex 301s to www (see
+            # nginx/conf.d/app.conf) and `curl -fsS` does not follow
+            # redirects, so hitting the apex here would never see the body.
+            if curl -fsS --max-time 10 https://www.dressingbear.com/api/health | grep -q '"status":"ok"'; then
               echo "Health check passed on attempt $attempt."
               exit 0
             fi

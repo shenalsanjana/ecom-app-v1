@@ -112,7 +112,7 @@ nano .env    # fill in every real value — see the list below
 chmod 600 .env
 ```
 
-Required values (see `.env.example` for the full annotated list): `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `DATABASE_URL` (must match the three Postgres values, host `postgres`), `AUTH_SECRET` (generate with `openssl rand -base64 32`), `AUTH_URL`/`APP_URL` (`https://dressingbear.com`), SMTP credentials, `BRAND_EMAIL`, Notify.lk credentials, and whichever payment/courier credentials are actually in use (`PAYHERE_*` at minimum; `KOKO_*`/`MINTPAY_*`/`ROYAL_EXPRESS_*` only if those integrations are enabled).
+Required values (see `.env.example` for the full annotated list): `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `DATABASE_URL` (must match the three Postgres values, host `postgres`), `AUTH_SECRET` (generate with `openssl rand -base64 32`), `AUTH_URL`/`APP_URL` (`https://www.dressingbear.com` — the canonical host; the bare apex only 301s to it, so pointing these at the apex breaks auth redirects), SMTP credentials, `BRAND_EMAIL`, Notify.lk credentials, and whichever payment/courier credentials are actually in use (`PAYHERE_*` at minimum; `KOKO_*`/`MINTPAY_*`/`ROYAL_EXPRESS_*` only if those integrations are enabled).
 
 ## 2. One-time production cutover (live data migration)
 
@@ -272,63 +272,26 @@ docker compose --profile tools run --rm certbot certonly \
 
 ### 3.3 Enable HTTPS
 
-Replace the contents of `nginx/conf.d/app.conf` with:
+Replace the HTTP-only bootstrap contents of `nginx/conf.d/app.conf` with the
+HTTPS config already checked into this repo at that same path — read it rather
+than copying a snippet from here, so the two can't drift apart.
 
-```nginx
-upstream dressingbear_app {
-    server app:3000;
-}
+Two properties of that file are load-bearing, so don't "simplify" them away:
 
-server {
-    listen 80;
-    listen [::]:80;
-    server_name dressingbear.com www.dressingbear.com;
-
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-
-    location / {
-        return 301 https://$host$request_uri;
-    }
-}
-
-server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    http2 on;
-    server_name dressingbear.com www.dressingbear.com;
-
-    ssl_certificate     /etc/letsencrypt/live/dressingbear.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/dressingbear.com/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
-
-    location / {
-        proxy_pass http://dressingbear_app;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_read_timeout 60s;
-
-        add_header X-Content-Type-Options nosniff always;
-        add_header X-Frame-Options SAMEORIGIN always;
-        add_header Referrer-Policy strict-origin-when-cross-origin always;
-        add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
-    }
-}
-```
+- **`www.dressingbear.com` is the canonical host, and the bare apex only 301s
+  to it.** Both hosts must not be served as co-equal origins: `AUTH_URL` makes
+  NextAuth rewrite every request URL to the www origin, so an apex request to a
+  protected route gets a cross-origin redirect — which browsers block for Next's
+  RSC prefetches (CORS), and which scopes auth cookies to the wrong origin.
+- **`/.well-known/acme-challenge/` is served over plain HTTP from the certbot
+  webroot, ahead of the HTTPS redirect.** Redirecting it hands Let's Encrypt to
+  the app, which 404s, and `certbot renew` fails silently until the cert expires.
 
 Then reload:
 
 ```bash
 docker compose restart nginx
-curl -f https://dressingbear.com/api/health
+curl -f https://www.dressingbear.com/api/health
 ```
 
 Commit this change to the repo (`git add nginx/conf.d/app.conf && git commit
