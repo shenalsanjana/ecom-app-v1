@@ -264,11 +264,12 @@ config, `nginx/conf.d/app.conf`) from step 2.6, so the webroot method works
 with zero downtime:
 
 ```bash
-docker compose --profile tools run --rm certbot certonly \
-  --webroot -w /var/www/certbot \
-  -d dressingbear.com -d www.dressingbear.com \
-  --email <your-email> --agree-tos --no-eff-email
+./scripts/certbot-issue.sh <your-email>
 ```
+
+That wrapper issues for both `dressingbear.com` and `www.dressingbear.com`
+via webroot, then reloads nginx. It requires the nginx service to be up (it
+checks, and refuses otherwise) because the challenge is served through it.
 
 ### 3.3 Enable HTTPS
 
@@ -303,16 +304,64 @@ from what those pulls expect and causing conflicts.
 
 ### 3.4 Certificate renewal
 
-Let's Encrypt certs expire after 90 days. Add a cron entry for automatic
-renewal:
+Let's Encrypt certs expire after 90 days. Renewal uses the **webroot**
+authenticator, which works with nginx left running — nginx serves the
+challenge token from the shared webroot at `/var/www/certbot`.
+
+Do not use `standalone`. It needs to bind port 80 for itself, which nginx
+already holds, so it fails with:
+
+```
+Could not bind TCP port 80 because it is already in use
+```
+
+#### One-time: confirm the lineage renews via webroot
+
+A certificate originally issued with `--standalone` keeps renewing that way,
+because the authenticator is recorded per-certificate in
+`/etc/letsencrypt/renewal/dressingbear.com.conf`. Migrate it:
+
+```bash
+cd /opt/dressingbear
+./scripts/certbot-issue.sh <your-email>
+```
+
+The script reads the stored authenticator and acts accordingly: already on
+webroot, it exits without touching anything; on `standalone` (or anything
+else), it reissues via webroot so certbot rewrites the renewal config itself.
+It is safe to re-run.
+
+Do **not** hand-edit `/etc/letsencrypt/renewal/dressingbear.com.conf`.
+Certbot regenerates that file on every issuance, so the edit is silently
+reverted the next time the cert is renewed — which is exactly when you need
+it to be correct.
+
+#### Ongoing: the cron entry
 
 ```bash
 sudo crontab -e
 ```
 
 ```cron
-0 3 * * * cd /opt/dressingbear && docker compose --profile tools run --rm certbot renew --quiet && docker compose exec nginx nginx -s reload
+0 3 * * * cd /opt/dressingbear && ./scripts/certbot-renew.sh --quiet >> /var/log/certbot-renew.log 2>&1
 ```
+
+`scripts/certbot-renew.sh` passes `--webroot --webroot-path /var/www/certbot`
+explicitly, so it renews correctly even if a lineage is still recorded as
+`standalone`, and it reloads nginx afterwards.
+
+Rehearse it any time without touching the real certificate:
+
+```bash
+./scripts/certbot-renew.sh --dry-run
+```
+
+The webroot directory itself is created by `scripts/deploy.sh` on every
+deploy and bind-mounted into both nginx (read-only) and the certbot service
+(read-write) — see the volume comments in `docker-compose.yml`. It is a host
+path rather than a named Docker volume on purpose: `/etc/letsencrypt` is also
+a host bind mount, so the path certbot records in the renewal config has to
+resolve on the host too.
 
 ## 4. Ongoing operations
 

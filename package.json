@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "test:nginx": "bash tests/nginx/acme-and-canonical.sh",
     "check:contrast": "tsx scripts/check-contrast.ts",
     "admin:create": "tsx scripts/create-admin.ts",
     "admin:ensure": "tsx scripts/ensure-admin.ts",

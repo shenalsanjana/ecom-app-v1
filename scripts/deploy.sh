@@ -44,6 +44,14 @@ docker compose --profile tools run --rm migrator npm run admin:ensure
 echo "==> Building the app image (queries Postgres at build time for ISR prerendering)"
 docker compose build app
 
+# nginx bind-mounts this path and serves /.well-known/acme-challenge/ from it.
+# Docker would create it implicitly when binding the mount, but do it here so
+# the directory exists with predictable ownership before nginx starts, and so
+# a missing webroot never shows up as a mystery 404 during cert renewal.
+# Non-fatal when unprivileged: the bind mount still works either way.
+echo "==> Ensuring the ACME webroot exists (/var/www/certbot)"
+mkdir -p /var/www/certbot 2>/dev/null || true
+
 echo "==> Starting the full stack"
 docker compose up -d
 
