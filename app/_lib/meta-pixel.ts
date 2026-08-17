@@ -103,6 +103,11 @@ export async function trackPurchaseOnce(
   contentIds: string[],
 ): Promise<void> {
   const f = fbq();
+  // TEMP DEBUG (remove after diagnosing the live-tracking-dead issue): makes
+  // the fbq-presence check readable straight from Console instead of having
+  // to infer it from the Network tab, which can't distinguish "blocked" from
+  // "loaded but neutered by an extension."
+  console.log("[pixel-debug] trackPurchaseOnce: window.fbq is", typeof f === "function" ? "a function (ok)" : f);
   if (!f || typeof window === "undefined") return;
 
   // Dedupe: browser Pixel does not auto-dedupe repeated browser fires, and the
