@@ -3,7 +3,7 @@
 
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
-import { auth } from "@/app/_lib/auth";
+import { getVerifiedSessionUser } from "@/app/_lib/session-user";
 import { prisma } from "@/app/_lib/prisma";
 import {
   ProfileSchema,
@@ -21,9 +21,12 @@ function flatten(errs: unknown): string {
 }
 
 async function requireUserId(): Promise<string> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Not authenticated");
-  return session.user.id;
+  // Verified against the database, not merely read off the JWT: a valid session
+  // cookie can name a User row that no longer exists, and address.create() would
+  // then violate `Address_userId_fkey`. A stale session is not authenticated.
+  const sessionUser = await getVerifiedSessionUser();
+  if (!sessionUser) throw new Error("Not authenticated");
+  return sessionUser.id;
 }
 
 export async function updateProfileAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

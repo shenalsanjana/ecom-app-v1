@@ -4,7 +4,6 @@
 import { z } from "zod";
 import { LkPhoneSchema, LkMobileSchema } from "@/app/_lib/validation";
 import { validateCartItems, type VariantStock } from "@/app/_lib/order-validation";
-import { auth } from "@/app/_lib/auth";
 import {
   sendPendingPrepaidNotificationEmail,
   sendAdminFailureAlertEmail,
@@ -14,12 +13,13 @@ import {
 } from "@/app/_lib/mailer";
 import { notifyOrderConfirmed } from "@/app/_lib/order-notifications";
 import { prisma } from "@/app/_lib/prisma";
+import { getVerifiedSessionUser } from "@/app/_lib/session-user";
 import { calculateDelivery } from "@/app/_lib/checkout-config";
 import { getDeliveryConfig } from "@/app/_lib/store-settings";
 import { zoneForCity } from "@/app/_lib/delivery-zones";
 import { initialPaymentStatus } from "@/app/_lib/order-status";
 import { nextWebNumber } from "@/app/_lib/web-number";
-import { acquireItemPools } from "@/app/_lib/inventory-pools";
+import { acquireItemPools, InsufficientStockError } from "@/app/_lib/inventory-pools";
 import { buildPlainStockMap, buildDesignStockMap, plainStockKey } from "@/app/_lib/variants";
 
 export type PaymentMethod = "COD" | "PAYHERE" | "KOKO" | "MINTPAY";
@@ -133,17 +133,26 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
   const { items, shippingAddress, paymentMethod, contactPhone, alternatePhone, guestInfo, idempotencyKey, notes } =
     parsed.data;
 
-  const session = await auth();
-
   let userId: string | null = null;
   let customerName: string;
   let customerEmail: string;
   let guestName: string | null = null;
   let guestEmail: string | null = null;
 
-  if (session?.user?.id) {
-    userId = session.user.id;
-    const sessionName = session.user.name?.trim();
+  // Verified against the database rather than trusted from the JWT. The session
+  // cookie (app/_lib/auth.config.ts: strategy "jwt", 30-day maxAge) can name a
+  // User row that no longer exists, and passing that id to order.create violates
+  // `Order_userId_fkey` — which took down the entire checkout. See
+  // app/_lib/session-user.ts for the full reasoning.
+  //
+  // When the row is gone we fall through to the guest branch below. The checkout
+  // page already renders the guest form in that state (resolveCheckoutPrefill
+  // returns null), so guestInfo is present and the sale is not lost.
+  const sessionUser = await getVerifiedSessionUser();
+
+  if (sessionUser) {
+    userId = sessionUser.id;
+    const sessionName = sessionUser.name?.trim();
     if (!sessionName) {
       return {
         success: false,
@@ -151,7 +160,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
       };
     }
     customerName = sessionName;
-    customerEmail = session.user.email ?? "";
+    customerEmail = sessionUser.email ?? "";
   } else if (guestInfo) {
     const email = guestInfo.email && guestInfo.email.length > 0 ? guestInfo.email : null;
     customerName = guestInfo.name;
@@ -297,8 +306,27 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
       });
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to create order";
-    return { success: false, error: message };
+    // Stock shortfalls are written for the shopper and name the item, so pass
+    // them straight through. Everything else is an internal fault: log it with
+    // context (this catch previously logged nothing, leaving production failures
+    // invisible) and show the shopper a safe message rather than raw Prisma
+    // internals.
+    if (error instanceof InsufficientStockError) {
+      return { success: false, error: error.message };
+    }
+    console.error("[checkout] order creation failed", {
+      orderId,
+      hasUserId: Boolean(userId),
+      idempotencyKey: idempotencyKey ?? null,
+      // Error instances serialize to `{}` through JSON log pipelines — pull the
+      // message and stack out explicitly so the log is actually diagnosable.
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    return {
+      success: false,
+      error: "We couldn't complete your order. Please try again, or contact us if the problem continues.",
+    };
   }
 
   // ── Branch on payment method (Option B2) ────────────────────────────

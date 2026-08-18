@@ -21,8 +21,8 @@ const { txOrderCreate, productVariantFindMany, plainStockFindMany, designFindMan
   designFindMany: vi.fn(async () => [{ id: "D1", quantity: 5 }]),
 }));
 
-vi.mock("@/app/_lib/auth", () => ({
-  auth: vi.fn(async () => null),
+vi.mock("@/app/_lib/session-user", () => ({
+  getVerifiedSessionUser: vi.fn(async () => null),
 }));
 vi.mock("@/app/_lib/prisma", () => ({
   prisma: {
@@ -74,7 +74,7 @@ import {
   sendPendingPrepaidNotificationEmail,
 } from "@/app/_lib/mailer";
 import { notifyOrderConfirmed } from "@/app/_lib/order-notifications";
-import { auth } from "@/app/_lib/auth";
+import { getVerifiedSessionUser } from "@/app/_lib/session-user";
 import { processOrder, type ProcessOrderInput } from "../actions";
 
 const baseInput: Omit<ProcessOrderInput, "paymentMethod"> = {
@@ -221,8 +221,8 @@ describe("processOrder — size is required", () => {
 
 describe("processOrder — phone-only customer (no email)", () => {
   it("COD checkout with no customer email: order succeeds and confirmation is dispatched", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
-      user: { id: "U1", name: "Phone Customer", email: null },
+    vi.mocked(getVerifiedSessionUser).mockResolvedValueOnce({
+      id: "U1", name: "Phone Customer", email: null,
     } as never);
     const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
     expect(result.success).toBe(true);
@@ -232,8 +232,8 @@ describe("processOrder — phone-only customer (no email)", () => {
 
 describe("processOrder — customer name requirement", () => {
   it("rejects logged-in checkout when session.user.name is empty", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
-      user: { id: "U1", name: "", email: "user@example.com" },
+    vi.mocked(getVerifiedSessionUser).mockResolvedValueOnce({
+      id: "U1", name: "", email: "user@example.com",
     } as never);
 
     const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
@@ -244,8 +244,8 @@ describe("processOrder — customer name requirement", () => {
   });
 
   it("rejects logged-in checkout when session.user.name is whitespace-only", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
-      user: { id: "U1", name: "   ", email: "user@example.com" },
+    vi.mocked(getVerifiedSessionUser).mockResolvedValueOnce({
+      id: "U1", name: "   ", email: "user@example.com",
     } as never);
 
     const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
@@ -370,5 +370,100 @@ describe("processOrder — variant color snapshots", () => {
     }
     expect(txOrderCreate).not.toHaveBeenCalled();
     expect(notifyOrderConfirmed).not.toHaveBeenCalled();
+  });
+});
+
+describe("processOrder — stale session (User row no longer exists)", () => {
+  // Sessions are JWTs (auth.config.ts: strategy "jwt", maxAge 30 days). `token.uid`
+  // is written once at login and never revalidated, so the cookie can outlive — or
+  // predate — the User row it names (a restored/replaced database, a removed
+  // account). Passing that id straight into order.create violates
+  // `Order_userId_fkey` and the raw Prisma error was surfaced to the shopper.
+  //
+  // The checkout PAGE already tolerates this: resolveCheckoutPrefill(null, …)
+  // returns null, so the guest form renders and the client submits guestInfo.
+  // The action must use it rather than trusting the stale id.
+  it("does not pass a non-existent userId to order.create", async () => {
+    vi.mocked(getVerifiedSessionUser).mockResolvedValueOnce(null);
+
+    const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
+
+    expect(result.success).toBe(true);
+    expect(txOrderCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ userId: null }) }),
+    );
+  });
+
+  it("falls back to the guest identity so the sale is not lost", async () => {
+    vi.mocked(getVerifiedSessionUser).mockResolvedValueOnce(null);
+
+    const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
+
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.isGuest).toBe(true);
+    expect(txOrderCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ guestName: "Jane Doe", guestEmail: "jane@example.com" }),
+      }),
+    );
+  });
+
+  it("still links the order to the user when the row DOES exist", async () => {
+    vi.mocked(getVerifiedSessionUser).mockResolvedValueOnce({
+      id: "U1", name: "Real Customer", email: "real@example.com",
+    } as never);
+
+    const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
+
+    expect(result.success).toBe(true);
+    expect(txOrderCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ userId: "U1" }) }),
+    );
+  });
+});
+
+describe("processOrder — error surface", () => {
+  // The catch around the order transaction returned `error.message` verbatim to
+  // the browser, so shoppers saw raw Prisma internals ("Invalid
+  // prisma.order.create() invocation: Foreign key constraint violated on the
+  // constraint: `Order_userId_fkey`"), and nothing was logged server-side.
+  // Stock messages ARE meant for the shopper; internals are not.
+  it("still shows the insufficient-stock message to the shopper", async () => {
+    plainStockFindMany.mockResolvedValue([
+      { id: "PS2", colorSlug: "white", size: "M", quantity: 0 },
+    ]);
+
+    const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error).toMatch(/stock/i);
+  });
+
+  it("does not leak internal database errors to the shopper", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    txOrderCreate.mockRejectedValueOnce(
+      new Error(
+        "Invalid `prisma.order.create()` invocation: Foreign key constraint violated on the constraint: `Order_userId_fkey`",
+      ),
+    );
+
+    const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).not.toMatch(/prisma|constraint|fkey/i);
+      expect(result.error.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("logs the real error server-side so it is diagnosable", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    txOrderCreate.mockRejectedValueOnce(new Error("connection terminated unexpectedly"));
+
+    await processOrder({ ...baseInput, paymentMethod: "COD" });
+
+    expect(spy).toHaveBeenCalled();
+    const logged = JSON.stringify(spy.mock.calls);
+    expect(logged).toMatch(/connection terminated/);
   });
 });

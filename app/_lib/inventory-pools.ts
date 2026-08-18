@@ -29,6 +29,18 @@ export async function restoreItemPools(tx: Prisma.TransactionClient, item: PoolI
   }
 }
 
+// Raised when a pool cannot satisfy a line. Distinct from an internal failure:
+// this message is written FOR the shopper and is safe to show them, whereas a
+// Prisma/connection error is not. Callers surface it directly and genericise
+// everything else. Extends Error, so existing `e instanceof Error ? e.message`
+// handlers (admin order edits) are unaffected.
+export class InsufficientStockError extends Error {
+  constructor(itemName: string) {
+    super(`Insufficient stock for "${itemName}"`);
+    this.name = "InsufficientStockError";
+  }
+}
+
 // Guarded-decrements both pools. Throws if either has insufficient quantity,
 // so the caller's transaction rolls back any prior work in the same batch.
 export async function acquireItemPools(tx: Prisma.TransactionClient, item: AcquireItem): Promise<void> {
@@ -37,13 +49,13 @@ export async function acquireItemPools(tx: Prisma.TransactionClient, item: Acqui
       where: { id: item.plainTshirtStockId, quantity: { gte: item.quantity } },
       data: { quantity: { decrement: item.quantity } },
     });
-    if (r.count === 0) throw new Error(`Insufficient stock for "${item.name}"`);
+    if (r.count === 0) throw new InsufficientStockError(item.name);
   }
   if (item.dtfDesignId) {
     const r = await tx.dtfDesign.updateMany({
       where: { id: item.dtfDesignId, quantity: { gte: item.quantity } },
       data: { quantity: { decrement: item.quantity } },
     });
-    if (r.count === 0) throw new Error(`Insufficient stock for "${item.name}"`);
+    if (r.count === 0) throw new InsufficientStockError(item.name);
   }
 }

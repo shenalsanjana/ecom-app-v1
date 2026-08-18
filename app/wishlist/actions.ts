@@ -3,19 +3,23 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { auth } from "@/app/_lib/auth";
 import { prisma } from "@/app/_lib/prisma";
+import { getVerifiedSessionUser } from "@/app/_lib/session-user";
 
 export async function toggleWishlistAction(formData: FormData): Promise<void> {
   const productId = formData.get("productId");
   const fromPath = (formData.get("fromPath") as string) || "/";
   if (typeof productId !== "string" || !productId) return;
 
-  const session = await auth();
-  if (!session?.user?.id) {
+  // Verified against the database, not just read off the JWT: a valid cookie can
+  // name a User row that no longer exists, and writing that id would violate
+  // `WishlistItem_userId_fkey`. A stale session is treated as signed out.
+  const sessionUser = await getVerifiedSessionUser();
+  if (!sessionUser) {
     redirect(`/login?callbackUrl=${encodeURIComponent(fromPath)}`);
   }
-  const userId = session.user.id;
+
+  const userId = sessionUser.id;
 
   const existing = await prisma.wishlistItem.findUnique({
     where: { userId_productId: { userId, productId } },
