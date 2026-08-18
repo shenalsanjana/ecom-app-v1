@@ -88,7 +88,7 @@ describe("fetchKokoOrderStatus — request shape", () => {
   it("POSTs to orderViewUrl with correct headers, body fields, and returns SUCCESS", async () => {
     setupKokoEnv();
 
-    const mockFetch = vi.fn().mockResolvedValue(mockResponse({ orderId: "ORD-1", trnId: "T1", status: "SUCCESS" }, { ok: true }));
+    const mockFetch = vi.fn().mockResolvedValue(mockResponse({ status: "OK", statusCode: 200, content: { orderId: "ORD-1", trnId: "T1", status: "SUCCESS" } }, { ok: true }));
     vi.stubGlobal("fetch", mockFetch);
 
     const { fetchKokoOrderStatus } = await import("../koko");
@@ -127,25 +127,79 @@ describe("fetchKokoOrderStatus — status extraction", () => {
     setupKokoEnv();
   });
 
-  it("extracts status from wrapped response { data: { status } }", async () => {
+  // VERIFIED CONTRACT. Captured from prodapi.paykoko.com/api/merchants/orderView
+  // on 2026-08-18 against four real, genuinely-paid production orders:
+  //
+  //   {"status":"OK","statusCode":200,
+  //    "content":{"trnId":"…","orderId":"…","status":"SUCCESS","desc":null,"signature":"…"}}
+  //
+  // Two separate `status` fields exist and they mean different things:
+  //   - the ENVELOPE's `status` is the API-CALL result ("OK")
+  //   - `content.status` is the PAYMENT status ("SUCCESS" / "FAILED" / "PENDING")
+  // Reading the envelope's `status` is what stranded every Koko order at
+  // "awaiting payment": "OK" is not a recognized payment token, so it defaulted
+  // to PENDING and finalization never ran.
+  function kokoEnvelope(paymentStatus: string, extra: Record<string, unknown> = {}) {
+    return {
+      status: "OK",
+      statusCode: 200,
+      content: {
+        trnId: "35a8f41f6bd948be67e2aba024db1058",
+        orderId: "ORD-1",
+        status: paymentStatus,
+        desc: null,
+        ...extra,
+      },
+    };
+  }
+
+  it("reads the PAYMENT status from content.status, not the envelope status", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse(kokoEnvelope("SUCCESS"), { ok: true })));
+
+    const { fetchKokoOrderStatus } = await import("../koko");
+    expect(await fetchKokoOrderStatus("ORD-1")).toBe("SUCCESS");
+  });
+
+  it("reads FAILED from content.status", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse(kokoEnvelope("FAILED"), { ok: true })));
+
+    const { fetchKokoOrderStatus } = await import("../koko");
+    expect(await fetchKokoOrderStatus("ORD-1")).toBe("FAILED");
+  });
+
+  it("reads PENDING from content.status", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse(kokoEnvelope("PENDING"), { ok: true })));
+
+    const { fetchKokoOrderStatus } = await import("../koko");
+    expect(await fetchKokoOrderStatus("ORD-1")).toBe("PENDING");
+  });
+
+  it("NEVER treats the envelope's own status as the payment status", async () => {
+    // The API-call result and the payment result are independent. An envelope
+    // reporting a successful CALL for an unpaid order must not finalize it —
+    // that would mark unpaid orders as PAID.
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      mockResponse({ status: "SUCCESS", statusCode: 200, content: { status: "PENDING" } }, { ok: true }),
+    ));
+
+    const { fetchKokoOrderStatus } = await import("../koko");
+    expect(await fetchKokoOrderStatus("ORD-1")).toBe("PENDING");
+  });
+
+  it("returns PENDING when the envelope carries no content object", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      mockResponse({ status: "OK", statusCode: 200 }, { ok: true }),
+    ));
+
+    const { fetchKokoOrderStatus } = await import("../koko");
+    expect(await fetchKokoOrderStatus("ORD-4")).toBe("PENDING");
+  });
+
+  it("still reads a `data`-wrapped envelope (older documented shape)", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse({ data: { status: "FAILED" } }, { ok: true })));
 
     const { fetchKokoOrderStatus } = await import("../koko");
     expect(await fetchKokoOrderStatus("ORD-2")).toBe("FAILED");
-  });
-
-  it("extracts status from flat response { status }", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse({ status: "PENDING" }, { ok: true })));
-
-    const { fetchKokoOrderStatus } = await import("../koko");
-    expect(await fetchKokoOrderStatus("ORD-3")).toBe("PENDING");
-  });
-
-  it("defaults to PENDING when no status field present", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse({}, { ok: true })));
-
-    const { fetchKokoOrderStatus } = await import("../koko");
-    expect(await fetchKokoOrderStatus("ORD-4")).toBe("PENDING");
   });
 });
 
@@ -178,10 +232,9 @@ describe("fetchKokoOrderStatus — A3 response signature verification", () => {
     const responseSignature = sign("RSA-SHA256", Buffer.from(responseDataString), testPrivateKey).toString("base64");
 
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse({
-        orderId: "ORD-1",
-        trnId: "T1",
-        status: "SUCCESS",
-        signature: responseSignature,
+        status: "OK",
+        statusCode: 200,
+        content: { orderId: "ORD-1", trnId: "T1", status: "SUCCESS", signature: responseSignature },
       }, { ok: true })));
 
     const warnSpy = vi.spyOn(console, "warn");
@@ -200,10 +253,9 @@ describe("fetchKokoOrderStatus — A3 response signature verification", () => {
     setupKokoEnv({ KOKO_PUBLIC_KEY: TEST_PUBLIC_KEY_PEM });
 
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse({
-        orderId: "ORD-1",
-        trnId: "T1",
-        status: "SUCCESS",
-        signature: "AAAA", // bogus signature
+        status: "OK",
+        statusCode: 200,
+        content: { orderId: "ORD-1", trnId: "T1", status: "SUCCESS", signature: "AAAA" /* bogus */ },
       }, { ok: true })));
 
     const warnSpy = vi.spyOn(console, "warn");
@@ -222,10 +274,9 @@ describe("fetchKokoOrderStatus — A3 response signature verification", () => {
     delete process.env.KOKO_PUBLIC_KEY;
 
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse({
-        orderId: "ORD-1",
-        trnId: "T1",
-        status: "SUCCESS",
-        signature: "bogus-but-ignored",
+        status: "OK",
+        statusCode: 200,
+        content: { orderId: "ORD-1", trnId: "T1", status: "SUCCESS", signature: "bogus-but-ignored" },
       }, { ok: true })));
 
     const warnSpy = vi.spyOn(console, "warn");
@@ -301,7 +352,7 @@ describe("fetchKokoOrderStatus — PENDING diagnostics", () => {
   it("reports reason 'status-field-absent' with the envelope shape when no status key exists", async () => {
     setupKokoEnv();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
-      mockResponse({ data: { orderId: "ORD-1", orderStatus: "SUCCESS" } }, { ok: true }),
+      mockResponse({ status: "OK", statusCode: 200, content: { orderId: "ORD-1", orderStatus: "SUCCESS" } }, { ok: true }),
     ));
 
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -310,7 +361,7 @@ describe("fetchKokoOrderStatus — PENDING diagnostics", () => {
     expect(await fetchKokoOrderStatus("ORD-1")).toBe("PENDING");
     const detail = pendingWarn(warnSpy);
     expect(detail?.reason).toBe("status-field-absent");
-    expect(detail?.payloadSource).toBe("json.data");
+    expect(detail?.payloadSource).toBe("json.content");
     // The shape is what identifies a wrong-field-name bug from the logs alone.
     expect(detail?.payloadKeys).toEqual(["orderId", "orderStatus"]);
   });
@@ -318,7 +369,7 @@ describe("fetchKokoOrderStatus — PENDING diagnostics", () => {
   it("reports reason 'status-not-terminal' with the unrecognized token", async () => {
     setupKokoEnv();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
-      mockResponse({ status: "COMPLETED" }, { ok: true }),
+      mockResponse({ status: "OK", statusCode: 200, content: { status: "COMPLETED" } }, { ok: true }),
     ));
 
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
