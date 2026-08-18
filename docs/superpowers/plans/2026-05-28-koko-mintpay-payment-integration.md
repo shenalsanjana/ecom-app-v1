@@ -2056,6 +2056,21 @@ Fast isolation ladder: (1) temporarily set `KOKO_MODE=test` + redeploy to hit `q
 
 **Method note for the future:** Mintpay returns `200 {"message":"Failed","data":"Invalid data format"}` for *validation* errors — so a raw 500 always means an *unhandled* server exception (a value that passed validation then broke view/DB logic), not a contract-shape issue. Reference material lives in `tmp/minit/` (API PDF, Postman collection, official WooCommerce `index.php`). Live mode (`app.mintpay.lk`, merchant `mp2167`) additionally requires the production merchant account be fully activated via the `support@mintpay.lk` onboarding email; if live still 500s after this fix while sandbox succeeds, that activation/provisioning is the remaining suspect.
 
+**SG-5 — Koko orderView response contract VERIFIED IN PRODUCTION (2026-08-18). Closes SG-1 and SG-2.** Symptom: every Koko order sat at `paymentStatus=PENDING` ("awaiting payment") even though the payments had settled in the Koko merchant portal. Root-caused with `scripts/koko-probe.ts` against `prodapi.paykoko.com/api/merchants/orderView` using live credentials, reproduced identically on four real paid orders (WEB0011, WEB0014, WEB0018, WEB0019). The actual response:
+
+```json
+{"status":"OK","statusCode":200,
+ "content":{"trnId":"35a8f41f…","orderId":"ORD-…","status":"SUCCESS","desc":null,"signature":"…"}}
+```
+
+**The envelope carries TWO `status` fields with different meanings.** The top-level `status` is the API-CALL result (`"OK"`); the PAYMENT status is `content.status`. The original parser read `json.data ?? json` — there is no `data` key, so it fell through to the bare envelope and read `"OK"`, which is not a recognized payment token and therefore defaulted to `PENDING`. `finalizePaidPayment` was never reached, and because the success page's poll (`/api/orders/[id]/payment-status`) only reads the database, the order could never recover. Fixed in `app/_lib/payments/koko.ts` by reading `json.content ?? json.data`.
+
+**The bare-envelope fallback was also a live false-positive risk and was removed deliberately.** A regression test pins this: an envelope reporting `status:"SUCCESS"` (call succeeded) for an order whose `content.status` is `PENDING` must NOT finalize — the old code returned `SUCCESS` there and would have marked unpaid orders as PAID. When neither `content` nor `data` is present the function now logs `content-missing` and returns `PENDING`, never guessing from the envelope.
+
+**SG-1 (orderView host) is confirmed correct as written:** live orders created against `prodapi` are viewable on `prodapi.../orderView`. No change needed. **SG-2 (response signature)** is confirmed present: `content.signature` is a base64 RSA-SHA256 signature over `orderId+trnId+status`, verifiable with `KOKO_PUBLIC_KEY`. Note it had never actually executed before this fix — the old code looked for `signature` at the top level, where it does not exist, so the check silently no-opped. It now runs with the correct values and remains non-fail-closed per A3.
+
+**Diagnosis tooling added:** `scripts/koko-probe.ts` (read-only; dumps the raw orderView body and what the parser extracts, layer by layer) and `scripts/koko-backfill.ts` (dry-run by default; promotes only Koko-verified-SUCCESS orders to PAID). `fetchKokoOrderStatus` now logs a `reason` on every PENDING path (`config-error`, `network-error`, `http-not-ok`, `non-json-body`, `content-missing`, `status-field-absent`, `status-not-terminal`) — previously all seven faults were indistinguishable from the database, which is why this took a live probe to find.
+
 ---
 
 ## Self-Review Notes

@@ -192,12 +192,27 @@ export async function fetchKokoOrderStatus(orderId: string): Promise<KokoStatus>
       return "PENDING";
     }
 
-    let json: {
+    type KokoOrderContent = {
       orderId?: string;
       trnId?: string;
       status?: string;
+      desc?: string | null;
       signature?: string;
-      data?: { orderId?: string; trnId?: string; status?: string; signature?: string };
+    };
+    // Koko's orderView envelope carries TWO `status` fields with different
+    // meanings. Verified against prodapi.paykoko.com on 2026-08-18 with four real
+    // paid orders:
+    //   {"status":"OK","statusCode":200,
+    //    "content":{"trnId":"…","orderId":"…","status":"SUCCESS","desc":null,"signature":"…"}}
+    // The top-level `status` is the API-CALL result; the PAYMENT status lives in
+    // `content.status`. Reading the envelope's `status` is what left every Koko
+    // order at "awaiting payment" — "OK" is not a payment token, so it fell
+    // through to PENDING and finalization never ran.
+    let json: {
+      status?: string;
+      statusCode?: number;
+      content?: KokoOrderContent;
+      data?: KokoOrderContent;
     };
     try {
       json = JSON.parse(raw);
@@ -211,7 +226,21 @@ export async function fetchKokoOrderStatus(orderId: string): Promise<KokoStatus>
       return "PENDING";
     }
 
-    const payload = json.data ?? json;
+    // Deliberately NO fallback to the bare envelope. If neither wrapper is
+    // present we cannot see a payment status at all, and reading the envelope's
+    // own `status` would eventually mark an UNPAID order as PAID the moment Koko
+    // reports a successful API call for one. Absent content => PENDING.
+    const payload = json.content ?? json.data;
+    if (!payload) {
+      logKokoPending("content-missing", {
+        orderId,
+        url: cfg.orderViewUrl,
+        topLevelKeys: Object.keys(json),
+        body: raw.slice(0, 500),
+      });
+      return "PENDING";
+    }
+
     const rawStatus = payload.status;
     const status = (rawStatus ?? "PENDING") as string;
 
@@ -239,9 +268,9 @@ export async function fetchKokoOrderStatus(orderId: string): Promise<KokoStatus>
     logKokoPending(rawStatus === undefined ? "status-field-absent" : "status-not-terminal", {
       orderId,
       url: cfg.orderViewUrl,
-      payloadSource: json.data ? "json.data" : "json (flat)",
+      payloadSource: json.content ? "json.content" : "json.data",
       topLevelKeys: Object.keys(json),
-      payloadKeys: Object.keys(payload ?? {}),
+      payloadKeys: Object.keys(payload),
       rawStatus,
       body: raw.slice(0, 500),
     });
