@@ -16,6 +16,25 @@ const PLUGIN_NAME = "customapi";
 const PLUGIN_VERSION = "1";
 const ORDER_VIEW_URL = "https://qaapi.paykoko.com/api/merchants/orderView";
 
+// A faithful `Response` stand-in. `fetchKokoOrderStatus` reads the body with
+// `.text()` and parses it itself (so a non-JSON Koko error page is logged rather
+// than swallowed by a throwing `.json()`), so a mock that only stubs `.json()`
+// does not exercise the real code path.
+function mockResponse(
+  payload: unknown,
+  init: { ok?: boolean; status?: number; contentType?: string } = {},
+) {
+  const body = JSON.stringify(payload);
+  return {
+    ok: init.ok ?? true,
+    status: init.status ?? (init.ok === false ? 500 : 200),
+    headers: { get: () => init.contentType ?? "application/json" },
+    text: async () => body,
+    json: async () => payload,
+  };
+}
+
+
 function setupKokoEnv(extraEnv: Record<string, string> = {}) {
   process.env.KOKO_MERCHANT_ID = MERCHANT_ID;
   process.env.KOKO_API_KEY = API_KEY;
@@ -69,10 +88,7 @@ describe("fetchKokoOrderStatus — request shape", () => {
   it("POSTs to orderViewUrl with correct headers, body fields, and returns SUCCESS", async () => {
     setupKokoEnv();
 
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ orderId: "ORD-1", trnId: "T1", status: "SUCCESS" }),
-    });
+    const mockFetch = vi.fn().mockResolvedValue(mockResponse({ orderId: "ORD-1", trnId: "T1", status: "SUCCESS" }, { ok: true }));
     vi.stubGlobal("fetch", mockFetch);
 
     const { fetchKokoOrderStatus } = await import("../koko");
@@ -112,30 +128,21 @@ describe("fetchKokoOrderStatus — status extraction", () => {
   });
 
   it("extracts status from wrapped response { data: { status } }", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ data: { status: "FAILED" } }),
-    }));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse({ data: { status: "FAILED" } }, { ok: true })));
 
     const { fetchKokoOrderStatus } = await import("../koko");
     expect(await fetchKokoOrderStatus("ORD-2")).toBe("FAILED");
   });
 
   it("extracts status from flat response { status }", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ status: "PENDING" }),
-    }));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse({ status: "PENDING" }, { ok: true })));
 
     const { fetchKokoOrderStatus } = await import("../koko");
     expect(await fetchKokoOrderStatus("ORD-3")).toBe("PENDING");
   });
 
   it("defaults to PENDING when no status field present", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({}),
-    }));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse({}, { ok: true })));
 
     const { fetchKokoOrderStatus } = await import("../koko");
     expect(await fetchKokoOrderStatus("ORD-4")).toBe("PENDING");
@@ -148,11 +155,7 @@ describe("fetchKokoOrderStatus — resilience", () => {
   });
 
   it("returns PENDING when orderView responds non-OK", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: false,
-      status: 502,
-      json: async () => ({}),
-    }));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse({}, { ok: false, status: 502 })));
 
     const { fetchKokoOrderStatus } = await import("../koko");
     await expect(fetchKokoOrderStatus("ORD-1")).resolves.toBe("PENDING");
@@ -174,15 +177,12 @@ describe("fetchKokoOrderStatus — A3 response signature verification", () => {
     const responseDataString = "ORD-1T1SUCCESS";
     const responseSignature = sign("RSA-SHA256", Buffer.from(responseDataString), testPrivateKey).toString("base64");
 
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse({
         orderId: "ORD-1",
         trnId: "T1",
         status: "SUCCESS",
         signature: responseSignature,
-      }),
-    }));
+      }, { ok: true })));
 
     const warnSpy = vi.spyOn(console, "warn");
     const { fetchKokoOrderStatus } = await import("../koko");
@@ -199,15 +199,12 @@ describe("fetchKokoOrderStatus — A3 response signature verification", () => {
   it("warns on signature mismatch but still returns the server status (A3 never fail-closed)", async () => {
     setupKokoEnv({ KOKO_PUBLIC_KEY: TEST_PUBLIC_KEY_PEM });
 
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse({
         orderId: "ORD-1",
         trnId: "T1",
         status: "SUCCESS",
         signature: "AAAA", // bogus signature
-      }),
-    }));
+      }, { ok: true })));
 
     const warnSpy = vi.spyOn(console, "warn");
     const { fetchKokoOrderStatus } = await import("../koko");
@@ -224,15 +221,12 @@ describe("fetchKokoOrderStatus — A3 response signature verification", () => {
     setupKokoEnv(); // no KOKO_PUBLIC_KEY
     delete process.env.KOKO_PUBLIC_KEY;
 
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockResponse({
         orderId: "ORD-1",
         trnId: "T1",
         status: "SUCCESS",
         signature: "bogus-but-ignored",
-      }),
-    }));
+      }, { ok: true })));
 
     const warnSpy = vi.spyOn(console, "warn");
     const { fetchKokoOrderStatus } = await import("../koko");
@@ -243,5 +237,96 @@ describe("fetchKokoOrderStatus — A3 response signature verification", () => {
       String(args[0]).includes("signature mismatch"),
     );
     expect(sigMismatchCalls).toHaveLength(0);
+  });
+});
+
+describe("fetchKokoOrderStatus — PENDING diagnostics", () => {
+  // Every one of these paths returns the same value (PENDING) and therefore leaves
+  // the order at "awaiting payment". The ONLY way to tell them apart in production
+  // is the logged `reason`, so each one is pinned here.
+  function pendingWarn(warnSpy: ReturnType<typeof vi.spyOn>) {
+    return (warnSpy.mock.calls as unknown[][]).find(
+      (args) => String(args[0]) === "[koko] orderView -> PENDING",
+    )?.[1] as Record<string, unknown> | undefined;
+  }
+
+  it("reports reason 'config-error' when required Koko env vars are missing", async () => {
+    setupKokoEnv();
+    delete process.env.KOKO_MERCHANT_ID;
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { fetchKokoOrderStatus } = await import("../koko");
+
+    expect(await fetchKokoOrderStatus("ORD-1")).toBe("PENDING");
+    expect(pendingWarn(warnSpy)?.reason).toBe("config-error");
+  });
+
+  it("reports reason 'http-not-ok' with the response body", async () => {
+    setupKokoEnv();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      mockResponse({ status: "CLIENT_ERROR", statusCode: 400 }, { ok: false, status: 400 }),
+    ));
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { fetchKokoOrderStatus } = await import("../koko");
+
+    expect(await fetchKokoOrderStatus("ORD-1")).toBe("PENDING");
+    const detail = pendingWarn(warnSpy);
+    expect(detail?.reason).toBe("http-not-ok");
+    expect(detail?.httpStatus).toBe(400);
+    expect(String(detail?.body)).toContain("CLIENT_ERROR");
+  });
+
+  it("reports reason 'non-json-body' instead of letting a HTML error page throw", async () => {
+    setupKokoEnv();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => "text/html" },
+      text: async () => "<html><body>Server Error</body></html>",
+      json: async () => {
+        throw new SyntaxError("Unexpected token <");
+      },
+    }));
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { fetchKokoOrderStatus } = await import("../koko");
+
+    expect(await fetchKokoOrderStatus("ORD-1")).toBe("PENDING");
+    const detail = pendingWarn(warnSpy);
+    expect(detail?.reason).toBe("non-json-body");
+    expect(String(detail?.body)).toContain("Server Error");
+  });
+
+  it("reports reason 'status-field-absent' with the envelope shape when no status key exists", async () => {
+    setupKokoEnv();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      mockResponse({ data: { orderId: "ORD-1", orderStatus: "SUCCESS" } }, { ok: true }),
+    ));
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { fetchKokoOrderStatus } = await import("../koko");
+
+    expect(await fetchKokoOrderStatus("ORD-1")).toBe("PENDING");
+    const detail = pendingWarn(warnSpy);
+    expect(detail?.reason).toBe("status-field-absent");
+    expect(detail?.payloadSource).toBe("json.data");
+    // The shape is what identifies a wrong-field-name bug from the logs alone.
+    expect(detail?.payloadKeys).toEqual(["orderId", "orderStatus"]);
+  });
+
+  it("reports reason 'status-not-terminal' with the unrecognized token", async () => {
+    setupKokoEnv();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      mockResponse({ status: "COMPLETED" }, { ok: true }),
+    ));
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { fetchKokoOrderStatus } = await import("../koko");
+
+    expect(await fetchKokoOrderStatus("ORD-1")).toBe("PENDING");
+    const detail = pendingWarn(warnSpy);
+    expect(detail?.reason).toBe("status-not-terminal");
+    expect(detail?.rawStatus).toBe("COMPLETED");
   });
 });

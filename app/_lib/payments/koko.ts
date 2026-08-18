@@ -120,9 +120,32 @@ function verifyKokoResponseSignature(
 
 type KokoStatus = "PENDING" | "SUCCESS" | "FAILED";
 
+// Diagnostic breadcrumb for the PENDING paths. `fetchKokoOrderStatus` deliberately
+// never throws — every failure degrades to PENDING so a transient Koko outage can
+// never mark a real payment as failed. The cost is that six very different faults
+// (missing config, network error, non-2xx, non-JSON body, absent status key,
+// unrecognized status token) all look identical from the database side: the order
+// simply sits at "awaiting payment" forever. This logs WHICH one happened.
+// Never logs credentials, signatures, or customer data — only shapes and tokens.
+function logKokoPending(reason: string, detail: Record<string, unknown>) {
+  console.warn("[koko] orderView -> PENDING", { reason, ...detail });
+}
+
 export async function fetchKokoOrderStatus(orderId: string): Promise<KokoStatus> {
+  let cfg: ReturnType<typeof getKokoConfig>;
   try {
-    const cfg = getKokoConfig();
+    cfg = getKokoConfig();
+  } catch (err) {
+    // Distinguished from a network failure: this is a deployment/config fault and
+    // would silently strand 100% of Koko orders at "awaiting payment".
+    logKokoPending("config-error", {
+      orderId,
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return "PENDING";
+  }
+
+  try {
     const body = new URLSearchParams({
       _mId: cfg.merchantId,
       _pluginName: cfg.pluginName,
@@ -139,26 +162,58 @@ export async function fetchKokoOrderStatus(orderId: string): Promise<KokoStatus>
       }),
     });
 
-    const response = await fetch(cfg.orderViewUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
-    });
-
-    if (!response.ok) {
-      console.warn("[koko] orderView returned non-OK", { orderId, status: response.status });
+    let response: Response;
+    try {
+      response = await fetch(cfg.orderViewUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+      });
+    } catch (err) {
+      logKokoPending("network-error", {
+        orderId,
+        url: cfg.orderViewUrl,
+        message: err instanceof Error ? err.message : String(err),
+      });
       return "PENDING";
     }
 
-    const json = (await response.json()) as {
+    // Read as text first: a non-JSON error page (HTML/plain) would otherwise make
+    // response.json() throw and hide the actual Koko error message.
+    const raw = await response.text();
+
+    if (!response.ok) {
+      logKokoPending("http-not-ok", {
+        orderId,
+        url: cfg.orderViewUrl,
+        httpStatus: response.status,
+        body: raw.slice(0, 500),
+      });
+      return "PENDING";
+    }
+
+    let json: {
       orderId?: string;
       trnId?: string;
       status?: string;
       signature?: string;
       data?: { orderId?: string; trnId?: string; status?: string; signature?: string };
     };
+    try {
+      json = JSON.parse(raw);
+    } catch {
+      logKokoPending("non-json-body", {
+        orderId,
+        url: cfg.orderViewUrl,
+        contentType: response.headers.get("content-type"),
+        body: raw.slice(0, 500),
+      });
+      return "PENDING";
+    }
+
     const payload = json.data ?? json;
-    const status = (payload.status ?? "PENDING") as string;
+    const rawStatus = payload.status;
+    const status = (rawStatus ?? "PENDING") as string;
 
     // A3: verify-when-present, never fail-closed.
     if (cfg.publicKey && payload.signature) {
@@ -174,10 +229,28 @@ export async function fetchKokoOrderStatus(orderId: string): Promise<KokoStatus>
       }
     }
 
-    if (status === "SUCCESS" || status === "FAILED" || status === "PENDING") return status;
+    if (status === "SUCCESS" || status === "FAILED") return status;
+
+    // Everything below stays PENDING. Record enough of the envelope SHAPE to tell
+    // "Koko really says pending" apart from "we are reading the wrong field".
+    // SG-1/SG-2 in docs/superpowers/plans/2026-05-28-koko-mintpay-payment-integration.md
+    // were never closed against a real successful payment, so the field that
+    // actually carries the payment status is still unconfirmed.
+    logKokoPending(rawStatus === undefined ? "status-field-absent" : "status-not-terminal", {
+      orderId,
+      url: cfg.orderViewUrl,
+      payloadSource: json.data ? "json.data" : "json (flat)",
+      topLevelKeys: Object.keys(json),
+      payloadKeys: Object.keys(payload ?? {}),
+      rawStatus,
+      body: raw.slice(0, 500),
+    });
     return "PENDING";
   } catch (err) {
-    console.warn("[koko] orderView lookup failed", { orderId, err });
+    logKokoPending("unexpected-error", {
+      orderId,
+      message: err instanceof Error ? err.message : String(err),
+    });
     return "PENDING";
   }
 }
