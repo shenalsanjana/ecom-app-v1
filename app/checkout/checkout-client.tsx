@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { formatPrice } from "@/app/_lib/format";
-import { calculateDelivery } from "@/app/_lib/checkout-config";
+import { calculateDelivery, isFreeDeliveryEligible } from "@/app/_lib/checkout-config";
 import { useDeliveryConfig } from "@/app/_components/delivery/delivery-config-provider";
 import { zoneForCity } from "@/app/_lib/delivery-zones";
 import { CityCombobox, type CityGroup } from "@/components/ui/city-combobox";
@@ -83,7 +83,7 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
   const deliveryConfig = useDeliveryConfig();
   const { freeThreshold: FREE_DELIVERY_THRESHOLD } = deliveryConfig;
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const shipping = calculateDelivery(subtotal, zoneForCity(address.city ?? ""), deliveryConfig);
+  const shipping = calculateDelivery(subtotal, zoneForCity(address.city ?? ""), deliveryConfig, paymentMethod);
   const total = subtotal + shipping;
 
   // Fire InitiateCheckout once, when the checkout form first has items. Guarded
@@ -565,11 +565,16 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
 
                   <InstallmentNote total={total} className="mt-3 text-center" />
 
-                  {subtotal >= FREE_DELIVERY_THRESHOLD && (
-                    <p className="mt-2 text-sm text-brand font-medium">
-                      You qualify for free delivery!
-                    </p>
-                  )}
+                  {subtotal >= FREE_DELIVERY_THRESHOLD &&
+                    (isFreeDeliveryEligible(paymentMethod) ? (
+                      <p className="mt-2 text-sm text-brand font-medium">
+                        You qualify for free delivery!
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Free delivery is not available with {paymentOptions.find((o) => o.id === paymentMethod)?.name ?? paymentMethod}.
+                      </p>
+                    ))}
 
                   {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 

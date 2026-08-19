@@ -192,7 +192,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
 
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const deliveryConfig = await getDeliveryConfig();
-  const shippingCost = calculateDelivery(subtotal, zoneForCity(shippingAddress.city), deliveryConfig);
+  const shippingCost = calculateDelivery(subtotal, zoneForCity(shippingAddress.city), deliveryConfig, paymentMethod);
   const total = subtotal + shippingCost;
   const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 

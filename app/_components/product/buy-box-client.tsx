@@ -13,6 +13,7 @@ import { InstallmentNote } from "@/app/_components/shared/installment-note";
 import { ColorSwatches, type SwatchOption } from "@/app/_components/product/color-swatches";
 import { useWishlist } from "@/app/_lib/wishlist-context";
 import { formatPrice } from "@/app/_lib/format";
+import { freeDeliveryExclusionNote } from "@/app/_lib/free-delivery-note";
 import { useDeliveryConfig } from "@/app/_components/delivery/delivery-config-provider";
 import { trackViewContent, trackAddToCart } from "@/app/_lib/meta-pixel";
 import { useCart } from "@/app/_lib/cart-context";
@@ -255,7 +256,7 @@ export function BuyBoxClient({
       </div>
 
       <ul className="flex flex-wrap gap-x-5 gap-y-2 border-t border-border pt-4 text-xs text-muted-foreground">
-        <li className="flex items-center gap-1.5"><Truck className="h-4 w-4" aria-hidden /> {FREE_DELIVERY_THRESHOLD > 0 ? `Free shipping over ${formatPrice(FREE_DELIVERY_THRESHOLD)}` : "Free shipping for all products"}</li>
+        <li className="flex items-center gap-1.5"><Truck className="h-4 w-4" aria-hidden /> {FREE_DELIVERY_THRESHOLD > 0 ? `Free shipping over ${formatPrice(FREE_DELIVERY_THRESHOLD)} (${freeDeliveryExclusionNote()})` : `Free shipping for all products (${freeDeliveryExclusionNote()})`}</li>
         <li className="flex items-center gap-1.5"><RotateCcw className="h-4 w-4" aria-hidden /> Free 14-day returns</li>
         <li className="flex items-center gap-1.5"><ShieldCheck className="h-4 w-4" aria-hidden /> Secure checkout</li>
       </ul>

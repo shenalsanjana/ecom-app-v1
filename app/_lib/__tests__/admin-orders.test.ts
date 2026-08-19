@@ -214,3 +214,34 @@ describe("courierBookedError", () => {
     expect(courierBookedError({ courierBookedAt: null })).toBeNull();
   });
 });
+
+import { recomputeTotals as recomputeTotalsForExclusion } from "../admin-orders";
+import { DEFAULT_DELIVERY_CONFIG } from "../checkout-config";
+
+describe("recomputeTotals — free delivery excluded for Koko/Mintpay", () => {
+  // Admin edits recompute shipping from scratch. Without the payment method the
+  // recompute would hand a Koko order free delivery that checkout correctly
+  // charged for, silently changing what the customer owes.
+  const qualifyingItems = [{ price: 4000, quantity: 2 }]; // 8000, clears 5000
+
+  it.each(["KOKO", "MINTPAY"] as const)("%s keeps its delivery charge on recompute", (method) => {
+    const totals = recomputeTotalsForExclusion(qualifyingItems, "Colombo", DEFAULT_DELIVERY_CONFIG, [], method);
+
+    expect(totals.subtotal).toBe(8000);
+    expect(totals.shippingCost).toBe(350);
+    expect(totals.total).toBe(8350);
+  });
+
+  it.each(["COD", "PAYHERE"] as const)("%s still recomputes to free delivery", (method) => {
+    const totals = recomputeTotalsForExclusion(qualifyingItems, "Colombo", DEFAULT_DELIVERY_CONFIG, [], method);
+
+    expect(totals.shippingCost).toBe(0);
+    expect(totals.total).toBe(8000);
+  });
+
+  it("is unchanged when no payment method is passed", () => {
+    const totals = recomputeTotalsForExclusion(qualifyingItems, "Colombo", DEFAULT_DELIVERY_CONFIG, []);
+
+    expect(totals.shippingCost).toBe(0);
+  });
+});

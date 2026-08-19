@@ -467,3 +467,37 @@ describe("processOrder — error surface", () => {
     expect(logged).toMatch(/connection terminated/);
   });
 });
+
+describe("processOrder — free delivery excluded for Koko/Mintpay", () => {
+  // The server action decides what the customer is actually charged, so the
+  // exclusion has to hold here regardless of what any client preview showed.
+  // baseInput is 2 x 1200 = 2400, below the 5000 threshold, so bump the price
+  // to clear it.
+  const qualifyingCart = {
+    ...baseInput,
+    items: [{ ...baseInput.items[0], price: 4000, quantity: 2 }], // 8000 subtotal
+  };
+
+  it.each(["KOKO", "MINTPAY"] as const)(
+    "%s is charged delivery even on a cart that clears the free-delivery threshold",
+    async (paymentMethod) => {
+      await processOrder({ ...qualifyingCart, paymentMethod });
+
+      expect(txOrderCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ subtotal: 8000, shippingCost: 350, total: 8350 }),
+        }),
+      );
+    },
+  );
+
+  it.each(["COD", "PAYHERE"] as const)("%s still gets free delivery on the same cart", async (paymentMethod) => {
+    await processOrder({ ...qualifyingCart, paymentMethod });
+
+    expect(txOrderCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ subtotal: 8000, shippingCost: 0, total: 8000 }),
+      }),
+    );
+  });
+});
