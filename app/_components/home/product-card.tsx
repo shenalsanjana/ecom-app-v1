@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Zap } from "lucide-react";
+import { Clock, Zap } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { AddToCartDialog } from "@/app/_components/cart/add-to-cart-dialog";
@@ -27,7 +27,7 @@ export function ProductCard({
   fromPath?: string;
   showEyebrow?: boolean;
 }) {
-  const { id, name, rating, reviewCount, category, variants, defaultColorSlug } = product;
+  const { id, name, rating, reviewCount, category, variants, defaultColorSlug, badge, lowStock } = product;
   const [selectedColor, setSelectedColor] = useState(defaultColorSlug);
   const variant = variants.find((v) => v.colorSlug === selectedColor) ?? variants[0];
 
@@ -59,6 +59,11 @@ export function ProductCard({
         <div className="absolute right-2 top-2 z-10">
           <WishlistHeart productId={id} fromPath={fromPath} />
         </div>
+        {badge && (
+          <span className="absolute bottom-3 left-3 z-10 rounded-full bg-primary px-[9px] py-1 text-[10px] font-semibold uppercase tracking-[0.05em] text-primary-foreground">
+            {badge}
+          </span>
+        )}
       </div>
       <CardContent className="flex flex-col gap-1.5 p-4">
         {showEyebrow && category && <Eyebrow>{prettifyCategory(category)}</Eyebrow>}
@@ -66,6 +71,12 @@ export function ProductCard({
           <Link href={href} className="hover:underline underline-offset-4">{name}</Link>
         </h3>
         <Rating rating={rating} reviewCount={reviewCount} />
+        {lowStock != null && (
+          <p className="flex items-center gap-1 text-xs font-semibold text-brand">
+            <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Only {lowStock} left
+          </p>
+        )}
         <ColorSwatches options={swatchOptions} selected={selectedColor} onSelect={setSelectedColor} />
         <Price price={price} originalPrice={originalPrice} />
       </CardContent>
