@@ -4,6 +4,7 @@ import { unstable_cache } from "next/cache";
 import { prisma } from "@/app/_lib/prisma";
 import type { Category, Prisma, Product, Review } from "@prisma/client";
 import { effectivePrice, effectiveOriginalPrice, availableSizes, sortSizeStocks, buildPlainStockMap, buildDesignStockMap } from "@/app/_lib/variants";
+import { unitsForVariant, lowStockSignal, pickBestsellers, BESTSELLER_COUNT } from "@/app/_lib/product-signals";
 
 export type ProductCardVariant = {
   id: string;
@@ -24,6 +25,11 @@ export type ProductView = {
   category: string;
   defaultColorSlug: string;
   variants: ProductCardVariant[];
+  // Display-only conversion signals, populated only by the home-page readers
+  // (getFeaturedProducts / getDealsProducts) via attachAggregates'
+  // `withSignals` option. Never used in pricing, cart or checkout logic.
+  badge?: "Bestseller";
+  lowStock?: number;
 };
 
 export type CategoryView = {
@@ -55,12 +61,15 @@ type ProductRow = Prisma.ProductGetPayload<{ select: typeof cardSelect }>;
 // `const cardSelect = Prisma.validator<Prisma.ProductSelect>()({ ...same... });`
 // and keep the `ProductGetPayload<{ select: typeof cardSelect }>` line as-is.
 
-async function attachAggregates(rows: ProductRow[]): Promise<ProductView[]> {
+async function attachAggregates(
+  rows: ProductRow[],
+  { withSignals = false }: { withSignals?: boolean } = {},
+): Promise<ProductView[]> {
   // A design with no active variants can't be carded; drop it.
   const usable = rows.filter((r) => r.variants.length > 0);
   if (usable.length === 0) return [];
   const ids = usable.map((r) => r.id);
-  const [grouped, plainStockRows, designStockRows] = await Promise.all([
+  const [grouped, plainStockRows, designStockRows, soldRows] = await Promise.all([
     prisma.review.groupBy({
       by: ["productId"],
       where: { productId: { in: ids }, approved: true },
@@ -69,9 +78,28 @@ async function attachAggregates(rows: ProductRow[]): Promise<ProductView[]> {
     }),
     prisma.plainTshirtStock.findMany({ select: { id: true, colorSlug: true, size: true, quantity: true } }),
     prisma.dtfDesign.findMany({ select: { id: true, quantity: true } }),
+    withSignals
+      ? prisma.orderItem.groupBy({
+          by: ["productId"],
+          where: {
+            productId: { in: ids },
+            order: { paymentStatus: { in: ["PAID", "COD_COLLECTED"] } },
+          },
+          _sum: { quantity: true },
+        })
+      : Promise.resolve([]),
   ]);
   const plainStock = buildPlainStockMap(plainStockRows);
   const designStock = buildDesignStockMap(designStockRows);
+  const bestsellers = withSignals
+    ? pickBestsellers(
+        soldRows.map((r) => ({
+          productId: r.productId as string,
+          units: r._sum.quantity ?? 0,
+        })),
+        BESTSELLER_COUNT,
+      )
+    : new Set<string>();
   const map = new Map(
     grouped.map((g) => [g.productId, { avg: g._avg.rating ?? 0, count: g._count._all }]),
   );
@@ -87,6 +115,18 @@ async function attachAggregates(rows: ProductRow[]): Promise<ProductView[]> {
       cardImages: v.images.map((im) => im.url),
       sizes: availableSizes(sortSizeStocks(v.sizeStocks), v.colorSlug, p.dtfDesignId, plainStock, designStock),
     }));
+    const defaultVariant = p.variants[0];
+    const units = withSignals
+      ? unitsForVariant(
+          defaultVariant.sizeStocks,
+          defaultVariant.colorSlug,
+          p.dtfDesignId,
+          plainStock,
+          designStock,
+        )
+      : 0;
+    const lowStock = withSignals ? lowStockSignal(units) : undefined;
+    const badge = bestsellers.has(p.id) ? ("Bestseller" as const) : undefined;
     return {
       id: p.id,
       name: p.name,
@@ -95,6 +135,8 @@ async function attachAggregates(rows: ProductRow[]): Promise<ProductView[]> {
       category: p.categorySlug,
       defaultColorSlug: variants[0].colorSlug,
       variants,
+      ...(badge ? { badge } : {}),
+      ...(lowStock != null ? { lowStock } : {}),
     };
   });
 }
@@ -121,7 +163,7 @@ export const getFeaturedProducts = unstable_cache(
       take: limit,
       select: cardSelect,
     });
-    return attachAggregates(rows);
+    return attachAggregates(rows, { withSignals: true });
   },
   ["featured-products"],
   { tags: ["catalog", "featured"], revalidate: 300 }
@@ -135,7 +177,7 @@ export const getDealsProducts = unstable_cache(
       take: limit,
       select: cardSelect,
     });
-    return attachAggregates(rows);
+    return attachAggregates(rows, { withSignals: true });
   },
   ["deals-products"],
   { tags: ["catalog", "deals"], revalidate: 120 }

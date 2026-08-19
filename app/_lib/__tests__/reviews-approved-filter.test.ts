@@ -5,7 +5,7 @@ vi.mock("next/cache", () => ({
 }));
 
 const {
-  reviewGroupBy, reviewAggregate, reviewFindMany, productFindUnique, productFindMany, plainFindMany, designFindMany,
+  reviewGroupBy, reviewAggregate, reviewFindMany, productFindUnique, productFindMany, plainFindMany, designFindMany, orderItemGroupBy,
 } = vi.hoisted(() => ({
   reviewGroupBy: vi.fn(),
   reviewAggregate: vi.fn(),
@@ -14,6 +14,7 @@ const {
   productFindMany: vi.fn(),
   plainFindMany: vi.fn(),
   designFindMany: vi.fn(),
+  orderItemGroupBy: vi.fn(),
 }));
 
 vi.mock("@/app/_lib/prisma", () => ({
@@ -22,6 +23,7 @@ vi.mock("@/app/_lib/prisma", () => ({
     product: { findUnique: productFindUnique, findMany: productFindMany },
     plainTshirtStock: { findMany: plainFindMany },
     dtfDesign: { findMany: designFindMany },
+    orderItem: { groupBy: orderItemGroupBy },
   },
 }));
 
@@ -35,6 +37,7 @@ beforeEach(() => {
   reviewFindMany.mockReset().mockResolvedValue([]);
   plainFindMany.mockReset().mockResolvedValue([]);
   designFindMany.mockReset().mockResolvedValue([]);
+  orderItemGroupBy.mockReset().mockResolvedValue([]);
   productFindUnique.mockReset().mockResolvedValue({
     id: "cat-white", name: "Cat", price: 2190, originalPrice: null,
     description: "d", categorySlug: "cat", archived: false, dtfDesignId: "d1",
