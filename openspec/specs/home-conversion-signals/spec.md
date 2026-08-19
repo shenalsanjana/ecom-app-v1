@@ -1,4 +1,14 @@
-## ADDED Requirements
+# home-conversion-signals
+
+## Purpose
+
+Defines the conversion-oriented presentation of the storefront home page: the scrolling
+announcement marquee, the social-proof strip, the deals countdown, the category tiles, and
+the display-only scarcity and bestseller signals on product cards — including the rule that
+those signals derive from real system data rather than fixed values, and the rule that they
+are scoped to the home page.
+
+## Requirements
 
 ### Requirement: Announcement marquee
 
