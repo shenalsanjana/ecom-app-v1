@@ -5,12 +5,26 @@
 // These are display metadata only: nothing here participates in pricing, cart,
 // or checkout logic. Both signals are derived from real data on purpose — a
 // hardcoded "Only 4 left" would be fabricated scarcity shown to real customers.
-import { stockForSize, type PlainStockMap, type DesignStockMap } from "@/app/_lib/variants";
+import {
+  designAvailable,
+  plainStockKey,
+  type PlainStockMap,
+  type DesignStockMap,
+} from "@/app/_lib/variants";
 
 export const LOW_STOCK_THRESHOLD = 6;
 export const BESTSELLER_COUNT = 3;
 
-/** Total fulfillable units for one color, summed across its sizes. */
+/**
+ * Total fulfillable units for one color, across all its sizes.
+ *
+ * Every finished tee consumes one blank AND one print from a SINGLE SHARED
+ * design pool (see `stockForSize` in variants.ts). Summing per-size minima
+ * against that shared pool would count the same design units once per size,
+ * overstating stock. The true total is capped once, at the colour level:
+ * min(designQty, sum of plain blanks across sizes) — zero when there is no
+ * design or the design pool is empty.
+ */
 export function unitsForVariant(
   sizes: { size: string }[],
   colorSlug: string,
@@ -18,11 +32,13 @@ export function unitsForVariant(
   plainStock: PlainStockMap,
   designStock: DesignStockMap,
 ): number {
-  return sizes.reduce(
-    (sum, s) =>
-      sum + stockForSize(colorSlug, s.size, dtfDesignId, plainStock, designStock),
+  if (!designAvailable(dtfDesignId, designStock)) return 0;
+  const designQty = designStock.get(dtfDesignId as string) ?? 0;
+  const totalPlain = sizes.reduce(
+    (sum, s) => sum + (plainStock.get(plainStockKey(colorSlug, s.size))?.quantity ?? 0),
     0,
   );
+  return Math.min(designQty, totalPlain);
 }
 
 /**

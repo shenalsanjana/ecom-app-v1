@@ -29,11 +29,18 @@ describe("unitsForVariant", () => {
     expect(unitsForVariant(SIZES, "white", "d1", plainStock, designStock)).toBe(6);
   });
 
-  it("is capped per size by the shared design pool", () => {
-    // Each size has 10 plain blanks but the design only has 1 print left, so
-    // every size is min(10, 1) = 1.
+  it("is capped by the shared design pool across the whole colour, not per size", () => {
+    // 3 sizes x 10 plain blanks each = 30 blanks, but the design pool has
+    // only 1 print left. Every finished tee consumes one blank AND one print
+    // from that single shared pool, so the true total is min(30, 1) = 1 —
+    // not 1 per size (which would triple-count the one available print).
     const { plainStock, designStock } = maps(10, 1);
-    expect(unitsForVariant(SIZES, "white", "d1", plainStock, designStock)).toBe(3);
+    expect(unitsForVariant(SIZES, "white", "d1", plainStock, designStock)).toBe(1);
+  });
+
+  it("pins the pool cap explicitly: plenty of blanks, design qty 2 -> 2", () => {
+    const { plainStock, designStock } = maps(10, 2);
+    expect(unitsForVariant(SIZES, "white", "d1", plainStock, designStock)).toBe(2);
   });
 
   it("is zero when the design is exhausted", () => {
