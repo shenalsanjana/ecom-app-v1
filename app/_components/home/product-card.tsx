@@ -27,9 +27,10 @@ export function ProductCard({
   fromPath?: string;
   showEyebrow?: boolean;
 }) {
-  const { id, name, rating, reviewCount, category, variants, defaultColorSlug, badge, lowStock } = product;
+  const { id, name, rating, reviewCount, category, variants, defaultColorSlug, badge } = product;
   const [selectedColor, setSelectedColor] = useState(defaultColorSlug);
   const variant = variants.find((v) => v.colorSlug === selectedColor) ?? variants[0];
+  const lowStock = variant.lowStock;
 
   const price = variant.price;
   const originalPrice = variant.originalPrice;

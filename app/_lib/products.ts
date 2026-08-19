@@ -15,6 +15,10 @@ export type ProductCardVariant = {
   originalPrice: number | null;
   cardImages: string[];        // sorted CARD urls
   sizes: string[];             // in-stock sizes for this color
+  // Display-only conversion signal, populated only by the home-page readers
+  // (getFeaturedProducts / getDealsProducts) via attachAggregates'
+  // `withSignals` option. Never used in pricing, cart or checkout logic.
+  lowStock?: number;
 };
 
 export type ProductView = {
@@ -25,11 +29,12 @@ export type ProductView = {
   category: string;
   defaultColorSlug: string;
   variants: ProductCardVariant[];
-  // Display-only conversion signals, populated only by the home-page readers
+  // Display-only conversion signal, populated only by the home-page readers
   // (getFeaturedProducts / getDealsProducts) via attachAggregates'
-  // `withSignals` option. Never used in pricing, cart or checkout logic.
+  // `withSignals` option. Never used in pricing, cart or checkout logic. This
+  // is a product-level fact (unlike lowStock, which is per-colour and lives
+  // on ProductCardVariant).
   badge?: "Bestseller";
-  lowStock?: number;
 };
 
 export type CategoryView = {
@@ -87,16 +92,18 @@ async function attachAggregates(
           },
           _sum: { quantity: true },
         })
-      : Promise.resolve([]),
+      : Promise.resolve([] as { productId: string | null; _sum: { quantity: number | null } }[]),
   ]);
   const plainStock = buildPlainStockMap(plainStockRows);
   const designStock = buildDesignStockMap(designStockRows);
   const bestsellers = withSignals
     ? pickBestsellers(
-        soldRows.map((r) => ({
-          productId: r.productId as string,
-          units: r._sum.quantity ?? 0,
-        })),
+        soldRows
+          .filter((r): r is typeof r & { productId: string } => r.productId != null)
+          .map((r) => ({
+            productId: r.productId,
+            units: r._sum.quantity ?? 0,
+          })),
         BESTSELLER_COUNT,
       )
     : new Set<string>();
@@ -105,27 +112,24 @@ async function attachAggregates(
   );
   return usable.map((p) => {
     const agg = map.get(p.id) ?? { avg: 0, count: 0 };
-    const variants: ProductCardVariant[] = p.variants.map((v) => ({
-      id: v.id,
-      colorSlug: v.colorSlug,
-      color: v.color,
-      swatchHex: v.swatchHex,
-      price: effectivePrice(v, p),
-      originalPrice: effectiveOriginalPrice(v, p),
-      cardImages: v.images.map((im) => im.url),
-      sizes: availableSizes(sortSizeStocks(v.sizeStocks), v.colorSlug, p.dtfDesignId, plainStock, designStock),
-    }));
-    const defaultVariant = p.variants[0];
-    const units = withSignals
-      ? unitsForVariant(
-          defaultVariant.sizeStocks,
-          defaultVariant.colorSlug,
-          p.dtfDesignId,
-          plainStock,
-          designStock,
-        )
-      : 0;
-    const lowStock = withSignals ? lowStockSignal(units) : undefined;
+    const variants: ProductCardVariant[] = p.variants.map((v) => {
+      const lowStock = withSignals
+        ? lowStockSignal(
+            unitsForVariant(v.sizeStocks, v.colorSlug, p.dtfDesignId, plainStock, designStock),
+          )
+        : undefined;
+      return {
+        id: v.id,
+        colorSlug: v.colorSlug,
+        color: v.color,
+        swatchHex: v.swatchHex,
+        price: effectivePrice(v, p),
+        originalPrice: effectiveOriginalPrice(v, p),
+        cardImages: v.images.map((im) => im.url),
+        sizes: availableSizes(sortSizeStocks(v.sizeStocks), v.colorSlug, p.dtfDesignId, plainStock, designStock),
+        ...(lowStock != null ? { lowStock } : {}),
+      };
+    });
     const badge = bestsellers.has(p.id) ? ("Bestseller" as const) : undefined;
     return {
       id: p.id,
@@ -136,7 +140,6 @@ async function attachAggregates(
       defaultColorSlug: variants[0].colorSlug,
       variants,
       ...(badge ? { badge } : {}),
-      ...(lowStock != null ? { lowStock } : {}),
     };
   });
 }
