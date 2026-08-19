@@ -71,9 +71,13 @@ export function recomputeTotals(
   city: string,
   config: DeliveryConfig = DEFAULT_DELIVERY_CONFIG,
   adjustments: { amount: number }[] = [],
+  // Pass the order's method: Koko/Mintpay never get free delivery, and an edit
+  // that recomputed without it would silently hand the order free shipping that
+  // checkout had correctly charged for.
+  paymentMethod?: string | null,
 ): { subtotal: number; shippingCost: number; total: number } {
   const subtotal = items.reduce((s, it) => s + it.price * it.quantity, 0);
-  const shippingCost = calculateDelivery(subtotal, zoneForCity(city), config);
+  const shippingCost = calculateDelivery(subtotal, zoneForCity(city), config, paymentMethod);
   const adjustmentTotal = adjustments.reduce((s, a) => s + a.amount, 0);
   const total = Math.max(0, subtotal + shippingCost + adjustmentTotal);
   return { subtotal, shippingCost, total };

@@ -149,7 +149,7 @@ export async function editAddress(
   if (!order) return { success: false, error: "Order not found" };
   if (order.courierBookedAt) return { success: false, error: "Address already sent to Curfox — cancel/rebook there." };
 
-  const totals = recomputeTotals(order.items, parsed.data.city, await getDeliveryConfig(), order.adjustments);
+  const totals = recomputeTotals(order.items, parsed.data.city, await getDeliveryConfig(), order.adjustments, order.paymentMethod);
   try {
     await prisma.order.update({
       where: { id: orderId },
@@ -213,7 +213,7 @@ export async function editItems(orderId: string, changes: ItemChange[]): Promise
     return { success: false, error: e instanceof Error ? e.message : "Invalid change" };
   }
 
-  const totals = recomputeTotals(next.nextItems, order.shippingCity, await getDeliveryConfig(), order.adjustments);
+  const totals = recomputeTotals(next.nextItems, order.shippingCity, await getDeliveryConfig(), order.adjustments, order.paymentMethod);
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -284,7 +284,7 @@ export async function addAdjustment(
   if (courierError) return { success: false, error: courierError };
 
   const amount = signedAdjustmentAmount(parsed.data.kind, parsed.data.amount);
-  const totals = recomputeTotals(order.items, order.shippingCity, await getDeliveryConfig(), [...order.adjustments, { amount }]);
+  const totals = recomputeTotals(order.items, order.shippingCity, await getDeliveryConfig(), [...order.adjustments, { amount }], order.paymentMethod);
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -314,7 +314,7 @@ export async function removeAdjustment(orderId: string, adjustmentId: string): P
   const target = order.adjustments.find((a) => a.id === adjustmentId);
   if (!target) return { success: false, error: "Adjustment not found" };
   const remaining = order.adjustments.filter((a) => a.id !== adjustmentId);
-  const totals = recomputeTotals(order.items, order.shippingCity, await getDeliveryConfig(), remaining);
+  const totals = recomputeTotals(order.items, order.shippingCity, await getDeliveryConfig(), remaining, order.paymentMethod);
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -453,6 +453,7 @@ export async function addOrderItem(
     order.shippingCity,
     await getDeliveryConfig(),
     order.adjustments,
+    order.paymentMethod,
   );
 
   try {
@@ -523,7 +524,7 @@ export async function swapOrderItem(
     : null;
   const price = effectivePrice({ price: resolved.variantPrice }, { price: resolved.productPrice });
   const nextItems = order.items.map((i) => (i.id === itemId ? { price, quantity: parsed.data.quantity } : i));
-  const totals = recomputeTotals(nextItems, order.shippingCity, await getDeliveryConfig(), order.adjustments);
+  const totals = recomputeTotals(nextItems, order.shippingCity, await getDeliveryConfig(), order.adjustments, order.paymentMethod);
 
   try {
     await prisma.$transaction(async (tx) => {

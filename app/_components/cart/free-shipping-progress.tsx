@@ -2,6 +2,7 @@
 
 import { Truck } from "lucide-react";
 import { formatPrice } from "@/app/_lib/format";
+import { freeDeliveryExclusionNote } from "@/app/_lib/free-delivery-note";
 import { useDeliveryConfig } from "@/app/_components/delivery/delivery-config-provider";
 
 type Props = { subtotal: number };
@@ -29,7 +30,10 @@ export function FreeShippingProgress({ subtotal }: Props) {
     return (
       <div className="mb-4 flex items-center gap-2 rounded-md bg-brand px-3 py-2 text-sm font-medium text-brand-foreground transition-opacity duration-(--duration-slow) ease-(--ease-out)">
         <Truck className="h-4 w-4 shrink-0" aria-hidden />
-        You qualify for free delivery!
+        <span>
+          You qualify for free delivery!{" "}
+          <span className="font-normal opacity-90">({freeDeliveryExclusionNote()})</span>
+        </span>
       </div>
     );
   }
@@ -50,7 +54,7 @@ export function FreeShippingProgress({ subtotal }: Props) {
         >
           {formatPrice(remaining)}
         </span>{" "}
-        more for free delivery
+        more for free delivery ({freeDeliveryExclusionNote()})
       </p>
       <div
         className="h-1.5 w-full overflow-hidden rounded-full bg-muted"

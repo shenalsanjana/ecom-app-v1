@@ -1,5 +1,6 @@
 // app/_components/shared/announcement-bar.tsx
 import { formatPrice } from "@/app/_lib/format";
+import { freeDeliveryExclusionNote } from "@/app/_lib/free-delivery-note";
 
 // Site-wide promo strip: free-shipping threshold + "pay in 3".
 // Scrolls away above the sticky header. Static (not dismissible) by design.
@@ -15,10 +16,14 @@ export function AnnouncementBar({ freeThreshold }: { freeThreshold: number }) {
         {freeThreshold > 0 ? (
           <>
             Free shipping over{" "}
-            <span className="font-medium">{formatPrice(freeThreshold)}</span>
+            <span className="font-medium">{formatPrice(freeThreshold)}</span>{" "}
+            <span className="opacity-80">({freeDeliveryExclusionNote()})</span>
           </>
         ) : (
-          <span className="font-medium">Free shipping for all products</span>
+          <>
+            <span className="font-medium">Free shipping for all products</span>{" "}
+            <span className="opacity-80">({freeDeliveryExclusionNote()})</span>
+          </>
         )}
         {"  ·  "}Pay in 3 interest-free with{" "}
         {kokoEnabled && (
