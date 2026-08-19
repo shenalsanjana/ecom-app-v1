@@ -38,7 +38,7 @@ describe("tintForSlug", () => {
         tintForSlug,
       ),
     );
-    expect(picked.size).toBeGreaterThan(1);
+    expect(picked.size).toBeGreaterThanOrEqual(3);
   });
 
   it("never returns an empty string", () => {
