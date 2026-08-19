@@ -13,13 +13,24 @@
 // inlines them at build time by exact textual match, so they must not be hoisted
 // into a variable or accessed dynamically.
 
+/** Pure form: names of the excluded methods, given the Koko flag. */
+export function excludedMethodNamesFor(kokoEnabled: boolean): string {
+  return kokoEnabled ? "Koko & Mintpay" : "Mintpay";
+}
+
+/** Pure form: short parenthetical for use beside free-delivery copy. */
+export function freeDeliveryExclusionNoteFor(kokoEnabled: boolean): string {
+  return `excludes ${excludedMethodNamesFor(kokoEnabled)}`;
+}
+
 /** Names of the excluded methods currently advertised, e.g. "Koko & Mintpay". */
 export function excludedMethodNames(): string {
-  const kokoEnabled = process.env.NEXT_PUBLIC_KOKO_ENABLED === "true";
-  return kokoEnabled ? "Koko & Mintpay" : "Mintpay";
+  return excludedMethodNamesFor(process.env.NEXT_PUBLIC_KOKO_ENABLED === "true");
 }
 
 /** Short parenthetical for use beside free-delivery copy. */
 export function freeDeliveryExclusionNote(): string {
-  return `excludes ${excludedMethodNames()}`;
+  return freeDeliveryExclusionNoteFor(
+    process.env.NEXT_PUBLIC_KOKO_ENABLED === "true",
+  );
 }
