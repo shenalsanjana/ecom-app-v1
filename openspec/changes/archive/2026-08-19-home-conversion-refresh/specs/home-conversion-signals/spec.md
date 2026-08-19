@@ -63,24 +63,34 @@ The strip MUST NOT repeat the free-shipping message, which the announcement marq
 
 The product card SHALL support two optional display-only signals: a badge pill rendered over the product image, and a low-stock nudge rendered beneath the rating. Each SHALL render only when its value is present, and neither SHALL participate in pricing, cart, or checkout logic.
 
-Both signals MUST be derived from real system data. The low-stock nudge SHALL report the fulfillable unit count for the product's default color, computed from live blank and design inventory, and SHALL be shown only when that count is between 1 and 6 inclusive. A count of zero MUST NOT produce a nudge, because unavailability is not scarcity. The badge SHALL read `Bestseller` and SHALL be awarded to the products with the highest quantity sold across orders whose payment status is `PAID` or `COD_COLLECTED`; ties MUST be broken deterministically so the badge does not move between cache windows.
+Both signals MUST be derived from real system data. The low-stock nudge SHALL report the fulfillable unit count for the colour the customer currently has selected on the card, and MUST update when they change colour — reporting another colour's count beside the selected colour would state something false. That count is computed from live blank and design inventory as `min(design pool quantity, total blanks across the colour's sizes)`: a finished item consumes one blank AND one design print from a single shared design pool, so summing per-size minima would overstate what can actually be fulfilled. The nudge SHALL be shown only when that count is between 1 and 6 inclusive. A count of zero MUST NOT produce a nudge, because unavailability is not scarcity. The badge SHALL read `Bestseller` and SHALL be awarded to the products with the highest quantity sold across orders whose payment status is `PAID` or `COD_COLLECTED`; ties MUST be broken deterministically so the badge does not move between cache windows.
 
 Fixed or fabricated values MUST NOT be used for either signal.
 
 #### Scenario: Low-stock nudge on a scarce product
 
-- **WHEN** a product's default color has between 1 and 6 fulfillable units
+- **WHEN** the colour selected on a card has between 1 and 6 fulfillable units
 - **THEN** its card shows a nudge reading "Only N left" with that count
 
 #### Scenario: No nudge on a well-stocked product
 
-- **WHEN** a product's default color has more than 6 fulfillable units
+- **WHEN** the colour selected on a card has more than 6 fulfillable units
 - **THEN** its card shows no low-stock nudge
 
 #### Scenario: No nudge on an unavailable product
 
-- **WHEN** a product's default color has zero fulfillable units
+- **WHEN** the colour selected on a card has zero fulfillable units
 - **THEN** its card shows no low-stock nudge
+
+#### Scenario: Nudge follows the selected colour
+
+- **WHEN** a customer switches a card to a different colour
+- **THEN** the low-stock nudge reflects that colour's fulfillable units, not the default colour's
+
+#### Scenario: Shared design pool caps the count
+
+- **WHEN** a colour has many blanks across its sizes but the shared design pool holds fewer prints
+- **THEN** the reported count is the design pool's quantity, not the sum of per-size availability
 
 #### Scenario: Bestseller badge reflects paid sales only
 

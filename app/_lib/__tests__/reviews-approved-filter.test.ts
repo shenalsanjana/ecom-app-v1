@@ -5,7 +5,7 @@ vi.mock("next/cache", () => ({
 }));
 
 const {
-  reviewGroupBy, reviewAggregate, reviewFindMany, productFindUnique, productFindMany, plainFindMany, designFindMany,
+  reviewGroupBy, reviewAggregate, reviewFindMany, productFindUnique, productFindMany, plainFindMany, designFindMany, orderItemGroupBy,
 } = vi.hoisted(() => ({
   reviewGroupBy: vi.fn(),
   reviewAggregate: vi.fn(),
@@ -14,6 +14,7 @@ const {
   productFindMany: vi.fn(),
   plainFindMany: vi.fn(),
   designFindMany: vi.fn(),
+  orderItemGroupBy: vi.fn(),
 }));
 
 vi.mock("@/app/_lib/prisma", () => ({
@@ -22,11 +23,12 @@ vi.mock("@/app/_lib/prisma", () => ({
     product: { findUnique: productFindUnique, findMany: productFindMany },
     plainTshirtStock: { findMany: plainFindMany },
     dtfDesign: { findMany: designFindMany },
+    orderItem: { groupBy: orderItemGroupBy },
   },
 }));
 
 import {
-  getFeaturedProducts, getProductDetail, getProductReviews, getReviewHistogram,
+  getFeaturedProducts, getProductDetail, getProductReviews, getReviewHistogram, getProducts,
 } from "../products";
 
 beforeEach(() => {
@@ -35,6 +37,7 @@ beforeEach(() => {
   reviewFindMany.mockReset().mockResolvedValue([]);
   plainFindMany.mockReset().mockResolvedValue([]);
   designFindMany.mockReset().mockResolvedValue([]);
+  orderItemGroupBy.mockReset().mockResolvedValue([]);
   productFindUnique.mockReset().mockResolvedValue({
     id: "cat-white", name: "Cat", price: 2190, originalPrice: null,
     description: "d", categorySlug: "cat", archived: false, dtfDesignId: "d1",
@@ -74,5 +77,27 @@ describe("review readers only see approved reviews", () => {
     }]);
     await getFeaturedProducts();
     expect(reviewGroupBy.mock.calls[0][0].where.approved).toBe(true);
+  });
+
+  it("does not run the bestseller groupBy for readers that do not opt into signals", async () => {
+    await getProductDetail("cat-white");
+    expect(orderItemGroupBy).not.toHaveBeenCalled();
+  });
+
+  it("does not run the bestseller groupBy for getProducts", async () => {
+    await getProducts();
+    expect(orderItemGroupBy).not.toHaveBeenCalled();
+  });
+
+  it("runs the bestseller groupBy for getFeaturedProducts, which opts into signals", async () => {
+    productFindMany.mockResolvedValueOnce([{
+      id: "cat-white", name: "Cat", price: 2190, originalPrice: null, categorySlug: "cat", dtfDesignId: "d1",
+      variants: [{
+        colorSlug: "white", color: "White", swatchHex: "#ffffff", price: null, originalPrice: null,
+        sortOrder: 0, images: [{ url: "/x.jpg" }], sizeStocks: [{ size: "M" }],
+      }],
+    }]);
+    await getFeaturedProducts();
+    expect(orderItemGroupBy).toHaveBeenCalled();
   });
 });

@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Star } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 
 export function Hero() {
@@ -18,11 +18,20 @@ export function Hero() {
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/35 to-black/5" />
         <div className="relative mx-auto flex min-h-[420px] max-w-7xl items-end px-4 py-10 sm:px-6 md:min-h-[560px] md:py-14 lg:min-h-[640px] lg:px-8">
           <div className="max-w-xl space-y-6 text-white drop-shadow-md">
+            <p className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-white/[0.28] bg-white/[0.14] px-[14px] py-[6px] text-[13px] backdrop-blur">
+              <Star className="h-4 w-4 shrink-0 fill-[#f0b429] stroke-[#f0b429]" aria-hidden />
+              <span>
+                <b className="font-semibold">4.8</b> · Loved by 12,000+ customers
+              </span>
+            </p>
             <p className="text-xs font-medium uppercase tracking-[0.22em] text-white/80">
               Oversize. Heavyweight. Unmistakably you.
             </p>
-            <h1 className="font-heading text-4xl font-semibold leading-tight tracking-tight md:text-5xl lg:text-6xl">
-              Unleash your inner bear.
+            <h1 className="font-heading text-[clamp(42px,5.4vw,70px)] font-bold leading-[1.02] tracking-[-0.03em]">
+              Unleash your inner{" "}
+              <span className="rounded-[12px] bg-brand px-[0.14em] text-white [-webkit-box-decoration-break:clone] [box-decoration-break:clone]">
+                bear.
+              </span>
             </h1>
             <p className="text-lg text-white/90">
               Premium oversize tees, cut for the drape that fits how you actually

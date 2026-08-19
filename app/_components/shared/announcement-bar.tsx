@@ -1,38 +1,62 @@
 // app/_components/shared/announcement-bar.tsx
-import { formatPrice } from "@/app/_lib/format";
-import { freeDeliveryExclusionNote } from "@/app/_lib/free-delivery-note";
+import { marqueeMessages } from "@/app/_lib/marquee";
 
-// Site-wide promo strip: free-shipping threshold + "pay in 3".
-// Scrolls away above the sticky header. Static (not dismissible) by design.
+// Site-wide promo strip: free-shipping threshold + "pay in 3" + COD + drops,
+// scrolling horizontally so the motion draws the eye. Scrolls away above the
+// sticky header. Static (not dismissible) by design.
 // Rendered in the layout above the DeliveryConfigProvider, so it takes the live
 // threshold as a prop (the layout already fetched the config) rather than a hook.
 // Koko is gated behind NEXT_PUBLIC_KOKO_ENABLED so we only advertise it once
 // it's actually offered at checkout (mirrors the server-side KOKO_ENABLED flag).
+//
+// The message set is rendered twice back-to-back: the keyframes translate the
+// track by -50%, so the second copy is what makes the loop seamless. It is
+// purely visual, hence aria-hidden — a screen reader should hear the set once.
+//
+// motion-reduce: the animation is disabled, but the track's `w-max` sizing
+// would otherwise still sit inside `overflow-hidden` without wrapping,
+// clipping messages 2-4 on narrow viewports. Under motion-reduce the track
+// wraps and centers instead (matching the plain wrapping paragraph this bar
+// replaced), and the decorative duplicate copy is hidden entirely so it
+// doesn't double the visible text once wrapped.
+//
+// hover/focus also pause the animation as a partial mitigation — not a
+// keyboard-operable pause control, so this does not by itself satisfy WCAG
+// 2.2.2.
 export function AnnouncementBar({ freeThreshold }: { freeThreshold: number }) {
   const kokoEnabled = process.env.NEXT_PUBLIC_KOKO_ENABLED === "true";
+  const messages = marqueeMessages(freeThreshold, kokoEnabled);
+
+  const set = (copy: 1 | 2) => (
+    <ul
+      className={
+        "flex shrink-0 items-center gap-[44px] pr-[44px]" +
+        (copy === 2 ? " motion-reduce:hidden" : " motion-reduce:flex-wrap motion-reduce:justify-center")
+      }
+      aria-hidden={copy === 2 ? true : undefined}
+    >
+      {messages.map((m) => (
+        <li
+          key={m.key}
+          className="flex items-center gap-[44px] whitespace-nowrap text-xs font-medium uppercase tracking-[0.06em]"
+        >
+          {m.text}
+          <span className="opacity-40" aria-hidden>
+            ✦
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+
   return (
-    <div className="bg-primary text-primary-foreground">
-      <p className="mx-auto max-w-7xl px-4 py-2 text-center text-xs tracking-wide sm:px-6 lg:px-8">
-        {freeThreshold > 0 ? (
-          <>
-            Free shipping over{" "}
-            <span className="font-medium">{formatPrice(freeThreshold)}</span>{" "}
-            <span className="opacity-80">({freeDeliveryExclusionNote()})</span>
-          </>
-        ) : (
-          <>
-            <span className="font-medium">Free shipping for all products</span>{" "}
-            <span className="opacity-80">({freeDeliveryExclusionNote()})</span>
-          </>
-        )}
-        {"  ·  "}Pay in 3 interest-free with{" "}
-        {kokoEnabled && (
-          <>
-            <span className="font-medium">Koko</span> &amp;{" "}
-          </>
-        )}
-        <span className="font-medium">Mintpay</span>
-      </p>
+    <div className="overflow-hidden bg-primary py-2 text-primary-foreground">
+      <div
+        className="flex w-max motion-safe:animate-marquee motion-reduce:w-full motion-reduce:flex-wrap motion-reduce:justify-center hover:[animation-play-state:paused] focus-within:[animation-play-state:paused]"
+      >
+        {set(1)}
+        {set(2)}
+      </div>
     </div>
   );
 }

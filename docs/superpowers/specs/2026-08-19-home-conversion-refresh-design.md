@@ -29,7 +29,7 @@ primitives — `Section`, `SectionHeader`, `Eyebrow`, `Price`, `Rating`,
 `SaleBadge`, `Card`, `buttonVariants`, `lucide-react`, `next/image`, and the
 `--token` CSS variables.
 
-Four deliberate deviations from the handoff were agreed during brainstorming.
+Five deliberate deviations from the handoff were agreed during brainstorming.
 Each is justified below at the change that owns it:
 
 | # | Deviation | Reason |
@@ -172,14 +172,23 @@ props.
 
 **Files:** `app/_lib/products.ts`, `app/_components/home/product-card.tsx`
 
-`ProductView` gains two optional display-only fields:
+`ProductView` gains one optional display-only field, and `ProductCardVariant`
+gains another:
 
 ```ts
+// ProductView — product-level fact
 badge?: "Bestseller";
+
+// ProductCardVariant — per-colour fact
 lowStock?: number;
 ```
 
-Neither participates in pricing, cart, or checkout logic.
+`lowStock` lives on the variant, not the product, because `ProductCard` lets
+the customer switch colour (price, image, and sizes all follow the selected
+variant already); a single product-level count would report one colour's
+stock while the card shows another. `badge` stays product-level — bestseller
+status is a fact about the product as a whole, not about any one colour.
+Neither field participates in pricing, cart, or checkout logic.
 
 **Data derivation (D3, D4).** `attachAggregates` takes a new
 `{ withSignals }: { withSignals?: boolean }` option, defaulting to `false`.
@@ -190,12 +199,23 @@ home page uses — pass `true`. `getProducts`, `searchProducts`,
 listings pay no extra query cost and the handoff's "nothing else in the app
 changes" holds literally.
 
-- `lowStock`: units remaining for the product's default variant, summed across
-  its in-stock sizes using the `plainStock` / `designStock` maps
-  `attachAggregates` **already loads** (via `buildPlainStockMap` /
-  `buildDesignStockMap`) plus `stockForSize`. Emitted only when the total is
-  `<= 6`; otherwise left undefined. No schema change, no new query — the maps
-  are in hand.
+- `lowStock`: computed once per variant, inside the existing
+  `p.variants.map(...)` in `attachAggregates`, using the `plainStock` /
+  `designStock` maps **already loaded** (via `buildPlainStockMap` /
+  `buildDesignStockMap`). The unit is `unitsForVariant`: every finished tee
+  consumes one blank AND one print from a single shared design pool, so the
+  fulfillable total for a colour is capped **once, across the whole colour**,
+  not once per size —
+  `min(designQty, sum of plain blanks across that colour's sizes)`, and `0`
+  when there is no design or the design pool is empty. Emitted only when that
+  total is `<= 6`; otherwise left undefined. No schema change, no new query —
+  the maps are in hand.
+
+  *(An earlier draft of this derivation summed `stockForSize` — itself
+  `min(plainQty, designQty)` — across sizes. Against a shared design pool that
+  triple-counts a single print run: 3 sizes x 10 blanks with 1 print left
+  reported "3 left" instead of the true "1 left". Fixed before ship; see
+  `app/_lib/product-signals.ts`.)*
 - `badge`: `"Bestseller"` for products in the top N by paid `orderItems`
   quantity, via one `prisma.orderItem.groupBy` scoped to the ids already in
   view. Both home readers are wrapped in `unstable_cache`, so this runs at most
@@ -219,6 +239,8 @@ because their readers never populate them. Note `/deals` reads via
   the `WishlistHeart` (`absolute right-2 top-2`) — bottom-left is free.
 - **Stock nudge**, in the card body directly under `<Rating />`: `text-xs
   font-semibold text-brand` with a small `Clock` icon — `Only {lowStock} left`.
+  Read from the currently selected `variant`, so switching colour switches
+  the count along with price, image, and sizes.
 
 ## 8. Change 6 — Deals band + countdown
 
