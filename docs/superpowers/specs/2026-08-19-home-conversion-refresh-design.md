@@ -38,6 +38,7 @@ Each is justified below at the change that owns it:
 | D2 | The social-proof strip's 4th item is 7-day returns, not free shipping | Free shipping would otherwise appear three times on one page |
 | D3 | Card badges ship as `Bestseller` only; `Trending` and `Almost gone` are dropped | No honest data source; `Almost gone` duplicates the stock nudge |
 | D4 | `badge`/`lowStock` are computed behind an opt-in flag used only by the two home readers | Keeps the handoff's "home page only" scope literal and avoids an extra query on search/category listings |
+| D5 | Tile ink is `#332d26` (not `#3a332c`), chosen by max contrast rather than a luminance threshold, and the caption's "soft ink" is dropped | The handoff's rule renders two of its six tints at 1.7–2.4:1 (§9) |
 
 ## 3. Change 1 — Brand color
 
@@ -269,11 +270,36 @@ grid; add `motion-safe:hover:-translate-y-[3px]`.
   slugs; anything else falls back to a deterministic slug-hash pick from the
   same six-color palette, so an admin adding a category gets a stable, distinct
   tile instead of a blank one.
-- Ink is **computed from tile luminance**, not hardcoded per tile, so the
-  fallback path is correct too: dark tiles → `#F1EDE4`, light tiles → `#3a332c`,
-  with a softer variant for the caption.
+- **Ink (D5).** The handoff says "dark tiles → `#F1EDE4`, light tiles →
+  `#3a332c`" computed from tile luminance. Implemented as a luminance
+  threshold, that rule is unshippable: measured WCAG contrast of each ink
+  against each tint is
+
+  | Tint | Luminance | vs `#3a332c` | vs `#F1EDE4` |
+  |---|---|---|---|
+  | Cat `#EFC4C4` | 0.618 | 7.91 | 1.35 |
+  | Dino `#AEBBA0` | 0.471 | 6.16 | 1.73 |
+  | Bear `#C4906E` | 0.328 | 4.47 | 2.38 |
+  | Retro `#E4D3B0` | 0.662 | 8.43 | 1.26 |
+  | Wave `#AEC3D1` | 0.526 | 6.82 | 1.56 |
+  | Nature `#BFC7A6` | 0.547 | 7.06 | 1.51 |
+
+  A threshold at 0.5 sends Dino and Bear to light ink at **1.73:1 and 2.38:1**.
+  Dark ink wins on all six. So `inkFor(bg)` picks **whichever of the two inks
+  has the higher contrast**, not whichever side of a threshold the tile falls
+  on — same intent, correct outcome, and it stays correct if the palette is
+  edited later.
+
+  The dark ink is darkened from `#3a332c` to **`#332d26`**, which lifts the
+  worst tile (Bear) from 4.47 to **4.90** so every tint clears AA 4.5:1 for
+  small text without altering any handoff tint.
+
+  The caption's **soft ink variant is dropped**: no softened ink clears 4.5:1
+  on Bear (`#6b6157` reaches only 2.18), so a "soft" caption would be the one
+  illegible element on the page. The caption uses the same ink, separated from
+  the name by the mono face, size, uppercase and `0.16em` tracking instead.
 - Content: centered `28px font-bold` category name; below it `font-mono
-  text-[10px] uppercase tracking-[0.16em]` `Shop {name} →` in the soft ink.
+  text-[10px] uppercase tracking-[0.16em]` `Shop {name} →` in the same ink.
 
 `CategoryView.image` stays on the type and in the query — it is used elsewhere,
 and if real category imagery lands later these tiles can revert to photos. The
@@ -307,6 +333,7 @@ fails.
 | Amber star | `#f0b429` |
 | Radius | `--radius: 1rem` — cards `rounded-2xl`, tiles `rounded-xl`, pills `rounded-full` |
 | Category tints | Cat `#EFC4C4`, Dino `#AEBBA0`, Bear `#C4906E`, Retro `#E4D3B0`, Wave `#AEC3D1`, Nature `#BFC7A6` |
+| Tile ink | `#332d26` (dark) / `#F1EDE4` (light), selected by max contrast — see §9 |
 | Fonts | Poppins 400/500/600/700; Geist Mono for the countdown — both already in `layout.tsx` |
 
 Icons all come from `lucide-react` (already a dependency): `Star`, `Check`,
