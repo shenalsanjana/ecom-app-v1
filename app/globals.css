@@ -74,7 +74,7 @@
 }
 
 :root {
-  /* Boutique palette — warm cream + cocoa + olive. Light only. */
+  /* Boutique palette — warm cream + cocoa + terracotta. Light only. */
   --background: oklch(0.972 0.013 80);
   --foreground: oklch(0.235 0.018 60);
   --card: oklch(0.985 0.008 80);

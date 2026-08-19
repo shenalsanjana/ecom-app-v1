@@ -12,13 +12,27 @@ import { marqueeMessages } from "@/app/_lib/marquee";
 // The message set is rendered twice back-to-back: the keyframes translate the
 // track by -50%, so the second copy is what makes the loop seamless. It is
 // purely visual, hence aria-hidden — a screen reader should hear the set once.
+//
+// motion-reduce: the animation is disabled, but the track's `w-max` sizing
+// would otherwise still sit inside `overflow-hidden` without wrapping,
+// clipping messages 2-4 on narrow viewports. Under motion-reduce the track
+// wraps and centers instead (matching the plain wrapping paragraph this bar
+// replaced), and the decorative duplicate copy is hidden entirely so it
+// doesn't double the visible text once wrapped.
+//
+// hover/focus also pause the animation as a partial mitigation — not a
+// keyboard-operable pause control, so this does not by itself satisfy WCAG
+// 2.2.2.
 export function AnnouncementBar({ freeThreshold }: { freeThreshold: number }) {
   const kokoEnabled = process.env.NEXT_PUBLIC_KOKO_ENABLED === "true";
   const messages = marqueeMessages(freeThreshold, kokoEnabled);
 
   const set = (copy: 1 | 2) => (
     <ul
-      className="flex shrink-0 items-center gap-[44px] pr-[44px]"
+      className={
+        "flex shrink-0 items-center gap-[44px] pr-[44px]" +
+        (copy === 2 ? " motion-reduce:hidden" : " motion-reduce:flex-wrap motion-reduce:justify-center")
+      }
       aria-hidden={copy === 2 ? true : undefined}
     >
       {messages.map((m) => (
@@ -37,7 +51,9 @@ export function AnnouncementBar({ freeThreshold }: { freeThreshold: number }) {
 
   return (
     <div className="overflow-hidden bg-primary py-2 text-primary-foreground">
-      <div className="flex w-max motion-safe:animate-marquee">
+      <div
+        className="flex w-max motion-safe:animate-marquee motion-reduce:w-full motion-reduce:flex-wrap motion-reduce:justify-center hover:[animation-play-state:paused] focus-within:[animation-play-state:paused]"
+      >
         {set(1)}
         {set(2)}
       </div>
