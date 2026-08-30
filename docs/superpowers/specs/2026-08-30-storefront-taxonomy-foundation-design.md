@@ -147,9 +147,15 @@ redirect simply starts being correct.
 
 **One segment:**
 1. current department → render department page
-2. department history → 301 to `/categories/{currentDept}`
-3. design history → 301 to `/categories/{dept}/{design}`
-4. otherwise `notFound()`
+2. **current design** → 301 to `/categories/{dept}/{design}`
+3. department history → 301 to `/categories/{currentDept}`
+4. design history → 301 to `/categories/{dept}/{design}`
+5. otherwise `notFound()`
+
+Step 2 is what keeps today's live URLs working. `cat` and `dino` are *current*
+design slugs (decision 6 keeps them unrenamed), so they never appear in
+`DesignSlugHistory` — a history-only lookup would 404 the very URLs this
+migration is meant to preserve. No seeded history rows are required.
 
 **Two segments** (`{dept}/{design}`):
 1. design resolves (current slug, then history) → if `dept` segment does not
