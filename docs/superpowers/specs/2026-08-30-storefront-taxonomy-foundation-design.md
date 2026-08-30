@@ -207,16 +207,25 @@ handoff's `#3a332c` so `bear #C4906E` clears AA at 4.90:1; Accessories reuses
 that exact hex, so all four department tints are already covered.
 
 **The 21 new design tints have never been contrast-checked.** (23 designs
-less `cat` and `dino`, which ship today.) Most are light
-pastels that will pass against dark ink, but `Cap #8E7A66` is materially
-darker than anything in the current palette, needs `INK_LIGHT`, and may not
-clear 4.5:1 either way.
+less `cat` and `dino`, which ship today.) They have now been measured against the real
+`inkFor` logic. All 4 department tints and 22 of the 23 design tints clear AA
+comfortably — 4.90:1 at worst, for `bear`/`accessories` `#C4906E`.
+
+**One fails: `Cap #8E7A66` reaches only 3.51:1** with its better ink
+(`INK_LIGHT`), and 3.32:1 with `INK_DARK` — no ink choice rescues it.
+
+**Fix: lighten Cap to `#A59585`**, which reaches 4.69:1 against `INK_DARK`.
+Darkening to `#796857` (4.57:1 against `INK_LIGHT`) also clears AA, but every
+other tint resolves to dark ink, so that would make Cap the only light-ink
+tile; the lightened value is more consistent and has more headroom. This is
+the one place the implementation deliberately departs from the canvas.
 
 `scripts/check-contrast.ts` currently parses `oklch()` pairs out of the
 `:root` block in `app/globals.css` and has no notion of hex tints. It gains a
-second pass that iterates every seeded tint, picks ink by luminance exactly as
-the runtime does, and exits non-zero on any pair below 4.5:1. **Any tint that
-fails is adjusted, not shipped as drawn.**
+second pass that iterates every seeded tint, picks ink with the **same
+`inkFor` helper the runtime uses**, and exits non-zero on any pair below
+4.5:1. The check must import `inkFor` rather than reimplement it — see the
+note below.
 
 Known limitation: the gate covers seeded defaults. Once tints are
 admin-editable, an admin could save a failing colour — so the admin action
@@ -247,7 +256,12 @@ of bug fixed for the marquee at `39ef139`.
 - two-segment request with a mismatched department segment redirects to canonical
 - one-segment resolution order: department before department-history before design-history
 - unknown slug at either arity returns not-found rather than a malformed redirect
-- ink selection for every seeded tint matches the luminance threshold
+- `inkFor` returns, for every seeded tint, whichever ink actually contrasts
+  better — **not** a luminance-threshold pick. `app/_lib/category-tint.ts`
+  carries an explicit comment that a 0.5 threshold would send `dino` (0.471)
+  and `bear` (0.328) to light ink at 1.73:1 and 2.38:1. Any reimplementation
+  of this logic in the contrast script would risk reintroducing exactly that
+  bug, so the script imports the helper
 - derived `showsNavDropdown` / `showsInDesignSection` for a department with
   and without `subName` and with and without designs
 
@@ -259,6 +273,8 @@ of bug fixed for the marquee at `39ef139`.
 **Contrast**
 - `npm run check:contrast` covers all 4 department tints and all 23 design
   tints and fails on any pair below AA
+- the suite pins `Cap` at `#A59585` so a future revert to the canvas value
+  fails loudly rather than silently shipping 3.51:1
 
 **E2E (Playwright)**
 - `/categories/cat` (a live indexed URL) 308s to `/categories/women/cat`
