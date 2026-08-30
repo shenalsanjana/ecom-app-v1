@@ -77,7 +77,7 @@ model Design {
   slug           String  @id      // cat, dino, snoopy
   name           String           // "Cats"
   departmentSlug String
-  image          String
+  image          String?          // null => tile renders as a flat hex
   hex            String
   sortOrder      Int     @default(0)
   dtfDesignId    String?          // optional link to the inventory pool
@@ -91,9 +91,15 @@ model Design {
 }
 ```
 
-`Product` gains `departmentSlug` (required) and `designSlug` (nullable —
-accessories and plain tees may have no design). `Product.categorySlug` is
-renamed to `designSlug`.
+`Product` gains `departmentSlug` (required) and `designSlug`.
+`Product.categorySlug` is renamed to `designSlug`.
+
+`designSlug` is **nullable for forward-compatibility only** — every seeded
+product has a design, including accessories (Tote, Cap, Socks) and plain tees
+(Oversized, Regular). What varies is not whether a design exists but whether
+it is *browsable*: `GRAPHIC` in the canvas omits accessories, so that
+department gets no nav dropdown and no filter-tree children, which falls out
+of the derived rules below rather than from a null.
 
 ### Derived, not stored
 
@@ -162,7 +168,8 @@ A single migration, ordered so no step reads a column it has not yet created:
 2. `CREATE TABLE "DepartmentSlugHistory"`
 3. `ALTER TABLE "Category" RENAME TO "Design"`;
    `ALTER TABLE "CategorySlugHistory" RENAME TO "DesignSlugHistory"`
-4. Add `Design.departmentSlug`, `hex`, `sortOrder`, `dtfDesignId` (nullable first)
+4. Add `Design.departmentSlug`, `hex`, `sortOrder`, `dtfDesignId` (nullable
+   first); drop `NOT NULL` on `Design.image`, since new designs have no photo
 5. Backfill `departmentSlug = 'women'` for `cat` and `dino` — both are
    women's graphic tees — and set `hex` from the seeded tint constants
 6. `ALTER TABLE "Product" RENAME COLUMN "categorySlug" TO "designSlug"`;
@@ -174,7 +181,8 @@ products in the seed they are trivially reversible.
 
 ## 7. Seed
 
-`prisma/seed.ts` gains the four departments and the ~21 designs, with names,
+`prisma/seed.ts` gains the four departments and all 23 designs (16 women,
+2 men, 2 plain fits, 3 accessories), with names,
 tints and sort order taken from the canvas's `DEPTS`, `GRAPHIC` and
 `DESIGN_HEX` maps. The Snoopy front/back split (`PRINTS`) is represented as
 two products under one design, not two designs.
@@ -198,7 +206,8 @@ hash fallback for a missing hex.
 handoff's `#3a332c` so `bear #C4906E` clears AA at 4.90:1; Accessories reuses
 that exact hex, so all four department tints are already covered.
 
-**The ~20 new design tints have never been contrast-checked.** Most are light
+**The 21 new design tints have never been contrast-checked.** (23 designs
+less `cat` and `dino`, which ship today.) Most are light
 pastels that will pass against dark ink, but `Cap #8E7A66` is materially
 darker than anything in the current palette, needs `INK_LIGHT`, and may not
 clear 4.5:1 either way.
@@ -248,7 +257,7 @@ of bug fixed for the marquee at `39ef139`.
   `Product.departmentSlug` is populated for every row
 
 **Contrast**
-- `npm run check:contrast` covers all four department tints and all ~21 design
+- `npm run check:contrast` covers all 4 department tints and all 23 design
   tints and fails on any pair below AA
 
 **E2E (Playwright)**
