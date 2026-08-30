@@ -61,11 +61,31 @@ sed -i 's#_lib/category-tint#_lib/taxonomy-tint#' app/_components/home/category-
 
 - [ ] **Step 2: Write the failing tests**
 
-Append to `app/_lib/taxonomy-tint.test.ts`:
+The sed in Step 1 rewrites the import path but leaves `CATEGORY_TINTS` in the
+import list, which no longer exists. **Replace the whole import block** at the
+top of `app/_lib/taxonomy-tint.test.ts` with:
 
 ```ts
-import { DEPARTMENT_TINTS, DESIGN_TINTS, ALL_TINTS, contrastRatio } from "./taxonomy-tint";
+import {
+  DEPARTMENT_TINTS,
+  DESIGN_TINTS,
+  ALL_TINTS,
+  TINT_PALETTE,
+  tintForSlug,
+  relativeLuminance,
+  contrastRatio,
+  inkFor,
+  INK_DARK,
+  INK_LIGHT,
+} from "./taxonomy-tint";
+```
 
+The file has a local `contrast` helper duplicating the new `contrastRatio`
+export; delete the local one and use the import.
+
+Then append:
+
+```ts
 describe("taxonomy tints", () => {
   it("defines all four departments", () => {
     expect(Object.keys(DEPARTMENT_TINTS).sort()).toEqual(
