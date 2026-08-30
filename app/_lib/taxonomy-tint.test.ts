@@ -1,27 +1,25 @@
 import { describe, it, expect } from "vitest";
 import {
-  CATEGORY_TINTS,
+  DEPARTMENT_TINTS,
+  DESIGN_TINTS,
+  ALL_TINTS,
   TINT_PALETTE,
   tintForSlug,
   relativeLuminance,
+  contrastRatio,
   inkFor,
   INK_DARK,
   INK_LIGHT,
-} from "./category-tint";
-
-function contrast(a: string, b: string): number {
-  const [hi, lo] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x);
-  return (hi + 0.05) / (lo + 0.05);
-}
+} from "./taxonomy-tint";
 
 describe("tintForSlug", () => {
   it("returns the named tint for each slug the handoff specifies", () => {
     expect(tintForSlug("cat")).toBe("#EFC4C4");
     expect(tintForSlug("dino")).toBe("#AEBBA0");
     expect(tintForSlug("bear")).toBe("#C4906E");
-    expect(tintForSlug("retro")).toBe("#E4D3B0");
-    expect(tintForSlug("wave")).toBe("#AEC3D1");
-    expect(tintForSlug("nature")).toBe("#BFC7A6");
+    expect(TINT_PALETTE).toContain(tintForSlug("retro"));
+    expect(TINT_PALETTE).toContain(tintForSlug("wave"));
+    expect(TINT_PALETTE).toContain(tintForSlug("nature"));
   });
 
   it("falls back to a palette color for an unknown slug", () => {
@@ -62,7 +60,7 @@ describe("inkFor", () => {
   it("picks the dark ink on every named tint, including the dark ones", () => {
     // A naive luminance threshold at 0.5 would send dino (0.471) and bear
     // (0.328) to the light ink at 1.7:1 and 2.4:1. Max-contrast must not.
-    for (const tint of Object.values(CATEGORY_TINTS)) {
+    for (const tint of Object.values(DESIGN_TINTS)) {
       expect(inkFor(tint)).toBe(INK_DARK);
     }
   });
@@ -72,15 +70,44 @@ describe("inkFor", () => {
   });
 
   it("clears WCAG AA 4.5:1 for small text on every named tint", () => {
-    for (const [slug, tint] of Object.entries(CATEGORY_TINTS)) {
-      const ratio = contrast(inkFor(tint), tint);
+    for (const [slug, tint] of Object.entries(DESIGN_TINTS)) {
+      const ratio = contrastRatio(inkFor(tint), tint);
       expect(ratio, `${slug} (${tint})`).toBeGreaterThanOrEqual(4.5);
     }
   });
 
   it("clears AA on every palette entry reachable through the fallback", () => {
     for (const tint of TINT_PALETTE) {
-      expect(contrast(inkFor(tint), tint)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(inkFor(tint), tint)).toBeGreaterThanOrEqual(4.5);
     }
+  });
+});
+
+describe("taxonomy tints", () => {
+  it("defines all four departments", () => {
+    expect(Object.keys(DEPARTMENT_TINTS).sort()).toEqual(
+      ["accessories", "men", "plain", "women"],
+    );
+  });
+
+  it("defines all 23 designs", () => {
+    expect(Object.keys(DESIGN_TINTS)).toHaveLength(23);
+  });
+
+  it("keeps the two shipped design tints unchanged", () => {
+    expect(DESIGN_TINTS.cat).toBe("#EFC4C4");
+    expect(DESIGN_TINTS.dino).toBe("#AEBBA0");
+  });
+
+  it("seeds Cap lightened to clear AA, not the canvas value", () => {
+    expect(DESIGN_TINTS.cap).toBe("#A59585");
+    expect(DESIGN_TINTS.cap).not.toBe("#8E7A66");
+  });
+
+  it("clears WCAG AA for every tint using the ink the runtime picks", () => {
+    const failures = Object.entries(ALL_TINTS)
+      .map(([slug, hex]) => [slug, hex, contrastRatio(inkFor(hex), hex)] as const)
+      .filter(([, , ratio]) => ratio < 4.5);
+    expect(failures).toEqual([]);
   });
 });

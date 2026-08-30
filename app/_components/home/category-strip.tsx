@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getCategories } from "@/app/_lib/products";
-import { tintForSlug, inkFor } from "@/app/_lib/category-tint";
+import { tintForSlug, inkFor } from "@/app/_lib/taxonomy-tint";
 import { Section } from "@/app/_components/ui/section";
 import { SectionHeader } from "@/app/_components/ui/section-header";
 
