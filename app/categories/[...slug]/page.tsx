@@ -10,7 +10,8 @@ import {
   type DesignSummary,
 } from "@/app/_lib/taxonomy";
 import { designPath } from "@/app/_lib/taxonomy-path";
-import { resolveCategoryRoute, type Resolution, type TaxonomyLookup } from "@/app/_lib/taxonomy-route";
+import { resolveCategorySegments } from "@/app/_lib/taxonomy-lookup";
+import type { Resolution } from "@/app/_lib/taxonomy-route";
 import { inkFor } from "@/app/_lib/taxonomy-tint";
 import { ProductCard } from "@/app/_components/home/product-card";
 import { SiteHeader } from "@/app/_components/home/site-header";
@@ -33,47 +34,22 @@ const SORT_OPTIONS = [
 const ITEMS_PER_PAGE = 12;
 
 /**
- * Resolves the catch-all segments against the live taxonomy.
+ * Resolves the catch-all segments and returns the departments alongside, so
+ * neither caller has to read them twice to look a name up.
  *
- * `resolveCategoryRoute` is synchronous by design (it is a pure module with no
- * Prisma import), but the two slug-history tables are async reads. So the
- * history lookups are pre-resolved here and handed to the resolver as plain
- * values — and only for a slug that matches nothing live, since a current
- * department or design short-circuits before either history branch is reached.
+ * The pre-resolution logic itself lives in `app/_lib/taxonomy-lookup.ts`, kept
+ * out of this page module so it is unit-testable without a database. The two
+ * history readers are injected here — that is the only Prisma-aware part.
  */
 async function resolveSegments(
   segments: string[],
 ): Promise<{ resolved: Resolution; departments: DepartmentView[] }> {
   const departments = await getDepartments();
-
-  const designToDept = new Map<string, string>();
-  for (const d of departments) {
-    for (const g of d.designs) designToDept.set(g.slug, d.slug);
-  }
-
-  const departmentExists = (slug: string) => departments.some((d) => d.slug === slug);
-  const designOf = (slug: string) => {
-    const departmentSlug = designToDept.get(slug);
-    return departmentSlug ? { departmentSlug } : null;
-  };
-
-  // One segment resolves that segment; two resolve the design segment (the
-  // department segment is corrected from the design, never looked up).
-  const candidates = segments.length === 1 ? segments.slice(0, 1) : segments.slice(1, 2);
-  const misses = candidates.filter((s) => !departmentExists(s) && !designOf(s));
-  const [deptHist, designHist] = await Promise.all([
-    Promise.all(misses.map((s) => getDepartmentSlugRedirect(s))),
-    Promise.all(misses.map((s) => getDesignPathRedirect(s))),
-  ]);
-
-  const lookup: TaxonomyLookup = {
-    departmentExists,
-    designOf,
-    departmentRedirect: (s) => deptHist[misses.indexOf(s)] ?? null,
-    designRedirect: (s) => designHist[misses.indexOf(s)] ?? null,
-  };
-
-  return { resolved: resolveCategoryRoute(segments, lookup), departments };
+  const resolved = await resolveCategorySegments(segments, departments, {
+    departmentRedirect: getDepartmentSlugRedirect,
+    designRedirect: getDesignPathRedirect,
+  });
+  return { resolved, departments };
 }
 
 function findDepartment(departments: DepartmentView[], slug: string): DepartmentView | undefined {

@@ -55,7 +55,14 @@ test.describe("HTTP contract", () => {
 });
 
 test.describe("rendered pages", () => {
-  test("legacy category URL redirects to its nested path", async ({ page }) => {
+  // NOTE: this test does NOT verify the redirect contract, and must not be
+  // read as if it does. `page.goto` reports the status of the FINAL response
+  // and follows a `<meta http-equiv="refresh">` just as happily as a 308, so
+  // this assertion passes either way — it passed while the route was serving
+  // 200 + meta-refresh, which is exactly the regression that matters. The 308
+  // itself is asserted by the `HTTP contract` request.get tests above. All
+  // this adds is that the browser ends up rendering the nested page.
+  test("a browser following the legacy URL ends up on the nested page", async ({ page }) => {
     const res = await page.goto("/categories/cat");
     expect(res?.status()).toBe(200);
     expect(new URL(page.url()).pathname).toBe("/categories/women/cat");
