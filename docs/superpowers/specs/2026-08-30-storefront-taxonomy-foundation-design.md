@@ -94,12 +94,21 @@ model Design {
 `Product` gains `departmentSlug` (required) and `designSlug`.
 `Product.categorySlug` is renamed to `designSlug`.
 
-`designSlug` is **nullable for forward-compatibility only** — every seeded
-product has a design, including accessories (Tote, Cap, Socks) and plain tees
-(Oversized, Regular). What varies is not whether a design exists but whether
-it is *browsable*: `GRAPHIC` in the canvas omits accessories, so that
-department gets no nav dropdown and no filter-tree children, which falls out
-of the derived rules below rather than from a null.
+`designSlug` is **NOT NULL** (as built — an earlier draft of this section
+called it "nullable for forward-compatibility", which the implementation
+deliberately did not do). Every product has a design, including accessories
+(Tote, Cap, Socks) and plain tees (Oversized, Regular), so nothing needs a
+null; the column it replaces, `Product.categorySlug`, was already NOT NULL, so
+making it nullable would have been a data-safety *downgrade* — it would have
+dropped the database-level guarantee that every product is filed somewhere and
+pushed the "is it missing?" check out into every read site. Keeping it NOT NULL
+also keeps the denormalised `Product.departmentSlug` derivable from the design
+on every write with no null branch to reason about.
+
+What varies is not whether a design exists but whether it is *browsable*:
+`GRAPHIC` in the canvas omits accessories, so that department gets no nav
+dropdown and no filter-tree children, which falls out of the derived rules
+below rather than from a null.
 
 ### Derived, not stored
 
@@ -196,6 +205,16 @@ two products under one design, not two designs.
 The existing guard at `prisma/seed.ts:76` counts categories to decide whether
 to skip; it moves to counting departments. `FORCE_SEED=true` behaviour is
 unchanged.
+
+**Consequence: there is no safe path to seed production.** The migration always
+INSERTs the four departments, so the skip guard fires on every production run
+and `npm run db:seed` will always no-op there. The only override, `FORCE_SEED=true`,
+prunes the catalog down to the 3-entry mock — on production that deletes every
+real product, cascading to images, reviews and wishlist items. Production
+therefore gets the 4 departments from the migration and only the designs the
+catalog already carries; the remaining designs are created by hand through
+`/admin/categories` or by a one-off idempotent script. The operational warning
+and the two pre-deploy checks live in `DEPLOY_OVH.md` §4.8.
 
 ## 8. Tints and contrast
 

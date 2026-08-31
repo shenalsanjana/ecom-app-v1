@@ -557,6 +557,68 @@ so `nginx` may briefly restart-loop if it comes up before `app` is ready. It
 self-heals via `restart: unless-stopped` once `app` becomes healthy; no
 action needed unless it hasn't stabilized within a minute or two.
 
+### 4.8 Seeding: never run the seed against production
+
+**Do not run `FORCE_SEED=true` against the production database. Ever.**
+
+`prisma/seed.ts` is a *development* catalog builder, not a production
+bootstrapper, and on production it has exactly two behaviours — both wrong:
+
+- **Without `FORCE_SEED`, it always skips.** The skip guard counts
+  `Department` rows, and the `20260830120000_taxonomy_foundation` migration
+  INSERTs all four departments. So `npm run db:seed` on production finds four
+  departments and exits without doing anything. It is not a way to add the
+  missing designs.
+- **With `FORCE_SEED=true`, it destroys the catalog.** The prune step runs
+  `product.deleteMany({ where: { id: { notIn: newProductIds } } })`, where
+  `newProductIds` is the 3-entry mock catalog. Every real product would be
+  deleted, cascading to its images, reviews and wishlist items, and
+  `design.deleteMany` would then take out every design not in the seed list.
+  There is no confirmation prompt and no dry run.
+
+**To add the remaining designs on production**, use `/admin/categories` in the
+admin UI, or write a one-off idempotent script that only ever `upsert`s the
+rows it needs and never deletes. Take a backup first (§4.5).
+
+#### Two checks worth running before you deploy this migration
+
+**(a) Does any existing `Category` slug collide with a department slug?** The
+migration promotes the four department slugs into their own namespace, and a
+pre-existing category slug of `men`, `women`, `plain` or `accessories` would
+silently start resolving as a *department* page under `/categories/<slug>`
+rather than as the design it used to be. Check before migrating:
+
+```bash
+docker compose exec -T postgres psql \
+  -U "$(grep '^POSTGRES_USER=' .env | cut -d= -f2)" \
+  -d "$(grep '^POSTGRES_DB=' .env | cut -d= -f2)" -c \
+  "SELECT slug, name FROM \"Category\" WHERE slug IN ('men','women','plain','accessories');"
+```
+
+Any row returned needs renaming (which records a `DesignSlugHistory` row and
+keeps the old URL redirecting) before the migration runs.
+
+**(b) Every pre-existing design is backfilled to `women`.** The migration has
+no way to tell which department an old flat category belonged to, so it files
+all of them under `women` with the Women tint `#EFC4C4`. Anything that is not
+actually a women's design must be re-filed by hand in `/admin/categories`
+after deploy:
+
+```bash
+docker compose exec -T postgres psql \
+  -U "$(grep '^POSTGRES_USER=' .env | cut -d= -f2)" \
+  -d "$(grep '^POSTGRES_DB=' .env | cut -d= -f2)" -c \
+  "SELECT slug, name, \"departmentSlug\" FROM \"Design\" ORDER BY slug;"
+```
+
+**Re-file only after the fix that keeps `Product.departmentSlug` in step with
+its design is deployed.** `Product.departmentSlug` is denormalised from
+`Design.departmentSlug`; before that fix, moving a design between departments
+updated the design alone and left every product under it stamped with the old
+department, with no error shown. Verify the deployed code — `updateCategory`
+in `app/admin/categories/actions.ts` must call `tx.product.updateMany` in both
+its field-only and rename branches — before touching the picker.
+
 ## 5. What this migration deliberately does not automate
 
 - The one-time database dump/restore (§2) and image migration (§2.5) are
