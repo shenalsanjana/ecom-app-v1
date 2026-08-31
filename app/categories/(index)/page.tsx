@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getProducts, parseSortBy } from "@/app/_lib/products";
-import { getDepartments } from "@/app/_lib/taxonomy";
+import { getDepartments, showsNavDropdown } from "@/app/_lib/taxonomy";
 import { designPath } from "@/app/_lib/taxonomy-path";
 import { inkFor } from "@/app/_lib/taxonomy-tint";
 import { ProductCard } from "@/app/_components/home/product-card";
@@ -47,6 +47,12 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
     ? allProducts.filter((p) => p.category === selectedCategory)
     : allProducts;
 
+  // Only link to departments that actually hold designs. The migration inserts
+  // all four departments but seeds no designs, so on a fresh production database
+  // three of them are empty — linking to them would advertise indexable
+  // "Nothing here yet" pages. showsNavDropdown is the spec's derived rule.
+  const linkedDepartments = departments.filter(showsNavDropdown);
+
   const ITEMS_PER_PAGE = 12;
   const totalPages = Math.ceil(displayProducts.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -82,7 +88,7 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
           </p>
 
           <ul className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            {departments.map((d) => (
+            {linkedDepartments.map((d) => (
               <li key={d.slug}>
                 <Link
                   href={`/categories/${d.slug}`}
@@ -123,7 +129,7 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
                     </span>
                   </Link>
                 </li>
-                {departments.map((d) => {
+                {linkedDepartments.map((d) => {
                   const designSlugs = new Set(d.designs.map((g) => g.slug));
                   const deptProducts = allProducts.filter((p) => designSlugs.has(p.category)).length;
                   return (
