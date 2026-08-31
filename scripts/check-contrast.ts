@@ -13,6 +13,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { ALL_TINTS, inkFor, contrastRatio as hexContrastRatio, INK_DARK } from "../app/_lib/taxonomy-tint";
 
 type RGB = readonly [number, number, number]; // sRGB 0..1
 
@@ -156,6 +157,23 @@ function main(): number {
     console.log(
       `${pair.label.padEnd(50)}  ${ratio.toFixed(2).padEnd(8)}  ${pair.threshold.toFixed(1).padEnd(8)}  ${status}  (${rgbToHex(fgRgb)} on ${rgbToHex(bgRgb)})`
     );
+  }
+
+  console.log("\nTile tints (ink chosen by inkFor, as the runtime does):");
+  let tintFailures = 0;
+  for (const [slug, hex] of Object.entries(ALL_TINTS)) {
+    const ink = inkFor(hex);
+    const ratio = hexContrastRatio(ink, hex);
+    const ok = ratio >= 4.5;
+    if (!ok) tintFailures++;
+    console.log(
+      `  ${ok ? "PASS" : "FAIL"} ${slug.padEnd(12)} ${hex} ` +
+      `ink=${ink === INK_DARK ? "dark" : "light"} ${ratio.toFixed(2)}:1`,
+    );
+  }
+  if (tintFailures > 0) {
+    console.error(`\n${tintFailures} tint(s) below WCAG AA 4.5:1`);
+    failed += tintFailures;
   }
 
   console.log();
