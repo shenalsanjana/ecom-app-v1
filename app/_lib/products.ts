@@ -442,11 +442,6 @@ export async function getProducts(opts: GetProductsOptions = {}): Promise<Produc
   return views;
 }
 
-export async function getDesignSlugRedirect(oldSlug: string): Promise<string | null> {
-  const row = await prisma.designSlugHistory.findUnique({ where: { oldSlug } });
-  return row?.currentSlug ?? null;
-}
-
 export async function getProductSlugRedirect(oldSlug: string): Promise<string | null> {
   const row = await prisma.productSlugHistory.findUnique({ where: { oldSlug } });
   return row?.currentId ?? null;

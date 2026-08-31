@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
-import { categories, catalogProducts } from "../app/_data/mock";
+import { catalogProducts } from "../app/_data/mock";
 import { REVIEW_AUTHORS, reviewPoolForCategory } from "../app/_data/review-content";
 import { DEPARTMENT_TINTS, DESIGN_TINTS } from "../app/_lib/taxonomy-tint";
 
@@ -257,7 +257,8 @@ async function main() {
   const totalVariants = await prisma.productVariant.count();
   const totalReviews = await prisma.review.count();
   console.log(
-    `Seeded ${categories.length} categories, ${catalogProducts.length} products, ${totalVariants} variants, ${totalReviews} reviews.`,
+    `Seeded ${departments.length} departments, ${designs.length} designs, ` +
+    `${catalogProducts.length} products, ${totalVariants} variants, ${totalReviews} reviews.`,
   );
 }
 
