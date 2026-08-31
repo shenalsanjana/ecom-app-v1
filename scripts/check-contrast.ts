@@ -1,12 +1,16 @@
 /**
- * Verifies every published color-token pair in app/globals.css meets WCAG AA
- * contrast (≥ 4.5:1 for body text, ≥ 3:1 for large text and non-text UI).
+ * Verifies every published color-token pair in app/globals.css and every
+ * tile tint in app/_lib/taxonomy-tint.ts meets WCAG AA contrast (≥ 4.5:1).
+ * For oklch pairs: body text ≥ 4.5:1, large text and UI ≥ 3:1.
  *
  * Run via:  npm run check:contrast
  *
- * Reads the :root block in app/globals.css, parses oklch(L C H) values,
- * converts to sRGB via OkLab → linear RGB → sRGB gamma encoding, computes
- * WCAG relative luminance per pair, and exits 1 on any failure.
+ * First pass: reads the :root block in app/globals.css, parses oklch(L C H)
+ * values, converts to sRGB via OkLab → linear RGB → sRGB gamma encoding,
+ * computes WCAG relative luminance per pair.
+ * Second pass: imports all tints from taxonomy-tint.ts, selects ink via
+ * inkFor(), and verifies each tint contrasts at AA 4.5:1 minimum.
+ * Exits 1 on any failure (from either pass).
  *
  * No new dependencies — pure tsx (already a devDep).
  */
@@ -124,7 +128,7 @@ function rgbToHex([r, g, b]: RGB): string {
 function main(): number {
   const css = readFileSync(CSS_PATH, "utf8");
   const tokens = parseTokens(css);
-  let failed = 0;
+  let pairFailures = 0;
 
   console.log(`Reading tokens from ${CSS_PATH}\n`);
   console.log(`${"Pair".padEnd(50)}  ${"Ratio".padEnd(8)}  Required  Status`);
@@ -137,7 +141,7 @@ function main(): number {
       console.log(
         `${pair.label.padEnd(50)}  ${"".padEnd(8)}  ${pair.threshold.toFixed(1).padEnd(8)}  MISSING TOKEN (${!fgVal ? "--" + pair.fg : "--" + pair.bg})`
       );
-      failed++;
+      pairFailures++;
       continue;
     }
     const fgOklch = resolveOklch(fgVal, tokens);
@@ -152,7 +156,7 @@ function main(): number {
     const bgRgb = oklchToSrgb(parseOklch(bgOklch));
     const ratio = contrastRatio(fgRgb, bgRgb);
     const ok = ratio >= pair.threshold;
-    if (!ok) failed++;
+    if (!ok) pairFailures++;
     const status = ok ? "PASS" : "FAIL";
     console.log(
       `${pair.label.padEnd(50)}  ${ratio.toFixed(2).padEnd(8)}  ${pair.threshold.toFixed(1).padEnd(8)}  ${status}  (${rgbToHex(fgRgb)} on ${rgbToHex(bgRgb)})`
@@ -173,15 +177,21 @@ function main(): number {
   }
   if (tintFailures > 0) {
     console.error(`\n${tintFailures} tint(s) below WCAG AA 4.5:1`);
-    failed += tintFailures;
   }
 
   console.log();
-  if (failed > 0) {
-    console.log(`${failed} pair(s) failed WCAG AA. Adjust tokens in app/globals.css and re-run.`);
+  const totalFailures = pairFailures + tintFailures;
+  if (totalFailures > 0) {
+    if (pairFailures > 0 && tintFailures > 0) {
+      console.error(`${pairFailures} pair(s) (in app/globals.css) and ${tintFailures} tint(s) (in app/_lib/taxonomy-tint.ts) failed WCAG AA. Fix both files and re-run.`);
+    } else if (pairFailures > 0) {
+      console.error(`${pairFailures} pair(s) failed WCAG AA. Adjust tokens in app/globals.css and re-run.`);
+    } else {
+      console.error(`${tintFailures} tint(s) failed WCAG AA. Adjust tints in app/_lib/taxonomy-tint.ts and re-run.`);
+    }
     return 1;
   }
-  console.log("All pairs meet WCAG AA.");
+  console.log("All pairs and tints meet WCAG AA.");
   return 0;
 }
 
