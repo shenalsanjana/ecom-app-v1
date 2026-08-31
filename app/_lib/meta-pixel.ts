@@ -64,7 +64,7 @@ function trackCustom(name: string, payload?: Record<string, unknown>): void {
 export function trackViewCategory(categoryName: string): void {
   // Custom event (not ViewContent) so the product-level conversion signal stays
   // clean. Carries the category NAME, not the slug, so audiences survive slug
-  // renames (the app rewrites slugs via getCategorySlugRedirect).
+  // renames (the app redirects retired slugs via getDesignPathRedirect).
   trackCustom("ViewCategory", {
     content_category: categoryName,
     content_name: categoryName,

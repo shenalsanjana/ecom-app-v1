@@ -25,14 +25,14 @@ async function downloadToUploads(url: string): Promise<string> {
 }
 
 async function migrateCategories(): Promise<number> {
-  const categories = await prisma.category.findMany({
+  const categories = await prisma.design.findMany({
     where: { image: { contains: BLOB_HOSTNAME_SUFFIX } },
   });
   let count = 0;
   for (const category of categories) {
-    if (!isBlobUrl(category.image)) continue;
+    if (!category.image || !isBlobUrl(category.image)) continue;
     const newUrl = await downloadToUploads(category.image);
-    await prisma.category.update({
+    await prisma.design.update({
       where: { slug: category.slug },
       data: { image: newUrl },
     });

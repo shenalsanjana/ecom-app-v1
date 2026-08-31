@@ -2,12 +2,12 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 
 type Props = {
-  categorySlug: string;
-  categoryName: string;
+  designSlug: string;
+  designName: string;
   productName: string;
 };
 
-export function Breadcrumb({ categorySlug, categoryName, productName }: Props) {
+export function Breadcrumb({ designSlug, designName, productName }: Props) {
   return (
     <nav aria-label="Breadcrumb" className="text-sm text-muted-foreground">
       <ol className="flex flex-wrap items-center gap-1">
@@ -22,10 +22,10 @@ export function Breadcrumb({ categorySlug, categoryName, productName }: Props) {
         <li aria-hidden="true"><ChevronRight className="h-3.5 w-3.5 text-muted-foreground" /></li>
         <li>
           <Link
-            href={`/?category=${categorySlug}`}
+            href={`/?category=${designSlug}`}
             className="underline-offset-4 transition-colors duration-(--duration-fast) hover:text-brand hover:underline"
           >
-            {categoryName}
+            {designName}
           </Link>
         </li>
         <li aria-hidden="true"><ChevronRight className="h-3.5 w-3.5 text-muted-foreground" /></li>

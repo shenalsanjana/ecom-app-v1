@@ -1,8 +1,30 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
-import { categories, catalogProducts } from "../app/_data/mock";
+import { catalogProducts } from "../app/_data/mock";
 import { REVIEW_AUTHORS, reviewPoolForCategory } from "../app/_data/review-content";
+import { DEPARTMENT_TINTS, DESIGN_TINTS } from "../app/_lib/taxonomy-tint";
+
+const departments = [
+  { slug: "men",   name: "Men",   navLabel: "Men",   tileName: "Men",   note: null, subName: "Oversized Graphic T-Shirts", sortOrder: 0 },
+  { slug: "women", name: "Women", navLabel: "Women", tileName: "Women", note: null, subName: "Oversized Graphic T-Shirts", sortOrder: 1 },
+  { slug: "plain", name: "Plain T-Shirts (Unisex)", navLabel: "Plain Tees", tileName: "Plain T-Shirts", note: "Unisex", subName: null, sortOrder: 2 },
+  { slug: "accessories", name: "Accessories", navLabel: "Accessories", tileName: "Accessories", note: null, subName: null, sortOrder: 3 },
+] as const;
+
+/** Design display names and their department. Slugs `cat` and `dino` are the
+ *  two that already ship and are deliberately not renamed (spec decision 6). */
+const designs = [
+  ["bear", "Bear", "women"], ["cat", "Cats", "women"], ["dino", "Dino", "women"],
+  ["dog", "Dog", "women"], ["feathers", "Feathers", "women"], ["heart", "Heart", "women"],
+  ["just-grow", "Just Grow", "women"], ["looney", "Looney", "women"], ["panda", "Panda", "women"],
+  ["penguin", "Penguin", "women"], ["sealovers", "Sealovers", "women"], ["snoopy", "Snoopy", "women"],
+  ["stitch", "Stitch", "women"], ["butterfly", "Butterfly", "women"], ["love", "Love", "women"],
+  ["paris", "Paris", "women"],
+  ["car", "Car", "men"], ["simpsons", "Simpsons", "men"],
+  ["oversized", "Oversized", "plain"], ["regular", "Regular", "plain"],
+  ["tote", "Tote", "accessories"], ["cap", "Cap", "accessories"], ["socks", "Socks", "accessories"],
+] as const satisfies ReadonlyArray<readonly [string, string, string]>;
 
 // Load Next.js-convention env files for local runs (`tsx prisma/seed.ts`).
 // On Vercel/CI, DATABASE_URL is already in process.env and these files are
@@ -73,27 +95,46 @@ function designStockFor(slug: string): number {
 }
 
 async function main() {
-  const existingCategoryCount = await prisma.category.count();
-  if (existingCategoryCount > 0 && process.env.FORCE_SEED !== "true") {
+  const existingDepartmentCount = await prisma.department.count();
+  if (existingDepartmentCount > 0 && process.env.FORCE_SEED !== "true") {
     console.log(
-      `[seed] Skipping: ${existingCategoryCount} categories already present. ` +
+      `[seed] Skipping: ${existingDepartmentCount} departments already present. ` +
       `Set FORCE_SEED=true to override.`,
     );
     return;
   }
 
-  if (existingCategoryCount > 0) {
+  if (existingDepartmentCount > 0) {
     console.log(
-      `[seed] FORCE_SEED=true detected; reseeding over ${existingCategoryCount} existing categories.`,
+      `[seed] FORCE_SEED=true detected; reseeding over ${existingDepartmentCount} existing departments.`,
     );
   }
 
-  // Categories
-  for (const c of categories) {
-    await prisma.category.upsert({
-      where: { slug: c.slug },
-      update: { name: c.name, image: c.image },
-      create: { slug: c.slug, name: c.name, image: c.image },
+  // Departments and designs. Tints come from DEPARTMENT_TINTS/DESIGN_TINTS so
+  // the seed and the contrast gate cannot disagree. The
+  // 20260830120000_taxonomy_foundation migration already INSERTs the 4
+  // departments, but they're upserted here too so `db:push` + `db:seed`
+  // works on a fresh database and a reseed is self-sufficient. `cat` and
+  // `dino` are the two designs the mock catalog ships; `image` is left out
+  // of their `update` payload so an image set by a previous seed/admin edit
+  // survives a reseed instead of being nulled out.
+  const departmentByDesign = new Map<string, string>();
+  for (const d of departments) {
+    await prisma.department.upsert({
+      where: { slug: d.slug },
+      update: { name: d.name, navLabel: d.navLabel, tileName: d.tileName, note: d.note, subName: d.subName, hex: DEPARTMENT_TINTS[d.slug], sortOrder: d.sortOrder },
+      create: { slug: d.slug, name: d.name, navLabel: d.navLabel, tileName: d.tileName, note: d.note, subName: d.subName, hex: DEPARTMENT_TINTS[d.slug], sortOrder: d.sortOrder },
+    });
+  }
+
+  for (const [slug, name, departmentSlug] of designs) {
+    const hex = DESIGN_TINTS[slug];
+    if (!hex) throw new Error(`[seed] no tint for design "${slug}"`);
+    departmentByDesign.set(slug, departmentSlug);
+    await prisma.design.upsert({
+      where: { slug },
+      update: { name, departmentSlug, hex },
+      create: { slug, name, departmentSlug, hex, image: null },
     });
   }
 
@@ -133,12 +174,14 @@ async function main() {
       where: { id: p.id },
       update: {
         name: p.name, price: p.price, originalPrice: p.originalPrice ?? null,
-        description: DEFAULT_DESCRIPTION, categorySlug: p.category,
+        description: DEFAULT_DESCRIPTION, designSlug: p.category,
+        departmentSlug: departmentByDesign.get(p.category)!,
         dtfDesignId: designIdBySlug.get(p.design.slug)!,
       },
       create: {
         id: p.id, name: p.name, price: p.price, originalPrice: p.originalPrice ?? null,
-        description: DEFAULT_DESCRIPTION, categorySlug: p.category,
+        description: DEFAULT_DESCRIPTION, designSlug: p.category,
+        departmentSlug: departmentByDesign.get(p.category)!,
         dtfDesignId: designIdBySlug.get(p.design.slug)!,
       },
     });
@@ -192,21 +235,21 @@ async function main() {
   }
 
   // FORCE_SEED runs replace the catalog wholesale, so prune any products and
-  // categories left over from a previous catalog. Product cascades to its
-  // images, reviews, and wishlist items; Category needs its products gone
-  // first (no onDelete on the Product->Category relation, so RESTRICT).
+  // designs left over from a previous catalog. Product cascades to its
+  // images, reviews, and wishlist items; Design needs its products gone
+  // first (no onDelete on the Product->Design relation, so RESTRICT).
   if (process.env.FORCE_SEED === "true") {
     const newProductIds = catalogProducts.map((p) => p.id);
-    const newCategorySlugs = categories.map((c) => c.slug);
+    const newDesignSlugs = designs.map(([slug]) => slug);
     const stalePrd = await prisma.product.deleteMany({
       where: { id: { notIn: newProductIds } },
     });
-    const staleCat = await prisma.category.deleteMany({
-      where: { slug: { notIn: newCategorySlugs } },
+    const staleDesign = await prisma.design.deleteMany({
+      where: { slug: { notIn: newDesignSlugs } },
     });
-    if (stalePrd.count > 0 || staleCat.count > 0) {
+    if (stalePrd.count > 0 || staleDesign.count > 0) {
       console.log(
-        `[seed] Removed stale catalog rows: ${stalePrd.count} products, ${staleCat.count} categories.`,
+        `[seed] Removed stale catalog rows: ${stalePrd.count} products, ${staleDesign.count} designs.`,
       );
     }
   }
@@ -214,7 +257,8 @@ async function main() {
   const totalVariants = await prisma.productVariant.count();
   const totalReviews = await prisma.review.count();
   console.log(
-    `Seeded ${categories.length} categories, ${catalogProducts.length} products, ${totalVariants} variants, ${totalReviews} reviews.`,
+    `Seeded ${departments.length} departments, ${designs.length} designs, ` +
+    `${catalogProducts.length} products, ${totalVariants} variants, ${totalReviews} reviews.`,
   );
 }
 

@@ -2,7 +2,7 @@ import type { SVGProps } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
-import { getCategories } from "@/app/_lib/products";
+import { getDesigns } from "@/app/_lib/products";
 
 function InstagramIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -58,7 +58,7 @@ const STATIC_COLUMNS: { heading: string; links: LinkItem[] }[] = [
 ];
 
 export async function SiteFooter() {
-  const categories = await getCategories();
+  const categories = await getDesigns();
   const categoryLinks: LinkItem[] = categories
     .slice(0, 6)
     .map((c) => ({ label: c.name, href: `/categories/${c.slug}` }));

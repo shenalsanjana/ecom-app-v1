@@ -4,7 +4,7 @@ import { ProductCard } from "@/app/_components/home/product-card";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { SortSelect } from "@/app/_components/shared/sort-select";
-import { getCategories, getProducts, parseSortBy } from "@/app/_lib/products";
+import { getDesigns, getProducts, parseSortBy } from "@/app/_lib/products";
 import type { Metadata } from "next";
 
 export async function generateMetadata(
@@ -38,7 +38,7 @@ type SearchPageProps = {
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const sp = await searchParams;
   const query = sp.q?.trim() || "";
-  const categorySlug = sp.category || "";
+  const designSlug = sp.category || "";
   const currentPage = Math.max(parseInt(sp.page || "1", 10), 1);
   const sortBy = parseSortBy(sp.sort, "newest");
   const minPrice = sp.minPrice ? parseFloat(sp.minPrice) : undefined;
@@ -47,14 +47,14 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
   const [products, categories] = await Promise.all([
     getProducts({
-      categorySlug: categorySlug || undefined,
+      designSlug: designSlug || undefined,
       searchQuery: query || undefined,
       sortBy,
       minPrice,
       maxPrice,
       inStockOnly,
     }),
-    getCategories(),
+    getDesigns(),
   ]);
 
   const totalPages = Math.ceil(products.length / ITEMS_PER_PAGE);
@@ -71,7 +71,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           <h1 className="text-2xl font-semibold tracking-tight">
             {query
               ? `Search results for "${query}"`
-              : categorySlug
+              : designSlug
               ? `Products in category`
               : "All products"}
           </h1>
@@ -126,7 +126,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                         page: 1,
                       })}
                       className={`block rounded px-3 py-2 text-sm ${
-                        !categorySlug
+                        !designSlug
                           ? "bg-accent text-accent-foreground"
                           : "text-muted-foreground hover:text-foreground"
                       }`}
@@ -150,7 +150,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                           page: 1,
                         })}
                         className={`block rounded px-3 py-2 text-sm ${
-                          categorySlug === cat.slug
+                          designSlug === cat.slug
                             ? "bg-accent text-accent-foreground"
                             : "text-muted-foreground hover:text-foreground"
                         }`}
@@ -228,7 +228,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                         key={page}
                         href={buildSearchLink({
                           query,
-                          category: categorySlug,
+                          category: designSlug,
                           sortBy,
                           minPrice,
                           maxPrice,

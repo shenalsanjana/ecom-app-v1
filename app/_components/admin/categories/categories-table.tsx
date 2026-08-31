@@ -4,7 +4,7 @@ import { isUploadedImage } from "@/app/_lib/uploaded-image";
 import { DeleteCategoryButton } from "./delete-category-button";
 import { CopyAdLinkButton } from "./copy-ad-link-button";
 
-type Row = { slug: string; name: string; image: string; productCount: number; adUrl: string };
+type Row = { slug: string; name: string; image: string | null; productCount: number; adUrl: string };
 
 export function CategoriesTable({ rows }: { rows: Row[] }) {
   if (rows.length === 0) return <p className="text-sm text-muted-foreground">No categories yet.</p>;
@@ -19,7 +19,12 @@ export function CategoriesTable({ rows }: { rows: Row[] }) {
       <tbody>
         {rows.map((c) => (
           <tr key={c.slug} className="border-b hover:bg-secondary/40">
-            <td className="p-2"><Image src={c.image} alt="" width={36} height={36} unoptimized={isUploadedImage(c.image)} className="rounded object-cover" /></td>
+            {/* image is optional on Design — tint-tiled designs carry no photo. */}
+            <td className="p-2">
+              {c.image
+                ? <Image src={c.image} alt="" width={36} height={36} unoptimized={isUploadedImage(c.image)} className="rounded object-cover" />
+                : <div className="h-9 w-9 rounded bg-secondary" aria-hidden="true" />}
+            </td>
             <td className="p-2 font-medium">
               <Link href={`/admin/categories/${c.slug}/edit`} className="hover:underline">{c.name}</Link>
             </td>

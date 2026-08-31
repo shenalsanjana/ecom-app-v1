@@ -17,7 +17,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
       designs={designs.map((d) => ({ id: d.id, name: d.name }))}
       plainTeeColors={plainTeeColors}
       initial={{
-        id: product.id, name: product.name, categorySlug: product.categorySlug,
+        id: product.id, name: product.name, designSlug: product.designSlug,
         price: String(product.price),
         originalPrice: product.originalPrice != null ? String(product.originalPrice) : "",
         description: product.description, archived: product.archived,

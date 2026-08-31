@@ -9,7 +9,7 @@ import { resolveDefaultVariant, productInStock, type PlainStockMap, type DesignS
 type Row = {
   id: string; name: string; price: number; originalPrice: number | null;
   archived: boolean; dtfDesignId: string | null;
-  category: { name: string } | null;
+  design: { name: string } | null;
   variants: {
     sortOrder: number;
     archived: boolean;
@@ -52,7 +52,7 @@ export function ProductsTable({
                 <Link href={`/admin/products/${p.id}/edit`} className="hover:underline">{p.name}</Link>
                 <br /><span className="text-muted-foreground">{p.id}</span>
               </td>
-              <td className="p-2">{p.category?.name ?? "—"}</td>
+              <td className="p-2">{p.design?.name ?? "—"}</td>
               <td className="p-2 font-medium">{formatPrice(p.price)}{p.originalPrice ? <span className="ml-1 text-xs text-muted-foreground line-through">{formatPrice(p.originalPrice)}</span> : null}</td>
               <td className="p-2">{p._count.variants}</td>
               <td className="p-2"><Badge variant={inStock ? "secondary" : "outline"}>{inStock ? "Available" : "Unavailable"}</Badge></td>

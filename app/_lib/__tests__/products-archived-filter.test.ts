@@ -15,7 +15,7 @@ beforeEach(() => {
 
 describe("storefront product readers exclude archived", () => {
   it("getProducts always filters archived:false", async () => {
-    await getProducts({ categorySlug: "cat" });
+    await getProducts({ designSlug: "cat" });
     expect(findMany.mock.calls[0][0].where.archived).toBe(false);
   });
   it("searchProducts filters archived:false", async () => {

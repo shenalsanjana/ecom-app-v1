@@ -93,17 +93,17 @@ async function main() {
   console.log("Each line: cold = first call, warm = repeat calls (caching/pool warmed)\n");
 
   // Pick a real product id for the detail benchmark.
-  const sample = await prisma.product.findFirst({ where: { archived: false }, select: { id: true, categorySlug: true } });
+  const sample = await prisma.product.findFirst({ where: { archived: false }, select: { id: true, designSlug: true } });
   const pid = sample?.id;
 
   const select = {
     id: true, name: true, price: true, originalPrice: true,
-    image: true, categorySlug: true, sizes: true,
+    image: true, designSlug: true, sizes: true,
   } as const;
 
   // 1. Categories (currently unstable_cache'd; measuring raw query cost)
   await bench("categories.findMany", () =>
-    prisma.category.findMany({ orderBy: { name: "asc" } }),
+    prisma.design.findMany({ orderBy: { name: "asc" } }),
   );
 
   // 2. Featured products + aggregates (2 sequential waves)
@@ -139,7 +139,7 @@ async function main() {
       const product = await prisma.product.findUnique({
         where: { id: pid, archived: false },
         include: {
-          category: true,
+          design: true,
           variants: {
             where: { archived: false },
             orderBy: { sortOrder: "asc" },
@@ -154,7 +154,7 @@ async function main() {
       const [, related] = await Promise.all([
         prisma.review.aggregate({ where: { productId: pid }, _avg: { rating: true }, _count: { _all: true } }),
         prisma.product.findMany({
-          where: { archived: false, categorySlug: product.categorySlug, id: { not: pid } },
+          where: { archived: false, designSlug: product.designSlug, id: { not: pid } },
           take: 4, orderBy: { id: "asc" }, select,
         }),
       ]);

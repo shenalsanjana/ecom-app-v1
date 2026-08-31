@@ -3,20 +3,44 @@
 // gradient tiles (every category resolved to a similar cream product photo, so
 // the six tiles read as six copies of the same muddy tile).
 //
-// getCategories() reads arbitrary rows from the database — the seed ships only
+// getDesigns() reads arbitrary rows from the database — the seed ships only
 // `cat` and `dino` — so an unnamed slug is the normal case and gets a stable
 // hash-picked color from the same palette rather than a blank tile.
 
-export const CATEGORY_TINTS: Record<string, string> = {
-  cat: "#EFC4C4",
-  dino: "#AEBBA0",
-  bear: "#C4906E",
-  retro: "#E4D3B0",
-  wave: "#AEC3D1",
-  nature: "#BFC7A6",
+/** Department tile tints, from the storefront canvas `DEPTS`. */
+export const DEPARTMENT_TINTS: Record<string, string> = {
+  men: "#B7C7D6",
+  women: "#EFC4C4",
+  plain: "#DEDAD2",
+  accessories: "#C4906E",
 };
 
-export const TINT_PALETTE = Object.values(CATEGORY_TINTS) as readonly string[];
+/**
+ * Design tile tints, from the canvas `DESIGN_HEX`.
+ *
+ * `cap` deliberately departs from the canvas. `#8E7A66` reaches only 3.51:1
+ * against INK_LIGHT and 3.32:1 against INK_DARK — no ink choice clears AA.
+ * Lightened to #A59585 (4.69:1 against INK_DARK), which also keeps it
+ * consistent with every other tint resolving to dark ink. See spec §8.
+ */
+export const DESIGN_TINTS: Record<string, string> = {
+  // women
+  bear: "#C4906E", cat: "#EFC4C4", dino: "#AEBBA0", dog: "#D9B99B",
+  feathers: "#CBBBD6", heart: "#E9AFB4", "just-grow": "#BFC7A6",
+  looney: "#E5C98F", panda: "#DEDAD2", penguin: "#B7C7D6",
+  sealovers: "#9FBFC4", snoopy: "#E4DCC6", stitch: "#A8C0D8",
+  butterfly: "#D8C0DA", love: "#E7B7B7", paris: "#DCC9B0",
+  // men
+  car: "#AEC3D1", simpsons: "#E8CE7A",
+  // plain
+  oversized: "#D3CCC0", regular: "#B9BFB2",
+  // accessories
+  tote: "#C9B79A", cap: "#A59585", socks: "#D6C7B8",
+};
+
+export const ALL_TINTS: Record<string, string> = { ...DEPARTMENT_TINTS, ...DESIGN_TINTS };
+
+export const TINT_PALETTE = Object.values(DESIGN_TINTS) as readonly string[];
 
 /** Dark ink. Darkened from the handoff's #3a332c so the darkest tint
  *  (bear #C4906E) clears AA 4.5:1 — it reaches 4.90:1 here, vs 4.47:1 before. */
@@ -24,7 +48,7 @@ export const INK_DARK = "#332d26";
 export const INK_LIGHT = "#F1EDE4";
 
 export function tintForSlug(slug: string): string {
-  const named = CATEGORY_TINTS[slug];
+  const named = ALL_TINTS[slug];
   if (named) return named;
   let hash = 0;
   for (let i = 0; i < slug.length; i++) {
@@ -43,7 +67,8 @@ export function relativeLuminance(hex: string): number {
   return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
 }
 
-function contrast(a: string, b: string): number {
+/** WCAG contrast ratio between two `#rrggbb` colors. */
+export function contrastRatio(a: string, b: string): number {
   const la = relativeLuminance(a);
   const lb = relativeLuminance(b);
   const [hi, lo] = la > lb ? [la, lb] : [lb, la];
@@ -56,7 +81,7 @@ function contrast(a: string, b: string): number {
  * (0.471) and bear (0.328) to the light ink at 1.73:1 and 2.38:1.
  */
 export function inkFor(bgHex: string): string {
-  return contrast(INK_DARK, bgHex) >= contrast(INK_LIGHT, bgHex)
+  return contrastRatio(INK_DARK, bgHex) >= contrastRatio(INK_LIGHT, bgHex)
     ? INK_DARK
     : INK_LIGHT;
 }

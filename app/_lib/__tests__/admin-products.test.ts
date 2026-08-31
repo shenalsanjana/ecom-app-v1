@@ -47,7 +47,7 @@ describe("buildProductWhere", () => {
   it("adds category and case-insensitive search on name + id", () => {
     const w = buildProductWhere({ tab: "active", category: "cat", q: "white" });
     expect(w.archived).toBe(false);
-    expect(w.categorySlug).toBe("cat");
+    expect(w.designSlug).toBe("cat");
     expect(w.OR).toEqual([
       { name: { contains: "white", mode: "insensitive" } },
       { id: { contains: "white", mode: "insensitive" } },

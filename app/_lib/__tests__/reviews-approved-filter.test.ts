@@ -40,8 +40,8 @@ beforeEach(() => {
   orderItemGroupBy.mockReset().mockResolvedValue([]);
   productFindUnique.mockReset().mockResolvedValue({
     id: "cat-white", name: "Cat", price: 2190, originalPrice: null,
-    description: "d", categorySlug: "cat", archived: false, dtfDesignId: "d1",
-    category: { slug: "cat", name: "Cat", image: "/x.jpg" },
+    description: "d", designSlug: "cat", archived: false, dtfDesignId: "d1",
+    design: { slug: "cat", name: "Cat", image: "/x.jpg" },
     variants: [{
       id: "var-1", productId: "cat-white", color: "White", colorSlug: "white",
       swatchHex: "#ffffff", sku: "SKU-1", price: null, originalPrice: null,
@@ -69,7 +69,7 @@ describe("review readers only see approved reviews", () => {
 
   it("list-rating aggregate filters approved:true", async () => {
     productFindMany.mockResolvedValueOnce([{
-      id: "cat-white", name: "Cat", price: 2190, originalPrice: null, categorySlug: "cat", dtfDesignId: "d1",
+      id: "cat-white", name: "Cat", price: 2190, originalPrice: null, designSlug: "cat", dtfDesignId: "d1",
       variants: [{
         colorSlug: "white", color: "White", swatchHex: "#ffffff", price: null, originalPrice: null,
         sortOrder: 0, images: [{ url: "/x.jpg" }], sizeStocks: [{ size: "M" }],
@@ -91,7 +91,7 @@ describe("review readers only see approved reviews", () => {
 
   it("runs the bestseller groupBy for getFeaturedProducts, which opts into signals", async () => {
     productFindMany.mockResolvedValueOnce([{
-      id: "cat-white", name: "Cat", price: 2190, originalPrice: null, categorySlug: "cat", dtfDesignId: "d1",
+      id: "cat-white", name: "Cat", price: 2190, originalPrice: null, designSlug: "cat", dtfDesignId: "d1",
       variants: [{
         colorSlug: "white", color: "White", swatchHex: "#ffffff", price: null, originalPrice: null,
         sortOrder: 0, images: [{ url: "/x.jpg" }], sizeStocks: [{ size: "M" }],

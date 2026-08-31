@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const { requireAdmin } = vi.hoisted(() => ({ requireAdmin: vi.fn() }));
 const {
   productUpdate, productFindUnique, productFindFirst, productCreate, productDelete, orderItemCount,
-  categoryCreate, categoryFindUnique,
+  designCreate, designFindUnique,
   variantDeleteMany, variantCreate, variantFindMany, variantUpdate,
   variantImageCreateMany, variantImageDeleteMany,
   variantSizeStockCreateMany, variantSizeStockDeleteMany,
@@ -12,7 +12,7 @@ const {
   vi.hoisted(() => ({
     productUpdate: vi.fn(), productFindUnique: vi.fn(), productFindFirst: vi.fn(), productCreate: vi.fn(),
     productDelete: vi.fn(), orderItemCount: vi.fn(),
-    categoryCreate: vi.fn(), categoryFindUnique: vi.fn(),
+    designCreate: vi.fn(), designFindUnique: vi.fn(),
     variantDeleteMany: vi.fn(), variantCreate: vi.fn(), variantFindMany: vi.fn(), variantUpdate: vi.fn(),
     variantImageCreateMany: vi.fn(), variantImageDeleteMany: vi.fn(),
     variantSizeStockCreateMany: vi.fn(), variantSizeStockDeleteMany: vi.fn(),
@@ -22,7 +22,7 @@ const {
 function buildClient() {
   return {
     product: { update: productUpdate, findUnique: productFindUnique, findFirst: productFindFirst, create: productCreate, delete: productDelete },
-    category: { create: categoryCreate, findUnique: categoryFindUnique },
+    design: { create: designCreate, findUnique: designFindUnique },
     productVariant: { deleteMany: variantDeleteMany, create: variantCreate, findMany: variantFindMany, update: variantUpdate },
     variantImage: { createMany: variantImageCreateMany, deleteMany: variantImageDeleteMany },
     variantSizeStock: { createMany: variantSizeStockCreateMany, deleteMany: variantSizeStockDeleteMany },
@@ -44,7 +44,9 @@ beforeEach(() => {
   requireAdmin.mockReset().mockResolvedValue({ user: { email: "admin@x.test" } });
   productUpdate.mockReset(); productFindUnique.mockReset(); productFindFirst.mockReset(); productCreate.mockReset();
   productDelete.mockReset(); orderItemCount.mockReset();
-  categoryCreate.mockReset(); categoryFindUnique.mockReset();
+  designCreate.mockReset();
+  // createProduct/updateProduct resolve the product's department from its design.
+  designFindUnique.mockReset().mockResolvedValue({ departmentSlug: "women" });
   variantDeleteMany.mockReset(); variantCreate.mockReset().mockResolvedValue({ id: "variant-1" });
   variantFindMany.mockReset().mockResolvedValue([]); variantUpdate.mockReset().mockResolvedValue({});
   variantImageCreateMany.mockReset(); variantImageDeleteMany.mockReset();
@@ -71,7 +73,7 @@ describe("archive/unarchive", () => {
 import { createProduct } from "../actions";
 
 const NEW_INPUT = {
-  name: "Cat White", slug: "cat-white", categorySlug: "cat",
+  name: "Cat White", slug: "cat-white", designSlug: "cat",
   price: 2190, originalPrice: null,
   description: "Soft tee",
   dtfDesignId: "d1",
@@ -123,7 +125,7 @@ describe("createProduct", () => {
 
     const createArg = productCreate.mock.calls[0][0];
     expect(createArg.data).toMatchObject({
-      id: "cat-white", name: "Cat White", categorySlug: "cat", dtfDesignId: "d1",
+      id: "cat-white", name: "Cat White", designSlug: "cat", dtfDesignId: "d1",
       price: 2190, originalPrice: null, description: "Soft tee", archived: false,
     });
     expect(createArg.data).not.toHaveProperty("image");

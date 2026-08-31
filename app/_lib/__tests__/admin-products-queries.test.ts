@@ -1,32 +1,35 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { productFindMany, productCount, productFindUnique, categoryFindMany, plainFindMany, designFindMany } = vi.hoisted(() => ({
+const { productFindMany, productCount, productFindUnique, designFindMany, plainFindMany, dtfDesignFindMany, departmentFindMany } = vi.hoisted(() => ({
   productFindMany: vi.fn(),
   productCount: vi.fn(),
   productFindUnique: vi.fn(),
-  categoryFindMany: vi.fn(),
-  plainFindMany: vi.fn(),
   designFindMany: vi.fn(),
+  plainFindMany: vi.fn(),
+  dtfDesignFindMany: vi.fn(),
+  departmentFindMany: vi.fn(),
 }));
 
 vi.mock("@/app/_lib/prisma", () => ({
   prisma: {
     product: { findMany: productFindMany, count: productCount, findUnique: productFindUnique },
-    category: { findMany: categoryFindMany },
+    design: { findMany: designFindMany },
     plainTshirtStock: { findMany: plainFindMany },
-    dtfDesign: { findMany: designFindMany },
+    dtfDesign: { findMany: dtfDesignFindMany },
+    department: { findMany: departmentFindMany },
   },
 }));
 
-import { listProducts, getProduct, listCategories, getLowStockProductIds, resolveProductWhere } from "../admin-products";
+import { listProducts, getProduct, listCategories, listDepartments, getLowStockProductIds, resolveProductWhere } from "../admin-products";
 
 beforeEach(() => {
   productFindMany.mockReset();
   productCount.mockReset();
   productFindUnique.mockReset();
-  categoryFindMany.mockReset();
+  designFindMany.mockReset();
   plainFindMany.mockReset().mockResolvedValue([]);
-  designFindMany.mockReset().mockResolvedValue([]);
+  dtfDesignFindMany.mockReset().mockResolvedValue([]);
+  departmentFindMany.mockReset();
 });
 
 describe("listProducts", () => {
@@ -76,7 +79,7 @@ describe("listProducts", () => {
 describe("getLowStockProductIds", () => {
   it("returns an empty list when neither pool has a low row", async () => {
     plainFindMany.mockResolvedValueOnce([]);
-    designFindMany.mockResolvedValueOnce([]);
+    dtfDesignFindMany.mockResolvedValueOnce([]);
     const ids = await getLowStockProductIds();
     expect(ids).toEqual([]);
     expect(productFindMany).not.toHaveBeenCalled();
@@ -84,7 +87,7 @@ describe("getLowStockProductIds", () => {
 
   it("flags a product whose design is low, and one whose offered color+size is low, but not an unaffected product", async () => {
     plainFindMany.mockResolvedValueOnce([{ colorSlug: "white", size: "M" }]);
-    designFindMany.mockResolvedValueOnce([{ id: "d-low" }]);
+    dtfDesignFindMany.mockResolvedValueOnce([{ id: "d-low" }]);
     productFindMany.mockResolvedValueOnce([
       { id: "p-design-low", dtfDesignId: "d-low", variants: [{ colorSlug: "pink", sizeStocks: [{ size: "L" }] }] },
       { id: "p-plain-low", dtfDesignId: "d-ok", variants: [{ colorSlug: "white", sizeStocks: [{ size: "M" }] }] },
@@ -111,12 +114,12 @@ describe("resolveProductWhere", () => {
 });
 
 describe("getProduct", () => {
-  it("includes ordered variants with images and size stock, plus category", async () => {
+  it("includes ordered variants with images and size stock, plus design", async () => {
     productFindUnique.mockResolvedValueOnce({ id: "cat-white" });
     await getProduct("cat-white");
     const arg = productFindUnique.mock.calls[0][0];
     expect(arg.where).toEqual({ id: "cat-white" });
-    expect(arg.include.category).toBe(true);
+    expect(arg.include.design).toBe(true);
     expect(arg.include.variants.where).toEqual({ archived: false });
     expect(arg.include.variants.orderBy).toEqual({ sortOrder: "asc" });
     expect(arg.include.variants.include.images.orderBy).toEqual({ sortOrder: "asc" });
@@ -126,9 +129,21 @@ describe("getProduct", () => {
 
 describe("listCategories", () => {
   it("returns categories ordered by name", async () => {
-    categoryFindMany.mockResolvedValueOnce([{ slug: "cat", name: "Cat" }]);
+    designFindMany.mockResolvedValueOnce([{ slug: "cat", name: "Cat" }]);
     const res = await listCategories();
-    expect(categoryFindMany).toHaveBeenCalledWith({ orderBy: { name: "asc" } });
+    expect(designFindMany).toHaveBeenCalledWith({ orderBy: { name: "asc" } });
     expect(res).toEqual([{ slug: "cat", name: "Cat" }]);
+  });
+});
+
+describe("listDepartments", () => {
+  it("returns departments in storefront order, not alphabetical", async () => {
+    departmentFindMany.mockResolvedValueOnce([
+      { slug: "men", name: "Men", sortOrder: 0 },
+      { slug: "women", name: "Women", sortOrder: 1 },
+    ]);
+    const res = await listDepartments();
+    expect(departmentFindMany).toHaveBeenCalledWith({ orderBy: { sortOrder: "asc" } });
+    expect(res.map((d) => d.slug)).toEqual(["men", "women"]);
   });
 });

@@ -29,7 +29,7 @@ export function buildProductWhere(params: ProductListParams): Prisma.ProductWher
       where.archived = false;
   }
 
-  if (params.category) where.categorySlug = params.category;
+  if (params.category) where.designSlug = params.category;
 
   const q = params.q?.trim();
   if (q) {
@@ -101,7 +101,7 @@ export async function listProducts(
       take: pageSize,
       skip: (page - 1) * pageSize,
       include: {
-        category: { select: { name: true } },
+        design: { select: { name: true } },
         variants: {
           // Deleting a color archives (soft-deletes) it; the admin list must show
           // only live colors, so its count/thumbnail/availability exclude archived rows.
@@ -130,7 +130,7 @@ export async function getProduct(id: string) {
   return prisma.product.findUnique({
     where: { id },
     include: {
-      category: true,
+      design: true,
       variants: {
         where: { archived: false },
         orderBy: { sortOrder: "asc" },
@@ -144,5 +144,11 @@ export async function getProduct(id: string) {
 }
 
 export async function listCategories() {
-  return prisma.category.findMany({ orderBy: { name: "asc" } });
+  return prisma.design.findMany({ orderBy: { name: "asc" } });
+}
+
+// Departments for the admin category form's picker. Ordered by sortOrder so the
+// select reads in the storefront's department order rather than alphabetically.
+export async function listDepartments() {
+  return prisma.department.findMany({ orderBy: { sortOrder: "asc" } });
 }

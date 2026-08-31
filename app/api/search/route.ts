@@ -4,8 +4,8 @@ import { searchProducts, getProducts, parseSortBy, type GetProductsOptions } fro
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const q = searchParams.get('q');
-  const categorySlug = searchParams.get('category');
-  const categorySlugs = searchParams.get('categories')?.split(',').filter(Boolean);
+  const designSlug = searchParams.get('category');
+  const designSlugs = searchParams.get('categories')?.split(',').filter(Boolean);
   const sortBy = parseSortBy(searchParams.get('sort') ?? undefined, 'newest');
   const minPrice = searchParams.get('minPrice')
     ? parseFloat(searchParams.get('minPrice')!)
@@ -30,8 +30,8 @@ export async function GET(request: NextRequest) {
       minPrice,
       maxPrice,
     };
-    if (categorySlug) opts.categorySlug = categorySlug;
-    if (categorySlugs && categorySlugs.length > 0) opts.categorySlugs = categorySlugs;
+    if (designSlug) opts.designSlug = designSlug;
+    if (designSlugs && designSlugs.length > 0) opts.designSlugs = designSlugs;
 
     const results = await getProducts(opts);
     if (limit && limit > 0) {
