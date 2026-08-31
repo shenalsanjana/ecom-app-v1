@@ -3,11 +3,12 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const { requireAdmin } = vi.hoisted(() => ({ requireAdmin: vi.fn() }));
 const {
   designCreate, designUpdate, designFindUnique, designFindFirst, designDelete,
-  historyUpsert, historyDeleteMany, productCount, txn,
+  historyUpsert, historyDeleteMany, productCount, productUpdateMany, txn,
 } = vi.hoisted(() => ({
   designCreate: vi.fn(), designUpdate: vi.fn(), designFindUnique: vi.fn(),
   designFindFirst: vi.fn(), designDelete: vi.fn(),
-  historyUpsert: vi.fn(), historyDeleteMany: vi.fn(), productCount: vi.fn(), txn: vi.fn(),
+  historyUpsert: vi.fn(), historyDeleteMany: vi.fn(), productCount: vi.fn(),
+  productUpdateMany: vi.fn(), txn: vi.fn(),
 }));
 
 vi.mock("@/app/_lib/admin-auth", () => ({ requireAdmin }));
@@ -17,7 +18,7 @@ function makeClient() {
   return {
     design: { create: designCreate, update: designUpdate, findUnique: designFindUnique, findFirst: designFindFirst, delete: designDelete },
     designSlugHistory: { upsert: historyUpsert, deleteMany: historyDeleteMany },
-    product: { count: productCount },
+    product: { count: productCount, updateMany: productUpdateMany },
   };
 }
 
@@ -33,6 +34,7 @@ beforeEach(() => {
   designCreate.mockReset(); designUpdate.mockReset(); designFindUnique.mockReset();
   designFindFirst.mockReset(); designDelete.mockReset();
   historyUpsert.mockReset(); historyDeleteMany.mockReset(); productCount.mockReset();
+  productUpdateMany.mockReset().mockResolvedValue({ count: 0 });
   txn.mockReset().mockImplementation(async (fn: (c: unknown) => unknown) => fn(makeClient()));
 });
 
@@ -179,6 +181,61 @@ describe("updateCategory", () => {
     const res = await updateCategory("cats", { name: "Cats", image: "/c.jpg" });
     expect(res).toEqual({ success: false, error: "Name and department are required" });
     expect(designUpdate).not.toHaveBeenCalled();
+  });
+
+  // BLOCKER 1 — Product.departmentSlug is denormalised from Design.departmentSlug.
+  // updateCategory is the second write path to that invariant (the first is
+  // departmentForDesign in app/admin/products/actions.ts) and must re-stamp the
+  // design's products, or moving a design between departments leaves every
+  // product under it filed in the old department with no error.
+  describe("keeps Product.departmentSlug in step with the design", () => {
+    it("re-stamps the design's products on a field-only move", async () => {
+      designUpdate.mockResolvedValueOnce({});
+      const res = await updateCategory("cats", { name: "Cats", image: null, departmentSlug: "men" });
+      expect(txn).toHaveBeenCalledTimes(1); // design + products move atomically
+      expect(productUpdateMany).toHaveBeenCalledWith({
+        where: { designSlug: "cats" },
+        data: { departmentSlug: "men" },
+      });
+      expect(res).toEqual({ success: true, slug: "cats", name: "Cats" });
+    });
+
+    it("re-stamps the design's products on the rename branch, matching on the NEW slug", async () => {
+      designFindFirst.mockResolvedValueOnce(null); // 'kittens' free
+      designUpdate.mockResolvedValueOnce({});
+      historyUpsert.mockResolvedValueOnce({});
+      historyDeleteMany.mockResolvedValueOnce({ count: 0 });
+      const res = await updateCategory("cats", { name: "Kittens", image: null, departmentSlug: "men" });
+      // ON UPDATE CASCADE has already moved Product.designSlug to 'kittens' by
+      // the time this runs, so a `where` on the old slug would match nothing.
+      expect(productUpdateMany).toHaveBeenCalledWith({
+        where: { designSlug: "kittens" },
+        data: { departmentSlug: "men" },
+      });
+      expect(productUpdateMany).not.toHaveBeenCalledWith(
+        expect.objectContaining({ where: { designSlug: "cats" } }),
+      );
+      expect(res).toEqual({ success: true, slug: "kittens", name: "Kittens" });
+    });
+
+    it("re-stamps against the suffixed slug when the rename collides", async () => {
+      designFindFirst.mockResolvedValueOnce({ slug: "kittens" }).mockResolvedValueOnce(null);
+      designUpdate.mockResolvedValueOnce({});
+      historyUpsert.mockResolvedValueOnce({});
+      historyDeleteMany.mockResolvedValueOnce({ count: 0 });
+      await updateCategory("cats", { name: "Kittens", image: null, departmentSlug: "accessories" });
+      expect(productUpdateMany).toHaveBeenCalledWith({
+        where: { designSlug: "kittens-2" },
+        data: { departmentSlug: "accessories" },
+      });
+    });
+
+    it("does not re-stamp products when the design write fails", async () => {
+      designUpdate.mockRejectedValueOnce(new Error("db down"));
+      const res = await updateCategory("cats", { name: "Cats", image: null, departmentSlug: "men" });
+      expect(productUpdateMany).not.toHaveBeenCalled();
+      expect(res).toEqual({ success: false, error: "Could not update category." });
+    });
   });
 });
 

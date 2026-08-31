@@ -89,9 +89,20 @@ export async function updateCategory(
   // Field-only update — slug is unchanged, so no rename + no history row.
   if (candidateSlug === currentSlug) {
     try {
-      await prisma.design.update({
-        where: { slug: currentSlug },
-        data: { name, image, departmentSlug },
+      await prisma.$transaction(async (tx) => {
+        await tx.design.update({
+          where: { slug: currentSlug },
+          data: { name, image, departmentSlug },
+        });
+        // Product.departmentSlug is denormalised from Design.departmentSlug.
+        // This action is the other write path to that invariant (the first is
+        // departmentForDesign in app/admin/products/actions.ts), so re-stamp
+        // every product under the design — otherwise moving a design from
+        // Women to Men leaves its products filed under Women forever.
+        await tx.product.updateMany({
+          where: { designSlug: currentSlug },
+          data: { departmentSlug },
+        });
       });
     } catch {
       return { success: false, error: "Could not update category." };
@@ -114,6 +125,13 @@ export async function updateCategory(
       await tx.design.update({
         where: { slug: currentSlug },
         data: { slug: newSlug, name, image, departmentSlug },
+      });
+      // Same denormalisation invariant as the field-only branch above. The
+      // cascade has already moved Product.designSlug to newSlug by now, so
+      // match on the NEW slug — `currentSlug` would select nothing.
+      await tx.product.updateMany({
+        where: { designSlug: newSlug },
+        data: { departmentSlug },
       });
       await tx.designSlugHistory.upsert({
         where: { oldSlug: currentSlug },
