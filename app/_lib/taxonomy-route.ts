@@ -1,4 +1,4 @@
-import { designPath } from "@/app/_lib/taxonomy";
+import { designPath } from "@/app/_lib/taxonomy-path";
 
 export type Resolution =
   | { kind: "department"; slug: string }

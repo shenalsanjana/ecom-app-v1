@@ -1,5 +1,7 @@
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/app/_lib/prisma";
+import { designPath } from "@/app/_lib/taxonomy-path";
+export { designPath };
 
 export type DesignSummary = { slug: string; name: string; hex: string };
 
@@ -14,12 +16,6 @@ export type DepartmentView = {
   sortOrder: number;
   designs: DesignSummary[];
 };
-
-/** The canonical path for a design. Never stored — always derived, so moving a
- *  design between departments needs no slug-history rows. */
-export function designPath(departmentSlug: string, designSlug: string): string {
-  return `/categories/${departmentSlug}/${designSlug}`;
-}
 
 /** A department shows a nav dropdown when it has designs to list. */
 export function showsNavDropdown(d: DepartmentView): boolean {
