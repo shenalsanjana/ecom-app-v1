@@ -1,4 +1,4 @@
-// app/categories/loading.tsx
+// app/categories/(index)/loading.tsx
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { ProductGridSkeleton } from "@/app/_components/shared/product-grid-skeleton";

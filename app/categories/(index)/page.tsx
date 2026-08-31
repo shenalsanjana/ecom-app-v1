@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { getDesigns, getProducts, parseSortBy } from "@/app/_lib/products";
+import { getProducts, parseSortBy } from "@/app/_lib/products";
+import { getDepartments } from "@/app/_lib/taxonomy";
+import { designPath } from "@/app/_lib/taxonomy-path";
+import { inkFor } from "@/app/_lib/taxonomy-tint";
 import { ProductCard } from "@/app/_components/home/product-card";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
@@ -27,14 +30,19 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
   const sortBy = parseSortBy(sp.sort, "newest");
   const currentPage = Math.max(parseInt(sp.page || "1", 10), 1);
 
-  const [categories, allProducts] = await Promise.all([
-    getDesigns(),
-    // Always fetch the full catalog (never category-filtered) so the sidebar
-    // counts represent the original totals and never change when a category is
-    // selected. Selecting a category only narrows the displayed list below.
+  const [departments, allProducts] = await Promise.all([
+    getDepartments(),
+    // Always fetch the full catalog (never design-filtered) so the sidebar
+    // counts represent the original totals and never change when a department
+    // is selected. Selecting a design only narrows the displayed list below.
     getProducts({ sortBy }),
   ]);
 
+  // `?category=<design>` predates the nested routes and is still honoured so
+  // any surviving link keeps filtering rather than silently showing everything.
+  const designNames = new Map(
+    departments.flatMap((d) => d.designs.map((g) => [g.slug, g.name] as const)),
+  );
   const displayProducts = selectedCategory
     ? allProducts.filter((p) => p.category === selectedCategory)
     : allProducts;
@@ -44,7 +52,6 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedProducts = displayProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-  const buildCategoryLink = (catSlug: string) => `/categories?category=${catSlug}${sortBy !== "newest" ? `&sort=${sortBy}` : ""}`;
   const buildPageLink = (page: number) => {
     const params = new URLSearchParams();
     if (selectedCategory) params.set("category", selectedCategory);
@@ -58,32 +65,45 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
     <>
       <SiteHeader />
       <main className="flex-1">
-      {/* Hero / Categories Section */}
+      {/* Hero / Departments Section */}
       <section className="border-b bg-muted/30">
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
             {selectedCategory
-              ? categories.find((c) => c.slug === selectedCategory)?.name || "Category"
+              ? designNames.get(selectedCategory) || "Category"
               : "Shop All Categories"}
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
             {selectedCategory
-              ? `Browse our collection of ${displayProducts.length} ${selectedCategory
-                  .split("-")
-                  .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                  .join(" ")} items`
+              ? `Browse our collection of ${displayProducts.length} ${
+                  designNames.get(selectedCategory) || selectedCategory
+                } items`
               : "Discover premium oversize t-shirts. Find your perfect fit from our curated collection."}
           </p>
+
+          <ul className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {departments.map((d) => (
+              <li key={d.slug}>
+                <Link
+                  href={`/categories/${d.slug}`}
+                  className="flex aspect-[4/3] items-end rounded-xl p-4 transition-transform hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  style={{ backgroundColor: d.hex, color: inkFor(d.hex) }}
+                >
+                  <span className="font-heading text-lg font-semibold tracking-tight">{d.tileName}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
-          {/* Sidebar - Categories */}
+          {/* Sidebar - Departments */}
           <aside className="lg:col-span-1">
             <div className="sticky top-24">
               <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Categories
+                Departments
               </h2>
               <ul className="space-y-1">
                 <li>
@@ -103,27 +123,36 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
                     </span>
                   </Link>
                 </li>
-                {categories.map((cat) => {
-                  const catProducts = allProducts.filter(
-                    (p) => p.category === cat.slug
-                  ).length;
+                {departments.map((d) => {
+                  const designSlugs = new Set(d.designs.map((g) => g.slug));
+                  const deptProducts = allProducts.filter((p) => designSlugs.has(p.category)).length;
                   return (
-                    <li key={cat.slug}>
+                    <li key={d.slug}>
                       <Link
-                        href={buildCategoryLink(cat.slug)}
-                        className={`block rounded-lg px-4 py-3 text-sm font-medium transition-colors ${
-                          selectedCategory === cat.slug
-                            ? "bg-primary text-primary-foreground shadow-lg"
-                            : "bg-background hover:bg-accent text-muted-foreground hover:text-foreground"
-                        }`}
+                        href={`/categories/${d.slug}`}
+                        className="block rounded-lg bg-background px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                       >
                         <span className="flex items-center justify-between">
-                          <span>{cat.name}</span>
+                          <span>{d.name}</span>
                           <span className="rounded-full bg-primary-foreground/10 px-2 py-0.5 text-xs font-normal">
-                            {catProducts}
+                            {deptProducts}
                           </span>
                         </span>
                       </Link>
+                      {d.designs.length > 0 && (
+                        <ul className="mt-1 space-y-0.5 pl-4">
+                          {d.designs.map((g) => (
+                            <li key={g.slug}>
+                              <Link
+                                href={designPath(d.slug, g.slug)}
+                                className="block rounded-lg px-4 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+                              >
+                                {g.name}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </li>
                   );
                 })}
