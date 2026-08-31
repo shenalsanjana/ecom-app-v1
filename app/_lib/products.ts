@@ -2,7 +2,7 @@
 import { unstable_cache } from "next/cache";
 
 import { prisma } from "@/app/_lib/prisma";
-import type { Category, Prisma, Product, Review } from "@prisma/client";
+import type { Design, Prisma, Product, Review } from "@prisma/client";
 import { effectivePrice, effectiveOriginalPrice, availableSizes, sortSizeStocks, buildPlainStockMap, buildDesignStockMap } from "@/app/_lib/variants";
 import { unitsForVariant, lowStockSignal, pickBestsellers, BESTSELLER_COUNT } from "@/app/_lib/product-signals";
 
@@ -37,16 +37,16 @@ export type ProductView = {
   badge?: "Bestseller";
 };
 
-export type CategoryView = {
+export type DesignView = {
   slug: string;
   name: string;
-  image: string;
+  image: string | null;
 };
 
 // Shared select for every product-card list read. `satisfies` keeps the literal
 // types so `ProductGetPayload` below infers the exact row shape.
 const cardSelect = {
-  id: true, name: true, price: true, originalPrice: true, categorySlug: true, dtfDesignId: true,
+  id: true, name: true, price: true, originalPrice: true, designSlug: true, dtfDesignId: true,
   variants: {
     where: { archived: false },
     orderBy: { sortOrder: "asc" },
@@ -136,7 +136,7 @@ async function attachAggregates(
       name: p.name,
       rating: agg.avg,
       reviewCount: agg.count,
-      category: p.categorySlug,
+      category: p.designSlug,
       defaultColorSlug: variants[0].colorSlug,
       variants,
       ...(badge ? { badge } : {}),
@@ -149,9 +149,9 @@ async function attachAggregates(
 // IMPORTANT: callbacks below must remain pure (no auth(), cookies(), headers());
 // unstable_cache throws at runtime if those slip in.
 
-export const getCategories = unstable_cache(
-  async (): Promise<CategoryView[]> => {
-    const rows = await prisma.category.findMany({ orderBy: { name: "asc" } });
+export const getDesigns = unstable_cache(
+  async (): Promise<DesignView[]> => {
+    const rows = await prisma.design.findMany({ orderBy: { name: "asc" } });
     return rows.map((c) => ({ slug: c.slug, name: c.name, image: c.image }));
   },
   ["categories-list"],
@@ -214,7 +214,7 @@ export type VariantDetail = {
 };
 
 export type ProductDetail = {
-  product: Product & { category: Category };
+  product: Product & { design: Design };
   variants: VariantDetail[];
   // Raw pool rows, not Maps — Maps aren't serializable across the Server→Client
   // Component boundary. Client consumers (buy-box-client, product-jsonld isn't
@@ -231,7 +231,7 @@ export const getProductDetail = unstable_cache(
     const product = await prisma.product.findUnique({
       where: { id, archived: false },
       include: {
-        category: true,
+        design: true,
         variants: {
           where: { archived: false },
           orderBy: { sortOrder: "asc" },
@@ -269,7 +269,7 @@ export const getProductDetail = unstable_cache(
         _count: { _all: true },
       }),
       prisma.product.findMany({
-        where: { archived: false, categorySlug: product.categorySlug, id: { not: id } },
+        where: { archived: false, designSlug: product.designSlug, id: { not: id } },
         take: 4,
         orderBy: { id: "asc" },
         select: cardSelect,
@@ -277,7 +277,7 @@ export const getProductDetail = unstable_cache(
     ]);
 
     // `product` still carries a variants relation; strip it from the returned
-    // shape so the type stays Product & { category }.
+    // shape so the type stays Product & { design }.
     const { variants: _drop, ...productScalars } = product;
     void _drop;
 
@@ -345,9 +345,9 @@ export function parseSortBy(value: string | undefined, fallback: SortBy = "newes
 }
 
 export type GetProductsOptions = {
-  categorySlug?: string;
+  designSlug?: string;
   searchQuery?: string;
-  categorySlugs?: string[];
+  designSlugs?: string[];
   sortBy?: SortBy;
   minPrice?: number;
   maxPrice?: number;
@@ -356,9 +356,9 @@ export type GetProductsOptions = {
 
 export async function getProducts(opts: GetProductsOptions = {}): Promise<ProductView[]> {
   const {
-    categorySlug,
+    designSlug,
     searchQuery,
-    categorySlugs,
+    designSlugs,
     sortBy = "newest",
     minPrice,
     maxPrice,
@@ -367,12 +367,12 @@ export async function getProducts(opts: GetProductsOptions = {}): Promise<Produc
 
   const where: Prisma.ProductWhereInput = { archived: false };
 
-  // Category filter
-  if (categorySlug) {
-    where.categorySlug = categorySlug;
+  // Design filter
+  if (designSlug) {
+    where.designSlug = designSlug;
   }
-  if (categorySlugs && categorySlugs.length > 0) {
-    where.categorySlug = { in: categorySlugs };
+  if (designSlugs && designSlugs.length > 0) {
+    where.designSlug = { in: designSlugs };
   }
 
   // Search query filter (name or description)
@@ -442,8 +442,8 @@ export async function getProducts(opts: GetProductsOptions = {}): Promise<Produc
   return views;
 }
 
-export async function getCategorySlugRedirect(oldSlug: string): Promise<string | null> {
-  const row = await prisma.categorySlugHistory.findUnique({ where: { oldSlug } });
+export async function getDesignSlugRedirect(oldSlug: string): Promise<string | null> {
+  const row = await prisma.designSlugHistory.findUnique({ where: { oldSlug } });
   return row?.currentSlug ?? null;
 }
 

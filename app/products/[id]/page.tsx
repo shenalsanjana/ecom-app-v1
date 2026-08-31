@@ -99,8 +99,8 @@ export default async function ProductPage({
       <main className="flex-1">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
           <Breadcrumb
-            categorySlug={detail.product.categorySlug}
-            categoryName={detail.product.category.name}
+            designSlug={detail.product.designSlug}
+            designName={detail.product.design.name}
             productName={detail.product.name}
           />
         </div>

@@ -3,7 +3,7 @@
 // gradient tiles (every category resolved to a similar cream product photo, so
 // the six tiles read as six copies of the same muddy tile).
 //
-// getCategories() reads arbitrary rows from the database — the seed ships only
+// getDesigns() reads arbitrary rows from the database — the seed ships only
 // `cat` and `dino` — so an unnamed slug is the normal case and gets a stable
 // hash-picked color from the same palette rather than a blank tile.
 

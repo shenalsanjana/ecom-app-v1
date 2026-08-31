@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getCategories, getProducts, parseSortBy } from "@/app/_lib/products";
+import { getDesigns, getProducts, parseSortBy } from "@/app/_lib/products";
 import { ProductCard } from "@/app/_components/home/product-card";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
@@ -28,7 +28,7 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
   const currentPage = Math.max(parseInt(sp.page || "1", 10), 1);
 
   const [categories, allProducts] = await Promise.all([
-    getCategories(),
+    getDesigns(),
     // Always fetch the full catalog (never category-filtered) so the sidebar
     // counts represent the original totals and never change when a category is
     // selected. Selecting a category only narrows the displayed list below.

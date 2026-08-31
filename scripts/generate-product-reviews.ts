@@ -47,7 +47,7 @@ async function main() {
     where: { archived: false },
     select: {
       id: true,
-      categorySlug: true,
+      designSlug: true,
       _count: { select: { reviews: true } },
     },
     orderBy: { id: "asc" },
@@ -64,7 +64,7 @@ async function main() {
     const rows = Array.from({ length: count }, () => {
       const daysAgo = Math.floor(rng() * 90);
       const createdAt = new Date(Date.now() - daysAgo * 86400_000);
-      const tpl = pick(reviewPoolForCategory(p.categorySlug), rng);
+      const tpl = pick(reviewPoolForCategory(p.designSlug), rng);
       return {
         productId: p.id,
         authorName: pick(REVIEW_AUTHORS, rng),
@@ -77,7 +77,7 @@ async function main() {
       };
     });
 
-    const bucket = (perCategory[p.categorySlug] ??= { products: 0, reviews: 0 });
+    const bucket = (perCategory[p.designSlug] ??= { products: 0, reviews: 0 });
     bucket.products += 1;
     bucket.reviews += rows.length;
     totalReviews += rows.length;

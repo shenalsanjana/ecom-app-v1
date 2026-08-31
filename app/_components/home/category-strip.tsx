@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { getCategories } from "@/app/_lib/products";
+import { getDesigns } from "@/app/_lib/products";
 import { tintForSlug, inkFor } from "@/app/_lib/taxonomy-tint";
 import { Section } from "@/app/_components/ui/section";
 import { SectionHeader } from "@/app/_components/ui/section-header";
 
 export async function CategoryStrip() {
-  const categories = await getCategories();
+  const categories = await getDesigns();
   return (
     <Section>
       <SectionHeader title="Shop by category" />

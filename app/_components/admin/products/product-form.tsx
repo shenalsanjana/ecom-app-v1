@@ -10,7 +10,7 @@ import { emptyVariant, type VariantDraft } from "./variant-draft";
 type Cat = { slug: string; name: string };
 type Design = { id: string; name: string };
 type Initial = {
-  id?: string; name: string; categorySlug: string; price: string; originalPrice: string;
+  id?: string; name: string; designSlug: string; price: string; originalPrice: string;
   description: string; archived: boolean; dtfDesignId: string; variants: VariantDraft[];
 };
 
@@ -35,7 +35,7 @@ export function ProductForm({
 
   function submit() {
     const input = {
-      name: f.name.trim(), slug, categorySlug: f.categorySlug,
+      name: f.name.trim(), slug, designSlug: f.designSlug,
       price: Number(f.price), originalPrice: toNum(f.originalPrice),
       description: f.description.trim(),
       dtfDesignId: f.dtfDesignId,
@@ -84,7 +84,7 @@ export function ProductForm({
           <div><label className="text-xs text-muted-foreground">Slug (URL id)</label>
             <input value={slug} onChange={(e) => { setSlugTouched(true); setSlug(slugify(e.target.value)); }} className="w-full rounded border px-2 py-1.5 text-sm" /></div>
           <div><label className="text-xs text-muted-foreground">Category</label>
-            <CategorySelect categories={categories} value={f.categorySlug} onChange={(s) => set("categorySlug", s)} /></div>
+            <CategorySelect categories={categories} value={f.designSlug} onChange={(s) => set("designSlug", s)} /></div>
           <div><label className="text-xs text-muted-foreground">DTF design</label>
             <select value={f.dtfDesignId} onChange={(e) => set("dtfDesignId", e.target.value)} className="w-full rounded border px-2 py-1.5 text-sm">
               <option value="">Select a design…</option>

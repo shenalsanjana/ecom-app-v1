@@ -32,13 +32,13 @@ function hashToInt(s: string): number {
 async function main() {
   const reviews = await prisma.review.findMany({
     where: { synthetic: true },
-    select: { id: true, product: { select: { categorySlug: true } } },
+    select: { id: true, product: { select: { designSlug: true } } },
   });
 
   const perCategory: Record<string, number> = {};
 
   for (const r of reviews) {
-    const slug = r.product.categorySlug;
+    const slug = r.product.designSlug;
     const pool = reviewPoolForCategory(slug);
     const tpl = pool[hashToInt(r.id) % pool.length];
     const author =

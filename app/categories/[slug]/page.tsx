@@ -1,6 +1,6 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import Link from "next/link";
-import { getCategories, getProducts, parseSortBy, getCategorySlugRedirect } from "@/app/_lib/products";
+import { getDesigns, getProducts, parseSortBy, getDesignSlugRedirect } from "@/app/_lib/products";
 import { ProductCard } from "@/app/_components/home/product-card";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
@@ -14,10 +14,10 @@ export async function generateMetadata(
   { params }: { params: Promise<{ slug: string }> },
 ): Promise<Metadata> {
   const { slug } = await params;
-  const categories = await getCategories();
+  const categories = await getDesigns();
   const category = categories.find((c) => c.slug === slug);
   if (!category) {
-    const dest = await getCategorySlugRedirect(slug);
+    const dest = await getDesignSlugRedirect(slug);
     if (dest) permanentRedirect(`/categories/${dest}`);
     return { title: "Category not found" };
   }
@@ -39,13 +39,13 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   const currentPage = Math.max(parseInt(sp.page || "1", 10), 1);
 
   const [categories, allProducts] = await Promise.all([
-    getCategories(),
-    getProducts({ categorySlug: slug, sortBy }),
+    getDesigns(),
+    getProducts({ designSlug: slug, sortBy }),
   ]);
 
   const category = categories.find((c) => c.slug === slug);
   if (!category) {
-    const dest = await getCategorySlugRedirect(slug);
+    const dest = await getDesignSlugRedirect(slug);
     if (dest) permanentRedirect(`/categories/${dest}`);
     notFound();
   }

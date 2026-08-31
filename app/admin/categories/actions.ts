@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/app/_lib/prisma";
 import { requireAdmin } from "@/app/_lib/admin-auth";
 import { slugify, uniqueSlug } from "@/app/_lib/admin-products";
+import { tintForSlug } from "@/app/_lib/taxonomy-tint";
 
 export type CategoryActionResult =
   | { success: true; slug?: string; name?: string }
@@ -30,12 +31,23 @@ export async function createCategory(input: { name: string; image: string }): Pr
   if (!baseSlug) return { success: false, error: "Name must contain letters or numbers" };
   const slug = await uniqueSlug(
     baseSlug,
-    async (s) => (await prisma.category.findUnique({ where: { slug: s } })) !== null,
+    async (s) => (await prisma.design.findUnique({ where: { slug: s } })) !== null,
   );
   let created;
   try {
-    created = await prisma.category.create({
-      data: { slug, name: parsed.data.name, image: parsed.data.image },
+    // `Design` gained two required columns that this form does not yet collect.
+    // `departmentSlug` defaults to "women" — every design in the catalog today
+    // is a women's graphic tee. `hex` comes from tintForSlug, which returns the
+    // canonical tint for a known slug and a stable palette colour for any other,
+    // so a newly created design never renders as a blank tile.
+    created = await prisma.design.create({
+      data: {
+        slug,
+        name: parsed.data.name,
+        image: parsed.data.image,
+        departmentSlug: "women",
+        hex: tintForSlug(slug),
+      },
     });
   } catch {
     return { success: false, error: "Could not create category." };
@@ -59,7 +71,7 @@ export async function updateCategory(
   // Name/image-only update — slug is unchanged, so no rename + no history row.
   if (candidateSlug === currentSlug) {
     try {
-      await prisma.category.update({ where: { slug: currentSlug }, data: { name, image } });
+      await prisma.design.update({ where: { slug: currentSlug }, data: { name, image } });
     } catch {
       return { success: false, error: "Could not update category." };
     }
@@ -71,21 +83,21 @@ export async function updateCategory(
   const newSlug = await uniqueSlug(
     candidateSlug,
     async (s) =>
-      (await prisma.category.findFirst({ where: { slug: s, NOT: { slug: currentSlug } } })) !== null,
+      (await prisma.design.findFirst({ where: { slug: s, NOT: { slug: currentSlug } } })) !== null,
   );
 
   try {
     await prisma.$transaction(async (tx) => {
-      // ON UPDATE CASCADE moves Product.categorySlug and existing
-      // CategorySlugHistory.currentSlug rows to newSlug automatically.
-      await tx.category.update({ where: { slug: currentSlug }, data: { slug: newSlug, name, image } });
-      await tx.categorySlugHistory.upsert({
+      // ON UPDATE CASCADE moves Product.designSlug and existing
+      // DesignSlugHistory.currentSlug rows to newSlug automatically.
+      await tx.design.update({ where: { slug: currentSlug }, data: { slug: newSlug, name, image } });
+      await tx.designSlugHistory.upsert({
         where: { oldSlug: currentSlug },
         update: { currentSlug: newSlug },
         create: { oldSlug: currentSlug, currentSlug: newSlug },
       });
       // If newSlug was itself a previously-retired slug, drop that row to avoid a self-redirect loop.
-      await tx.categorySlugHistory.deleteMany({ where: { oldSlug: newSlug } });
+      await tx.designSlugHistory.deleteMany({ where: { oldSlug: newSlug } });
     });
   } catch {
     return { success: false, error: "Could not update category." };
@@ -96,12 +108,12 @@ export async function updateCategory(
 
 export async function deleteCategory(slug: string): Promise<CategoryActionResult> {
   await requireAdmin();
-  const productCount = await prisma.product.count({ where: { categorySlug: slug } });
+  const productCount = await prisma.product.count({ where: { designSlug: slug } });
   if (productCount > 0) {
     return { success: false, error: "This category has products. Reassign or remove them first." };
   }
   try {
-    await prisma.category.delete({ where: { slug } });
+    await prisma.design.delete({ where: { slug } });
   } catch {
     return { success: false, error: "Could not delete category." };
   }

@@ -4,7 +4,7 @@ import { CategoriesTable } from "@/app/_components/admin/categories/categories-t
 import { absoluteUrl } from "@/app/_lib/absolute-url";
 
 export default async function AdminCategoriesPage() {
-  const categories = await prisma.category.findMany({
+  const categories = await prisma.design.findMany({
     orderBy: { name: "asc" },
     include: { _count: { select: { products: true } } },
   });

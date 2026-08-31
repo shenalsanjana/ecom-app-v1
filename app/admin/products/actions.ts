@@ -79,7 +79,7 @@ const VariantInputSchema = z.object({
 const ProductInputSchema = z.object({
   name: z.string().trim().min(1),
   slug: z.string().trim().optional(),
-  categorySlug: z.string().trim().min(1),
+  designSlug: z.string().trim().min(1),
   price: z.number().positive(),
   originalPrice: z.number().positive().nullable().optional(),
   description: z.string().trim().min(1),
@@ -88,6 +88,19 @@ const ProductInputSchema = z.object({
 });
 export type VariantInput = z.infer<typeof VariantInputSchema>;
 export type ProductInput = z.infer<typeof ProductInputSchema>;
+
+// Product.departmentSlug is denormalised from the product's design so that
+// department listings are a single indexed read. The form only picks a design,
+// so every write resolves the department from it and keeps the two in step —
+// otherwise re-assigning a product to a design in another department would
+// leave it filed under the old one.
+async function departmentForDesign(designSlug: string): Promise<string | null> {
+  const design = await prisma.design.findUnique({
+    where: { slug: designSlug },
+    select: { departmentSlug: true },
+  });
+  return design?.departmentSlug ?? null;
+}
 
 // Reject duplicate colorSlugs or duplicate non-empty SKUs within one product,
 // so the DB unique constraints surface as a friendly message, not a 500.
@@ -233,11 +246,14 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
     async (s) => (await prisma.product.findUnique({ where: { id: s } })) !== null,
   );
 
+  const departmentSlug = await departmentForDesign(d.designSlug);
+  if (!departmentSlug) return { success: false, error: "Could not create product (unknown category)." };
+
   try {
     await prisma.$transaction(async (tx) => {
       await tx.product.create({
         data: {
-          id: slug, name: d.name, categorySlug: d.categorySlug, dtfDesignId: d.dtfDesignId,
+          id: slug, name: d.name, designSlug: d.designSlug, departmentSlug, dtfDesignId: d.dtfDesignId,
           price: d.price, originalPrice: d.originalPrice ?? null,
           description: d.description, archived: false,
         },
@@ -245,7 +261,7 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
       await writeVariants(tx, slug, d.variants);
     }, TX_OPTIONS);
   } catch (e) {
-    console.error("createProduct failed", { slug, categorySlug: d.categorySlug, error: e });
+    console.error("createProduct failed", { slug, designSlug: d.designSlug, error: e });
     return { success: false, error: "Could not create product (check the category and that SKUs are unique)." };
   }
   revalidate(slug);
@@ -267,6 +283,9 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
   const candidateSlug = slugify(d.slug || d.name);
   if (!candidateSlug) return { success: false, error: "Name must contain letters or numbers" };
 
+  const departmentSlug = await departmentForDesign(d.designSlug);
+  if (!departmentSlug) return { success: false, error: "Could not save the product (unknown category)." };
+
   // Field-only edit (slug unchanged): update scalars + rebuild variants.
   if (candidateSlug === id) {
     try {
@@ -274,7 +293,7 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
         await tx.product.update({
           where: { id },
           data: {
-            name: d.name, categorySlug: d.categorySlug, dtfDesignId: d.dtfDesignId,
+            name: d.name, designSlug: d.designSlug, departmentSlug, dtfDesignId: d.dtfDesignId,
             price: d.price, originalPrice: d.originalPrice ?? null,
             description: d.description,
           },
@@ -282,7 +301,7 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
         await reconcileVariants(tx, id, d.variants);
       }, TX_OPTIONS);
     } catch (e) {
-      console.error("updateProduct failed (field-only)", { id, categorySlug: d.categorySlug, error: e });
+      console.error("updateProduct failed (field-only)", { id, designSlug: d.designSlug, error: e });
       return { success: false, error: "Could not save the product. Please try again — if you changed a SKU, make sure it isn't already used by another product." };
     }
     revalidate(id);
@@ -300,7 +319,7 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
       await tx.product.update({
         where: { id },
         data: {
-          id: newSlug, name: d.name, categorySlug: d.categorySlug, dtfDesignId: d.dtfDesignId,
+          id: newSlug, name: d.name, designSlug: d.designSlug, departmentSlug, dtfDesignId: d.dtfDesignId,
           price: d.price, originalPrice: d.originalPrice ?? null,
           description: d.description,
         },
@@ -314,7 +333,7 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
       await tx.productSlugHistory.deleteMany({ where: { oldSlug: newSlug } });
     }, TX_OPTIONS);
   } catch (e) {
-    console.error("updateProduct failed (rename)", { id, newSlug, categorySlug: d.categorySlug, error: e });
+    console.error("updateProduct failed (rename)", { id, newSlug, designSlug: d.designSlug, error: e });
     return { success: false, error: "Could not save the product. Please try again — if you changed a SKU, make sure it isn't already used by another product." };
   }
   revalidatePath(`/admin/products/${id}/edit`);

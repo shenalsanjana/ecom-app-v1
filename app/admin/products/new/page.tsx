@@ -14,7 +14,7 @@ export default async function NewProductPage() {
       categories={categories.map((c) => ({ slug: c.slug, name: c.name }))}
       designs={designs.map((d) => ({ id: d.id, name: d.name }))}
       plainTeeColors={plainTeeColors}
-      initial={{ name: "", categorySlug: "", price: "", originalPrice: "", description: "", archived: false, dtfDesignId: "", variants: [emptyVariant()] }}
+      initial={{ name: "", designSlug: "", price: "", originalPrice: "", description: "", archived: false, dtfDesignId: "", variants: [emptyVariant()] }}
     />
   );
 }

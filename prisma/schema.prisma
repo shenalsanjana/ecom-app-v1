@@ -41,18 +41,50 @@ model Address {
   @@index([userId])
 }
 
-model Category {
-  slug        String                @id
-  name        String
-  image       String
+model Department {
+  slug      String  @id
+  name      String
+  navLabel  String
+  tileName  String
+  note      String?
+  subName   String?
+  hex       String
+  sortOrder Int     @default(0)
+
+  designs     Design[]
   products    Product[]
-  slugHistory CategorySlugHistory[]
+  slugHistory DepartmentSlugHistory[]
 }
 
-model CategorySlugHistory {
-  oldSlug     String   @id
+model DepartmentSlugHistory {
+  oldSlug     String     @id
   currentSlug String
-  category    Category @relation(fields: [currentSlug], references: [slug], onDelete: Cascade, onUpdate: Cascade)
+  department  Department @relation(fields: [currentSlug], references: [slug], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([currentSlug])
+}
+
+model Design {
+  slug           String  @id
+  name           String
+  departmentSlug String
+  image          String?
+  hex            String
+  sortOrder      Int     @default(0)
+  dtfDesignId    String?
+
+  department  Department          @relation(fields: [departmentSlug], references: [slug])
+  dtfDesign   DtfDesign?          @relation(fields: [dtfDesignId], references: [id], onDelete: SetNull)
+  products    Product[]
+  slugHistory DesignSlugHistory[]
+
+  @@index([departmentSlug])
+}
+
+model DesignSlugHistory {
+  oldSlug     String @id
+  currentSlug String
+  design      Design @relation(fields: [currentSlug], references: [slug], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([currentSlug])
 }
@@ -63,11 +95,13 @@ model Product {
   price         Float
   originalPrice Float?
   description   String
-  categorySlug  String
+  designSlug    String
+  departmentSlug String
   archived      Boolean  @default(false)
   dtfDesignId   String?
 
-  category      Category       @relation(fields: [categorySlug], references: [slug])
+  design        Design         @relation(fields: [designSlug], references: [slug])
+  department    Department     @relation(fields: [departmentSlug], references: [slug])
   dtfDesign     DtfDesign?     @relation(fields: [dtfDesignId], references: [id], onDelete: Restrict)
   wishlistItems WishlistItem[]
   reviews       Review[]
@@ -75,7 +109,8 @@ model Product {
   slugHistory   ProductSlugHistory[]
   variants      ProductVariant[]
 
-  @@index([categorySlug])
+  @@index([designSlug])
+  @@index([departmentSlug])
   @@index([archived])
   @@index([dtfDesignId])
 }
@@ -155,6 +190,7 @@ model DtfDesign {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  designs    Design[]
   products   Product[]
   orderItems OrderItem[]
 }

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { categories, catalogProducts } from "../app/_data/mock";
 import { REVIEW_AUTHORS, reviewPoolForCategory } from "../app/_data/review-content";
+import { DESIGN_TINTS } from "../app/_lib/taxonomy-tint";
 
 // Load Next.js-convention env files for local runs (`tsx prisma/seed.ts`).
 // On Vercel/CI, DATABASE_URL is already in process.env and these files are
@@ -73,7 +74,7 @@ function designStockFor(slug: string): number {
 }
 
 async function main() {
-  const existingCategoryCount = await prisma.category.count();
+  const existingCategoryCount = await prisma.design.count();
   if (existingCategoryCount > 0 && process.env.FORCE_SEED !== "true") {
     console.log(
       `[seed] Skipping: ${existingCategoryCount} categories already present. ` +
@@ -88,12 +89,20 @@ async function main() {
     );
   }
 
-  // Categories
+  // Designs. Both designs the mock catalog ships (`cat`, `dino`) are women's
+  // graphic tees. Tints come from DESIGN_TINTS so the seed and the contrast
+  // gate cannot disagree; the four departments are inserted by the
+  // 20260830120000_taxonomy_foundation migration, not seeded here.
+  const departmentByDesign = new Map<string, string>();
   for (const c of categories) {
-    await prisma.category.upsert({
+    const hex = DESIGN_TINTS[c.slug];
+    if (!hex) throw new Error(`[seed] no tint for design "${c.slug}"`);
+    const departmentSlug = "women";
+    departmentByDesign.set(c.slug, departmentSlug);
+    await prisma.design.upsert({
       where: { slug: c.slug },
-      update: { name: c.name, image: c.image },
-      create: { slug: c.slug, name: c.name, image: c.image },
+      update: { name: c.name, image: c.image, departmentSlug, hex },
+      create: { slug: c.slug, name: c.name, image: c.image, departmentSlug, hex },
     });
   }
 
@@ -133,12 +142,14 @@ async function main() {
       where: { id: p.id },
       update: {
         name: p.name, price: p.price, originalPrice: p.originalPrice ?? null,
-        description: DEFAULT_DESCRIPTION, categorySlug: p.category,
+        description: DEFAULT_DESCRIPTION, designSlug: p.category,
+        departmentSlug: departmentByDesign.get(p.category)!,
         dtfDesignId: designIdBySlug.get(p.design.slug)!,
       },
       create: {
         id: p.id, name: p.name, price: p.price, originalPrice: p.originalPrice ?? null,
-        description: DEFAULT_DESCRIPTION, categorySlug: p.category,
+        description: DEFAULT_DESCRIPTION, designSlug: p.category,
+        departmentSlug: departmentByDesign.get(p.category)!,
         dtfDesignId: designIdBySlug.get(p.design.slug)!,
       },
     });
@@ -193,16 +204,16 @@ async function main() {
 
   // FORCE_SEED runs replace the catalog wholesale, so prune any products and
   // categories left over from a previous catalog. Product cascades to its
-  // images, reviews, and wishlist items; Category needs its products gone
-  // first (no onDelete on the Product->Category relation, so RESTRICT).
+  // images, reviews, and wishlist items; Design needs its products gone
+  // first (no onDelete on the Product->Design relation, so RESTRICT).
   if (process.env.FORCE_SEED === "true") {
     const newProductIds = catalogProducts.map((p) => p.id);
-    const newCategorySlugs = categories.map((c) => c.slug);
+    const newDesignSlugs = categories.map((c) => c.slug);
     const stalePrd = await prisma.product.deleteMany({
       where: { id: { notIn: newProductIds } },
     });
-    const staleCat = await prisma.category.deleteMany({
-      where: { slug: { notIn: newCategorySlugs } },
+    const staleCat = await prisma.design.deleteMany({
+      where: { slug: { notIn: newDesignSlugs } },
     });
     if (stalePrd.count > 0 || staleCat.count > 0) {
       console.log(
