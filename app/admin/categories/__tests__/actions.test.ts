@@ -37,15 +37,15 @@ beforeEach(() => {
 });
 
 describe("createCategory", () => {
-  it("rejects empty name or image", async () => {
-    expect(await createCategory({ name: "  ", image: "/x.jpg" })).toEqual({ success: false, error: "Name and image are required" });
-    expect(await createCategory({ name: "Hats", image: "" })).toEqual({ success: false, error: "Name and image are required" });
+  it("rejects an empty name", async () => {
+    expect(await createCategory({ name: "  ", image: "/x.jpg", departmentSlug: "women" }))
+      .toEqual({ success: false, error: "Name is required" });
   });
   it("slugifies, ensures uniqueness, creates, and returns the slug", async () => {
     designFindUnique.mockResolvedValueOnce({ slug: "hats" }).mockResolvedValueOnce(null); // 'hats' taken, 'hats-2' free
     designCreate.mockResolvedValueOnce({ slug: "hats-2", name: "Hats" });
-    const res = await createCategory({ name: "Hats", image: "/hats.jpg" });
-    // departmentSlug and hex are defaulted — the form collects neither.
+    const res = await createCategory({ name: "Hats", image: "/hats.jpg", departmentSlug: "women" });
+    // hex is not collected by the form; it is derived from the slug.
     expect(designCreate).toHaveBeenCalledWith({
       data: {
         slug: "hats-2", name: "Hats", image: "/hats.jpg",
@@ -55,17 +55,57 @@ describe("createCategory", () => {
     expect(res).toEqual({ success: true, slug: "hats-2", name: "Hats" });
   });
   it("rejects a name with no slug-able characters", async () => {
-    const res = await createCategory({ name: "!!!", image: "/x.jpg" });
+    const res = await createCategory({ name: "!!!", image: "/x.jpg", departmentSlug: "women" });
     expect(res).toEqual({ success: false, error: "Name must contain letters or numbers" });
     expect(designCreate).not.toHaveBeenCalled();
+  });
+
+  // FIX 1 — image is optional and must persist as NULL, never "".
+  it.each([
+    ["empty string", ""],
+    ["whitespace only", "   "],
+    ["null", null],
+    ["absent", undefined],
+  ])("creates a design with no image when image is %s, persisting NULL not \"\"", async (_label, image) => {
+    designFindUnique.mockResolvedValueOnce(null);
+    designCreate.mockResolvedValueOnce({ slug: "tote", name: "Tote" });
+    const res = await createCategory({ name: "Tote", image, departmentSlug: "accessories" });
+    expect(designCreate).toHaveBeenCalledWith({
+      data: {
+        slug: "tote", name: "Tote", image: null,
+        departmentSlug: "accessories", hex: tintForSlug("tote"),
+      },
+    });
+    expect(res).toEqual({ success: true, slug: "tote", name: "Tote" });
+  });
+
+  // FIX 2 — the chosen department is written, not hardcoded to "women".
+  it("files the design under the chosen department", async () => {
+    designFindUnique.mockResolvedValueOnce(null);
+    designCreate.mockResolvedValueOnce({ slug: "car", name: "Car" });
+    await createCategory({ name: "Car", image: "/car.jpg", departmentSlug: "men" });
+    expect(designCreate).toHaveBeenCalledWith({
+      data: {
+        slug: "car", name: "Car", image: "/car.jpg",
+        departmentSlug: "men", hex: tintForSlug("car"),
+      },
+    });
+  });
+  it("falls back to women when no department is supplied (product-form quick-create)", async () => {
+    designFindUnique.mockResolvedValueOnce(null);
+    designCreate.mockResolvedValueOnce({ slug: "hats", name: "Hats" });
+    await createCategory({ name: "Hats", image: "/h.jpg" });
+    expect(designCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ departmentSlug: "women" }) }),
+    );
   });
 });
 
 describe("updateCategory", () => {
-  it("cosmetic edit (name changes but slug doesn't): updates name/image only, no history, no suffix", async () => {
+  it("cosmetic edit (name changes but slug doesn't): updates fields only, no history, no suffix", async () => {
     designUpdate.mockResolvedValueOnce({});
-    const res = await updateCategory("cats", { name: "Cats", image: "/cats.jpg" }); // slugify('Cats') === 'cats'
-    expect(designUpdate).toHaveBeenCalledWith({ where: { slug: "cats" }, data: { name: "Cats", image: "/cats.jpg" } });
+    const res = await updateCategory("cats", { name: "Cats", image: "/cats.jpg", departmentSlug: "women" }); // slugify('Cats') === 'cats'
+    expect(designUpdate).toHaveBeenCalledWith({ where: { slug: "cats" }, data: { name: "Cats", image: "/cats.jpg", departmentSlug: "women" } });
     expect(designFindFirst).not.toHaveBeenCalled();
     expect(historyUpsert).not.toHaveBeenCalled();
     expect(res).toEqual({ success: true, slug: "cats", name: "Cats" });
@@ -75,9 +115,9 @@ describe("updateCategory", () => {
     designUpdate.mockResolvedValueOnce({});
     historyUpsert.mockResolvedValueOnce({});
     historyDeleteMany.mockResolvedValueOnce({ count: 0 });
-    const res = await updateCategory("cats", { name: "Kittens", image: "/k.jpg" });
+    const res = await updateCategory("cats", { name: "Kittens", image: "/k.jpg", departmentSlug: "women" });
     expect(designFindFirst).toHaveBeenCalledWith({ where: { slug: "kittens", NOT: { slug: "cats" } } });
-    expect(designUpdate).toHaveBeenCalledWith({ where: { slug: "cats" }, data: { slug: "kittens", name: "Kittens", image: "/k.jpg" } });
+    expect(designUpdate).toHaveBeenCalledWith({ where: { slug: "cats" }, data: { slug: "kittens", name: "Kittens", image: "/k.jpg", departmentSlug: "women" } });
     expect(historyUpsert).toHaveBeenCalledWith({
       where: { oldSlug: "cats" },
       update: { currentSlug: "kittens" },
@@ -91,15 +131,54 @@ describe("updateCategory", () => {
     designUpdate.mockResolvedValueOnce({});
     historyUpsert.mockResolvedValueOnce({});
     historyDeleteMany.mockResolvedValueOnce({ count: 0 });
-    const res = await updateCategory("cats", { name: "Kittens", image: "/k.jpg" });
-    expect(designUpdate).toHaveBeenCalledWith({ where: { slug: "cats" }, data: { slug: "kittens-2", name: "Kittens", image: "/k.jpg" } });
+    const res = await updateCategory("cats", { name: "Kittens", image: "/k.jpg", departmentSlug: "women" });
+    expect(designUpdate).toHaveBeenCalledWith({ where: { slug: "cats" }, data: { slug: "kittens-2", name: "Kittens", image: "/k.jpg", departmentSlug: "women" } });
     expect(res).toEqual({ success: true, slug: "kittens-2", name: "Kittens" });
   });
   it("rejects a rename to a name with no slug-able characters", async () => {
-    const res = await updateCategory("cats", { name: "!!!", image: "/k.jpg" });
+    const res = await updateCategory("cats", { name: "!!!", image: "/k.jpg", departmentSlug: "women" });
     expect(res).toEqual({ success: false, error: "Name must contain letters or numbers" });
     expect(designUpdate).not.toHaveBeenCalled();
     expect(designFindFirst).not.toHaveBeenCalled();
+  });
+
+  // FIX 1 — a null-image design must be editable without uploading a photo.
+  it("saves a design that has no image, keeping it NULL rather than \"\"", async () => {
+    designUpdate.mockResolvedValueOnce({});
+    const res = await updateCategory("cats", { name: "Cats", image: "", departmentSlug: "women" });
+    expect(designUpdate).toHaveBeenCalledWith({
+      where: { slug: "cats" },
+      data: { name: "Cats", image: null, departmentSlug: "women" },
+    });
+    expect(res).toEqual({ success: true, slug: "cats", name: "Cats" });
+  });
+
+  // FIX 2 — the department is writable, and on both branches.
+  it("moves a design to another department on a field-only edit", async () => {
+    designUpdate.mockResolvedValueOnce({});
+    await updateCategory("cats", { name: "Cats", image: null, departmentSlug: "men" });
+    expect(designUpdate).toHaveBeenCalledWith({
+      where: { slug: "cats" },
+      data: { name: "Cats", image: null, departmentSlug: "men" },
+    });
+  });
+  it("carries the department through the rename branch too", async () => {
+    designFindFirst.mockResolvedValueOnce(null);
+    designUpdate.mockResolvedValueOnce({});
+    historyUpsert.mockResolvedValueOnce({});
+    historyDeleteMany.mockResolvedValueOnce({ count: 0 });
+    await updateCategory("cats", { name: "Kittens", image: null, departmentSlug: "accessories" });
+    expect(designUpdate).toHaveBeenCalledWith({
+      where: { slug: "cats" },
+      data: { slug: "kittens", name: "Kittens", image: null, departmentSlug: "accessories" },
+    });
+  });
+  it("rejects an update with no department rather than defaulting it to women", async () => {
+    // @ts-expect-error departmentSlug is required — this guards the runtime path
+    // against a caller that omits it, which would silently re-file the design.
+    const res = await updateCategory("cats", { name: "Cats", image: "/c.jpg" });
+    expect(res).toEqual({ success: false, error: "Name and department are required" });
+    expect(designUpdate).not.toHaveBeenCalled();
   });
 });
 

@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { productFindMany, productCount, productFindUnique, designFindMany, plainFindMany, dtfDesignFindMany } = vi.hoisted(() => ({
+const { productFindMany, productCount, productFindUnique, designFindMany, plainFindMany, dtfDesignFindMany, departmentFindMany } = vi.hoisted(() => ({
   productFindMany: vi.fn(),
   productCount: vi.fn(),
   productFindUnique: vi.fn(),
   designFindMany: vi.fn(),
   plainFindMany: vi.fn(),
   dtfDesignFindMany: vi.fn(),
+  departmentFindMany: vi.fn(),
 }));
 
 vi.mock("@/app/_lib/prisma", () => ({
@@ -15,10 +16,11 @@ vi.mock("@/app/_lib/prisma", () => ({
     design: { findMany: designFindMany },
     plainTshirtStock: { findMany: plainFindMany },
     dtfDesign: { findMany: dtfDesignFindMany },
+    department: { findMany: departmentFindMany },
   },
 }));
 
-import { listProducts, getProduct, listCategories, getLowStockProductIds, resolveProductWhere } from "../admin-products";
+import { listProducts, getProduct, listCategories, listDepartments, getLowStockProductIds, resolveProductWhere } from "../admin-products";
 
 beforeEach(() => {
   productFindMany.mockReset();
@@ -27,6 +29,7 @@ beforeEach(() => {
   designFindMany.mockReset();
   plainFindMany.mockReset().mockResolvedValue([]);
   dtfDesignFindMany.mockReset().mockResolvedValue([]);
+  departmentFindMany.mockReset();
 });
 
 describe("listProducts", () => {
@@ -130,5 +133,17 @@ describe("listCategories", () => {
     const res = await listCategories();
     expect(designFindMany).toHaveBeenCalledWith({ orderBy: { name: "asc" } });
     expect(res).toEqual([{ slug: "cat", name: "Cat" }]);
+  });
+});
+
+describe("listDepartments", () => {
+  it("returns departments in storefront order, not alphabetical", async () => {
+    departmentFindMany.mockResolvedValueOnce([
+      { slug: "men", name: "Men", sortOrder: 0 },
+      { slug: "women", name: "Women", sortOrder: 1 },
+    ]);
+    const res = await listDepartments();
+    expect(departmentFindMany).toHaveBeenCalledWith({ orderBy: { sortOrder: "asc" } });
+    expect(res.map((d) => d.slug)).toEqual(["men", "women"]);
   });
 });

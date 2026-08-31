@@ -146,3 +146,9 @@ export async function getProduct(id: string) {
 export async function listCategories() {
   return prisma.design.findMany({ orderBy: { name: "asc" } });
 }
+
+// Departments for the admin category form's picker. Ordered by sortOrder so the
+// select reads in the storefront's department order rather than alphabetically.
+export async function listDepartments() {
+  return prisma.department.findMany({ orderBy: { sortOrder: "asc" } });
+}
