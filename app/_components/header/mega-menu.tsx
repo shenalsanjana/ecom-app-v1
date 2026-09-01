@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { NavigationMenu } from "@base-ui/react/navigation-menu";
-import { MIN_MEGA_MENU_COLUMNS, type NavColumn } from "@/app/_lib/taxonomy-nav";
+import { MIN_MEGA_MENU_COLUMNS, type NavColumn } from "@/app/_lib/taxonomy-nav-model";
 
 const TRIGGER_CLASS =
   "flex items-center gap-1 text-xs uppercase tracking-[0.12em] text-muted-foreground transition-colors duration-(--duration-fast) hover:text-brand data-[popup-open]:text-brand";
@@ -12,7 +12,11 @@ const TRIGGER_CLASS =
  *
  *  Takes plain columns rather than DepartmentView rows: this is a Client
  *  Component, and `@/app/_lib/taxonomy` imports Prisma. The header does that
- *  work and passes the result down. The type-only import below is erased.
+ *  work and passes the result down. Both imports above come from
+ *  `taxonomy-nav-model`, not `taxonomy-nav` — that module value-imports from
+ *  `@/app/_lib/taxonomy`, and importing even one unrelated export from it
+ *  pulls Prisma's evaluation into this client bundle. `taxonomy-nav-model`
+ *  has zero imports, so nothing here can leak.
  *
  *  Links are plain next/link elements rather than NavigationMenu.Link — Base
  *  UI's `render` prop would move the href into props.render, where this repo's
@@ -64,6 +68,14 @@ export function MegaMenu({ columns }: { columns: NavColumn[] }) {
                 </li>
               ))}
             </ul>
+            <div className="mt-6 border-t pt-4">
+              <Link
+                href="/categories"
+                className="text-sm text-muted-foreground transition-colors duration-(--duration-fast) hover:text-brand"
+              >
+                Shop all categories
+              </Link>
+            </div>
           </NavigationMenu.Content>
         </NavigationMenu.Item>
       </NavigationMenu.List>

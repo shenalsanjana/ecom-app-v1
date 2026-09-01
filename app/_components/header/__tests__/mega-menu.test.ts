@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { NavColumn } from "@/app/_lib/taxonomy-nav";
+import type { NavColumn } from "@/app/_lib/taxonomy-nav-model";
 import { MegaMenu } from "@/app/_components/header/mega-menu";
 
 const columns: NavColumn[] = [
@@ -46,11 +46,16 @@ function collectText(node: unknown, out: string[] = []): string[] {
 }
 
 describe("MegaMenu", () => {
-  it("emits every department and every design as a link", () => {
+  it("emits every department and every design as a link, plus a panel-level browse-all link", () => {
+    // NAV_LINKS drops /categories once the panel replaces the plain "Shop"
+    // link, so the panel itself must still offer a route to the browse-all
+    // page — otherwise it disappears from desktop nav entirely once a
+    // second department qualifies.
     const hrefs = collectHrefs(MegaMenu({ columns }));
     expect(hrefs).toEqual([
       "/categories/women", "/categories/women/cat", "/categories/women/dino",
       "/categories/men", "/categories/men/car",
+      "/categories",
     ]);
   });
 

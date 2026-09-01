@@ -8,7 +8,10 @@ vi.mock("next/cache", () => ({
   revalidateTag: vi.fn(),
 }));
 
-import { navColumns, MIN_MEGA_MENU_COLUMNS } from "@/app/_lib/taxonomy-nav";
+import { navColumns } from "@/app/_lib/taxonomy-nav";
+// The constant lives in taxonomy-nav-model (zero imports) and is only
+// re-exported by taxonomy-nav for back-compat — reach it at its real source.
+import { MIN_MEGA_MENU_COLUMNS } from "@/app/_lib/taxonomy-nav-model";
 
 const dept = (over: Partial<DepartmentView>): DepartmentView => ({
   slug: "women", name: "Women", navLabel: "Women", tileName: "Women",
