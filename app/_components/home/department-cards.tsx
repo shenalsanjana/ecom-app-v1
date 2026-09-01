@@ -16,9 +16,14 @@ export function departmentSlides(d: DepartmentView): Slide[] {
 }
 
 /** The prototype's "N products" branch is unreachable here: the section only
- *  renders departments passing showsNavDropdown, so designs is never empty. */
+ *  renders departments passing showsNavDropdown, so designs is never empty.
+ *  Singularises "1 design" -- the prototype's own `designs + ' designs'`
+ *  read "1 designs" for a one-design department, and that grammar bug is not
+ *  something worth carrying into production, especially next to Task 6's
+ *  productNote, which singularises the same way inches away on the page. */
 export function departmentNote(d: DepartmentView): string {
-  return d.note ?? `${d.designs.length} designs`;
+  const n = d.designs.length;
+  return d.note ?? `${n} ${n === 1 ? "design" : "designs"}`;
 }
 
 export function DepartmentCards({ departments }: { departments: DepartmentView[] }) {

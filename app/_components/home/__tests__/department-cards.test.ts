@@ -72,7 +72,12 @@ describe("departmentNote", () => {
     expect(departmentNote(dept({ note: "Unisex" }))).toBe("Unisex");
   });
 
-  it("falls back to the design count", () => {
+  it("singularises the design count for exactly one design", () => {
+    // The default fixture already carries exactly one design.
+    expect(departmentNote(dept({ note: null }))).toBe("1 design");
+  });
+
+  it("falls back to the plural design count", () => {
     // The prototype's "N products" branch is unreachable: DepartmentCards only
     // renders departments passing showsNavDropdown, so designs is never empty.
     expect(departmentNote(dept({
@@ -96,7 +101,7 @@ describe("DepartmentCards", () => {
 
     expect(collectHrefs(tree)).toEqual(["/categories/women", "/categories/men"]);
     expect(collectProp(tree, "name")).toEqual(["Women", "Men"]);
-    expect(collectProp(tree, "note")).toEqual(["1 designs", "Unisex"]);
+    expect(collectProp(tree, "note")).toEqual(["1 design", "Unisex"]);
   });
 
   it("hands each card its own department's slides, not another's", () => {
