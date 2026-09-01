@@ -22,14 +22,7 @@ This applies to every surface that lists designs, including the home page sectio
 
 Every storefront surface that paints a taxonomy tile SHALL take the colour from the department or design row it is rendering. Deriving a tile's colour from a hard-coded slug-to-colour map at render time is prohibited, so that re-seeding or editing a row changes what is displayed.
 
-Ink colour SHALL be chosen by measured contrast against the tint, never by a lightness threshold.
-
 #### Scenario: A row's tint is changed
 
 - **WHEN** a department or design row's stored tint is changed and the cache is revalidated
 - **THEN** the rendered tile uses the new colour
-
-#### Scenario: A tile picks its ink
-
-- **WHEN** a tile is painted with any stored tint
-- **THEN** the ink is whichever of the two ink colours measures higher contrast against that tint

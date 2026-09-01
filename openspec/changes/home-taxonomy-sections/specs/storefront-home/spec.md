@@ -2,15 +2,18 @@
 
 ### Requirement: Home page section order
 
-The public home page SHALL render its primary sections in this top-to-bottom order: hero banner, social-proof strip, Featured products, Shop by category, Shop by design, Deals, Trust strip. The social-proof strip MUST appear directly below the hero banner, Featured products MUST appear directly below the social-proof strip, and the Shop by design section MUST appear directly below the Shop by category section.
+The public home page SHALL render its primary sections in this top-to-bottom order whenever they render: hero banner, social-proof strip, Featured products, Shop by category, Shop by design, Deals, Trust strip. The social-proof strip MUST appear directly below the hero banner, and Featured products MUST appear directly below the social-proof strip. Whether the Shop by category and Shop by design sections render at all is governed by a separate requirement; when both render, the Shop by design section MUST appear immediately after the Shop by category section.
 
 #### Scenario: Visitor lands on the home page
 
 - **WHEN** a visitor loads the home page
 - **THEN** the social-proof strip is rendered immediately after the hero banner
 - **AND** the Featured products grid is rendered immediately after the social-proof strip
-- **AND** the Shop by category section still renders below Featured products
-- **AND** the Shop by design section renders immediately after Shop by category
+
+#### Scenario: Both taxonomy sections qualify to render
+
+- **WHEN** the home page renders and both the Shop by category and Shop by design sections qualify to render
+- **THEN** the Shop by design section is rendered immediately after the Shop by category section
 
 ## ADDED Requirements
 
