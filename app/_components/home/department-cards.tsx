@@ -1,34 +1,53 @@
 import { Section } from "@/app/_components/ui/section";
 import { SectionHeader } from "@/app/_components/ui/section-header";
-import { TintTile } from "@/app/_components/ui/tint-tile";
+import { SlideClock } from "@/app/_components/ui/slide-clock";
+import { DepartmentCard } from "@/app/_components/home/department-card";
+import type { Slide } from "@/app/_components/ui/slide-show";
 import { showsNavDropdown, type DepartmentView } from "@/app/_lib/taxonomy";
 
-/** Below this many linked departments the four-up grid reads as a bug rather
- *  than a catalog, so the section renders nothing at all. Production ships four
- *  departments but designs under only one, and `scripts/deploy.sh` never seeds. */
+/** Below this many linked departments the grid reads as a bug rather than a
+ *  catalog, so the section renders nothing at all. */
 export const MIN_DEPARTMENT_CARDS = 2;
 
+/** One slide per design under the department -- a re-projection of data the
+ *  page has already paid for, so this costs no query. */
+export function departmentSlides(d: DepartmentView): Slide[] {
+  return d.designs.map((g) => ({ hex: g.hex, photo: g.image, label: g.name }));
+}
+
+/** The prototype's "N products" branch is unreachable here: the section only
+ *  renders departments passing showsNavDropdown, so designs is never empty. */
+export function departmentNote(d: DepartmentView): string {
+  return d.note ?? `${d.designs.length} designs`;
+}
+
 export function DepartmentCards({ departments }: { departments: DepartmentView[] }) {
-  // showsNavDropdown is the spec's derived rule: never link a department that
-  // holds no designs, or the tile leads to an indexable "Nothing here yet." page.
   const linked = departments.filter(showsNavDropdown);
   if (linked.length < MIN_DEPARTMENT_CARDS) return null;
 
   return (
     <Section>
       <SectionHeader title="Shop by category" />
-      <ul className="grid grid-cols-2 gap-6 lg:grid-cols-4">
-        {linked.map((d) => (
-          <li key={d.slug}>
-            <TintTile
-              href={`/categories/${d.slug}`}
-              label={d.tileName}
-              subLabel={d.note}
-              hex={d.hex}
-            />
-          </li>
-        ))}
-      </ul>
+      <SlideClock>
+        <ul className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-6">
+          {linked.map((d) => (
+            <li key={d.slug}>
+              {/* Called as a plain function, not JSX: DepartmentCard has no
+                  hooks of its own (SlideShow, which does, stays behind its
+                  own JSX element below), so calling it directly here just
+                  inlines its render output into this tree -- identical HTML,
+                  but it lets a node-environment test walk straight through to
+                  the name/note text without mounting anything. */}
+              {DepartmentCard({
+                href: `/categories/${d.slug}`,
+                name: d.tileName,
+                note: departmentNote(d),
+                slides: departmentSlides(d),
+              })}
+            </li>
+          ))}
+        </ul>
+      </SlideClock>
     </Section>
   );
 }
