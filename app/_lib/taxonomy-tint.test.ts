@@ -10,6 +10,8 @@ import {
   inkFor,
   INK_DARK,
   INK_LIGHT,
+  SCRIM_ALPHA,
+  compositeOverBlack,
 } from "./taxonomy-tint";
 
 describe("tintForSlug", () => {
@@ -109,5 +111,47 @@ describe("taxonomy tints", () => {
       .map(([slug, hex]) => [slug, hex, contrastRatio(inkFor(hex), hex)] as const)
       .filter(([, , ratio]) => ratio < 4.5);
     expect(failures).toEqual([]);
+  });
+});
+
+describe("compositeOverBlack", () => {
+  it("returns the color unchanged at alpha 0", () => {
+    expect(compositeOverBlack("#EFC4C4", 0)).toBe("#efc4c4");
+  });
+
+  it("returns black at alpha 1", () => {
+    expect(compositeOverBlack("#EFC4C4", 1)).toBe("#000000");
+  });
+
+  it("matches a hand-computed composite", () => {
+    // #EFC4C4 = (239, 196, 196); at alpha 0.3 each channel scales by 0.7:
+    // 239*0.7 = 167.3 -> 167 (0xa7), 196*0.7 = 137.2 -> 137 (0x89).
+    expect(compositeOverBlack("#EFC4C4", 0.3)).toBe("#a78989");
+  });
+});
+
+describe("SCRIM_ALPHA", () => {
+  it("clears AA against INK_LIGHT through the scrim alone, for every named tint", () => {
+    // If a photo tile's image never paints — slow load, broken URL, rejected
+    // host — the label still sits on the tint composited with the scrim
+    // alone, since TintTile always uses INK_LIGHT once an image is given.
+    // That composite must itself clear 4.5:1, independent of the photo.
+    const failures = Object.entries(ALL_TINTS)
+      .map(([slug, hex]) => {
+        const composite = compositeOverBlack(hex, SCRIM_ALPHA);
+        return [slug, composite, contrastRatio(composite, INK_LIGHT)] as const;
+      })
+      .filter(([, , ratio]) => ratio < 4.5);
+    expect(failures).toEqual([]);
+  });
+
+  it("is the smallest one-decimal alpha that clears AA for every tint", () => {
+    // One tenth below SCRIM_ALPHA, at least one tint must fail — otherwise
+    // SCRIM_ALPHA is not the minimal value the doc comment claims it is.
+    const nextLowest = Math.round((SCRIM_ALPHA - 0.1) * 10) / 10;
+    const stillPasses = Object.values(ALL_TINTS).every(
+      (hex) => contrastRatio(compositeOverBlack(hex, nextLowest), INK_LIGHT) >= 4.5,
+    );
+    expect(stillPasses).toBe(false);
   });
 });

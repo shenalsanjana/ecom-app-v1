@@ -19,6 +19,8 @@ import { SiteFooter } from "@/app/_components/home/site-footer";
 import { SortSelect } from "@/app/_components/shared/sort-select";
 import { ProductGridSkeleton } from "@/app/_components/shared/product-grid-skeleton";
 import { TrackCategoryView } from "@/app/_components/analytics/track-category-view";
+import { Breadcrumb } from "@/app/_components/ui/breadcrumb";
+import { taxonomyTrail } from "@/app/_lib/taxonomy-trail";
 import type { Metadata } from "next";
 
 export const revalidate = 300;
@@ -183,17 +185,7 @@ async function DesignBody({
     <main className="flex-1">
       <section className="border-b bg-muted/30">
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <nav className="mb-4 text-sm">
-            <Link href="/" className="text-muted-foreground hover:text-foreground">Home</Link>
-            <span className="mx-2 text-muted-foreground">/</span>
-            <Link href="/categories" className="text-muted-foreground hover:text-foreground">Categories</Link>
-            <span className="mx-2 text-muted-foreground">/</span>
-            <Link href={`/categories/${department.slug}`} className="text-muted-foreground hover:text-foreground">
-              {department.name}
-            </Link>
-            <span className="mx-2 text-muted-foreground">/</span>
-            <span className="text-foreground">{design.name}</span>
-          </nav>
+          <Breadcrumb items={taxonomyTrail({ department, design })} className="mb-4" />
           <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">{design.name}</h1>
           <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
             {allProducts.length} product{allProducts.length !== 1 ? "s" : ""} in the {design.name} collection.
@@ -289,13 +281,7 @@ function DepartmentBody({ department }: { department: DepartmentView }) {
     <main className="flex-1">
       <section className="border-b bg-muted/30">
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <nav className="mb-4 text-sm">
-            <Link href="/" className="text-muted-foreground hover:text-foreground">Home</Link>
-            <span className="mx-2 text-muted-foreground">/</span>
-            <Link href="/categories" className="text-muted-foreground hover:text-foreground">Categories</Link>
-            <span className="mx-2 text-muted-foreground">/</span>
-            <span className="text-foreground">{department.name}</span>
-          </nav>
+          <Breadcrumb items={taxonomyTrail({ department })} className="mb-4" />
           <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">{department.name}</h1>
           {department.note && (
             <p className="mt-4 max-w-2xl text-lg text-muted-foreground">{department.note}</p>

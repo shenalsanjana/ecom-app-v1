@@ -43,8 +43,8 @@ beforeEach(() => getDepartments.mockReset());
 describe("SiteFooter category links", () => {
   it("links designs by their nested path", async () => {
     getDepartments.mockResolvedValue([
-      dept({ slug: "women", designs: [{ slug: "cat", name: "Cats", hex: "#EFC4C4" }] }),
-      dept({ slug: "men", name: "Men", designs: [{ slug: "car", name: "Car", hex: "#AEC3D1" }] }),
+      dept({ slug: "women", designs: [{ slug: "cat", name: "Cats", hex: "#EFC4C4", image: null }] }),
+      dept({ slug: "men", name: "Men", designs: [{ slug: "car", name: "Car", hex: "#AEC3D1", image: null }] }),
     ]);
 
     const hrefs = collectHrefs(await SiteFooter());
@@ -60,7 +60,7 @@ describe("SiteFooter category links", () => {
       dept({
         slug: "women",
         designs: Array.from({ length: 8 }, (_, i) => ({
-          slug: `d${i}`, name: `Design ${i}`, hex: "#EFC4C4",
+          slug: `d${i}`, name: `Design ${i}`, hex: "#EFC4C4", image: null,
         })),
       }),
       dept({ slug: "men", name: "Men", designs: [] }),

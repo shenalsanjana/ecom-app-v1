@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { getProducts, parseSortBy } from "@/app/_lib/products";
 import { getDepartments, showsNavDropdown } from "@/app/_lib/taxonomy";
-import { designPath } from "@/app/_lib/taxonomy-path";
 import { inkFor } from "@/app/_lib/taxonomy-tint";
 import { ProductCard } from "@/app/_components/home/product-card";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { SortSelect } from "@/app/_components/shared/sort-select";
+import { countsByDesign, countsByDepartment } from "@/app/_lib/taxonomy-counts";
+import { taxonomyTrail } from "@/app/_lib/taxonomy-trail";
+import { Breadcrumb } from "@/app/_components/ui/breadcrumb";
+import { FilterTree } from "@/app/_components/categories/filter-tree";
 import type { Metadata } from "next";
 
 export const revalidate = 3600;
@@ -53,6 +56,9 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
   // "Nothing here yet" pages. showsNavDropdown is the spec's derived rule.
   const linkedDepartments = departments.filter(showsNavDropdown);
 
+  const byDesign = countsByDesign(allProducts);
+  const byDepartment = countsByDepartment(linkedDepartments, byDesign);
+
   const ITEMS_PER_PAGE = 12;
   const totalPages = Math.ceil(displayProducts.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -74,6 +80,7 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
       {/* Hero / Departments Section */}
       <section className="border-b bg-muted/30">
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+          <Breadcrumb items={taxonomyTrail({})} className="mb-4" />
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
             {selectedCategory
               ? designNames.get(selectedCategory) || "Category"
@@ -108,61 +115,13 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
           {/* Sidebar - Departments */}
           <aside className="lg:col-span-1">
             <div className="sticky top-24">
-              <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Departments
-              </h2>
-              <ul className="space-y-1">
-                <li>
-                  <Link
-                    href="/categories"
-                    className={`block rounded-lg px-4 py-3 text-sm font-medium transition-colors ${
-                      !selectedCategory
-                        ? "bg-primary text-primary-foreground shadow-lg"
-                        : "bg-background hover:bg-accent text-foreground"
-                    }`}
-                  >
-                    <span className="flex items-center justify-between">
-                      <span>All</span>
-                      <span className="rounded-full bg-primary-foreground/20 px-2 py-0.5 text-xs font-normal">
-                        {allProducts.length}
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-                {linkedDepartments.map((d) => {
-                  const designSlugs = new Set(d.designs.map((g) => g.slug));
-                  const deptProducts = allProducts.filter((p) => designSlugs.has(p.category)).length;
-                  return (
-                    <li key={d.slug}>
-                      <Link
-                        href={`/categories/${d.slug}`}
-                        className="block rounded-lg bg-background px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                      >
-                        <span className="flex items-center justify-between">
-                          <span>{d.name}</span>
-                          <span className="rounded-full bg-primary-foreground/10 px-2 py-0.5 text-xs font-normal">
-                            {deptProducts}
-                          </span>
-                        </span>
-                      </Link>
-                      {d.designs.length > 0 && (
-                        <ul className="mt-1 space-y-0.5 pl-4">
-                          {d.designs.map((g) => (
-                            <li key={g.slug}>
-                              <Link
-                                href={designPath(d.slug, g.slug)}
-                                className="block rounded-lg px-4 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-                              >
-                                {g.name}
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+              <FilterTree
+                departments={linkedDepartments}
+                byDesign={byDesign}
+                byDepartment={byDepartment}
+                totalCount={allProducts.length}
+                selectedDesign={selectedCategory}
+              />
 
               {/* Sort */}
               <div className="mt-8">

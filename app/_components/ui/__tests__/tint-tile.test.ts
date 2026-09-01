@@ -46,3 +46,47 @@ describe("TintTile", () => {
     expect((dark.props.style as { color: string }).color).toBe(INK_LIGHT);
   });
 });
+
+/** Collect the value of one prop from every element in the tree. */
+function collectProp(node: unknown, key: string, out: unknown[] = []): unknown[] {
+  if (node === null || node === undefined || typeof node !== "object") return out;
+  if (Array.isArray(node)) {
+    for (const child of node) collectProp(child, key, out);
+    return out;
+  }
+  const props = (node as { props?: Record<string, unknown> }).props;
+  if (props) {
+    if (key in props) out.push(props[key]);
+    collectProp(props.children, key, out);
+  }
+  return out;
+}
+
+describe("TintTile with a photo", () => {
+  it("keeps the tint as the ground so a failed image still has a background", () => {
+    const el = TintTile({ href: "/x", label: "Cats", hex: "#EFC4C4", image: "/img/cat.jpg" }) as Rendered;
+    expect((el.props.style as { backgroundColor: string }).backgroundColor).toBe("#EFC4C4");
+  });
+
+  it("uses light ink over a photo rather than measuring contrast against the tint", () => {
+    // #EFC4C4 is light, so inkFor would choose dark ink — which would be the
+    // wrong answer over a photograph that could be any colour.
+    const el = TintTile({ href: "/x", label: "Cats", hex: "#EFC4C4", image: "/img/cat.jpg" }) as Rendered;
+    expect((el.props.style as { color: string }).color).toBe(INK_LIGHT);
+  });
+
+  it("renders the image and a scrim above it", () => {
+    const tree = TintTile({ href: "/x", label: "Cats", hex: "#EFC4C4", image: "/img/cat.jpg" });
+    const srcs = collectProp(tree, "src");
+    expect(srcs).toContain("/img/cat.jpg");
+    expect(collectProp(tree, "data-scrim")).toHaveLength(1);
+  });
+
+  it("is unchanged when image is null", () => {
+    const withNull = TintTile({ href: "/x", label: "Cats", hex: "#EFC4C4", image: null }) as Rendered;
+    const without = TintTile({ href: "/x", label: "Cats", hex: "#EFC4C4" }) as Rendered;
+    expect((withNull.props.style as { color: string }).color)
+      .toBe((without.props.style as { color: string }).color);
+    expect(collectProp(withNull, "src")).toHaveLength(0);
+  });
+});

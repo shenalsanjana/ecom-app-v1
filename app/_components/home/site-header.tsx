@@ -7,19 +7,25 @@ import { ProfileMenu } from "@/app/_components/header/profile-menu";
 import { CartIconWrapper } from "@/app/_components/header/cart-icon-wrapper";
 import { MobileNav } from "@/app/_components/header/mobile-nav";
 import { BrandMark } from "@/app/_components/shared/brand-mark";
+import { getDepartments } from "@/app/_lib/taxonomy";
+import { navColumns } from "@/app/_lib/taxonomy-nav";
+import { MegaMenu } from "@/app/_components/header/mega-menu";
 
 const NAV_LINKS = [
-  { href: "/categories", label: "Shop" },
   { href: "/deals", label: "Deals" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
 ];
 
-export function SiteHeader() {
+export async function SiteHeader() {
+  // One cached read (same key the footer already uses on every page), turned
+  // into plain columns here so the client leaves never import Prisma.
+  const columns = navColumns(await getDepartments());
+
   return (
     <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:gap-6 sm:px-6 lg:px-8">
-        <MobileNav />
+        <MobileNav columns={columns} />
         <BrandMark />
         <Link
           href="/"
@@ -29,6 +35,7 @@ export function SiteHeader() {
           <Home className="h-5 w-5" />
         </Link>
         <nav className="hidden items-center gap-5 text-sm md:flex">
+          <MegaMenu columns={columns} />
           {NAV_LINKS.map((l) => (
             <Link
               key={l.label}
