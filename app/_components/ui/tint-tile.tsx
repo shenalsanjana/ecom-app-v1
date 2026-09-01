@@ -1,32 +1,50 @@
 import Link from "next/link";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { inkFor } from "@/app/_lib/taxonomy-tint";
+import { inkFor, INK_LIGHT } from "@/app/_lib/taxonomy-tint";
 
 type TintTileProps = {
   href: string;
   label: string;
   subLabel?: string | null;
   hex: string;
+  image?: string | null;
   className?: string;
 };
 
-/** A tinted browse tile. Ink is chosen by measured contrast (`inkFor`), never by
- *  a luminance threshold — see the comment block in app/_lib/taxonomy-tint.ts. */
-export function TintTile({ href, label, subLabel, hex, className }: TintTileProps) {
+/** A tinted browse tile.
+ *
+ *  Without an image, ink is chosen by measured contrast (`inkFor`), never by a
+ *  luminance threshold — see the comment block in app/_lib/taxonomy-tint.ts.
+ *  With one, contrast against the tint says nothing about legibility over the
+ *  photograph, so the tile uses light ink over a scrim instead. The tint stays
+ *  as the ground either way, so a slow or failed image still has a background. */
+export function TintTile({ href, label, subLabel, hex, image, className }: TintTileProps) {
+  const ink = image ? INK_LIGHT : inkFor(hex);
   return (
     <Link
       href={href}
       className={cn(
-        "flex aspect-[3/4] flex-col items-center justify-center gap-2 overflow-hidden rounded-xl px-4 text-center",
+        "relative flex aspect-[3/4] flex-col items-center justify-center gap-2 overflow-hidden rounded-xl px-4 text-center",
         "transition-transform duration-(--duration-base) ease-(--ease-out) motion-safe:hover:-translate-y-[3px]",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
         className,
       )}
-      style={{ backgroundColor: hex, color: inkFor(hex) }}
+      style={{ backgroundColor: hex, color: ink }}
     >
-      <span className="font-heading text-[28px] font-bold leading-tight">{label}</span>
+      {image && (
+        <>
+          <Image src={image} alt="" fill sizes="(min-width: 1024px) 25vw, 50vw" className="object-cover" />
+          <div
+            data-scrim=""
+            aria-hidden="true"
+            className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/10"
+          />
+        </>
+      )}
+      <span className="relative font-heading text-[28px] font-bold leading-tight">{label}</span>
       {subLabel && (
-        <span className="font-mono text-[10px] uppercase tracking-[0.16em]">{subLabel}</span>
+        <span className="relative font-mono text-[10px] uppercase tracking-[0.16em]">{subLabel}</span>
       )}
     </Link>
   );
