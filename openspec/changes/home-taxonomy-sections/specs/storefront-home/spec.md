@@ -51,12 +51,19 @@ Both sections SHALL become visible on their own as the catalog grows, requiring 
 - **WHEN** a design is added under a second department
 - **THEN** the Shop by category section appears on the home page without further action
 
-### Requirement: The home page reads the taxonomy once
+### Requirement: The home page reads the taxonomy once for its own sections
 
-The home page SHALL read the department taxonomy a single time per render and pass the same rows to every section that needs them. Sections that display the taxonomy SHALL be pure of data access.
+The home page SHALL read the department taxonomy a single time and pass those same rows to both of its taxonomy sections, which SHALL be pure of data access.
+
+Site-wide chrome that renders on every page — the footer — is excluded: it SHALL read the taxonomy itself rather than receive it, because it cannot depend on any one page having read it. Both reads SHALL share a cache entry, so the exclusion costs at most one additional query on a cold cache.
 
 #### Scenario: The home page renders
 
 - **WHEN** the home page renders both taxonomy sections
-- **THEN** the department taxonomy is read exactly once
+- **THEN** the page reads the department taxonomy exactly once
 - **AND** both sections receive the same rows
+
+#### Scenario: Site-wide chrome renders
+
+- **WHEN** the footer renders on any page, including one that never reads the taxonomy
+- **THEN** it obtains the taxonomy through its own read
