@@ -74,9 +74,23 @@ export function SlideShow({
                 e.stopPropagation();
                 setPinned(i);
               }}
-              className="h-[5px] w-[5px] rounded-full"
-              style={{ backgroundColor: i === index ? "rgba(20,15,10,.8)" : "rgba(20,15,10,.28)" }}
-            />
+              // The visible dot stays 5x5 with a 4px gap (unchanged) -- WCAG
+              // 2.5.8 wants a ~24x24 hit target, but neighboring dots sit
+              // only 9px apart center-to-center (5px dot + 4px gap), so a
+              // 24px target would collide with the next one. 8px is the
+              // largest square that still leaves a 1px buffer between
+              // neighbors. The negative margin pulls the enlarged box back
+              // to a 5px layout footprint, so the row's spacing and the
+              // pill's own size are untouched.
+              className="grid place-items-center rounded-full"
+              style={{ width: 8, height: 8, margin: "-1.5px" }}
+            >
+              <span
+                aria-hidden="true"
+                className="h-[5px] w-[5px] rounded-full"
+                style={{ backgroundColor: i === index ? "rgba(20,15,10,.8)" : "rgba(20,15,10,.28)" }}
+              />
+            </button>
           ))}
         </div>
       )}
