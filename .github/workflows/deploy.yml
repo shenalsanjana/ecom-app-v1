@@ -40,6 +40,14 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
+      # Type checking lives here, not in `next build`. next.config.ts sets
+      # `typescript.ignoreBuildErrors` because tsc took 17.1 minutes inside the
+      # Docker builder stage on the VPS versus ~24s here. The deploy job below
+      # declares `needs: test`, so a type error fails this job and the VPS never
+      # builds. Do not delete this step without also removing that config flag.
+      - name: Type check
+        run: npx tsc --noEmit
+
       - name: Run tests
         run: npm run test
 
