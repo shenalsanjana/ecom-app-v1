@@ -21,9 +21,17 @@ export function DesignGrid({ departments }: { departments: DepartmentView[] }) {
         {groups.map((d) => (
           <div key={d.slug}>
             {/* Men and Women share a subName, so the department name is what
-                identifies a group. The two always render as a pair. */}
+                identifies a group. The two always render as a pair. The
+                visible Eyebrow above is not programmatically associated with
+                the heading, so the department name is repeated into the h3
+                itself (visually hidden) — otherwise a screen-reader user
+                navigating by heading hears two identical "Oversized Graphic
+                T-Shirts" headings with nothing to tell them apart. */}
             <Eyebrow className="mb-1">{d.name}</Eyebrow>
-            <h3 className="font-heading text-xl font-semibold tracking-tight">{d.subName}</h3>
+            <h3 className="font-heading text-xl font-semibold tracking-tight">
+              <span className="sr-only">{d.name} — </span>
+              {d.subName}
+            </h3>
             <ul className="mt-6 grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4">
               {d.designs.map((design) => (
                 <li key={design.slug}>

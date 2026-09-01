@@ -12,7 +12,11 @@ import { getDepartments } from "@/app/_lib/taxonomy";
 export const revalidate = 300;
 
 export default async function Home() {
-  // One cached read, shared by both taxonomy sections.
+  // One cached read, shared by both taxonomy sections. SiteFooter is the
+  // deliberate exception: it calls getDepartments() itself (it renders on
+  // ~20 pages, not just this one, so it must self-fetch), which hits the
+  // same unstable_cache key and is negligible. It's mocked out in this
+  // page's tests, so those tests don't cover that second call.
   const departments = await getDepartments();
 
   return (

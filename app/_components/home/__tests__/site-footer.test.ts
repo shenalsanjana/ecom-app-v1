@@ -68,8 +68,14 @@ describe("SiteFooter category links", () => {
 
     const hrefs = collectHrefs(await SiteFooter());
     const designLinks = hrefs.filter((h) => h.startsWith("/categories/women/"));
+    // No current code path could ever emit a bare "/categories/men" (there's
+    // no department-level link in the footer), so that's not what proves men
+    // contributes nothing. Counting every /categories/-prefixed href and
+    // finding it equals women's capped total does: if men's empty designs
+    // list leaked anything in, this total would exceed 6.
+    const allCategoryLinks = hrefs.filter((h) => h.startsWith("/categories/"));
 
     expect(designLinks).toHaveLength(6);
-    expect(hrefs).not.toContain("/categories/men");
+    expect(allCategoryLinks).toHaveLength(6);
   });
 });
