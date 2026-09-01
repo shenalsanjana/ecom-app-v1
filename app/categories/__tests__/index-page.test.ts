@@ -34,6 +34,7 @@ vi.mock("@/app/_components/home/site-footer", () => ({ SiteFooter: () => null })
 vi.mock("@/app/_components/shared/sort-select", () => ({ SortSelect: () => null }));
 
 import CategoriesPage from "../(index)/page";
+import { FilterTree } from "@/app/_components/categories/filter-tree";
 
 const dept = (over: Partial<DepartmentView>): DepartmentView => ({
   slug: "women", name: "Women", navLabel: "Women", tileName: "Women",
@@ -57,6 +58,24 @@ function collectHrefs(node: unknown, out: string[] = []): string[] {
   return out;
 }
 
+/** The sidebar's links moved into FilterTree, and a tree walk does not enter
+ *  child components — so the page's own tree shows the tile row only. The
+ *  departments the page hands the tree are read from its props instead;
+ *  filter-tree.test.ts proves the tree links every one it is given. */
+function filterTreeDepartments(node: unknown): { slug: string }[] | null {
+  if (node === null || node === undefined || typeof node !== "object") return null;
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = filterTreeDepartments(child);
+      if (found) return found;
+    }
+    return null;
+  }
+  const el = node as { type?: unknown; props?: Record<string, unknown> };
+  if (el.type === FilterTree) return el.props?.departments as { slug: string }[];
+  return el.props ? filterTreeDepartments(el.props.children) : null;
+}
+
 beforeEach(() => {
   getProducts.mockReset().mockResolvedValue([]);
   getDepartments.mockReset();
@@ -77,15 +96,17 @@ describe("/categories department lists", () => {
     const tree = await CategoriesPage({ searchParams: Promise.resolve({}) });
     const hrefs = collectHrefs(tree);
 
-    // Women has a design, so it is linked — once from the tile row, once from
-    // the sidebar list.
-    expect(hrefs.filter((h) => h === "/categories/women")).toHaveLength(2);
-    expect(hrefs).toContain("/categories/women/cat");
+    // Women has a design, so the tile row links it.
+    expect(hrefs).toContain("/categories/women");
 
-    // The three empty departments are not linked from anywhere on the page.
+    // The three empty departments are not linked from the tile row...
     expect(hrefs).not.toContain("/categories/men");
     expect(hrefs).not.toContain("/categories/plain");
     expect(hrefs).not.toContain("/categories/accessories");
+
+    // ...nor reachable through the sidebar, which is only ever handed the
+    // departments that survive showsNavDropdown.
+    expect(filterTreeDepartments(tree)?.map((d) => d.slug)).toEqual(["women"]);
   });
 
   it("links every department once designs exist under each", async () => {
@@ -94,10 +115,11 @@ describe("/categories department lists", () => {
       dept({ slug: "men", name: "Men", designs: [{ slug: "car", name: "Car", hex: "#C4D3EF" }] }),
     ]);
 
-    const hrefs = collectHrefs(await CategoriesPage({ searchParams: Promise.resolve({}) }));
+    const tree = await CategoriesPage({ searchParams: Promise.resolve({}) });
+    const hrefs = collectHrefs(tree);
 
     expect(hrefs).toContain("/categories/women");
     expect(hrefs).toContain("/categories/men");
-    expect(hrefs).toContain("/categories/men/car");
+    expect(filterTreeDepartments(tree)?.map((d) => d.slug)).toEqual(["women", "men"]);
   });
 });
