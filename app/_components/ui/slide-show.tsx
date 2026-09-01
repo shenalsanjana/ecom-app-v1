@@ -1,0 +1,85 @@
+// app/_components/ui/slide-show.tsx
+"use client";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
+import { inkFor } from "@/app/_lib/taxonomy-tint";
+import { dotLabel, rotates, slideIndex } from "@/app/_lib/slide-rotation";
+import { useSlideTick } from "@/app/_components/ui/slide-clock";
+
+export type Slide = { hex: string; photo?: string | null; label?: string; title?: string };
+
+export function SlideShow({
+  slides, dots, fadeMs, subject,
+}: {
+  slides: Slide[];
+  dots: "bottom-right" | "top-right";
+  fadeMs: number;
+  subject: string;
+}) {
+  const [pinned, setPinned] = useState<number | null>(null);
+  const tick = useSlideTick();
+  const index = slideIndex(tick, slides.length, pinned);
+  const showDots = rotates(slides.length);
+
+  return (
+    <>
+      {slides.map((slide, i) => (
+        <div
+          key={i}
+          aria-hidden={i !== index}
+          className="absolute inset-0 bg-cover bg-center"
+          style={{
+            backgroundColor: slide.hex, // ground: a failed photo still has one
+            backgroundImage: slide.photo ? `url(${slide.photo})` : undefined,
+            opacity: i === index ? 1 : 0,
+            transition: `opacity ${fadeMs}ms ease`,
+          }}
+        >
+          {slide.title && (
+            <div className="absolute inset-0 flex items-center justify-center px-3 pb-[34px] pt-[14px] text-center">
+              <span
+                className="text-[15px] font-semibold leading-[1.2] text-balance"
+                style={{ color: inkFor(slide.hex) }}
+              >
+                {slide.title}
+              </span>
+            </div>
+          )}
+          {slide.label && (
+            <span className="absolute left-[10px] top-[10px] max-w-[calc(100%-20px)] truncate rounded-full bg-white/[.72] px-[9px] py-1 text-[10px] font-medium tracking-[.02em] text-[#5b524a] backdrop-blur-[4px]">
+              {slide.label}
+            </span>
+          )}
+        </div>
+      ))}
+
+      {showDots && (
+        <div
+          className={cn(
+            "absolute z-10 flex items-center gap-1 rounded-full px-1.5 py-1 backdrop-blur-[4px]",
+            dots === "bottom-right"
+              ? "bottom-[10px] right-[10px] bg-white/60"
+              : "right-[9px] top-[9px] bg-white/[.58]",
+          )}
+        >
+          {slides.map((slide, i) => (
+            <button
+              key={i}
+              type="button"
+              aria-label={dotLabel(subject, slide.label, i, slides.length)}
+              aria-current={i === index}
+              onClick={(e) => {
+                // The tile is a link; choosing a slide must not navigate.
+                e.preventDefault();
+                e.stopPropagation();
+                setPinned(i);
+              }}
+              className="h-[5px] w-[5px] rounded-full"
+              style={{ backgroundColor: i === index ? "rgba(20,15,10,.8)" : "rgba(20,15,10,.28)" }}
+            />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
