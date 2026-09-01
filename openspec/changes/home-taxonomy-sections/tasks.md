@@ -46,9 +46,9 @@
 
 ## 6. Validation
 
-- [x] 6.1 `npm run test` — expect 866 across 106 files (baseline 849/101 plus 17 new)
+- [x] 6.1 `npm run test` — **869 passed across 106 files.** The plan predicted 866 (baseline 849/101 plus the 17 planned tests); the extra 3 are the design-grid tests added by the code-review fix wave.
 - [x] 6.2 `npx tsc --noEmit` — expect clean
 - [x] 6.3 `npm run check:contrast` — expect all 35 pairs and tints at AA
 - [x] 6.4 `npm run lint` — ran clean against this change: 7 problems (4 errors, 3 warnings), all pre-existing and in files this change does not touch. This is worse than the plan's predicted "4 errors + 1 warning" — the two extra warnings are in `app/_lib/__tests__/taxonomy-route.test.ts`, a taxonomy-foundation file this branch never touches, so the prediction was stale, not this change's regression.
-- [x] 6.5 `npm run build` and `npm run test:e2e` were **not run** — `DATABASE_URL` points at the docker-compose host `postgres`, unreachable from this dev box. Both are owed a green run in CI or against the VPS before this ships; do not treat them as passing.
+- [ ] 6.5 `npm run build` and `npm run test:e2e` were **not run** — `DATABASE_URL` points at the docker-compose host `postgres`, unreachable from this dev box. Both are owed a green run in CI or against the VPS before this ships; do not treat them as passing.
 - [x] 6.6 No incidental fixes were needed beyond the feature work itself — this fix wave (the code-review remediation commit(s)) is the one exception, and it is committed separately from the original five feature-task commits above.
