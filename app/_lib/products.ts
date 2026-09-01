@@ -27,6 +27,9 @@ export type ProductView = {
   rating: number;
   reviewCount: number;
   category: string;
+  /** Department name for the card eyebrow. Null only if a design somehow has no
+   *  department row; the card falls back to the design name alone. */
+  departmentName: string | null;
   defaultColorSlug: string;
   variants: ProductCardVariant[];
   // Display-only conversion signal, populated only by the home-page readers
@@ -47,6 +50,10 @@ export type DesignView = {
 // types so `ProductGetPayload` below infers the exact row shape.
 const cardSelect = {
   id: true, name: true, price: true, originalPrice: true, designSlug: true, dtfDesignId: true,
+  // The card eyebrow reads "Department › Design". The department name comes
+  // off the relation this select already has a path to — never a second read,
+  // and never getDepartments() threaded down into a card.
+  design: { select: { name: true, department: { select: { name: true } } } },
   variants: {
     where: { archived: false },
     orderBy: { sortOrder: "asc" },
@@ -137,6 +144,7 @@ async function attachAggregates(
       rating: agg.avg,
       reviewCount: agg.count,
       category: p.designSlug,
+      departmentName: p.design?.department?.name ?? null,
       defaultColorSlug: variants[0].colorSlug,
       variants,
       ...(badge ? { badge } : {}),

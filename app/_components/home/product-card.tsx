@@ -9,7 +9,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { AddToCartDialog } from "@/app/_components/cart/add-to-cart-dialog";
 import { WishlistHeart } from "@/app/_components/wishlist/wishlist-heart";
 import { ColorSwatches } from "@/app/_components/product/color-swatches";
-import { prettifyCategory } from "@/app/_lib/category-label";
+import { cardEyebrow } from "@/app/_lib/category-label";
 import { isUploadedImage } from "@/app/_lib/uploaded-image";
 import { discountPct } from "@/app/_lib/pricing";
 import { Eyebrow } from "@/app/_components/ui/eyebrow";
@@ -27,7 +27,7 @@ export function ProductCard({
   fromPath?: string;
   showEyebrow?: boolean;
 }) {
-  const { id, name, rating, reviewCount, category, variants, defaultColorSlug, badge } = product;
+  const { id, name, rating, reviewCount, category, departmentName, variants, defaultColorSlug, badge } = product;
   const [selectedColor, setSelectedColor] = useState(defaultColorSlug);
   const variant = variants.find((v) => v.colorSlug === selectedColor) ?? variants[0];
   const lowStock = variant.lowStock;
@@ -67,7 +67,7 @@ export function ProductCard({
         )}
       </div>
       <CardContent className="flex flex-col gap-1.5 p-4">
-        {showEyebrow && category && <Eyebrow>{prettifyCategory(category)}</Eyebrow>}
+        {showEyebrow && category && <Eyebrow>{cardEyebrow(departmentName, category)}</Eyebrow>}
         <h3 className="font-heading line-clamp-2 min-h-[2.75rem] text-base font-medium leading-snug">
           <Link href={href} className="hover:underline underline-offset-4">{name}</Link>
         </h3>

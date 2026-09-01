@@ -9,3 +9,11 @@ export function prettifyCategory(slug: string): string {
   const joiner = parts[0]?.length === 1 ? "-" : " ";
   return parts.join(joiner);
 }
+
+/** "Women › Cats", or just "Cats" when the department is unknown — never a
+ *  dangling separator. Pure and kept out of the card component so it can be
+ *  tested without loading the card's client-only import chain. */
+export function cardEyebrow(departmentName: string | null, designSlug: string): string {
+  const design = prettifyCategory(designSlug);
+  return departmentName ? `${departmentName} › ${design}` : design;
+}
