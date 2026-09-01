@@ -17,7 +17,8 @@ export const revalidate = 300;
 
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
-import { Breadcrumb } from "@/app/_components/product/breadcrumb";
+import { Breadcrumb } from "@/app/_components/ui/breadcrumb";
+import { taxonomyTrail } from "@/app/_lib/taxonomy-trail";
 import { ImageGallery } from "@/app/_components/product/image-gallery";
 import { BuyBoxClient } from "@/app/_components/product/buy-box-client";
 import { Description } from "@/app/_components/product/description";
@@ -99,9 +100,11 @@ export default async function ProductPage({
       <main className="flex-1">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
           <Breadcrumb
-            designSlug={detail.product.designSlug}
-            designName={detail.product.design.name}
-            productName={detail.product.name}
+            items={taxonomyTrail({
+              department: detail.product.design.department,
+              design: detail.product.design,
+              productName: detail.product.name,
+            })}
           />
         </div>
 

@@ -2,7 +2,7 @@
 import { unstable_cache } from "next/cache";
 
 import { prisma } from "@/app/_lib/prisma";
-import type { Design, Prisma, Product, Review } from "@prisma/client";
+import type { Department, Design, Prisma, Product, Review } from "@prisma/client";
 import { effectivePrice, effectiveOriginalPrice, availableSizes, sortSizeStocks, buildPlainStockMap, buildDesignStockMap } from "@/app/_lib/variants";
 import { unitsForVariant, lowStockSignal, pickBestsellers, BESTSELLER_COUNT } from "@/app/_lib/product-signals";
 
@@ -214,7 +214,10 @@ export type VariantDetail = {
 };
 
 export type ProductDetail = {
-  product: Product & { design: Design };
+  // The department rides along on the design join the query already performs —
+  // the breadcrumb needs its slug, name and subName, and a second read for
+  // three columns would be waste. The relation is required in the schema.
+  product: Product & { design: Design & { department: Department } };
   variants: VariantDetail[];
   // Raw pool rows, not Maps — Maps aren't serializable across the Server→Client
   // Component boundary. Client consumers (buy-box-client, product-jsonld isn't
@@ -231,7 +234,7 @@ export const getProductDetail = unstable_cache(
     const product = await prisma.product.findUnique({
       where: { id, archived: false },
       include: {
-        design: true,
+        design: { include: { department: true } },
         variants: {
           where: { archived: false },
           orderBy: { sortOrder: "asc" },
@@ -277,7 +280,7 @@ export const getProductDetail = unstable_cache(
     ]);
 
     // `product` still carries a variants relation; strip it from the returned
-    // shape so the type stays Product & { design }.
+    // shape so the type stays Product & { design & department }.
     const { variants: _drop, ...productScalars } = product;
     void _drop;
 
