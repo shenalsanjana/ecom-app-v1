@@ -3,7 +3,7 @@ import { prisma } from "@/app/_lib/prisma";
 import { designPath } from "@/app/_lib/taxonomy-path";
 export { designPath };
 
-export type DesignSummary = { slug: string; name: string; hex: string };
+export type DesignSummary = { slug: string; name: string; hex: string; image: string | null };
 
 export type DepartmentView = {
   slug: string;
@@ -32,7 +32,7 @@ export const getDepartments = unstable_cache(
   async (): Promise<DepartmentView[]> => {
     const rows = await prisma.department.findMany({
       orderBy: { sortOrder: "asc" },
-      include: { designs: { orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { slug: true, name: true, hex: true } } },
+      include: { designs: { orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { slug: true, name: true, hex: true, image: true } } },
     });
     return rows.map((d) => ({
       slug: d.slug, name: d.name, navLabel: d.navLabel, tileName: d.tileName,

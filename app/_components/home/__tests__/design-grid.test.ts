@@ -13,7 +13,7 @@ import { DesignGrid, MIN_DESIGN_GROUPS } from "@/app/_components/home/design-gri
 const dept = (over: Partial<DepartmentView>): DepartmentView => ({
   slug: "women", name: "Women", navLabel: "Women", tileName: "Women",
   note: null, subName: "Oversized Graphic T-Shirts", hex: "#EFC4C4",
-  sortOrder: 1, designs: [{ slug: "cat", name: "Cats", hex: "#EFC4C4" }],
+  sortOrder: 1, designs: [{ slug: "cat", name: "Cats", hex: "#EFC4C4", image: null }],
   ...over,
 });
 
@@ -119,8 +119,8 @@ describe("DesignGrid", () => {
           dept({
             slug: "women",
             designs: [
-              { slug: "cat", name: "Cats", hex: "#EFC4C4" },
-              { slug: "dino", name: "Dino", hex: "#BFD8C2" },
+              { slug: "cat", name: "Cats", hex: "#EFC4C4", image: null },
+              { slug: "dino", name: "Dino", hex: "#BFD8C2", image: null },
             ],
           }),
         ],
@@ -141,8 +141,8 @@ describe("DesignGrid", () => {
           dept({
             slug: "accessories", name: "Accessories", subName: null,
             designs: [
-              { slug: "tote", name: "Tote", hex: "#C9B79A" },
-              { slug: "cap", name: "Cap", hex: "#A59585" },
+              { slug: "tote", name: "Tote", hex: "#C9B79A", image: null },
+              { slug: "cap", name: "Cap", hex: "#A59585", image: null },
             ],
           }),
         ],
@@ -155,7 +155,7 @@ describe("DesignGrid", () => {
   it("renders nothing when no department qualifies", () => {
     const tree = DesignGrid({
       departments: [
-        dept({ slug: "plain", subName: null, designs: [{ slug: "tote", name: "Tote", hex: "#C9B79A" }] }),
+        dept({ slug: "plain", subName: null, designs: [{ slug: "tote", name: "Tote", hex: "#C9B79A", image: null }] }),
         dept({ slug: "men", name: "Men", designs: [] }),
       ],
     });
@@ -169,7 +169,7 @@ describe("DesignGrid", () => {
     const tree = DesignGrid({
       departments: [
         dept({ slug: "women", name: "Women" }),
-        dept({ slug: "men", name: "Men", designs: [{ slug: "car", name: "Car", hex: "#AEC3D1" }] }),
+        dept({ slug: "men", name: "Men", designs: [{ slug: "car", name: "Car", hex: "#AEC3D1", image: null }] }),
       ],
     });
     const text = collectText(tree);
@@ -184,7 +184,7 @@ describe("DesignGrid", () => {
       DesignGrid({
         departments: [
           dept({ slug: "women" }),
-          dept({ slug: "men", name: "Men", designs: [{ slug: "car", name: "Car", hex: "#AEC3D1" }] }),
+          dept({ slug: "men", name: "Men", designs: [{ slug: "car", name: "Car", hex: "#AEC3D1", image: null }] }),
         ],
       }),
     );
@@ -202,7 +202,7 @@ describe("DesignGrid", () => {
       DesignGrid({
         departments: [
           dept({ slug: "women", name: "Women" }),
-          dept({ slug: "men", name: "Men", designs: [{ slug: "car", name: "Car", hex: "#AEC3D1" }] }),
+          dept({ slug: "men", name: "Men", designs: [{ slug: "car", name: "Car", hex: "#AEC3D1", image: null }] }),
         ],
       }),
     );
@@ -223,7 +223,7 @@ describe("DesignGrid", () => {
         dept({
           slug: "women",
           hex: "#EFC4C4",
-          designs: [{ slug: "cat", name: "Cats", hex: "#123456" }],
+          designs: [{ slug: "cat", name: "Cats", hex: "#123456", image: null }],
         }),
       ],
     });
@@ -236,11 +236,11 @@ describe("DesignGrid", () => {
       departments: [
         dept({
           slug: "women", name: "Women", hex: "#EFC4C4",
-          designs: [{ slug: "cat", name: "Cats", hex: "#123456" }],
+          designs: [{ slug: "cat", name: "Cats", hex: "#123456", image: null }],
         }),
         dept({
           slug: "men", name: "Men", hex: "#AEC3D1",
-          designs: [{ slug: "car", name: "Car", hex: "#654321" }],
+          designs: [{ slug: "car", name: "Car", hex: "#654321", image: null }],
         }),
       ],
     });
@@ -257,6 +257,21 @@ describe("DesignGrid", () => {
     expect(collectText(men)).not.toContain("Women");
     expect(collectProp(men, "label")).toEqual(["Car"]);
     expect(collectProp(men, "hex")).toEqual(["#654321"]);
+  });
+
+  it("hands a design's photo to its tile, and nothing when there is none", () => {
+    const tree = DesignGrid({
+      departments: [
+        dept({
+          slug: "women",
+          designs: [
+            { slug: "cat", name: "Cats", hex: "#EFC4C4", image: "/img/cat.jpg" },
+            { slug: "dino", name: "Dino", hex: "#BFD8C2", image: null },
+          ],
+        }),
+      ],
+    });
+    expect(collectProp(tree, "image")).toEqual(["/img/cat.jpg", null]);
   });
 
   it("states its threshold", () => {

@@ -39,6 +39,7 @@ export function DesignGrid({ departments }: { departments: DepartmentView[] }) {
                     href={designPath(d.slug, design.slug)}
                     label={design.name}
                     hex={design.hex}
+                    image={design.image}
                   />
                 </li>
               ))}

@@ -5,7 +5,7 @@ import type { DepartmentView } from "../taxonomy";
 const dept = (over: Partial<DepartmentView>): DepartmentView => ({
   slug: "women", name: "Women", navLabel: "Women", tileName: "Women",
   note: null, subName: "Oversized Graphic T-Shirts", hex: "#EFC4C4",
-  sortOrder: 1, designs: [{ slug: "cat", name: "Cats", hex: "#EFC4C4" }],
+  sortOrder: 1, designs: [{ slug: "cat", name: "Cats", hex: "#EFC4C4", image: null }],
   ...over,
 });
 

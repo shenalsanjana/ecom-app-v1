@@ -13,16 +13,16 @@ import { FilterTree } from "@/app/_components/categories/filter-tree";
 const dept = (over: Partial<DepartmentView>): DepartmentView => ({
   slug: "women", name: "Women", navLabel: "Women", tileName: "Women",
   note: null, subName: "Oversized Graphic T-Shirts", hex: "#EFC4C4",
-  sortOrder: 1, designs: [{ slug: "cat", name: "Cats", hex: "#EFC4C4" }],
+  sortOrder: 1, designs: [{ slug: "cat", name: "Cats", hex: "#EFC4C4", image: null }],
   ...over,
 });
 
 const departments = [
   dept({ slug: "women", designs: [
-    { slug: "cat", name: "Cats", hex: "#EFC4C4" },
-    { slug: "dino", name: "Dino", hex: "#BFD8C2" },
+    { slug: "cat", name: "Cats", hex: "#EFC4C4", image: null },
+    { slug: "dino", name: "Dino", hex: "#BFD8C2", image: null },
   ] }),
-  dept({ slug: "men", name: "Men", designs: [{ slug: "car", name: "Car", hex: "#AEC3D1" }] }),
+  dept({ slug: "men", name: "Men", designs: [{ slug: "car", name: "Car", hex: "#AEC3D1", image: null }] }),
 ];
 
 const byDesign = new Map([["cat", 3], ["dino", 1], ["car", 2]]);
@@ -98,7 +98,7 @@ describe("FilterTree", () => {
   it("prints zero for a design with no products rather than nothing", () => {
     const text = collectText(
       FilterTree({
-        departments: [dept({ designs: [{ slug: "ghost", name: "Ghost", hex: "#EFC4C4" }] })],
+        departments: [dept({ designs: [{ slug: "ghost", name: "Ghost", hex: "#EFC4C4", image: null }] })],
         byDesign: new Map(), byDepartment: new Map([["women", 0]]),
         totalCount: 0, selectedDesign: "",
       }),

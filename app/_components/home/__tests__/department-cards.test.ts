@@ -15,7 +15,7 @@ import { DepartmentCards, MIN_DEPARTMENT_CARDS } from "@/app/_components/home/de
 const dept = (over: Partial<DepartmentView>): DepartmentView => ({
   slug: "women", name: "Women", navLabel: "Women", tileName: "Women",
   note: null, subName: "Oversized Graphic T-Shirts", hex: "#EFC4C4",
-  sortOrder: 1, designs: [{ slug: "cat", name: "Cats", hex: "#EFC4C4" }],
+  sortOrder: 1, designs: [{ slug: "cat", name: "Cats", hex: "#EFC4C4", image: null }],
   ...over,
 });
 
@@ -69,7 +69,7 @@ describe("DepartmentCards", () => {
     const tree = DepartmentCards({
       departments: [
         dept({ slug: "women" }),
-        dept({ slug: "men", name: "Men", tileName: "Men", designs: [{ slug: "car", name: "Car", hex: "#AEC3D1" }] }),
+        dept({ slug: "men", name: "Men", tileName: "Men", designs: [{ slug: "car", name: "Car", hex: "#AEC3D1", image: null }] }),
         dept({ slug: "plain", tileName: "Plain T-Shirts", subName: null, designs: [] }),
       ],
     });

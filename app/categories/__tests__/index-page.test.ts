@@ -86,7 +86,7 @@ describe("/categories department lists", () => {
     getDepartments.mockResolvedValue([
       dept({
         slug: "women", name: "Women", sortOrder: 1,
-        designs: [{ slug: "cat", name: "Cats", hex: "#EFC4C4" }],
+        designs: [{ slug: "cat", name: "Cats", hex: "#EFC4C4", image: null }],
       }),
       dept({ slug: "men", name: "Men", sortOrder: 0, designs: [] }),
       dept({ slug: "plain", name: "Plain T-Shirts (Unisex)", subName: null, sortOrder: 2, designs: [] }),
@@ -111,8 +111,8 @@ describe("/categories department lists", () => {
 
   it("links every department once designs exist under each", async () => {
     getDepartments.mockResolvedValue([
-      dept({ slug: "women", designs: [{ slug: "cat", name: "Cats", hex: "#EFC4C4" }] }),
-      dept({ slug: "men", name: "Men", designs: [{ slug: "car", name: "Car", hex: "#C4D3EF" }] }),
+      dept({ slug: "women", designs: [{ slug: "cat", name: "Cats", hex: "#EFC4C4", image: null }] }),
+      dept({ slug: "men", name: "Men", designs: [{ slug: "car", name: "Car", hex: "#C4D3EF", image: null }] }),
     ]);
 
     const tree = await CategoriesPage({ searchParams: Promise.resolve({}) });

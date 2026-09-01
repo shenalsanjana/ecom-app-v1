@@ -16,7 +16,7 @@ import { MIN_MEGA_MENU_COLUMNS } from "@/app/_lib/taxonomy-nav-model";
 const dept = (over: Partial<DepartmentView>): DepartmentView => ({
   slug: "women", name: "Women", navLabel: "Women", tileName: "Women",
   note: null, subName: "Oversized Graphic T-Shirts", hex: "#EFC4C4",
-  sortOrder: 1, designs: [{ slug: "cat", name: "Cats", hex: "#EFC4C4" }],
+  sortOrder: 1, designs: [{ slug: "cat", name: "Cats", hex: "#EFC4C4", image: null }],
   ...over,
 });
 
@@ -42,7 +42,7 @@ describe("navColumns", () => {
     // the nav lists Plain Tees and Accessories too.
     const cols = navColumns([
       dept({ slug: "plain", navLabel: "Plain Tees", subName: null,
-             designs: [{ slug: "tote", name: "Tote", hex: "#C9B79A" }] }),
+             designs: [{ slug: "tote", name: "Tote", hex: "#C9B79A", image: null }] }),
     ]);
     expect(cols).toHaveLength(1);
     expect(cols[0].designs[0].href).toBe("/categories/plain/tote");
