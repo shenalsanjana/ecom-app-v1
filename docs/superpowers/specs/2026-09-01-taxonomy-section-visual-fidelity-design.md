@@ -101,7 +101,7 @@ where slides are product photos with no caption of their own.
 
 ### 4.2 `DepartmentCard`
 
-Outer: `rounded-2xl bg-card`, ring `0 0 0 1px color-mix(in oklab, var(--fg) 6%, transparent)`,
+Outer: `rounded-2xl bg-card`, ring `0 0 0 1px color-mix(in oklab, var(--foreground) 6%, transparent)`,
 hover `-translate-y-[3px]` + `shadow-card`, transition `.25s ease`. Media is 1:1. Body is
 `padding: 16px 18px 18px`, a `space-between` row: name at 21px/700, `line-height: 1.1`,
 `tracking-[-0.015em]`, `text-wrap: balance`; mono note at 10px, `tracking-[.16em]`, uppercase,
