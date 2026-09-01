@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { inkFor, INK_LIGHT } from "@/app/_lib/taxonomy-tint";
+import { inkFor, INK_LIGHT, SCRIM_ALPHA } from "@/app/_lib/taxonomy-tint";
 
 type TintTileProps = {
   href: string;
@@ -35,10 +35,15 @@ export function TintTile({ href, label, subLabel, hex, image, className }: TintT
       {image && (
         <>
           <Image src={image} alt="" fill sizes="(min-width: 1024px) 25vw, 50vw" className="object-cover" />
+          {/* Flat, not a gradient: the label can sit anywhere in the tile, so
+           *  the contrast guarantee (see SCRIM_ALPHA in taxonomy-tint.ts) has
+           *  to hold everywhere, not just at one gradient stop. The opacity
+           *  here and the one the test enforces are the same constant. */}
           <div
             data-scrim=""
             aria-hidden="true"
-            className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/10"
+            className="absolute inset-0 bg-black"
+            style={{ opacity: SCRIM_ALPHA }}
           />
         </>
       )}

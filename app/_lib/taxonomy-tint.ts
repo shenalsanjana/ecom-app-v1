@@ -85,3 +85,32 @@ export function inkFor(bgHex: string): string {
     ? INK_DARK
     : INK_LIGHT;
 }
+
+/**
+ * Opacity of the black scrim a photo tile paints over its tint, everywhere
+ * the label can sit. A tile with a photo always uses INK_LIGHT (see TintTile)
+ * instead of measuring contrast against the tint, because contrast against
+ * the tint says nothing once a photograph covers it. But if the photo never
+ * paints — slow load, broken URL, rejected host — the label sits on the tint
+ * composited with this scrim alone, so that composite must itself clear
+ * 4.5:1 against INK_LIGHT for every named tint. 0.6 is the smallest value (to
+ * one decimal place) for which it does; the worst case is snoopy (#E4DCC6),
+ * which reaches 6.09:1 at 0.6 but only 4.36:1 at 0.5. See the "clears AA
+ * against INK_LIGHT through the scrim alone" test in taxonomy-tint.test.ts.
+ */
+export const SCRIM_ALPHA = 0.6;
+
+/**
+ * The color produced by painting a black layer of the given opacity over a
+ * `#rrggbb` color — i.e. what a photo tile's tint looks like underneath its
+ * scrim if the photo itself never paints. Pure alpha compositing: black
+ * contributes nothing to any channel, so each channel is simply scaled by
+ * `1 - alpha`.
+ */
+export function compositeOverBlack(hex: string, alpha: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const channels = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) =>
+    Math.round(v * (1 - alpha)),
+  );
+  return "#" + channels.map((c) => c.toString(16).padStart(2, "0")).join("");
+}
