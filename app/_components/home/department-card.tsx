@@ -12,7 +12,7 @@ export function DepartmentCard({
     <Link
       href={href}
       className="flex flex-col overflow-hidden rounded-2xl bg-card transition-[transform,box-shadow] duration-(--duration-base) ease-(--ease-out) motion-safe:hover:-translate-y-[3px] hover:shadow-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-      style={{ boxShadow: "0 0 0 1px color-mix(in oklab, var(--fg) 6%, transparent)" }}
+      style={{ boxShadow: "0 0 0 1px color-mix(in oklab, var(--foreground) 6%, transparent)" }}
     >
       <div className="relative aspect-square overflow-hidden">
         <SlideShow slides={slides} dots="bottom-right" fadeMs={700} subject={name} />

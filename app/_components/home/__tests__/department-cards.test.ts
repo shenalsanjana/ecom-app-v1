@@ -51,20 +51,6 @@ function collectProp(node: unknown, key: string, out: unknown[] = []): unknown[]
   return out;
 }
 
-/** Walk the returned element tree and collect every rendered text child. */
-function collectText(node: unknown, out: string[] = []): string[] {
-  if (node === null || node === undefined) return out;
-  if (typeof node === "string") { out.push(node); return out; }
-  if (typeof node !== "object") return out;
-  if (Array.isArray(node)) {
-    for (const child of node) collectText(child, out);
-    return out;
-  }
-  const props = (node as { props?: Record<string, unknown> }).props;
-  if (props) collectText(props.children, out);
-  return out;
-}
-
 describe("departmentSlides", () => {
   it("projects one slide per design, carrying its photo, tint and name", () => {
     const slides = departmentSlides(dept({
@@ -109,8 +95,8 @@ describe("DepartmentCards", () => {
     });
 
     expect(collectHrefs(tree)).toEqual(["/categories/women", "/categories/men"]);
-    expect(collectText(tree)).toContain("Women");
-    expect(collectText(tree)).toContain("Unisex");
+    expect(collectProp(tree, "name")).toEqual(["Women", "Men"]);
+    expect(collectProp(tree, "note")).toEqual(["1 designs", "Unisex"]);
   });
 
   it("hands each card its own department's slides, not another's", () => {

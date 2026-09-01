@@ -32,18 +32,12 @@ export function DepartmentCards({ departments }: { departments: DepartmentView[]
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-6">
           {linked.map((d) => (
             <li key={d.slug}>
-              {/* Called as a plain function, not JSX: DepartmentCard has no
-                  hooks of its own (SlideShow, which does, stays behind its
-                  own JSX element below), so calling it directly here just
-                  inlines its render output into this tree -- identical HTML,
-                  but it lets a node-environment test walk straight through to
-                  the name/note text without mounting anything. */}
-              {DepartmentCard({
-                href: `/categories/${d.slug}`,
-                name: d.tileName,
-                note: departmentNote(d),
-                slides: departmentSlides(d),
-              })}
+              <DepartmentCard
+                href={`/categories/${d.slug}`}
+                name={d.tileName}
+                note={departmentNote(d)}
+                slides={departmentSlides(d)}
+              />
             </li>
           ))}
         </ul>
