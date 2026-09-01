@@ -25,7 +25,7 @@ export async function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:gap-6 sm:px-6 lg:px-8">
-        <MobileNav />
+        <MobileNav columns={columns} />
         <BrandMark />
         <Link
           href="/"
