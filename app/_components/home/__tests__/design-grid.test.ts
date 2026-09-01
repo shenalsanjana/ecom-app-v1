@@ -8,7 +8,7 @@ vi.mock("next/cache", () => ({
   revalidateTag: vi.fn(),
 }));
 
-import { DesignGrid, MIN_DESIGN_GROUPS } from "@/app/_components/home/design-grid";
+import { DesignGrid, MIN_DESIGN_GROUPS, designSlides, productNote } from "@/app/_components/home/design-grid";
 
 const dept = (over: Partial<DepartmentView>): DepartmentView => ({
   slug: "women", name: "Women", navLabel: "Women", tileName: "Women",
@@ -111,6 +111,82 @@ function findByKey(node: unknown, key: string): unknown {
   return null;
 }
 
+describe("designSlides", () => {
+  const design = { slug: "cat", name: "Cats", hex: "#EFC4C4", image: "/own.jpg" };
+
+  it("uses the design's product photos when it has them", () => {
+    const slides = designSlides(design, { photos: ["/a.jpg", "/b.jpg"], count: 5 });
+    expect(slides).toEqual([
+      { hex: "#EFC4C4", photo: "/a.jpg" },
+      { hex: "#EFC4C4", photo: "/b.jpg" },
+    ]);
+  });
+
+  it("falls back to the design's own image when no product has one", () => {
+    expect(designSlides(design, { photos: [], count: 2 }))
+      .toEqual([{ hex: "#EFC4C4", photo: "/own.jpg" }]);
+  });
+
+  it("falls back to a tint-only slide carrying the name when there is no photo at all", () => {
+    const bare = { slug: "cat", name: "Cats", hex: "#EFC4C4", image: null };
+    expect(designSlides(bare, undefined))
+      .toEqual([{ hex: "#EFC4C4", photo: null, title: "Cats" }]);
+  });
+});
+
+describe("productNote", () => {
+  it("singularises one product", () => {
+    expect(productNote(1)).toBe("1 product");
+    expect(productNote(4)).toBe("4 products");
+    expect(productNote(0)).toBe("0 products");
+  });
+});
+
+describe("DesignGrid headings", () => {
+  it("moves the sub-category to the section eyebrow and names each group by department", () => {
+    // subName is shared by Men and Women, so it identifies the section; the
+    // department name identifies the group.
+    const tree = DesignGrid({
+      departments: [
+        dept({ slug: "women", name: "Women" }),
+        dept({ slug: "men", name: "Men", designs: [{ slug: "car", name: "Car", hex: "#AEC3D1", image: null }] }),
+      ],
+      media: new Map(),
+    });
+
+    const h3s = collectH3Texts(tree);
+    expect(h3s).toEqual(["Women", "Men"]);
+    // The eyebrow is a PROP on SectionHeader, not children, so collectText
+    // cannot see it -- SectionHeader is an unrendered element in this tree.
+    // Exactly once, in the section header, not repeated per group.
+    expect(collectProp(tree, "eyebrow")).toEqual(["Oversized Graphic T-Shirts"]);
+  });
+
+  it("labels each group with its design count", () => {
+    const tree = DesignGrid({
+      departments: [dept({
+        slug: "women",
+        designs: [
+          { slug: "cat", name: "Cats", hex: "#EFC4C4", image: null },
+          { slug: "dino", name: "Dino", hex: "#BFD8C2", image: null },
+        ],
+      })],
+      media: new Map(),
+    });
+    expect(collectText(tree)).toContain("2 designs");
+  });
+
+  it("captions a tile with its real product count", () => {
+    const tree = DesignGrid({
+      departments: [dept({ slug: "women" })],
+      media: new Map([["cat", { photos: [], count: 3 }]]),
+    });
+    // `note` is a prop handed to DesignTile, not text DesignGrid renders
+    // itself, so it is reachable via collectProp rather than collectText.
+    expect(collectProp(tree, "note")).toContain("3 products");
+  });
+});
+
 describe("DesignGrid", () => {
   it("links designs by their nested path, never the flat one", () => {
     const hrefs = collectHrefs(
@@ -124,6 +200,7 @@ describe("DesignGrid", () => {
             ],
           }),
         ],
+        media: new Map(),
       }),
     );
 
@@ -146,6 +223,7 @@ describe("DesignGrid", () => {
             ],
           }),
         ],
+        media: new Map(),
       }),
     );
 
@@ -158,25 +236,10 @@ describe("DesignGrid", () => {
         dept({ slug: "plain", subName: null, designs: [{ slug: "tote", name: "Tote", hex: "#C9B79A", image: null }] }),
         dept({ slug: "men", name: "Men", designs: [] }),
       ],
+      media: new Map(),
     });
 
     expect(tree).toBeNull();
-  });
-
-  it("names each group by department as well as sub-category", () => {
-    // Men and Women both seed subName "Oversized Graphic T-Shirts", so the
-    // department name is the only thing telling the two groups apart.
-    const tree = DesignGrid({
-      departments: [
-        dept({ slug: "women", name: "Women" }),
-        dept({ slug: "men", name: "Men", designs: [{ slug: "car", name: "Car", hex: "#AEC3D1", image: null }] }),
-      ],
-    });
-    const text = collectText(tree);
-
-    expect(text).toContain("Women");
-    expect(text).toContain("Men");
-    expect(text.filter((t) => t === "Oversized Graphic T-Shirts")).toHaveLength(2);
   });
 
   it("keeps the heading hierarchy well-formed: one h2 for the section, h3 per group", () => {
@@ -186,6 +249,7 @@ describe("DesignGrid", () => {
           dept({ slug: "women" }),
           dept({ slug: "men", name: "Men", designs: [{ slug: "car", name: "Car", hex: "#AEC3D1", image: null }] }),
         ],
+        media: new Map(),
       }),
     );
 
@@ -193,31 +257,11 @@ describe("DesignGrid", () => {
     expect(tags).not.toContain("h2"); // the section's h2 comes from SectionHeader
   });
 
-  it("puts the department name inside the heading's own accessible name, not merely nearby", () => {
-    // The visible Eyebrow above the h3 is not programmatically associated
-    // with it, so a screen reader navigating by heading alone must still be
-    // able to tell "Women" and "Men" apart from the h3 text alone — not just
-    // from text elsewhere in the section.
-    const h3Texts = collectH3Texts(
-      DesignGrid({
-        departments: [
-          dept({ slug: "women", name: "Women" }),
-          dept({ slug: "men", name: "Men", designs: [{ slug: "car", name: "Car", hex: "#AEC3D1", image: null }] }),
-        ],
-      }),
-    );
-
-    expect(h3Texts).toHaveLength(2);
-    expect(h3Texts[0]).toContain("Women");
-    expect(h3Texts[0]).toContain("Oversized Graphic T-Shirts");
-    expect(h3Texts[1]).toContain("Men");
-    expect(h3Texts[1]).toContain("Oversized Graphic T-Shirts");
-  });
-
-  it("paints a design tile with the design's own hex, not the department's", () => {
+  it("gives a design tile slides painted with the design's own hex, not the department's", () => {
     // The department hex and the design hex are deliberately different here
     // (and #123456 appears in neither DEPARTMENT_TINTS nor DESIGN_TINTS), so
-    // this only passes if the tile reads `design.hex` rather than `d.hex`.
+    // this only passes if the slides are built from `design.hex` rather than
+    // `d.hex`.
     const tree = DesignGrid({
       departments: [
         dept({
@@ -226,12 +270,15 @@ describe("DesignGrid", () => {
           designs: [{ slug: "cat", name: "Cats", hex: "#123456", image: null }],
         }),
       ],
+      media: new Map(),
     });
 
-    expect(collectProp(tree, "hex")).toEqual(["#123456"]);
+    expect(collectProp(tree, "slides")).toEqual([
+      [{ hex: "#123456", photo: null, title: "Cats" }],
+    ]);
   });
 
-  it("keeps each group's eyebrow, heading, tile labels and hexes scoped to its own subtree", () => {
+  it("keeps each group's heading, tile names and slides scoped to its own subtree", () => {
     const tree = DesignGrid({
       departments: [
         dept({
@@ -243,23 +290,22 @@ describe("DesignGrid", () => {
           designs: [{ slug: "car", name: "Car", hex: "#654321", image: null }],
         }),
       ],
+      media: new Map(),
     });
 
     const women = findByKey(tree, "women");
     const men = findByKey(tree, "men");
 
-    expect(collectText(women)).toContain("Women");
-    expect(collectText(women)).not.toContain("Men");
-    expect(collectProp(women, "label")).toEqual(["Cats"]);
-    expect(collectProp(women, "hex")).toEqual(["#123456"]);
+    expect(collectH3Texts(women)).toEqual(["Women"]);
+    expect(collectProp(women, "name")).toEqual(["Cats"]);
+    expect(collectProp(women, "slides")).toEqual([[{ hex: "#123456", photo: null, title: "Cats" }]]);
 
-    expect(collectText(men)).toContain("Men");
-    expect(collectText(men)).not.toContain("Women");
-    expect(collectProp(men, "label")).toEqual(["Car"]);
-    expect(collectProp(men, "hex")).toEqual(["#654321"]);
+    expect(collectH3Texts(men)).toEqual(["Men"]);
+    expect(collectProp(men, "name")).toEqual(["Car"]);
+    expect(collectProp(men, "slides")).toEqual([[{ hex: "#654321", photo: null, title: "Car" }]]);
   });
 
-  it("hands a design's photo to its tile, and nothing when there is none", () => {
+  it("hands a design's photo to its tile's slides, and nothing when there is none", () => {
     const tree = DesignGrid({
       departments: [
         dept({
@@ -270,8 +316,12 @@ describe("DesignGrid", () => {
           ],
         }),
       ],
+      media: new Map(),
     });
-    expect(collectProp(tree, "image")).toEqual(["/img/cat.jpg", null]);
+    expect(collectProp(tree, "slides")).toEqual([
+      [{ hex: "#EFC4C4", photo: "/img/cat.jpg" }],
+      [{ hex: "#BFD8C2", photo: null, title: "Dino" }],
+    ]);
   });
 
   it("states its threshold", () => {
