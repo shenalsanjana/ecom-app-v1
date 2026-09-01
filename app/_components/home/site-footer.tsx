@@ -2,7 +2,7 @@ import type { SVGProps } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
-import { getDesigns } from "@/app/_lib/products";
+import { designPath, getDepartments } from "@/app/_lib/taxonomy";
 
 function InstagramIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -58,10 +58,17 @@ const STATIC_COLUMNS: { heading: string; links: LinkItem[] }[] = [
 ];
 
 export async function SiteFooter() {
-  const categories = await getDesigns();
-  const categoryLinks: LinkItem[] = categories
-    .slice(0, 6)
-    .map((c) => ({ label: c.name, href: `/categories/${c.slug}` }));
+  const departments = await getDepartments();
+  // Flatten in taxonomy order. Departments holding no designs contribute
+  // nothing, so no empty department is ever linked from the footer.
+  const categoryLinks: LinkItem[] = departments
+    .flatMap((d) =>
+      d.designs.map((design) => ({
+        label: design.name,
+        href: designPath(d.slug, design.slug),
+      })),
+    )
+    .slice(0, 6);
 
   // Insert the dynamic Categories column second (between Shop and Help) so the
   // visual order matches the previous static layout.
