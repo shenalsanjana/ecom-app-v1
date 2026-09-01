@@ -151,7 +151,9 @@ The countdown SHALL be implemented as an isolated client component so the surrou
 
 ### Requirement: Category tiles are visually distinct and legible
 
-Category tiles SHALL be rendered as solid color fills rather than photographs beneath a gradient. Each known category slug SHALL map to its own tint; a slug with no mapping MUST receive a stable, deterministic tint from the same palette so that categories added later are still distinct rather than blank.
+Category tiles SHALL be rendered as solid color fills rather than photographs beneath a gradient. Each design SHALL carry its own tint, stored on the row and seeded from the shared tint source; a slug with no mapping MUST receive a stable, deterministic tint from the same palette so that designs added later are still distinct rather than blank.
+
+Tint values and the WCAG AA gate over them are specified in `storefront-taxonomy`.
 
 Tile text color SHALL be selected by whichever candidate ink has the higher measured contrast against the tile, and MUST NOT be selected by a luminance threshold. Every tile SHALL meet WCAG AA 4.5:1 for small text.
 

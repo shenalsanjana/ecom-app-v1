@@ -1,21 +1,43 @@
 # admin-category-management Specification
 
 ## Purpose
-TBD - created by archiving change admin-category-management. Update Purpose after archive.
+
+Admin management of the catalog's design level — the rows that were called categories
+before the Department -> Design taxonomy landed. The storefront-facing URL and
+taxonomy contract lives in `storefront-taxonomy`.
 ## Requirements
 ### Requirement: Admin can list, create, and edit categories
 
-The system SHALL provide an admin `/admin/categories` area where an authenticated admin can view all categories with their product counts, create a new category (name + image), and edit an existing category's name and image. All category mutations SHALL require an authenticated admin.
+The system SHALL provide an admin `/admin/categories` area where an authenticated admin can view all designs with their product counts, create a new design (name + department, with an optional image), and edit an existing design's name, department and image. All design mutations SHALL require an authenticated admin.
+
+The department field SHALL be required on both create and update, and its options SHALL be read from the database ordered by sort order rather than hardcoded. Defaulting the department on update is prohibited: a silent default there re-files a design without the admin choosing to.
+
+The image SHALL be optional. An absent or blank image SHALL persist as NULL rather than an empty string, and SHALL NOT block saving — a design with no image renders as a flat tint tile.
 
 #### Scenario: List categories with product counts
 
 - **WHEN** an admin opens `/admin/categories`
 - **THEN** every category is listed with its name, slug, image, and the number of products in it
 
-#### Scenario: Create a category
+#### Scenario: Create a design
 
-- **WHEN** an admin submits a new category with a name and image
-- **THEN** a category is created with a slug derived from the name (made unique if needed)
+- **WHEN** an admin submits a new design with a name and a department
+- **THEN** a design is created with a slug derived from the name (made unique if needed), filed under the chosen department
+
+#### Scenario: Create a design without an image
+
+- **WHEN** an admin submits a new design leaving the image blank
+- **THEN** the design is created with a null image and renders as a flat tint tile
+
+#### Scenario: Edit a design that has no image
+
+- **WHEN** an admin opens a design whose image is null and changes only its name
+- **THEN** the edit saves successfully; a missing image does not block the form
+
+#### Scenario: Move a design to another department
+
+- **WHEN** an admin changes a design's department
+- **THEN** the design is re-filed and every product referencing it has its denormalised department updated in the same transaction
 
 #### Scenario: Reject a name with no slug-able characters
 
@@ -37,19 +59,19 @@ When an edit changes the category name such that its derived slug changes, the s
 - **WHEN** an admin edits a category's name in a way that produces the same slug (e.g. only capitalization)
 - **THEN** the name/image are updated and no slug-history mapping is created
 
-#### Scenario: Retired slug redirects to current
+#### Scenario: Retired slug redirects to the current nested path
 
-- **WHEN** a visitor requests `/categories/<old-slug>` for a category that was renamed
-- **THEN** the storefront responds with a permanent (308) redirect to `/categories/<current-slug>`
+- **WHEN** a visitor requests `/categories/<old-slug>` for a design that was renamed
+- **THEN** the storefront responds with a permanent (308) redirect to `/categories/<department>/<current-slug>`, where the department is the design's current one — see `storefront-taxonomy`
 
 #### Scenario: Rename back removes the self-loop
 
 - **WHEN** a category is renamed away and then back to a previously retired slug
 - **THEN** no slug-history row maps a slug to itself (no redirect loop)
 
-### Requirement: Admin can delete a category only when it has no products
+### Requirement: Admin can delete a design only when it has no products
 
-The system SHALL allow an admin to delete a category only when no products reference it. If any product references the category, deletion SHALL be refused with a message to reassign or remove those products first. Deleting a category SHALL remove its slug-history mappings.
+The system SHALL allow an admin to delete a design only when no products reference it. If any product references the design, deletion SHALL be refused with a message to reassign or remove those products first. Deleting a design SHALL remove its slug-history mappings.
 
 #### Scenario: Delete an empty category
 
