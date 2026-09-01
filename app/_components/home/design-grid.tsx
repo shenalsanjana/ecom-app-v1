@@ -26,6 +26,14 @@ export function productNote(count: number): string {
   return `${count} ${count === 1 ? "product" : "products"}`;
 }
 
+/** Singularises the same way productNote does, inches above it on the tile
+ *  below -- department-cards.tsx's departmentNote was fixed for the same
+ *  bug in the previous task; a group holding exactly one design must not
+ *  read "1 designs" next to a tile that correctly reads "1 product". */
+export function designCountNote(count: number): string {
+  return `${count} ${count === 1 ? "design" : "designs"}`;
+}
+
 export function DesignGrid({
   departments, media,
 }: {
@@ -48,7 +56,7 @@ export function DesignGrid({
               <div className="mb-4 flex items-baseline gap-2.5">
                 <h3 className="font-heading text-[15px] font-semibold">{d.name}</h3>
                 <span className="font-mono text-[10px] uppercase tracking-[.14em] text-muted-foreground">
-                  {`${d.designs.length} designs`}
+                  {designCountNote(d.designs.length)}
                 </span>
               </div>
               <ul className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-3.5">

@@ -8,7 +8,9 @@ vi.mock("next/cache", () => ({
   revalidateTag: vi.fn(),
 }));
 
-import { DesignGrid, MIN_DESIGN_GROUPS, designSlides, productNote } from "@/app/_components/home/design-grid";
+import {
+  DesignGrid, MIN_DESIGN_GROUPS, designSlides, productNote, designCountNote,
+} from "@/app/_components/home/design-grid";
 
 const dept = (over: Partial<DepartmentView>): DepartmentView => ({
   slug: "women", name: "Women", navLabel: "Women", tileName: "Women",
@@ -142,6 +144,17 @@ describe("productNote", () => {
   });
 });
 
+describe("designCountNote", () => {
+  it("singularises one design", () => {
+    // Same shape as productNote, inches above it on the page -- a group
+    // holding exactly one design must not read "1 designs" next to a tile
+    // that correctly reads "1 product".
+    expect(designCountNote(1)).toBe("1 design");
+    expect(designCountNote(2)).toBe("2 designs");
+    expect(designCountNote(0)).toBe("0 designs");
+  });
+});
+
 describe("DesignGrid headings", () => {
   it("moves the sub-category to the section eyebrow and names each group by department", () => {
     // subName is shared by Men and Women, so it identifies the section; the
@@ -174,6 +187,22 @@ describe("DesignGrid headings", () => {
       media: new Map(),
     });
     expect(collectText(tree)).toContain("2 designs");
+  });
+
+  it("singularises a group's design count when it holds exactly one design", () => {
+    // showsInDesignSection only requires subName !== null && designs.length > 0
+    // -- a one-design department is reachable, and its header must not read
+    // "1 designs" the way department-cards.tsx's departmentNote was fixed for
+    // in the previous task.
+    const tree = DesignGrid({
+      departments: [dept({
+        slug: "women",
+        designs: [{ slug: "cat", name: "Cats", hex: "#EFC4C4", image: null }],
+      })],
+      media: new Map(),
+    });
+    expect(collectText(tree)).toContain("1 design");
+    expect(collectText(tree)).not.toContain("1 designs");
   });
 
   it("captions a tile with its real product count", () => {
