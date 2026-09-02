@@ -44,9 +44,18 @@ export function designMedia(
  *
  * Tagged "catalog", which the admin actions already bust with
  * revalidateTag("catalog", "max") -- no new invalidation is introduced.
+ *
+ * `unstable_cache` persists a hit as `JSON.stringify(result)` and returns
+ * `JSON.parse(...)` on the next read (see next/dist/server/web/spec-extension/
+ * unstable-cache.js) -- it is a JSON boundary, not a structured-clone one. A
+ * `Map` survives `JSON.stringify` as `"{}"`, so a cache MISS used to return a
+ * real Map (and work) while every subsequent HIT returned `{}` and threw
+ * downstream at `media.get(...)`. The cached callback below returns a plain,
+ * JSON-safe entry array; the Map is rebuilt on every call, outside the cache
+ * boundary, so a hit and a miss are indistinguishable to the caller.
  */
-export const getDesignMedia = unstable_cache(
-  async (): Promise<Map<string, DesignMedia>> => {
+const getDesignMediaEntries = unstable_cache(
+  async (): Promise<[string, DesignMedia][]> => {
     const rows = await prisma.product.findMany({
       where: { archived: false },
       orderBy: [{ designSlug: "asc" }, { id: "asc" }], // deterministic slide order
@@ -67,8 +76,12 @@ export const getDesignMedia = unstable_cache(
         },
       },
     });
-    return designMedia(rows);
+    return [...designMedia(rows)];
   },
   ["design-media"],
   { tags: ["catalog", "products"], revalidate: 3600 },
 );
+
+export async function getDesignMedia(): Promise<Map<string, DesignMedia>> {
+  return new Map(await getDesignMediaEntries());
+}
