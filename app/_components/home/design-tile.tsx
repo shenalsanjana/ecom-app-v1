@@ -31,9 +31,11 @@ export function DesignTile({
         style={{ backgroundImage: CAPTION_GRADIENT }}
       >
         <span className="text-[15px] font-semibold leading-[1.15] text-white">{name}</span>
-        <span className="font-mono text-[9px] uppercase tracking-[.14em] text-white/[.72]">
-          {note}
-        </span>
+        {note && (
+          <span className="font-mono text-[9px] uppercase tracking-[.14em] text-white/[.72]">
+            {note}
+          </span>
+        )}
       </div>
     </Link>
   );

@@ -1,6 +1,5 @@
 import { Section } from "@/app/_components/ui/section";
 import { SectionHeader } from "@/app/_components/ui/section-header";
-import { SlideClock } from "@/app/_components/ui/slide-clock";
 import { DesignTile } from "@/app/_components/home/design-tile";
 import type { Slide } from "@/app/_components/ui/slide-show";
 import type { DesignMedia } from "@/app/_lib/taxonomy-media";
@@ -22,7 +21,10 @@ export function designSlides(design: DesignSummary, media: DesignMedia | undefin
   return [{ hex: design.hex, photo: null, title: design.name }];
 }
 
+/** Empty string, not "0 products", when a design's products are all
+ *  archived: a live tile printing a zero count reads as broken, not honest. */
 export function productNote(count: number): string {
+  if (count === 0) return "";
   return `${count} ${count === 1 ? "product" : "products"}`;
 }
 
@@ -43,38 +45,44 @@ export function DesignGrid({
   const groups = departments.filter(showsInDesignSection);
   if (groups.length < MIN_DESIGN_GROUPS) return null;
 
+  // subName is shared by Men and Women today, so it names the section; the
+  // department name names each group. But a future department with a
+  // different sub-name must not be silently folded under the first group's
+  // label -- the eyebrow is only trustworthy when every group agrees.
+  const eyebrow = groups.every((g) => g.subName === groups[0].subName)
+    ? (groups[0].subName ?? undefined)
+    : undefined;
+
   return (
     <Section>
-      {/* subName is shared by Men and Women, so it names the section; the
-          department name names each group. That asymmetry is why no group
-          heading needs an sr-only disambiguator any more. */}
-      <SectionHeader eyebrow={groups[0].subName ?? undefined} title="Shop by design" />
-      <SlideClock>
-        <div className="space-y-[34px]">
-          {groups.map((d) => (
-            <div key={d.slug}>
-              <div className="mb-4 flex items-baseline gap-2.5">
-                <h3 className="font-heading text-[15px] font-semibold">{d.name}</h3>
-                <span className="font-mono text-[10px] uppercase tracking-[.14em] text-muted-foreground">
-                  {designCountNote(d.designs.length)}
-                </span>
-              </div>
-              <ul className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-3.5">
-                {d.designs.map((design) => (
-                  <li key={design.slug}>
-                    <DesignTile
-                      href={designPath(d.slug, design.slug)}
-                      name={design.name}
-                      note={productNote(media.get(design.slug)?.count ?? 0)}
-                      slides={designSlides(design, media.get(design.slug))}
-                    />
-                  </li>
-                ))}
-              </ul>
+      <SectionHeader eyebrow={eyebrow} title="Shop by design" />
+      {/* No SlideClock here: it's hoisted to page.tsx so this section and
+          DepartmentCards' rotating tiles share exactly one interval -- see
+          taxonomy-tile-slides/spec.md's "one shared timer" requirement. */}
+      <div className="space-y-[34px]">
+        {groups.map((d) => (
+          <div key={d.slug}>
+            <div className="mb-4 flex items-baseline gap-2.5">
+              <h3 className="font-heading text-[15px] font-semibold">{d.name}</h3>
+              <span className="font-mono text-[10px] uppercase tracking-[.14em] text-muted-foreground">
+                {designCountNote(d.designs.length)}
+              </span>
             </div>
-          ))}
-        </div>
-      </SlideClock>
+            <ul className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-3.5">
+              {d.designs.map((design) => (
+                <li key={design.slug}>
+                  <DesignTile
+                    href={designPath(d.slug, design.slug)}
+                    name={design.name}
+                    note={productNote(media.get(design.slug)?.count ?? 0)}
+                    slides={designSlides(design, media.get(design.slug))}
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
     </Section>
   );
 }

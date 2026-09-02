@@ -36,6 +36,7 @@ import { DepartmentCards } from "@/app/_components/home/department-cards";
 import { DesignGrid } from "@/app/_components/home/design-grid";
 import { ProductGrid } from "@/app/_components/home/product-grid";
 import { DealsSection } from "@/app/_components/home/deals-section";
+import { SlideClock } from "@/app/_components/ui/slide-clock";
 
 const departments: DepartmentView[] = [
   {
@@ -108,5 +109,22 @@ describe("home page", () => {
     // have been given the extra read.
     expect(cards?.props.media).toBeUndefined();
     expect(getDesignMedia).toHaveBeenCalledTimes(1);
+  });
+
+  it("drives both taxonomy sections off exactly one shared SlideClock", async () => {
+    // taxonomy-tile-slides/spec.md: "the implementation MUST NOT start one
+    // timer per tile" -- each section used to mount its own SlideClock,
+    // which drifts out of phase over time. This is the regression test for
+    // that: DepartmentCards and DesignGrid must both sit inside a single
+    // SlideClock instance on the home page, not carry one each.
+    const elements = collectElements(await Home());
+    const clocks = elements.filter((e) => e.type === SlideClock);
+    expect(clocks).toHaveLength(1);
+
+    // And both sections must actually be inside it, not merely present
+    // somewhere else on the page.
+    const clockChildTypes = collectElements(clocks[0].props.children).map((e) => e.type);
+    expect(clockChildTypes).toContain(DepartmentCards);
+    expect(clockChildTypes).toContain(DesignGrid);
   });
 });

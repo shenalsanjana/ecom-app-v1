@@ -140,7 +140,13 @@ describe("productNote", () => {
   it("singularises one product", () => {
     expect(productNote(1)).toBe("1 product");
     expect(productNote(4)).toBe("4 products");
-    expect(productNote(0)).toBe("0 products");
+  });
+
+  it("suppresses the note entirely at zero, rather than printing '0 products'", () => {
+    // Reachable when a design's products are all archived: media.count can be
+    // zero on an otherwise-live tile, and a zero count read aloud on a live
+    // tile looks broken rather than honest.
+    expect(productNote(0)).toBe("");
   });
 });
 
@@ -173,6 +179,21 @@ describe("DesignGrid headings", () => {
     // cannot see it -- SectionHeader is an unrendered element in this tree.
     // Exactly once, in the section header, not repeated per group.
     expect(collectProp(tree, "eyebrow")).toEqual(["Oversized Graphic T-Shirts"]);
+  });
+
+  it("omits the eyebrow when the groups' sub-names disagree, rather than mislabelling one with another's", () => {
+    const tree = DesignGrid({
+      departments: [
+        dept({ slug: "women", name: "Women", subName: "Oversized Graphic T-Shirts" }),
+        dept({
+          slug: "men", name: "Men", subName: "Plain T-Shirts",
+          designs: [{ slug: "car", name: "Car", hex: "#AEC3D1", image: null }],
+        }),
+      ],
+      media: new Map(),
+    });
+
+    expect(collectProp(tree, "eyebrow")).toEqual([undefined]);
   });
 
   it("labels each group with its design count", () => {

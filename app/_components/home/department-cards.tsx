@@ -1,6 +1,5 @@
 import { Section } from "@/app/_components/ui/section";
 import { SectionHeader } from "@/app/_components/ui/section-header";
-import { SlideClock } from "@/app/_components/ui/slide-clock";
 import { DepartmentCard } from "@/app/_components/home/department-card";
 import type { Slide } from "@/app/_components/ui/slide-show";
 import { showsNavDropdown, type DepartmentView } from "@/app/_lib/taxonomy";
@@ -33,20 +32,21 @@ export function DepartmentCards({ departments }: { departments: DepartmentView[]
   return (
     <Section>
       <SectionHeader title="Shop by category" />
-      <SlideClock>
-        <ul className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-6">
-          {linked.map((d) => (
-            <li key={d.slug}>
-              <DepartmentCard
-                href={`/categories/${d.slug}`}
-                name={d.tileName}
-                note={departmentNote(d)}
-                slides={departmentSlides(d)}
-              />
-            </li>
-          ))}
-        </ul>
-      </SlideClock>
+      {/* No SlideClock here: it's hoisted to page.tsx so this section and
+          DesignGrid's rotating tiles share exactly one interval -- see
+          taxonomy-tile-slides/spec.md's "one shared timer" requirement. */}
+      <ul className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-6">
+        {linked.map((d) => (
+          <li key={d.slug}>
+            <DepartmentCard
+              href={`/categories/${d.slug}`}
+              name={d.tileName}
+              note={departmentNote(d)}
+              slides={departmentSlides(d)}
+            />
+          </li>
+        ))}
+      </ul>
     </Section>
   );
 }
