@@ -56,7 +56,7 @@ This preference SHALL be read at runtime. A CSS-only guard is insufficient, beca
 
 When a visitor selects a slide through its pagination control, that tile SHALL hold that slide and SHALL NOT resume advancing. Other tiles on the page are unaffected.
 
-A pinned position SHALL be clamped to the available slides, so a stale selection can never resolve to an image that is not there.
+A pinned position that no longer identifies an existing slide SHALL be disregarded, and the tile SHALL resume following the shared tick. It MUST NOT silently resolve to a different image than the one chosen — substituting a neighbour for a vanished selection is a worse answer than resuming rotation.
 
 #### Scenario: A visitor picks a slide
 
@@ -67,7 +67,8 @@ A pinned position SHALL be clamped to the available slides, so a stale selection
 #### Scenario: A pinned position no longer exists
 
 - **WHEN** a tile holds a pinned position beyond the end of its current slides
-- **THEN** it resolves to a slide that exists rather than rendering nothing
+- **THEN** it disregards the pin and resumes following the shared tick
+- **AND** it does not substitute a neighbouring slide for the one that vanished
 
 ### Requirement: A pagination control is named by what it shows
 

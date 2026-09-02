@@ -1,0 +1,87 @@
+// app/_lib/taxonomy-media.ts
+import { unstable_cache } from "next/cache";
+import { prisma } from "@/app/_lib/prisma";
+
+/** Up to this many photos rotate on a design tile. */
+export const MAX_SLIDES = 4;
+
+export type DesignMedia = { photos: string[]; count: number };
+
+/** One non-archived product, with its default variant's first CARD image. */
+export type ProductMediaRow = {
+  designSlug: string;
+  variants: { images: { url: string }[] }[];
+};
+
+/**
+ * Photos and product counts per design. Pure, and separate from the query, so
+ * the arithmetic is testable without a database -- the same split
+ * `taxonomy-counts.ts` uses.
+ *
+ * The row set IS the non-archived products, so counting rows gives the caption
+ * and the first `maxSlides` urls give the slides. A product with no variant, or
+ * a variant with no CARD image, still counts but contributes no photo.
+ */
+export function designMedia(
+  rows: ProductMediaRow[],
+  maxSlides: number = MAX_SLIDES,
+): Map<string, DesignMedia> {
+  const media = new Map<string, DesignMedia>();
+  for (const row of rows) {
+    const entry = media.get(row.designSlug) ?? { photos: [], count: 0 };
+    entry.count += 1;
+    const url = row.variants[0]?.images[0]?.url;
+    if (url && entry.photos.length < maxSlides) entry.photos.push(url);
+    media.set(row.designSlug, entry);
+  }
+  return media;
+}
+
+/**
+ * Read only by the home route. Deliberately NOT folded into getDepartments():
+ * the footer calls that on every page, so nesting product -> variant -> image
+ * into it would slow ~20 routes for data only this one reads.
+ *
+ * Tagged "catalog", which the admin actions already bust with
+ * revalidateTag("catalog", "max") -- no new invalidation is introduced.
+ *
+ * `unstable_cache` persists a hit as `JSON.stringify(result)` and returns
+ * `JSON.parse(...)` on the next read (see next/dist/server/web/spec-extension/
+ * unstable-cache.js) -- it is a JSON boundary, not a structured-clone one. A
+ * `Map` survives `JSON.stringify` as `"{}"`, so a cache MISS used to return a
+ * real Map (and work) while every subsequent HIT returned `{}` and threw
+ * downstream at `media.get(...)`. The cached callback below returns a plain,
+ * JSON-safe entry array; the Map is rebuilt on every call, outside the cache
+ * boundary, so a hit and a miss are indistinguishable to the caller.
+ */
+const getDesignMediaEntries = unstable_cache(
+  async (): Promise<[string, DesignMedia][]> => {
+    const rows = await prisma.product.findMany({
+      where: { archived: false },
+      orderBy: [{ designSlug: "asc" }, { id: "asc" }], // deterministic slide order
+      select: {
+        designSlug: true,
+        variants: {
+          where: { archived: false },
+          orderBy: { sortOrder: "asc" },
+          take: 1,
+          select: {
+            images: {
+              where: { role: "CARD" },
+              orderBy: { sortOrder: "asc" },
+              take: 1,
+              select: { url: true },
+            },
+          },
+        },
+      },
+    });
+    return [...designMedia(rows)];
+  },
+  ["design-media"],
+  { tags: ["catalog", "products"], revalidate: 3600 },
+);
+
+export async function getDesignMedia(): Promise<Map<string, DesignMedia>> {
+  return new Map(await getDesignMediaEntries());
+}

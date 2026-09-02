@@ -10,7 +10,9 @@ vi.mock("next/cache", () => ({
   revalidateTag: vi.fn(),
 }));
 
-import { DepartmentCards, MIN_DEPARTMENT_CARDS } from "@/app/_components/home/department-cards";
+import {
+  DepartmentCards, MIN_DEPARTMENT_CARDS, departmentSlides, departmentNote,
+} from "@/app/_components/home/department-cards";
 
 const dept = (over: Partial<DepartmentView>): DepartmentView => ({
   slug: "women", name: "Women", navLabel: "Women", tileName: "Women",
@@ -49,53 +51,75 @@ function collectProp(node: unknown, key: string, out: unknown[] = []): unknown[]
   return out;
 }
 
+describe("departmentSlides", () => {
+  it("projects one slide per design, carrying its photo, tint and name", () => {
+    const slides = departmentSlides(dept({
+      designs: [
+        { slug: "cat", name: "Cats", hex: "#EFC4C4", image: "/cat.jpg" },
+        { slug: "dino", name: "Dino", hex: "#BFD8C2", image: null },
+      ],
+    }));
+
+    expect(slides).toEqual([
+      { hex: "#EFC4C4", photo: "/cat.jpg", label: "Cats" },
+      { hex: "#BFD8C2", photo: null, label: "Dino" },
+    ]);
+  });
+});
+
+describe("departmentNote", () => {
+  it("prefers the department's own note", () => {
+    expect(departmentNote(dept({ note: "Unisex" }))).toBe("Unisex");
+  });
+
+  it("singularises the design count for exactly one design", () => {
+    // The default fixture already carries exactly one design.
+    expect(departmentNote(dept({ note: null }))).toBe("1 design");
+  });
+
+  it("falls back to the plural design count", () => {
+    // The prototype's "N products" branch is unreachable: DepartmentCards only
+    // renders departments passing showsNavDropdown, so designs is never empty.
+    expect(departmentNote(dept({
+      note: null,
+      designs: [
+        { slug: "cat", name: "Cats", hex: "#EFC4C4", image: null },
+        { slug: "dino", name: "Dino", hex: "#BFD8C2", image: null },
+      ],
+    }))).toBe("2 designs");
+  });
+});
+
 describe("DepartmentCards", () => {
-  it("renders nothing when only one department has designs", () => {
-    // Production today: the migration inserts four departments, the deploy
-    // never seeds, and both shipped designs sit under `women`.
+  it("renders the name, note and link for each linked department", () => {
     const tree = DepartmentCards({
       departments: [
-        dept({ slug: "women" }),
-        dept({ slug: "men", name: "Men", tileName: "Men", designs: [] }),
-        dept({ slug: "plain", tileName: "Plain T-Shirts", subName: null, designs: [] }),
-        dept({ slug: "accessories", tileName: "Accessories", subName: null, designs: [] }),
+        dept({ slug: "women", tileName: "Women", note: null }),
+        dept({ slug: "men", tileName: "Men", note: "Unisex" }),
       ],
     });
 
-    expect(tree).toBeNull();
+    expect(collectHrefs(tree)).toEqual(["/categories/women", "/categories/men"]);
+    expect(collectProp(tree, "name")).toEqual(["Women", "Men"]);
+    expect(collectProp(tree, "note")).toEqual(["1 design", "Unisex"]);
   });
 
-  it("renders once at least two departments have designs, omitting the empty ones", () => {
+  it("hands each card its own department's slides, not another's", () => {
     const tree = DepartmentCards({
       departments: [
-        dept({ slug: "women" }),
-        dept({ slug: "men", name: "Men", tileName: "Men", designs: [{ slug: "car", name: "Car", hex: "#AEC3D1", image: null }] }),
-        dept({ slug: "plain", tileName: "Plain T-Shirts", subName: null, designs: [] }),
-      ],
-    });
-    const hrefs = collectHrefs(tree);
-
-    expect(hrefs).toEqual(["/categories/women", "/categories/men"]);
-    expect(hrefs).not.toContain("/categories/plain");
-  });
-
-  it("labels a tile with tileName and note, and paints it with the row's hex", () => {
-    // #123456 appears in neither DEPARTMENT_TINTS nor DESIGN_TINTS, so this
-    // passes only if the tile reads the database column rather than
-    // tintForSlug(). A real seeded value would not tell the two apart.
-    const tree = DepartmentCards({
-      departments: [
-        dept({ slug: "plain", tileName: "Plain T-Shirts", note: "Unisex", hex: "#123456" }),
-        dept({ slug: "women" }),
+        dept({ slug: "women", designs: [{ slug: "cat", name: "Cats", hex: "#111111", image: null }] }),
+        dept({ slug: "men", designs: [{ slug: "car", name: "Car", hex: "#222222", image: null }] }),
       ],
     });
 
-    expect(collectProp(tree, "label")).toContain("Plain T-Shirts");
-    expect(collectProp(tree, "subLabel")).toContain("Unisex");
-    expect(collectProp(tree, "hex")).toContain("#123456");
+    expect(collectProp(tree, "slides")).toEqual([
+      [{ hex: "#111111", photo: null, label: "Cats" }],
+      [{ hex: "#222222", photo: null, label: "Car" }],
+    ]);
   });
 
-  it("states its threshold", () => {
+  it("still drops a department with no designs, and its threshold is unchanged", () => {
+    expect(DepartmentCards({ departments: [dept({ designs: [] })] })).toBeNull();
     expect(MIN_DEPARTMENT_CARDS).toBe(2);
   });
 });

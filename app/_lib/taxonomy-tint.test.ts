@@ -10,8 +10,11 @@ import {
   inkFor,
   INK_DARK,
   INK_LIGHT,
-  SCRIM_ALPHA,
   compositeOverBlack,
+  compositeOver,
+  CAPTION_SCRIM_MIN_ALPHA,
+  CAPTION_OVERLAY,
+  CAPTION_NOTE_ALPHA,
 } from "./taxonomy-tint";
 
 describe("tintForSlug", () => {
@@ -130,28 +133,38 @@ describe("compositeOverBlack", () => {
   });
 });
 
-describe("SCRIM_ALPHA", () => {
-  it("clears AA against INK_LIGHT through the scrim alone, for every named tint", () => {
-    // If a photo tile's image never paints — slow load, broken URL, rejected
-    // host — the label still sits on the tint composited with the scrim
-    // alone, since TintTile always uses INK_LIGHT once an image is given.
-    // That composite must itself clear 4.5:1, independent of the photo.
-    const failures = Object.entries(ALL_TINTS)
-      .map(([slug, hex]) => {
-        const composite = compositeOverBlack(hex, SCRIM_ALPHA);
-        return [slug, composite, contrastRatio(composite, INK_LIGHT)] as const;
-      })
-      .filter(([, , ratio]) => ratio < 4.5);
-    expect(failures).toEqual([]);
+describe("compositeOver", () => {
+  it("reduces to compositeOverBlack when the overlay is black", () => {
+    expect(compositeOver("#E4DCC6", "#000000", 0.6)).toBe(compositeOverBlack("#E4DCC6", 0.6));
   });
 
-  it("is the smallest one-decimal alpha that clears AA for every tint", () => {
-    // One tenth below SCRIM_ALPHA, at least one tint must fail — otherwise
-    // SCRIM_ALPHA is not the minimal value the doc comment claims it is.
-    const nextLowest = Math.round((SCRIM_ALPHA - 0.1) * 10) / 10;
-    const stillPasses = Object.values(ALL_TINTS).every(
-      (hex) => contrastRatio(compositeOverBlack(hex, nextLowest), INK_LIGHT) >= 4.5,
-    );
-    expect(stillPasses).toBe(false);
+  it("returns the source untouched at alpha 0 and the overlay at alpha 1", () => {
+    expect(compositeOver("#E4DCC6", "#140f0a", 0)).toBe("#e4dcc6");
+    expect(compositeOver("#E4DCC6", "#140f0a", 1)).toBe("#140f0a");
+  });
+});
+
+describe("the caption gradient's contrast floor", () => {
+  // The caption sits over a gradient, not a flat scrim, so the guarantee holds
+  // only where the text actually sits. CAPTION_SCRIM_MIN_ALPHA is the gradient's
+  // floor across that band. If the photo never paints, the text sits on the tint
+  // composited with that floor alone -- which must still clear AA.
+  const grounds = Object.entries(ALL_TINTS).map(
+    ([name, hex]) => [name, compositeOver(hex, CAPTION_OVERLAY, CAPTION_SCRIM_MIN_ALPHA)] as const,
+  );
+
+  it("clears AA for the caption's name line against every tint", () => {
+    for (const [name, ground] of grounds) {
+      expect(contrastRatio("#ffffff", ground), name).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("clears AA for the caption's note line, which is only 72% white at 9px", () => {
+    // The note is the binding case: small text at partial opacity. Its effective
+    // colour is white composited onto the same ground at CAPTION_NOTE_ALPHA.
+    for (const [name, ground] of grounds) {
+      const note = compositeOver(ground, "#ffffff", CAPTION_NOTE_ALPHA);
+      expect(contrastRatio(note, ground), name).toBeGreaterThanOrEqual(4.5);
+    }
   });
 });

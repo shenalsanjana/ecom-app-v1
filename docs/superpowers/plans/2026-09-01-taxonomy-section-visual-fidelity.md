@@ -804,7 +804,7 @@ export function DepartmentCard({
     <Link
       href={href}
       className="flex flex-col overflow-hidden rounded-2xl bg-card transition-[transform,box-shadow] duration-(--duration-base) ease-(--ease-out) motion-safe:hover:-translate-y-[3px] hover:shadow-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-      style={{ boxShadow: "0 0 0 1px color-mix(in oklab, var(--fg) 6%, transparent)" }}
+      style={{ boxShadow: "0 0 0 1px color-mix(in oklab, var(--foreground) 6%, transparent)" }}
     >
       <div className="relative aspect-square overflow-hidden">
         <SlideShow slides={slides} dots="bottom-right" fadeMs={700} subject={name} />
@@ -962,8 +962,10 @@ describe("DesignGrid headings", () => {
 
     const h3s = collectH3Texts(tree);
     expect(h3s).toEqual(["Women", "Men"]);
-    // Exactly once, in the section header -- not repeated per group.
-    expect(collectText(tree).filter((t) => t === "Oversized Graphic T-Shirts")).toHaveLength(1);
+    // The eyebrow is a PROP on SectionHeader, not children, so collectText
+    // cannot see it -- SectionHeader is an unrendered element in this tree.
+    // Exactly once, in the section header, not repeated per group.
+    expect(collectProp(tree, "eyebrow")).toEqual(["Oversized Graphic T-Shirts"]);
   });
 
   it("labels each group with its design count", () => {
@@ -985,7 +987,9 @@ describe("DesignGrid headings", () => {
       departments: [dept({ slug: "women" })],
       media: new Map([["cat", { photos: [], count: 3 }]]),
     });
-    expect(collectText(tree)).toContain("3 products");
+    // `note` is a prop handed to DesignTile, not text DesignGrid renders
+    // itself, so it is reachable via collectProp rather than collectText.
+    expect(collectProp(tree, "note")).toContain("3 products");
   });
 });
 ```
