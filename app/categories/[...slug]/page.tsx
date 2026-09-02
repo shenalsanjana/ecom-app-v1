@@ -12,8 +12,11 @@ import {
 import { designPath } from "@/app/_lib/taxonomy-path";
 import { resolveCategorySegments } from "@/app/_lib/taxonomy-lookup";
 import type { Resolution } from "@/app/_lib/taxonomy-route";
-import { inkFor } from "@/app/_lib/taxonomy-tint";
+import { getDesignMedia, type DesignMedia } from "@/app/_lib/taxonomy-media";
 import { ProductCard } from "@/app/_components/home/product-card";
+import { DesignTile } from "@/app/_components/home/design-tile";
+import { designCountNote, designSlides, productNote } from "@/app/_components/home/design-grid";
+import { SlideClock } from "@/app/_components/ui/slide-clock";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { SortSelect } from "@/app/_components/shared/sort-select";
@@ -116,11 +119,15 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   if (resolved.kind === "department") {
     const department = findDepartment(departments, resolved.slug);
     if (!department) notFound();
+    // Read here rather than inside DepartmentBody so the body stays a plain
+    // sync function — testable by calling it — and so a design route never
+    // pays for a read only the department view uses.
+    const media = await getDesignMedia();
     return (
       <>
         <SiteHeader />
         <TrackCategoryView name={department.name} />
-        <DepartmentBody department={department} />
+        <DepartmentBody department={department} media={media} />
         <SiteFooter />
       </>
     );
@@ -275,8 +282,21 @@ function DesignBodySkeleton() {
   );
 }
 
-/** A department lists its designs as solid tiles — it has no products of its own. */
-function DepartmentBody({ department }: { department: DepartmentView }) {
+/** Mirrors the grid below: columns half again as wide as the home page's, so
+ *  the tiles ask for a correspondingly larger photo. */
+const DESIGN_SLIDE_SIZES = "(min-width:1024px) 16vw, (min-width:640px) 30vw, 45vw";
+
+/** A department lists its designs — it has no products of its own. The tiles
+ *  are the home page's "Shop by design" cards: the design's own product
+ *  photography, its name, and how many products sit under it. Exported so it
+ *  can be tested by calling it, the way mobile-nav's TaxonomySection is. */
+export function DepartmentBody({
+  department,
+  media,
+}: {
+  department: DepartmentView;
+  media: Map<string, DesignMedia>;
+}) {
   return (
     <main className="flex-1">
       <section className="border-b bg-muted/30">
@@ -290,30 +310,40 @@ function DepartmentBody({ department }: { department: DepartmentView }) {
       </section>
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {department.subName && (
-          <h2 className="mb-6 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            {department.subName}
-          </h2>
-        )}
-
         {department.designs.length === 0 ? (
           <div className="text-center py-20">
             <p className="text-lg text-muted-foreground">Nothing here yet. Check back soon.</p>
           </div>
         ) : (
-          <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {department.designs.map((g) => (
-              <li key={g.slug}>
-                <Link
-                  href={designPath(department.slug, g.slug)}
-                  className="flex aspect-square items-end rounded-xl p-4 transition-transform hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                  style={{ backgroundColor: g.hex, color: inkFor(g.hex) }}
-                >
-                  <span className="font-heading text-lg font-semibold tracking-tight">{g.name}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <>
+            <div className="mb-4 flex items-baseline gap-2.5">
+              {department.subName && (
+                <h2 className="font-heading text-[15px] font-semibold">{department.subName}</h2>
+              )}
+              <span className="font-mono text-[10px] uppercase tracking-[.14em] text-muted-foreground">
+                {designCountNote(department.designs.length)}
+              </span>
+            </div>
+            {/* The home page hoists one SlideClock over both taxonomy sections
+                so their tiles share a single interval. This page has one grid,
+                so the clock sits directly over it — without a provider the
+                tiles would hold on their first photo forever. */}
+            <SlideClock>
+              <ul className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3.5">
+                {department.designs.map((g) => (
+                  <li key={g.slug}>
+                    <DesignTile
+                      href={designPath(department.slug, g.slug)}
+                      name={g.name}
+                      note={productNote(media.get(g.slug)?.count ?? 0)}
+                      slides={designSlides(g, media.get(g.slug))}
+                      sizes={DESIGN_SLIDE_SIZES}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </SlideClock>
+          </>
         )}
       </div>
     </main>
