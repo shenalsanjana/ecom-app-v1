@@ -62,8 +62,8 @@ The step-by-step detail, including the test code and implementation for each ite
 - [x] 8.2 Delete `app/_components/ui/tint-tile.tsx` and `app/_components/ui/__tests__/tint-tile.test.ts`
 - [x] 8.3 Check whether `SCRIM_ALPHA` is now dead; if nothing outside the tests reads it, remove the constant, its doc comment and its test block. `INK_LIGHT` and `inkFor` stay — `SlideShow` uses `inkFor`
 - [x] 8.4 Verify the three already-shipped deltas (`8fd1811` PDP breadcrumb, `9df07fd` card department label, `8110721` design photo on tile) against the prototype and record the outcome here. Report mismatches as findings; do not fix them in this change
-- [ ] 8.5 Run `npm run build` — **COULD NOT RUN**: no reachable Postgres (`postgres:5432` is a docker-compose hostname). Reproduced by the controller with the real `.env` present; fails prerendering `/_not-found` via the footer's `getDepartments()`, unrelated to this change. Must be run before merge
+- [x] 8.5 Run `npm run build` — **PASSED** (exit 0, zero prerender errors) against a real Postgres, seeded with 4 departments / 23 designs / 2 products. Both taxonomy sections render; the `design-media` cache entry serialises to a JSON list of pairs, not `{}`
 - [x] 8.6 Run `npm run test`
 - [x] 8.7 Run `npm run check:contrast` — required, the tint guarantees moved in group 1
-- [ ] 8.8 Run `npm run test:e2e` — **COULD NOT RUN**: same missing-database cause. Must be run before merge — required, home navigation changed. If it cannot run in this environment, say so explicitly rather than reporting it passed
+- [ ] 8.8 Run `npm run test:e2e` — **STILL COULD NOT RUN**, now for a different reason: Chromium cannot exec (`libatk-1.0.so.0: cannot open shared object file`). All 53 failures are browser-launch failures; the 9 passes are the non-browser tests. Needs `sudo npx playwright install-deps`, and sudo requires a password here. Must be run before merge — required, home navigation changed. If it cannot run in this environment, say so explicitly rather than reporting it passed
 - [x] 8.9 Commit
