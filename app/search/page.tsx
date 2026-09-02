@@ -4,7 +4,18 @@ import { ProductCard } from "@/app/_components/home/product-card";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { SortSelect } from "@/app/_components/shared/sort-select";
+import {
+  ApplyFilters,
+  FILTER_COUNT,
+  FILTER_HEADING,
+  FILTER_ROW,
+  FILTER_ROW_ACTIVE,
+  FILTER_ROW_IDLE,
+  InStockField,
+  PriceRangeFields,
+} from "@/app/_components/shared/filter-fields";
 import { getDesigns, getProducts, parseSortBy } from "@/app/_lib/products";
+import { parsePrice } from "@/app/_lib/parse-price";
 import type { Metadata } from "next";
 
 export async function generateMetadata(
@@ -41,9 +52,13 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const designSlug = sp.category || "";
   const currentPage = Math.max(parseInt(sp.page || "1", 10), 1);
   const sortBy = parseSortBy(sp.sort, "newest");
-  const minPrice = sp.minPrice ? parseFloat(sp.minPrice) : undefined;
-  const maxPrice = sp.maxPrice ? parseFloat(sp.maxPrice) : undefined;
+  const minPrice = parsePrice(sp.minPrice);
+  const maxPrice = parsePrice(sp.maxPrice);
   const inStockOnly = sp.inStockOnly === "true";
+  // The search term itself is not a filter — clearing the filters keeps what
+  // you searched for and only drops what you narrowed it by.
+  const isFiltered =
+    Boolean(designSlug) || minPrice !== undefined || maxPrice !== undefined || inStockOnly;
 
   const [products, categories] = await Promise.all([
     getProducts({
@@ -82,117 +97,88 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
         {/* Filters sidebar + results grid */}
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
-          {/* Sidebar filters */}
+          {/* Sidebar filters. Price and stock post a plain GET back to /search,
+              so they filter with or without JavaScript; the category rows are
+              links and navigate on their own, and sort sits outside the form
+              because SortSelect pushes the URL itself. */}
           <aside className="lg:col-span-1">
             <div className="sticky top-24 space-y-6">
-              {/* Price filter */}
-              <div>
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide">
-                  Price Range
-                </h3>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    name="minPrice"
-                    placeholder="Min"
-                    className="w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    defaultValue={minPrice || ""}
-                  />
-                  <input
-                    type="number"
-                    name="maxPrice"
-                    placeholder="Max"
-                    className="w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    defaultValue={maxPrice || ""}
-                  />
-                </div>
-              </div>
+              <form action="/search" className="space-y-6">
+                {/* Carried so applying a price never drops the search term,
+                    the category or the order. Paging restarts by simply not
+                    being sent. */}
+                {query && <input type="hidden" name="q" value={query} />}
+                {designSlug && <input type="hidden" name="category" value={designSlug} />}
+                {sortBy !== "newest" && <input type="hidden" name="sort" value={sortBy} />}
 
-              {/* Category filter */}
-              <div>
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide">
-                  Categories
-                </h3>
-                <ul className="space-y-1">
-                  <li>
-                    <Link
-                      href={buildSearchLink({
-                        query,
-                        category: "",
-                        sortBy,
-                        minPrice,
-                        maxPrice,
-                        inStockOnly,
-                        page: 1,
-                      })}
-                      className={`block rounded px-3 py-2 text-sm ${
-                        !designSlug
-                          ? "bg-accent text-accent-foreground"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      All Categories
-                      <span className="ml-1 text-xs opacity-60">
-                        ({products.length})
-                      </span>
-                    </Link>
-                  </li>
-                  {categories.map((cat) => (
-                    <li key={cat.slug}>
+                <PriceRangeFields minPrice={minPrice} maxPrice={maxPrice} />
+
+                <div>
+                  <h2 className={FILTER_HEADING}>Categories</h2>
+                  <ul>
+                    <li>
                       <Link
                         href={buildSearchLink({
                           query,
-                          category: cat.slug,
+                          category: "",
                           sortBy,
                           minPrice,
                           maxPrice,
                           inStockOnly,
                           page: 1,
                         })}
-                        className={`block rounded px-3 py-2 text-sm ${
-                          designSlug === cat.slug
-                            ? "bg-accent text-accent-foreground"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
+                        className={`${FILTER_ROW} ${!designSlug ? FILTER_ROW_ACTIVE : FILTER_ROW_IDLE}`}
                       >
-                        {cat.name}
+                        <span>All products</span>
+                        <span className={FILTER_COUNT}>{products.length}</span>
                       </Link>
                     </li>
-                  ))}
-                </ul>
-              </div>
+                    {categories.map((cat) => (
+                      <li key={cat.slug}>
+                        <Link
+                          href={buildSearchLink({
+                            query,
+                            category: cat.slug,
+                            sortBy,
+                            minPrice,
+                            maxPrice,
+                            inStockOnly,
+                            page: 1,
+                          })}
+                          className={`${FILTER_ROW} ${
+                            designSlug === cat.slug ? FILTER_ROW_ACTIVE : FILTER_ROW_IDLE
+                          }`}
+                        >
+                          <span>{cat.name}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
 
-              {/* Stock filter */}
-              <div>
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide">
-                  Availability
-                </h3>
-                <label className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    name="inStockOnly"
-                    defaultChecked={inStockOnly}
-                    className="rounded border-input text-primary focus:ring-ring"
-                  />
-                  <span>In stock only</span>
-                </label>
-              </div>
+                <InStockField inStockOnly={inStockOnly} />
 
-              {/* Sort */}
+                <ApplyFilters
+                  clearHref={
+                    isFiltered
+                      ? buildSearchLink({ query, category: "", sortBy, page: 1 })
+                      : null
+                  }
+                />
+              </form>
+
               <div>
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide">
-                  Sort By
-                </h3>
+                <h2 className={FILTER_HEADING}>Sort by</h2>
                 <SortSelect
                   value={sortBy}
                   options={[
                     { value: "newest", label: "Newest" },
-                    { value: "name", label: "Name (A-Z)" },
-                    { value: "price_asc", label: "Price (Low to High)" },
-                    { value: "price_desc", label: "Price (High to Low)" },
-                    { value: "rating", label: "Rating" },
+                    { value: "name", label: "Name (A–Z)" },
+                    { value: "price_asc", label: "Price: low to high" },
+                    { value: "price_desc", label: "Price: high to low" },
+                    { value: "rating", label: "Customer rating" },
                   ]}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:border-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 />
               </div>
             </div>
@@ -201,14 +187,24 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           {/* Results grid */}
           <div className="lg:col-span-3">
             {paginatedProducts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
-                <Search className="mb-4 h-12 w-12 text-muted-foreground" />
-                <p className="text-lg font-medium text-muted-foreground">
-                  No products found
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed px-6 py-20 text-center">
+                <Search className="mb-4 h-10 w-10 text-muted-foreground" />
+                <p className="text-base font-medium">
+                  {isFiltered ? "Nothing matches these filters" : "Nothing matches that search"}
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  Try adjusting your search or filters
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {isFiltered
+                    ? "Widen the price range or clear the filters to see more."
+                    : "Try a shorter term, or browse the departments in the menu."}
                 </p>
+                {isFiltered && (
+                  <Link
+                    href={buildSearchLink({ query, category: "", sortBy, page: 1 })}
+                    className="mt-4 text-sm font-medium text-brand underline-offset-4 hover:underline"
+                  >
+                    Clear all filters
+                  </Link>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
@@ -221,9 +217,10 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="mt-8 flex justify-center">
-                <nav className="flex items-center gap-2" aria-label="Pagination">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                    (page) => (
+                <nav className="flex items-center gap-1" aria-label="Pagination">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    const here = page === currentPage;
+                    return (
                       <Link
                         key={page}
                         href={buildSearchLink({
@@ -235,16 +232,17 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                           inStockOnly,
                           page,
                         })}
-                        className={`flex h-10 w-10 items-center justify-center rounded-md border ${
-                          page === currentPage
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-background hover:bg-accent"
+                        {...(here ? { "aria-current": "page" as const } : {})}
+                        className={`flex h-10 w-10 items-center justify-center rounded-lg border-b-2 text-sm tabular-nums transition-colors duration-(--duration-fast) ${
+                          here
+                            ? "border-brand bg-secondary font-medium text-foreground"
+                            : "border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
                         }`}
                       >
                         {page}
                       </Link>
-                    )
-                  )}
+                    );
+                  })}
                 </nav>
               </div>
             )}
