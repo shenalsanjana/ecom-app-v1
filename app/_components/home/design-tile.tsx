@@ -16,17 +16,19 @@ const CAPTION_GRADIENT =
   ` transparent 100%)`;
 
 /** Mirrors design-grid.tsx's grid-cols-[repeat(auto-fill,minmax(130px,1fr))]:
- *  roughly twice as many columns as the department grid at any given width. */
+ *  roughly twice as many columns as the department grid at any given width.
+ *  A caller laying the tiles out on a wider grid passes its own `sizes` --
+ *  see the department page, whose columns are half again as wide. */
 const SLIDE_SIZES = "(min-width:1024px) 12vw, (min-width:640px) 20vw, 33vw";
 
 export function DesignTile({
-  href, name, note, slides,
+  href, name, note, slides, sizes = SLIDE_SIZES,
 }: {
-  href: string; name: string; note: string; slides: Slide[];
+  href: string; name: string; note: string; slides: Slide[]; sizes?: string;
 }) {
   return (
     <div className="group relative block aspect-square overflow-hidden rounded-[14px] transition-transform duration-(--duration-base) ease-(--ease-out) motion-safe:hover:-translate-y-[3px]">
-      <SlideShow slides={slides} dots="top-right" fadeMs={650} subject={name} sizes={SLIDE_SIZES} />
+      <SlideShow slides={slides} dots="top-right" fadeMs={650} subject={name} sizes={sizes} />
       <div
         className="absolute inset-x-0 bottom-0 flex flex-col gap-px px-3 pb-[11px] pt-[26px]"
         style={{ backgroundImage: CAPTION_GRADIENT }}
