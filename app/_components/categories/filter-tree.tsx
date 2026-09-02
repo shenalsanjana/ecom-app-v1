@@ -1,6 +1,13 @@
 import Link from "next/link";
 import { designPath } from "@/app/_lib/taxonomy-path";
 import type { DepartmentView } from "@/app/_lib/taxonomy";
+import {
+  FILTER_COUNT,
+  FILTER_HEADING,
+  FILTER_ROW,
+  FILTER_ROW_ACTIVE,
+  FILTER_ROW_IDLE,
+} from "@/app/_components/shared/filter-fields";
 
 type Props = {
   departments: DepartmentView[];
@@ -8,33 +15,43 @@ type Props = {
   byDepartment: Map<string, number>;
   totalCount: number;
   selectedDesign: string;
+  /** Where "All products" points, carrying the price and stock filters that
+   *  are in force. Defaults to the bare browse page. */
+  allHref?: string;
 };
 
-const ROW = "block rounded-lg px-4 py-3 text-sm font-medium transition-colors";
-const ROW_ACTIVE = "bg-primary text-primary-foreground shadow-lg";
-const ROW_IDLE = "bg-background text-muted-foreground hover:bg-accent hover:text-foreground";
+const ROW = FILTER_ROW;
+const ROW_ACTIVE = FILTER_ROW_ACTIVE;
+const ROW_IDLE = FILTER_ROW_IDLE;
+const COUNT = FILTER_COUNT;
 
-/** The browse sidebar: departments, their designs, and how many products sit
- *  under each. Pure — the page does the reading and the arithmetic. */
-export function FilterTree({ departments, byDesign, byDepartment, totalCount, selectedDesign }: Props) {
+/** The category list: departments, how many products sit under each, and — for
+ *  the department you are in — its designs. Pure; the page does the reading and
+ *  the arithmetic.
+ *
+ *  Designs stay folded away until their department is the one selected. All of
+ *  them at once turned the rail into a wall of rows, and every design is one
+ *  hover away in the header nav. */
+export function FilterTree({
+  departments,
+  byDesign,
+  byDepartment,
+  totalCount,
+  selectedDesign,
+  allHref = "/categories",
+}: Props) {
   return (
-    <>
-      <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        Departments
-      </h2>
-      <ul className="space-y-1">
+    <div>
+      <h2 className={FILTER_HEADING}>Categories</h2>
+      <ul>
         <li>
           <Link
-            href="/categories"
+            href={allHref}
             data-active={!selectedDesign}
             className={`${ROW} ${!selectedDesign ? ROW_ACTIVE : ROW_IDLE}`}
           >
-            <span className="flex items-center justify-between">
-              <span>All</span>
-              <span className="rounded-full bg-primary-foreground/20 px-2 py-0.5 text-xs font-normal">
-                {totalCount}
-              </span>
-            </span>
+            <span>All products</span>
+            <span className={COUNT}>{totalCount}</span>
           </Link>
         </li>
         {departments.map((d) => {
@@ -47,15 +64,11 @@ export function FilterTree({ departments, byDesign, byDepartment, totalCount, se
                 data-active={deptActive}
                 className={`${ROW} ${deptActive ? ROW_ACTIVE : ROW_IDLE}`}
               >
-                <span className="flex items-center justify-between">
-                  <span>{d.name}</span>
-                  <span className="rounded-full bg-primary-foreground/10 px-2 py-0.5 text-xs font-normal">
-                    {byDepartment.get(d.slug) ?? 0}
-                  </span>
-                </span>
+                <span>{d.name}</span>
+                <span className={COUNT}>{byDepartment.get(d.slug) ?? 0}</span>
               </Link>
-              {d.designs.length > 0 && (
-                <ul className="mt-1 space-y-0.5 pl-4">
+              {deptActive && d.designs.length > 0 && (
+                <ul className="ml-3 border-l pl-1">
                   {d.designs.map((g) => {
                     const active = g.slug === selectedDesign;
                     return (
@@ -63,12 +76,14 @@ export function FilterTree({ departments, byDesign, byDepartment, totalCount, se
                         <Link
                           href={designPath(d.slug, g.slug)}
                           data-active={active}
-                          className={`flex items-center justify-between rounded-lg px-4 py-1.5 text-sm transition-colors ${
-                            active ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                          className={`flex items-center justify-between gap-3 rounded-lg py-1.5 pl-3 pr-2 text-sm transition-colors duration-(--duration-fast) ${
+                            active
+                              ? "font-medium text-foreground"
+                              : "text-muted-foreground hover:text-foreground"
                           }`}
                         >
                           <span>{g.name}</span>
-                          <span className="text-xs text-muted-foreground">{byDesign.get(g.slug) ?? 0}</span>
+                          <span className={COUNT}>{byDesign.get(g.slug) ?? 0}</span>
                         </Link>
                       </li>
                     );
@@ -79,6 +94,6 @@ export function FilterTree({ departments, byDesign, byDepartment, totalCount, se
           );
         })}
       </ul>
-    </>
+    </div>
   );
 }

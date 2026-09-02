@@ -72,20 +72,37 @@ function activeFlags(node: unknown, out: { href: unknown; active: unknown }[] = 
 }
 
 describe("FilterTree", () => {
-  it("links every department and design, plus All", () => {
+  it("links All and every department, holding the designs back until one is chosen", () => {
     const hrefs = collectHrefs(
       FilterTree({ departments, byDesign, byDepartment, totalCount: 6, selectedDesign: "" }),
+    );
+    expect(hrefs).toEqual(["/categories", "/categories/women", "/categories/men"]);
+  });
+
+  it("unfolds only the selected design's own department", () => {
+    const hrefs = collectHrefs(
+      FilterTree({ departments, byDesign, byDepartment, totalCount: 6, selectedDesign: "cat" }),
     );
     expect(hrefs).toEqual([
       "/categories",
       "/categories/women", "/categories/women/cat", "/categories/women/dino",
-      "/categories/men", "/categories/men/car",
+      "/categories/men",
     ]);
   });
 
-  it("shows a count beside every design, not just every department", () => {
+  it("points All at the href it is given, so applied filters survive the click", () => {
+    const hrefs = collectHrefs(
+      FilterTree({
+        departments, byDesign, byDepartment, totalCount: 6, selectedDesign: "cat",
+        allHref: "/categories?minPrice=1000",
+      }),
+    );
+    expect(hrefs[0]).toBe("/categories?minPrice=1000");
+  });
+
+  it("shows a count beside every visible design, not just every department", () => {
     const text = collectText(
-      FilterTree({ departments, byDesign, byDepartment, totalCount: 6, selectedDesign: "" }),
+      FilterTree({ departments, byDesign, byDepartment, totalCount: 6, selectedDesign: "cat" }),
     );
     // department totals
     expect(text).toContain("4");
@@ -100,7 +117,7 @@ describe("FilterTree", () => {
       FilterTree({
         departments: [dept({ designs: [{ slug: "ghost", name: "Ghost", hex: "#EFC4C4", image: null }] })],
         byDesign: new Map(), byDepartment: new Map([["women", 0]]),
-        totalCount: 0, selectedDesign: "",
+        totalCount: 0, selectedDesign: "ghost",
       }),
     );
     expect(text).toContain("0");
