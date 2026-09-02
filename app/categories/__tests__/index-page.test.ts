@@ -34,7 +34,7 @@ vi.mock("@/app/_components/home/site-footer", () => ({ SiteFooter: () => null })
 vi.mock("@/app/_components/shared/sort-select", () => ({ SortSelect: () => null }));
 
 import CategoriesPage from "../(index)/page";
-import { FilterTree } from "@/app/_components/categories/filter-tree";
+import { FilterRail } from "@/app/_components/categories/filter-rail";
 
 const dept = (over: Partial<DepartmentView>): DepartmentView => ({
   slug: "women", name: "Women", navLabel: "Women", tileName: "Women",
@@ -58,22 +58,22 @@ function collectHrefs(node: unknown, out: string[] = []): string[] {
   return out;
 }
 
-/** The sidebar's links moved into FilterTree, and a tree walk does not enter
- *  child components — so the page's own tree shows the tile row only. The
- *  departments the page hands the tree are read from its props instead;
- *  filter-tree.test.ts proves the tree links every one it is given. */
-function filterTreeDepartments(node: unknown): { slug: string }[] | null {
+/** The sidebar's links live inside FilterRail, and a tree walk does not enter
+ *  child components — so they never appear in the page's own tree. Read the
+ *  departments the page hands the rail from its props instead;
+ *  filter-tree.test.ts proves the rail's tree links every one it is given. */
+function filterRailDepartments(node: unknown): { slug: string }[] | null {
   if (node === null || node === undefined || typeof node !== "object") return null;
   if (Array.isArray(node)) {
     for (const child of node) {
-      const found = filterTreeDepartments(child);
+      const found = filterRailDepartments(child);
       if (found) return found;
     }
     return null;
   }
   const el = node as { type?: unknown; props?: Record<string, unknown> };
-  if (el.type === FilterTree) return el.props?.departments as { slug: string }[];
-  return el.props ? filterTreeDepartments(el.props.children) : null;
+  if (el.type === FilterRail) return el.props?.departments as { slug: string }[];
+  return el.props ? filterRailDepartments(el.props.children) : null;
 }
 
 beforeEach(() => {
@@ -82,7 +82,7 @@ beforeEach(() => {
 });
 
 describe("/categories department lists", () => {
-  it("omits departments that have no designs, in both the tile row and the sidebar", async () => {
+  it("omits departments that have no designs from the browse rail", async () => {
     getDepartments.mockResolvedValue([
       dept({
         slug: "women", name: "Women", sortOrder: 1,
@@ -94,32 +94,58 @@ describe("/categories department lists", () => {
     ]);
 
     const tree = await CategoriesPage({ searchParams: Promise.resolve({}) });
+
+    // The rail is only ever handed the departments that survive
+    // showsNavDropdown, so the three empty ones are unreachable from here.
+    expect(filterRailDepartments(tree)?.map((d) => d.slug)).toEqual(["women"]);
+
+    // And the page itself links no department directly.
     const hrefs = collectHrefs(tree);
-
-    // Women has a design, so the tile row links it.
-    expect(hrefs).toContain("/categories/women");
-
-    // The three empty departments are not linked from the tile row...
     expect(hrefs).not.toContain("/categories/men");
     expect(hrefs).not.toContain("/categories/plain");
     expect(hrefs).not.toContain("/categories/accessories");
-
-    // ...nor reachable through the sidebar, which is only ever handed the
-    // departments that survive showsNavDropdown.
-    expect(filterTreeDepartments(tree)?.map((d) => d.slug)).toEqual(["women"]);
   });
 
-  it("links every department once designs exist under each", async () => {
+  it("hands the rail every department once designs exist under each", async () => {
     getDepartments.mockResolvedValue([
       dept({ slug: "women", designs: [{ slug: "cat", name: "Cats", hex: "#EFC4C4", image: null }] }),
       dept({ slug: "men", name: "Men", designs: [{ slug: "car", name: "Car", hex: "#C4D3EF", image: null }] }),
     ]);
 
     const tree = await CategoriesPage({ searchParams: Promise.resolve({}) });
-    const hrefs = collectHrefs(tree);
 
-    expect(hrefs).toContain("/categories/women");
-    expect(hrefs).toContain("/categories/men");
-    expect(filterTreeDepartments(tree)?.map((d) => d.slug)).toEqual(["women", "men"]);
+    expect(filterRailDepartments(tree)?.map((d) => d.slug)).toEqual(["women", "men"]);
+  });
+});
+
+describe("/categories filters", () => {
+  beforeEach(() => {
+    getDepartments.mockResolvedValue([
+      dept({ slug: "women", designs: [{ slug: "cat", name: "Cats", hex: "#EFC4C4", image: null }] }),
+    ]);
+  });
+
+  it("sends the price and stock filters to the query, and never narrows the counts read", async () => {
+    await CategoriesPage({
+      searchParams: Promise.resolve({ minPrice: "1000", maxPrice: "4500", inStockOnly: "true" }),
+    });
+
+    // First read is the whole catalogue — the sidebar counts must not move
+    // when a filter is applied.
+    expect(getProducts).toHaveBeenNthCalledWith(1, { sortBy: "newest" });
+    expect(getProducts).toHaveBeenNthCalledWith(2, {
+      sortBy: "newest",
+      designSlug: undefined,
+      minPrice: 1000,
+      maxPrice: 4500,
+      inStockOnly: true,
+    });
+  });
+
+  it("ignores a price that is not a number rather than passing NaN to the query", async () => {
+    await CategoriesPage({ searchParams: Promise.resolve({ minPrice: "abc" }) });
+    // Nothing is being filtered, so the catalogue read is the only read.
+    expect(getProducts).toHaveBeenCalledTimes(1);
+    expect(getProducts).toHaveBeenCalledWith({ sortBy: "newest" });
   });
 });
