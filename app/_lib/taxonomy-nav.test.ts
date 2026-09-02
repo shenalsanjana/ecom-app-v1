@@ -9,9 +9,6 @@ vi.mock("next/cache", () => ({
 }));
 
 import { navColumns } from "@/app/_lib/taxonomy-nav";
-// The constant lives in taxonomy-nav-model (zero imports) and is only
-// re-exported by taxonomy-nav for back-compat — reach it at its real source.
-import { MIN_MEGA_MENU_COLUMNS } from "@/app/_lib/taxonomy-nav-model";
 
 const dept = (over: Partial<DepartmentView>): DepartmentView => ({
   slug: "women", name: "Women", navLabel: "Women", tileName: "Women",
@@ -26,6 +23,7 @@ describe("navColumns", () => {
     expect(cols).toEqual([
       {
         label: "Women",
+        note: null,
         href: "/categories/women",
         designs: [{ label: "Cats", href: "/categories/women/cat" }],
       },
@@ -48,7 +46,10 @@ describe("navColumns", () => {
     expect(cols[0].designs[0].href).toBe("/categories/plain/tote");
   });
 
-  it("states its threshold", () => {
-    expect(MIN_MEGA_MENU_COLUMNS).toBe(2);
+  it("carries the department's qualifier through to the nav", () => {
+    const cols = navColumns([
+      dept({ slug: "plain", navLabel: "Plain Tees", note: "Unisex" }),
+    ]);
+    expect(cols[0].note).toBe("Unisex");
   });
 });

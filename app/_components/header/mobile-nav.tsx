@@ -17,15 +17,16 @@ import type { NavColumn } from "@/app/_lib/taxonomy-nav-model";
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
-  { href: "/categories", label: "Shop" },
+  { href: "/categories", label: "All products" },
   { href: "/deals", label: "Deals" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
 ];
 
-// Mobile-only menu: the desktop header gates its nav + search behind `md:`,
-// leaving small screens with no way to browse or search. This Sheet restores
-// both. Hidden on md+ via the trigger's own `md:hidden`.
+// Small-screen menu: the desktop header gates its nav + search behind `lg:`
+// (five department links plus the brand and icons overrun a tablet), leaving
+// everything narrower with no way to browse or search. This Sheet restores
+// both. Hidden on lg+ via the trigger's own `lg:hidden`.
 export function MobileNav({ columns }: { columns: NavColumn[] }) {
   const [open, setOpen] = useState(false);
   return (
@@ -36,7 +37,7 @@ export function MobileNav({ columns }: { columns: NavColumn[] }) {
             variant="ghost"
             size="icon"
             aria-label="Open menu"
-            className="md:hidden"
+            className="lg:hidden"
           />
         }
       >
@@ -79,9 +80,8 @@ export function MobileNav({ columns }: { columns: NavColumn[] }) {
  *  be tested by calling it: MobileNav itself holds `useState`, which cannot run
  *  in the node test environment. `onNavigate` closes the sheet on a tap.
  *
- *  Unlike the desktop trigger there is no minimum-column gate: one collapsible
- *  row is an ordinary list item, and this is the only place the taxonomy
- *  reaches phones. */
+ *  The desktop bar lists departments in a row; a phone gets them as collapsible
+ *  rows instead, and this is the only place the taxonomy reaches phones. */
 export function TaxonomySection({
   columns,
   onNavigate,
@@ -96,7 +96,12 @@ export function TaxonomySection({
         <Accordion.Item key={col.href} className="border-b last:border-b-0">
           <Accordion.Header>
             <Accordion.Trigger className="flex w-full items-center justify-between py-3 text-sm font-medium">
-              {col.label}
+              <span className="flex items-baseline gap-1.5">
+                {col.label}
+                {col.note && (
+                  <span className="text-xs font-normal text-muted-foreground">{col.note}</span>
+                )}
+              </span>
               <ChevronDown className="h-4 w-4 transition-transform data-[panel-open]:rotate-180" />
             </Accordion.Trigger>
           </Accordion.Header>

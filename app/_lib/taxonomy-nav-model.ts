@@ -8,11 +8,9 @@
 
 export type NavColumn = {
   label: string;
+  /** The department's qualifier ("Unisex"), printed beside the label in the
+   *  nav. Null for departments whose name needs no qualifying. */
+  note: string | null;
   href: string;
   designs: { label: string; href: string }[];
 };
-
-/** Below this many columns the panel is one lonely list, which is a worse
- *  affordance than a plain link to the browse page. Production has one
- *  qualifying department today. */
-export const MIN_MEGA_MENU_COLUMNS = 2;

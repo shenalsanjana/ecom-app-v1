@@ -3,9 +3,9 @@ import type { NavColumn } from "@/app/_lib/taxonomy-nav-model";
 import { TaxonomySection } from "@/app/_components/header/mobile-nav";
 
 const columns: NavColumn[] = [
-  { label: "Women", href: "/categories/women",
+  { label: "Women", note: null, href: "/categories/women",
     designs: [{ label: "Cats", href: "/categories/women/cat" }] },
-  { label: "Men", href: "/categories/men",
+  { label: "Men", note: null, href: "/categories/men",
     designs: [{ label: "Car", href: "/categories/men/car" }] },
 ];
 
