@@ -1,9 +1,22 @@
 import { describe, it, expect } from "vitest";
+import Link from "next/link";
 import { DesignTile } from "@/app/_components/home/design-tile";
 import { CAPTION_OVERLAY, CAPTION_SCRIM_MIN_ALPHA } from "@/app/_lib/taxonomy-tint";
-import type { Slide } from "@/app/_components/ui/slide-show";
+import { SlideShow, type Slide } from "@/app/_components/ui/slide-show";
 
-type Rendered = { props: Record<string, unknown> };
+/** Find every element of the given `type` in the tree (by reference, not by
+ *  name -- Link and SlideShow are both function/object identities). */
+function collectByType(node: unknown, type: unknown, out: unknown[] = []): unknown[] {
+  if (node === null || node === undefined || typeof node !== "object") return out;
+  if (Array.isArray(node)) {
+    for (const child of node) collectByType(child, type, out);
+    return out;
+  }
+  const el = node as { type?: unknown; props?: Record<string, unknown> };
+  if (el.type === type) out.push(el);
+  if (el.props) collectByType(el.props.children, type, out);
+  return out;
+}
 
 /** Walk the returned element tree and collect every rendered text child. */
 function collectText(node: unknown, out: string[] = []): string[] {
@@ -41,8 +54,33 @@ const slides: Slide[] = [
 
 describe("DesignTile", () => {
   it("links to the given href", () => {
-    const el = DesignTile({ href: "/categories/women/cat", name: "Cats", note: "3 products", slides }) as Rendered;
-    expect(el.props.href).toBe("/categories/women/cat");
+    const tree = DesignTile({ href: "/categories/women/cat", name: "Cats", note: "3 products", slides });
+    const links = collectByType(tree, Link) as Array<{ props: Record<string, unknown> }>;
+    expect(links).toHaveLength(1);
+    expect(links[0].props.href).toBe("/categories/women/cat");
+  });
+
+  it("names the link by the design name, and gives the link no other content", () => {
+    // The link has no visible children of its own -- the tile's photo,
+    // caption and dots all render as its siblings (Finding 4) -- so it needs
+    // an explicit accessible name rather than one derived from content.
+    const tree = DesignTile({ href: "/x", name: "Cats", note: "3 products", slides });
+    const links = collectByType(tree, Link) as Array<{ props: Record<string, unknown> }>;
+    expect(links[0].props["aria-label"]).toBe("Cats");
+    expect(links[0].props.children).toBeUndefined();
+  });
+
+  it("renders the tile's photos and dots outside the link, never nested inside it", () => {
+    // <button> inside <a> is invalid HTML (nested-interactive) and multiplies
+    // the link's accessible name with every dot's own label. The Link has no
+    // children at all now -- SlideShow (which owns the dots when it rotates)
+    // renders as its sibling, not its descendant.
+    const tree = DesignTile({ href: "/x", name: "Cats", note: "3 products", slides });
+    const [link] = collectByType(tree, Link) as Array<{ props: Record<string, unknown> }>;
+    expect(link.props.children).toBeUndefined();
+    // And SlideShow is present somewhere in the tile at all -- otherwise the
+    // assertion above would pass vacuously.
+    expect(collectByType(tree, SlideShow)).toHaveLength(1);
   });
 
   it("renders the name and note as text", () => {

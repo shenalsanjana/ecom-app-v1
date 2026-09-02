@@ -3,19 +3,22 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { SlideShow, type Slide } from "@/app/_components/ui/slide-show";
 
+/** Mirrors department-cards.tsx's grid-cols-[repeat(auto-fill,minmax(220px,1fr))]:
+ *  roughly five columns on a wide viewport, fewer as it narrows. */
+const SLIDE_SIZES = "(min-width:1024px) 20vw, (min-width:640px) 33vw, 50vw";
+
 export function DepartmentCard({
   href, name, note, slides,
 }: {
   href: string; name: string; note: string; slides: Slide[];
 }) {
   return (
-    <Link
-      href={href}
-      className="flex flex-col overflow-hidden rounded-2xl bg-card transition-[transform,box-shadow] duration-(--duration-base) ease-(--ease-out) motion-safe:hover:-translate-y-[3px] hover:shadow-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+    <div
+      className="group relative flex flex-col overflow-hidden rounded-2xl bg-card transition-[transform,box-shadow] duration-(--duration-base) ease-(--ease-out) motion-safe:hover:-translate-y-[3px] hover:shadow-card"
       style={{ boxShadow: "0 0 0 1px color-mix(in oklab, var(--foreground) 6%, transparent)" }}
     >
       <div className="relative aspect-square overflow-hidden">
-        <SlideShow slides={slides} dots="bottom-right" fadeMs={700} subject={name} />
+        <SlideShow slides={slides} dots="bottom-right" fadeMs={700} subject={name} sizes={SLIDE_SIZES} />
       </div>
       <div className="flex items-center justify-between gap-2.5 px-[18px] pb-[18px] pt-4">
         <div className="flex min-w-0 flex-col gap-[3px]">
@@ -28,6 +31,15 @@ export function DepartmentCard({
         </div>
         <ArrowRight className="h-[19px] w-[19px] shrink-0 text-brand" aria-hidden />
       </div>
-    </Link>
+      {/* The whole-card click target, not the card's wrapper: the dot buttons
+          SlideShow renders (z-10, above this) must stay siblings of the link,
+          not descendants -- see slide-show.tsx. Its accessible name is set
+          explicitly because it has no content of its own to derive one from. */}
+      <Link
+        href={href}
+        aria-label={name}
+        className="absolute inset-0 z-[1] rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+      />
+    </div>
   );
 }

@@ -28,6 +28,12 @@ describe("slideIndex", () => {
 });
 
 describe("rotates", () => {
+  // This only tests the arithmetic; the "never subscribes to the clock" half
+  // of the claim depends on SlideShow gating useSlideTick() behind a real
+  // component boundary on this result, not an `if`. See
+  // app/_components/ui/__tests__/slide-show.test.ts and the
+  // "never renders the hook-owning RotatingSlideShow" cases in
+  // department-card.test.ts / design-tile.test.ts for that half.
   it("is false for a single slide, so it never subscribes to the clock", () => {
     expect(rotates(0)).toBe(false);
     expect(rotates(1)).toBe(false);
