@@ -7,7 +7,9 @@ import { SiteFooter } from "@/app/_components/home/site-footer";
 import { countsByDesign, countsByDepartment } from "@/app/_lib/taxonomy-counts";
 import { taxonomyTrail } from "@/app/_lib/taxonomy-trail";
 import { Breadcrumb } from "@/app/_components/ui/breadcrumb";
-import { FilterRail } from "@/app/_components/categories/filter-rail";
+import { FilterRail, SORT_OPTIONS } from "@/app/_components/categories/filter-rail";
+import { FilterDisclosure } from "@/app/_components/categories/filter-disclosure";
+import { SortSelect } from "@/app/_components/shared/sort-select";
 import { parsePrice } from "@/app/_lib/parse-price";
 import type { Metadata } from "next";
 
@@ -95,6 +97,14 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
     return qs ? `/categories?${qs}` : "/categories";
   };
 
+  // Shown on the collapsed Filters button, so a narrowed list is never a
+  // mystery on a phone. Sort is not counted: it reorders, it never hides.
+  const activeCount =
+    (selectedCategory ? 1 : 0) +
+    (minPrice !== undefined ? 1 : 0) +
+    (maxPrice !== undefined ? 1 : 0) +
+    (inStockOnly ? 1 : 0);
+
   const heading = selectedCategory
     ? designNames.get(selectedCategory) || "Category"
     : "All products";
@@ -117,19 +127,30 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
           <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-4">
             <aside className="lg:col-span-1">
               <div className="sticky top-24">
-                <FilterRail
-                  departments={linkedDepartments}
-                  byDesign={byDesign}
-                  byDepartment={byDepartment}
-                  totalCount={allProducts.length}
-                  selectedDesign={selectedCategory}
-                  minPrice={minPrice}
-                  maxPrice={maxPrice}
-                  inStockOnly={inStockOnly}
-                  sortBy={sortBy}
-                  allHref={buildLink({ category: "" })}
-                  clearHref={isFiltered ? "/categories" : null}
-                />
+                <FilterDisclosure
+                  activeCount={activeCount}
+                  sort={
+                    <SortSelect
+                      value={sortBy}
+                      options={SORT_OPTIONS}
+                      className="rounded-lg border bg-background py-2 pl-3 pr-8 text-sm focus:border-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    />
+                  }
+                >
+                  <FilterRail
+                    departments={linkedDepartments}
+                    byDesign={byDesign}
+                    byDepartment={byDepartment}
+                    totalCount={allProducts.length}
+                    selectedDesign={selectedCategory}
+                    minPrice={minPrice}
+                    maxPrice={maxPrice}
+                    inStockOnly={inStockOnly}
+                    sortBy={sortBy}
+                    allHref={buildLink({ category: "" })}
+                    clearHref={isFiltered ? "/categories" : null}
+                  />
+                </FilterDisclosure>
               </div>
             </aside>
 

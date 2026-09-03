@@ -73,7 +73,10 @@ export function FilterRail({
         <ApplyFilters clearHref={clearHref} />
       </form>
 
-      <div>
+      {/* Hidden on a phone: FilterDisclosure lifts sort out of the collapsed
+          rail and into the row beside the Filters button, where it stays one
+          tap away. */}
+      <div className="hidden lg:block">
         <h2 className={FILTER_HEADING}>Sort by</h2>
         <SortSelect
           value={sortBy}

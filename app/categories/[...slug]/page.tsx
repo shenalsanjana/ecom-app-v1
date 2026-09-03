@@ -17,6 +17,7 @@ import { ProductCard } from "@/app/_components/home/product-card";
 import { DesignTile } from "@/app/_components/home/design-tile";
 import { designCountNote, designSlides, productNote } from "@/app/_components/home/design-grid";
 import { SlideClock } from "@/app/_components/ui/slide-clock";
+import { FILTER_HEADING } from "@/app/_components/shared/filter-fields";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { SortSelect } from "@/app/_components/shared/sort-select";
@@ -202,26 +203,29 @@ async function DesignBody({
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
-          <aside className="lg:col-span-1">
+          {/* The rail is desktop-only. Stacked above the grid on a phone, a
+              department's designs (Women has sixteen) filled the screen before
+              a single product appeared. Below lg the sort control moves into
+              the toolbar over the grid and the siblings become chips under it,
+              so a phone lands on products. */}
+          <aside className="hidden lg:col-span-1 lg:block">
             <div className="sticky top-24">
-              <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Sort By</h2>
+              <h2 className={FILTER_HEADING}>Sort by</h2>
               <SortSelect
                 value={sortBy}
                 options={SORT_OPTIONS}
-                className="w-full rounded-lg border bg-background px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:border-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               />
 
               {siblings.length > 0 && (
                 <div className="mt-8">
-                  <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    More in {department.name}
-                  </h2>
+                  <h2 className={FILTER_HEADING}>More in {department.name}</h2>
                   <ul className="space-y-1">
                     {siblings.map((g) => (
                       <li key={g.slug}>
                         <Link
                           href={designPath(department.slug, g.slug)}
-                          className="block rounded-lg px-4 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+                          className="block rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors duration-(--duration-fast) hover:bg-secondary/60 hover:text-foreground"
                         >
                           {g.name}
                         </Link>
@@ -234,8 +238,18 @@ async function DesignBody({
           </aside>
 
           <div className="lg:col-span-3">
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-muted-foreground">Showing {paginatedProducts.length} of {allProducts.length} products</p>
+              <div className="flex items-center gap-2 lg:hidden">
+                {/* Labelled by the span for sighted readers; the select carries
+                    its own accessible name, so the span is not a <label>. */}
+                <span aria-hidden="true" className="text-sm text-muted-foreground">Sort</span>
+                <SortSelect
+                  value={sortBy}
+                  options={SORT_OPTIONS}
+                  className="rounded-lg border bg-background py-2 pl-3 pr-8 text-sm focus:border-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                />
+              </div>
             </div>
 
             {allProducts.length === 0 ? (
@@ -252,15 +266,44 @@ async function DesignBody({
 
             {totalPages > 1 && (
               <div className="mt-12 flex justify-center">
-                <nav className="flex items-center gap-2" aria-label="Pagination">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <Link key={page} href={buildPageLink(page)}
-                      className={`flex h-10 w-10 items-center justify-center rounded-lg border font-medium ${page === currentPage ? "bg-primary text-primary-foreground shadow-lg" : "bg-background hover:bg-accent"}`}>
-                      {page}
-                    </Link>
-                  ))}
+                <nav className="flex items-center gap-1" aria-label="Pagination">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    const here = page === currentPage;
+                    return (
+                      <Link key={page} href={buildPageLink(page)}
+                        {...(here ? { "aria-current": "page" as const } : {})}
+                        className={`flex h-10 w-10 items-center justify-center rounded-lg border-b-2 text-sm tabular-nums transition-colors duration-(--duration-fast) ${
+                          here
+                            ? "border-brand bg-secondary font-medium text-foreground"
+                            : "border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                        }`}>
+                        {page}
+                      </Link>
+                    );
+                  })}
                 </nav>
               </div>
+            )}
+
+            {/* The rail's sibling list, rebuilt as chips for a phone: it sits
+                after the products rather than before them, and wraps instead
+                of running down the page. */}
+            {siblings.length > 0 && (
+              <section className="mt-12 lg:hidden">
+                <h2 className={FILTER_HEADING}>More in {department.name}</h2>
+                <ul className="flex flex-wrap gap-2">
+                  {siblings.map((g) => (
+                    <li key={g.slug}>
+                      <Link
+                        href={designPath(department.slug, g.slug)}
+                        className="block rounded-full border px-3 py-1.5 text-sm text-muted-foreground transition-colors duration-(--duration-fast) hover:border-brand hover:text-foreground"
+                      >
+                        {g.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             )}
           </div>
         </div>
