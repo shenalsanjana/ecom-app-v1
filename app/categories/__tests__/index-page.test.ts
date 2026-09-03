@@ -35,6 +35,7 @@ vi.mock("@/app/_components/shared/sort-select", () => ({ SortSelect: () => null 
 
 import CategoriesPage from "../(index)/page";
 import { FilterRail } from "@/app/_components/categories/filter-rail";
+import { FilterDisclosure } from "@/app/_components/categories/filter-disclosure";
 
 const dept = (over: Partial<DepartmentView>): DepartmentView => ({
   slug: "women", name: "Women", navLabel: "Women", tileName: "Women",
@@ -74,6 +75,21 @@ function filterRailDepartments(node: unknown): { slug: string }[] | null {
   const el = node as { type?: unknown; props?: Record<string, unknown> };
   if (el.type === FilterRail) return el.props?.departments as { slug: string }[];
   return el.props ? filterRailDepartments(el.props.children) : null;
+}
+
+/** One prop off the FilterDisclosure the page renders. */
+function disclosureProp(node: unknown, name: string): unknown {
+  if (node === null || node === undefined || typeof node !== "object") return undefined;
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = disclosureProp(child, name);
+      if (found !== undefined) return found;
+    }
+    return undefined;
+  }
+  const el = node as { type?: unknown; props?: Record<string, unknown> };
+  if (el.type === FilterDisclosure) return el.props?.[name];
+  return el.props ? disclosureProp(el.props.children, name) : undefined;
 }
 
 beforeEach(() => {
@@ -140,6 +156,22 @@ describe("/categories filters", () => {
       maxPrice: 4500,
       inStockOnly: true,
     });
+  });
+
+  it("counts what is applied for the collapsed Filters button, ignoring sort", async () => {
+    // Sort reorders, it never hides — counting it would tell a phone that a
+    // filter is on when nothing is being held back.
+    const tree = await CategoriesPage({
+      searchParams: Promise.resolve({
+        category: "cat", minPrice: "1000", inStockOnly: "true", sort: "rating",
+      }),
+    });
+    expect(disclosureProp(tree, "activeCount")).toBe(3);
+  });
+
+  it("counts nothing when the page is unfiltered", async () => {
+    const tree = await CategoriesPage({ searchParams: Promise.resolve({ sort: "rating" }) });
+    expect(disclosureProp(tree, "activeCount")).toBe(0);
   });
 
   it("ignores a price that is not a number rather than passing NaN to the query", async () => {
