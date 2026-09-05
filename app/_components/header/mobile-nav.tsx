@@ -15,9 +15,10 @@ import { Button } from "@/components/ui/button";
 import { Accordion } from "@base-ui/react/accordion";
 import type { NavColumn } from "@/app/_lib/taxonomy-nav-model";
 
+// "Home" and "All products" pointed at two different pages and now point at
+// one, so the sheet lists it once, under the name that says what is there.
 const NAV_LINKS = [
-  { href: "/", label: "Home" },
-  { href: "/categories", label: "All products" },
+  { href: "/", label: "Shop all" },
   { href: "/deals", label: "Deals" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },

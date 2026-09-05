@@ -14,6 +14,10 @@ import { DepartmentNav } from "@/app/_components/header/department-nav";
 // they already were, so the bar names only what there is to shop.
 const NAV_LINKS = [{ href: "/deals", label: "Deals" }];
 
+// The catalogue is the home page, so this is both "shop everything" and the
+// way back to the front — which is why the row carries no separate Home link.
+const LEADING_NAV_LINKS = [{ href: "/", label: "Shop all" }];
+
 export async function SiteHeader() {
   // One cached read (same key the footer already uses on every page), turned
   // into plain columns here so the client leaves never import Prisma.
@@ -24,7 +28,7 @@ export async function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:gap-6 sm:px-6 lg:px-8">
         <MobileNav columns={columns} />
         <BrandMark />
-        <DepartmentNav columns={columns} links={NAV_LINKS} />
+        <DepartmentNav columns={columns} links={NAV_LINKS} leadingLinks={LEADING_NAV_LINKS} />
         <form action="/search" className="relative ml-auto hidden flex-1 max-w-sm lg:block">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input type="search" name="q" placeholder="Search products..." className="pl-9" defaultValue="" />

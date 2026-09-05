@@ -84,6 +84,36 @@ describe("DepartmentNav", () => {
     ]);
   });
 
+  it("opens the row with the leading links, ahead of every department", () => {
+    usePathname.mockReturnValue("/cart");
+    const hrefs = collectHrefs(
+      DepartmentNav({
+        columns,
+        leadingLinks: [{ href: "/", label: "Shop all" }],
+        links: [{ href: "/deals", label: "Deals" }],
+      }),
+    );
+    // Widest first, then each department, then the plain links.
+    expect(hrefs[0]).toBe("/");
+    expect(hrefs.at(-1)).toBe("/deals");
+    expect(collectText(DepartmentNav({ columns, leadingLinks: [{ href: "/", label: "Shop all" }] })))
+      .toContain("Shop all");
+  });
+
+  it("marks the root link active only on the root, not on every page under it", () => {
+    // "/" is a prefix of every path, so the startsWith rule the departments
+    // use would light "Shop all" up on the whole site.
+    const leadingLinks = [{ href: "/", label: "Shop all" }];
+
+    usePathname.mockReturnValue("/");
+    expect(activeFlags(DepartmentNav({ columns, leadingLinks }))
+      .filter((f) => f.active === true).map((f) => f.href)).toEqual(["/"]);
+
+    usePathname.mockReturnValue("/categories/women/cat");
+    expect(activeFlags(DepartmentNav({ columns, leadingLinks }))
+      .filter((f) => f.active === true).map((f) => f.href)).toEqual(["/categories/women"]);
+  });
+
   it("marks nothing when you are somewhere else entirely", () => {
     usePathname.mockReturnValue("/cart");
     const flags = activeFlags(DepartmentNav({ columns, links: [{ href: "/deals", label: "Deals" }] }));

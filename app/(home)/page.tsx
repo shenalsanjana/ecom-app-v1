@@ -1,28 +1,35 @@
 import Link from "next/link";
 import { getProducts, parseSortBy } from "@/app/_lib/products";
 import { getDepartments, showsNavDropdown } from "@/app/_lib/taxonomy";
+import { BrandBand } from "@/app/_components/home/brand-band";
 import { ProductCard } from "@/app/_components/home/product-card";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
+import { DealsSection } from "@/app/_components/home/deals-section";
+import { TrustStrip } from "@/app/_components/home/trust-strip";
 import { countsByDesign, countsByDepartment } from "@/app/_lib/taxonomy-counts";
-import { taxonomyTrail } from "@/app/_lib/taxonomy-trail";
-import { Breadcrumb } from "@/app/_components/ui/breadcrumb";
 import { FilterRail, SORT_OPTIONS } from "@/app/_components/categories/filter-rail";
 import { FilterDisclosure } from "@/app/_components/categories/filter-disclosure";
 import { SortSelect } from "@/app/_components/shared/sort-select";
 import { parsePrice } from "@/app/_lib/parse-price";
-import type { Metadata } from "next";
 
+// The catalogue is the home page. This file is the former
+// app/categories/(index)/page.tsx moved onto "/" with its links repointed;
+// /categories now 308s here (see next.config.ts) so there is one shop-all URL,
+// not two serving the same list. The marketing sections that used to open this
+// page — the photo hero, the featured-products grid, and the department and
+// design tile sections — are gone from it: the first three put the catalogue
+// below the fold, and the last two navigate to exactly what the filter rail
+// now navigates to, on the same screen. Deals and trust survive, below the
+// grid, where they no longer stand between a visitor and a product.
+//
+// revalidate is the browse page's 3600, not the old home page's 300: this
+// renders the catalogue, and the catalogue is what that hour was tuned for.
 export const revalidate = 3600;
-
-export const metadata: Metadata = {
-  title: "Shop all categories",
-  description: "Browse every category: oversize t-shirts, graphic tees, solid basics.",
-};
 
 const ITEMS_PER_PAGE = 12;
 
-type CategoriesPageProps = {
+type HomePageProps = {
   searchParams: Promise<{
     category?: string;
     sort?: string;
@@ -33,7 +40,7 @@ type CategoriesPageProps = {
   }>;
 };
 
-export default async function CategoriesPage({ searchParams }: CategoriesPageProps) {
+export default async function Home({ searchParams }: HomePageProps) {
   const sp = await searchParams;
   const selectedCategory = sp.category || "";
   const sortBy = parseSortBy(sp.sort, "newest");
@@ -94,7 +101,7 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
     if (inStockOnly) params.set("inStockOnly", "true");
     if (page > 1) params.set("page", String(page));
     const qs = params.toString();
-    return qs ? `/categories?${qs}` : "/categories";
+    return qs ? `/?${qs}` : "/";
   };
 
   // Shown on the collapsed Filters button, so a narrowed list is never a
@@ -107,24 +114,31 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
 
   const heading = selectedCategory
     ? designNames.get(selectedCategory) || "Category"
-    : "All products";
+    : "The whole rack";
 
   return (
     <>
       <SiteHeader />
       <main className="flex-1">
+        <BrandBand
+          heading={heading}
+          blurb={
+            selectedCategory
+              ? null
+              : "Oversize graphic tees and heavyweight basics, cut for the drape you actually wear."
+          }
+        />
+
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <Breadcrumb items={taxonomyTrail({})} className="mb-4" />
-          <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
-            {heading}
-          </h1>
-          <p className="mt-2 text-sm tabular-nums text-muted-foreground">
+          {/* Sits above the grid rather than up in the band because it
+              describes the grid: it is the filter's answer, and it moves. */}
+          <p className="text-sm tabular-nums text-muted-foreground">
             {isFiltered && displayProducts.length !== allProducts.length
               ? `${displayProducts.length} of ${allProducts.length} products`
               : `${displayProducts.length} product${displayProducts.length === 1 ? "" : "s"}`}
           </p>
 
-          <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-4">
+          <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-4">
             <aside className="lg:col-span-1">
               <div className="sticky top-24">
                 <FilterDisclosure
@@ -148,7 +162,7 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
                     inStockOnly={inStockOnly}
                     sortBy={sortBy}
                     allHref={buildLink({ category: "" })}
-                    clearHref={isFiltered ? "/categories" : null}
+                    clearHref={isFiltered ? "/" : null}
                   />
                 </FilterDisclosure>
               </div>
@@ -162,7 +176,7 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
                     Widen the price range or clear the filters to see the full catalogue.
                   </p>
                   <Link
-                    href="/categories"
+                    href="/"
                     className="mt-4 inline-block text-sm font-medium text-brand underline-offset-4 hover:underline"
                   >
                     Clear all filters
@@ -171,7 +185,7 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
               ) : (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {paginatedProducts.map((product) => (
-                    <ProductCard key={product.id} product={product} fromPath="/categories" />
+                    <ProductCard key={product.id} product={product} fromPath="/" />
                   ))}
                 </div>
               )}
@@ -202,6 +216,9 @@ export default async function CategoriesPage({ searchParams }: CategoriesPagePro
             </div>
           </div>
         </div>
+
+        <DealsSection />
+        <TrustStrip />
       </main>
       <SiteFooter />
     </>

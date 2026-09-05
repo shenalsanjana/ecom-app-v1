@@ -13,7 +13,7 @@ export default function ProductNotFound() {
           The product you&apos;re looking for is no longer available, or the link is broken.
         </p>
         <Link
-          href="/categories"
+          href="/"
           className={buttonVariants({ variant: "brand", size: "lg", className: "mt-8" })}
         >
           Browse all products
