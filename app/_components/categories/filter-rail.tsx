@@ -26,6 +26,10 @@ type Props = {
   maxPrice?: number;
   inStockOnly: boolean;
   sortBy: string;
+  /** The page's default order. The hidden input below is omitted when sortBy
+   *  matches it, so a plain-GET filter never pins the default into the URL.
+   *  Passed in rather than assumed: the page owns which order it opens on. */
+  defaultSort: string;
   /** "All products" with the price and stock filters still applied. */
   allHref: string;
   /** Where to land with every filter dropped. Null hides the reset link. */
@@ -47,6 +51,7 @@ export function FilterRail({
   maxPrice,
   inStockOnly,
   sortBy,
+  defaultSort,
   allHref,
   clearHref,
 }: Props) {
@@ -56,7 +61,7 @@ export function FilterRail({
         {/* Carried so applying a price never silently resets where you are or
             how the list is ordered. Paging restarts by simply not being sent. */}
         {selectedDesign && <input type="hidden" name="category" value={selectedDesign} />}
-        {sortBy !== "newest" && <input type="hidden" name="sort" value={sortBy} />}
+        {sortBy !== defaultSort && <input type="hidden" name="sort" value={sortBy} />}
 
         <PriceRangeFields minPrice={minPrice} maxPrice={maxPrice} />
 
