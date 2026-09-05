@@ -161,7 +161,7 @@ export default async function DealsPage({ searchParams }: DealsPageProps) {
               Check back soon for new limited-time offers
             </p>
             <Link
-              href="/"
+              href="/categories"
               className="mt-6 inline-block rounded-lg bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-lg transition-colors hover:bg-primary/90"
             >
               Browse All Products

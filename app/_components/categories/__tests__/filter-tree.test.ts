@@ -76,7 +76,7 @@ describe("FilterTree", () => {
     const hrefs = collectHrefs(
       FilterTree({ departments, byDesign, byDepartment, totalCount: 6, selectedDesign: "" }),
     );
-    expect(hrefs).toEqual(["/", "/categories/women", "/categories/men"]);
+    expect(hrefs).toEqual(["/categories", "/categories/women", "/categories/men"]);
   });
 
   it("unfolds only the selected design's own department", () => {
@@ -84,7 +84,7 @@ describe("FilterTree", () => {
       FilterTree({ departments, byDesign, byDepartment, totalCount: 6, selectedDesign: "cat" }),
     );
     expect(hrefs).toEqual([
-      "/",
+      "/categories",
       "/categories/women", "/categories/women/cat", "/categories/women/dino",
       "/categories/men",
     ]);
@@ -140,7 +140,7 @@ describe("FilterTree", () => {
       selectedDesign: "", selectedDepartment: "women",
     });
     expect(collectHrefs(tree)).toEqual([
-      "/",
+      "/categories",
       "/categories/women", "/categories/women/cat", "/categories/women/dino",
       "/categories/men",
     ]);
@@ -162,6 +162,6 @@ describe("FilterTree", () => {
     const flags = activeFlags(
       FilterTree({ departments, byDesign, byDepartment, totalCount: 6, selectedDesign: "" }),
     );
-    expect(flags.filter((f) => f.active === true).map((f) => f.href)).toEqual(["/"]);
+    expect(flags.filter((f) => f.active === true).map((f) => f.href)).toEqual(["/categories"]);
   });
 });

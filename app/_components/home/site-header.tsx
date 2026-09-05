@@ -14,13 +14,12 @@ import { DepartmentNav } from "@/app/_components/header/department-nav";
 // they already were, so the bar names only what there is to shop.
 const NAV_LINKS = [{ href: "/deals", label: "Deals" }];
 
-// Both point at "/", because the catalogue IS the home page. Two labels for
-// one destination is deliberate: "Home" is the word people look for to get
-// back to the front, and "Shop the collection" is what the page actually is.
-const LEADING_NAV_LINKS = [
-  { href: "/", label: "Home" },
-  { href: "/", label: "Shop the collection" },
-];
+// The catalogue opens the row, ahead of the departments, because the row
+// reads as a narrowing: everything, then each department. There is no "Home"
+// entry beside it — the brand mark to its left already goes home, and a nav
+// link that duplicates the logo spends a slot on a destination nobody has to
+// look for.
+const LEADING_NAV_LINKS = [{ href: "/categories", label: "Shop the collection" }];
 
 export async function SiteHeader() {
   // One cached read (same key the footer already uses on every page), turned
