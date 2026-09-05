@@ -76,7 +76,7 @@ describe("FilterTree", () => {
     const hrefs = collectHrefs(
       FilterTree({ departments, byDesign, byDepartment, totalCount: 6, selectedDesign: "" }),
     );
-    expect(hrefs).toEqual(["/categories", "/categories/women", "/categories/men"]);
+    expect(hrefs).toEqual(["/", "/categories/women", "/categories/men"]);
   });
 
   it("unfolds only the selected design's own department", () => {
@@ -84,7 +84,7 @@ describe("FilterTree", () => {
       FilterTree({ departments, byDesign, byDepartment, totalCount: 6, selectedDesign: "cat" }),
     );
     expect(hrefs).toEqual([
-      "/categories",
+      "/",
       "/categories/women", "/categories/women/cat", "/categories/women/dino",
       "/categories/men",
     ]);
@@ -94,10 +94,10 @@ describe("FilterTree", () => {
     const hrefs = collectHrefs(
       FilterTree({
         departments, byDesign, byDepartment, totalCount: 6, selectedDesign: "cat",
-        allHref: "/categories?minPrice=1000",
+        allHref: "/?minPrice=1000",
       }),
     );
-    expect(hrefs[0]).toBe("/categories?minPrice=1000");
+    expect(hrefs[0]).toBe("/?minPrice=1000");
   });
 
   it("shows a count beside every visible design, not just every department", () => {
@@ -135,6 +135,6 @@ describe("FilterTree", () => {
     const flags = activeFlags(
       FilterTree({ departments, byDesign, byDepartment, totalCount: 6, selectedDesign: "" }),
     );
-    expect(flags.filter((f) => f.active === true).map((f) => f.href)).toEqual(["/categories"]);
+    expect(flags.filter((f) => f.active === true).map((f) => f.href)).toEqual(["/"]);
   });
 });

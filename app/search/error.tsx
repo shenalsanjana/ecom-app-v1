@@ -25,7 +25,7 @@ export default function SearchError({
         <Button onClick={reset} variant="brand" size="lg">
           Try again
         </Button>
-        <Link href="/categories" className={buttonVariants({ variant: "outline", size: "lg" })}>
+        <Link href="/" className={buttonVariants({ variant: "outline", size: "lg" })}>
           Browse categories
         </Link>
       </div>

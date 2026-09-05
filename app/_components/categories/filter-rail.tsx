@@ -32,8 +32,9 @@ type Props = {
   clearHref: string | null;
 };
 
-/** The browse rail. Price and stock post a plain GET back to /categories, so
- *  they filter with or without JavaScript — the category rows are links and
+/** The browse rail. Price and stock post a plain GET back to "/" — the
+ *  shop-all page, which is the home page — so they filter with or without
+ *  JavaScript — the category rows are links and
  *  navigate on their own, and sort sits outside the form because SortSelect
  *  pushes the URL itself. */
 export function FilterRail({
@@ -51,7 +52,7 @@ export function FilterRail({
 }: Props) {
   return (
     <div className="space-y-6">
-      <form action="/categories" className="space-y-6">
+      <form action="/" className="space-y-6">
         {/* Carried so applying a price never silently resets where you are or
             how the list is ordered. Paging restarts by simply not being sent. */}
         {selectedDesign && <input type="hidden" name="category" value={selectedDesign} />}

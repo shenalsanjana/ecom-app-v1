@@ -6,27 +6,24 @@ const plain = { slug: "plain", name: "Plain T-Shirts (Unisex)", subName: null };
 const cats = { slug: "cat", name: "Cats" };
 
 describe("taxonomyTrail", () => {
-  it("starts every trail at Home and Categories", () => {
-    expect(taxonomyTrail({})).toEqual([
-      { label: "Home", href: "/" },
-      { label: "Categories" },
-    ]);
+  it("starts every trail at a single Shop all crumb", () => {
+    // Home and Categories were two crumbs pointing at two pages; the catalogue
+    // moved onto "/" and they became one.
+    expect(taxonomyTrail({})).toEqual([{ label: "Shop all" }]);
   });
 
   it("ends a department page on the department, unlinked and without its sub-category", () => {
     // The sub-category is context for a design, not a place you can be. Omitting
     // it here also stops the department crumb linking to the page you are on.
     expect(taxonomyTrail({ department: women })).toEqual([
-      { label: "Home", href: "/" },
-      { label: "Categories", href: "/categories" },
+      { label: "Shop all", href: "/" },
       { label: "Women" },
     ]);
   });
 
   it("shows the sub-category, unlinked, between department and design", () => {
     expect(taxonomyTrail({ department: women, design: cats })).toEqual([
-      { label: "Home", href: "/" },
-      { label: "Categories", href: "/categories" },
+      { label: "Shop all", href: "/" },
       { label: "Women", href: "/categories/women" },
       { label: "Oversized Graphic T-Shirts" },
       { label: "Cats" },
@@ -36,7 +33,7 @@ describe("taxonomyTrail", () => {
   it("omits the sub-category crumb for a department that has none", () => {
     const labels = taxonomyTrail({ department: plain, design: { slug: "tote", name: "Tote" } })
       .map((c) => c.label);
-    expect(labels).toEqual(["Home", "Categories", "Plain T-Shirts (Unisex)", "Tote"]);
+    expect(labels).toEqual(["Shop all", "Plain T-Shirts (Unisex)", "Tote"]);
   });
 
   it("links the design when a product follows it", () => {
@@ -58,6 +55,6 @@ describe("taxonomyTrail", () => {
 
   it("drops a design that has no department, rather than inventing a path", () => {
     // designPath needs both segments; a design with no department cannot be linked.
-    expect(taxonomyTrail({ design: cats }).map((c) => c.label)).toEqual(["Home", "Categories"]);
+    expect(taxonomyTrail({ design: cats }).map((c) => c.label)).toEqual(["Shop all"]);
   });
 });

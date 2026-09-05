@@ -36,15 +36,36 @@ const PANEL_SPLITS_AT = 8;
 export function DepartmentNav({
   columns,
   links = [],
+  leadingLinks = [],
 }: {
   columns: NavColumn[];
   links?: PlainLink[];
+  /** Links that open the row, ahead of the departments. "Shop all" belongs
+   *  here and not in `links`: the row reads as a narrowing — everything, then
+   *  each department — and putting it last would file the widest entry behind
+   *  the narrow ones. */
+  leadingLinks?: PlainLink[];
 }) {
   const pathname = usePathname();
-  const isHere = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  // "/" is every path's prefix, so the startsWith test would mark a link to it
+  // active on every page. An exact match is the right rule for the root, and
+  // for the departments the prefix test still catches their design pages.
+  const isHere = (href: string) =>
+    href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <nav aria-label="Departments" className="hidden h-full items-stretch gap-6 lg:flex">
+      {leadingLinks.map((l) => (
+        <Link
+          key={l.href}
+          href={l.href}
+          data-active={isHere(l.href)}
+          className={`${ITEM} ${isHere(l.href) ? ITEM_ACTIVE : ITEM_IDLE}`}
+        >
+          {l.label}
+        </Link>
+      ))}
+
       {columns.map((col) => (
         <div key={col.href} className="group relative flex items-stretch">
           <Link

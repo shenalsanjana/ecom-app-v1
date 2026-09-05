@@ -33,9 +33,9 @@ const STATIC_COLUMNS: { heading: string; links: LinkItem[] }[] = [
   {
     heading: "Shop",
     links: [
-      { label: "All Products", href: "/categories" },
-      { label: "New Arrivals", href: "/categories?sort=newest" },
-      { label: "Best Sellers", href: "/categories?sort=rating" },
+      { label: "Shop all", href: "/" },
+      { label: "New Arrivals", href: "/?sort=newest" },
+      { label: "Best Sellers", href: "/?sort=rating" },
       { label: "Deals", href: "/deals" },
     ],
   },
