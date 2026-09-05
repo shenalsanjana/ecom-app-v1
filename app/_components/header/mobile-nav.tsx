@@ -18,7 +18,7 @@ import type { NavColumn } from "@/app/_lib/taxonomy-nav-model";
 // "Home" and "All products" pointed at two different pages and now point at
 // one, so the sheet lists it once, under the name that says what is there.
 const NAV_LINKS = [
-  { href: "/", label: "Shop all" },
+  { href: "/", label: "Shop the collection" },
   { href: "/deals", label: "Deals" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },

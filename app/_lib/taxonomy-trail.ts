@@ -8,7 +8,7 @@ type TrailInput = {
   productName?: string | null;
 };
 
-/** Shop all › Department › [sub-category] › [Design] › [Product].
+/** Shop the collection › Department › [sub-category] › [Design] › [Product].
  *
  *  One crumb at the root, not two: this used to open "Home › Categories", and
  *  those became the same page when the catalogue moved onto "/". It carries
@@ -22,7 +22,7 @@ type TrailInput = {
  *    linking to itself.
  *  - The final crumb never carries an href — it is the page you are on. */
 export function taxonomyTrail({ department, design, productName }: TrailInput): Crumb[] {
-  const crumbs: Crumb[] = [{ label: "Shop all", href: "/" }];
+  const crumbs: Crumb[] = [{ label: "Shop the collection", href: "/" }];
 
   if (department) {
     crumbs.push({ label: department.name, href: `/categories/${department.slug}` });

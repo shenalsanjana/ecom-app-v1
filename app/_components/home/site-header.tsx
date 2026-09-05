@@ -16,7 +16,7 @@ const NAV_LINKS = [{ href: "/deals", label: "Deals" }];
 
 // The catalogue is the home page, so this is both "shop everything" and the
 // way back to the front — which is why the row carries no separate Home link.
-const LEADING_NAV_LINKS = [{ href: "/", label: "Shop all" }];
+const LEADING_NAV_LINKS = [{ href: "/", label: "Shop the collection" }];
 
 export async function SiteHeader() {
   // One cached read (same key the footer already uses on every page), turned

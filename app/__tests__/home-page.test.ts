@@ -31,7 +31,12 @@ vi.mock("@/app/_lib/taxonomy", async (importOriginal) => ({
 }));
 vi.mock("@/app/_lib/products", () => ({
   getProducts,
-  parseSortBy: (_v: string | undefined, fallback: string) => fallback,
+  // Mirrors the real parseSortBy rather than always returning the fallback:
+  // which value comes back decides what the page serialises into its links, so
+  // a stub that swallowed ?sort= would make those assertions vacuous. The real
+  // one cannot be reused here — products.ts imports Prisma at module scope.
+  parseSortBy: (v: string | undefined, fallback: string) =>
+    v && ["name", "price_asc", "price_desc", "rating", "newest"].includes(v) ? v : fallback,
 }));
 vi.mock("@/app/_components/home/product-card", () => ({ ProductCard: () => null }));
 vi.mock("@/app/_components/home/site-header", () => ({ SiteHeader: () => null }));
@@ -43,7 +48,7 @@ vi.mock("@/app/_components/home/deals-section", () => ({ DealsSection: () => nul
 vi.mock("@/app/_components/home/trust-strip", () => ({ TrustStrip: () => null }));
 
 import Home from "../(home)/page";
-import { BrandBand } from "@/app/_components/home/brand-band";
+import { OfferBanner } from "@/app/_components/home/offer-banner";
 import { FilterRail } from "@/app/_components/categories/filter-rail";
 import { FilterDisclosure } from "@/app/_components/categories/filter-disclosure";
 import { DealsSection } from "@/app/_components/home/deals-section";
@@ -57,7 +62,8 @@ const dept = (over: Partial<DepartmentView>): DepartmentView => ({
   ...over,
 });
 
-const product = (id: string) => ({ id, name: id, slug: id });
+const product = (id: string, variants: { price: number; originalPrice: number | null }[] = []) =>
+  ({ id, name: id, slug: id, variants });
 
 /** Walk the returned element tree and collect every `href` prop. */
 function collectHrefs(node: unknown, out: string[] = []): string[] {
@@ -124,9 +130,9 @@ describe("home page composition", () => {
     // The band opens <main>: nothing stands between the header and it, which
     // is the whole point of dropping the photo hero.
     const main = collectElements(tree).find((e) => e.type === "main");
-    expect(collectElements(main?.props.children)[0]?.type).toBe(BrandBand);
+    expect(collectElements(main?.props.children)[0]?.type).toBe(OfferBanner);
 
-    const band = types.indexOf(BrandBand);
+    const band = types.indexOf(OfferBanner);
     const card = types.indexOf(ProductCard);
     const deals = types.indexOf(DealsSection);
     const trust = types.indexOf(TrustStrip);
@@ -136,16 +142,16 @@ describe("home page composition", () => {
     expect(trust).toBeGreaterThan(deals);
   });
 
-  it("carries no second <h1>, because BrandBand holds the page's only one", async () => {
+  it("carries no second <h1>, because OfferBanner holds the page's only one", async () => {
     // The band renders the heading it is handed. A heading in the catalogue
     // below it — where "All products" used to sit — would be a second h1.
     const headings = collectElements(await render()).filter((e) => e.type === "h1");
     expect(headings).toHaveLength(0);
-    expect(find(await render(), BrandBand)).toBeDefined();
+    expect(find(await render(), OfferBanner)).toBeDefined();
   });
 
   it("names the whole catalogue in the band, with the brand line beside it", async () => {
-    const band = find(await render(), BrandBand);
+    const band = find(await render(), OfferBanner);
     expect(band?.props.heading).toBe("The whole rack");
     expect(band?.props.blurb).toEqual(expect.stringContaining("Oversize graphic tees"));
   });
@@ -153,14 +159,59 @@ describe("home page composition", () => {
   it("swaps the heading for the design and drops the blurb once a filter is on", async () => {
     // The blurb describes the whole catalogue; on a narrowed page it would be
     // describing something the grid is no longer showing.
-    const band = find(await render({ category: "cat" }), BrandBand);
+    const band = find(await render({ category: "cat" }), OfferBanner);
     expect(band?.props.heading).toBe("Cats");
     expect(band?.props.blurb).toBeNull();
   });
 
   it("falls back to a generic heading for a category slug that no longer exists", async () => {
-    const band = find(await render({ category: "ghost" }), BrandBand);
+    const band = find(await render({ category: "ghost" }), OfferBanner);
     expect(band?.props.heading).toBe("Category");
+  });
+});
+
+describe("home page offer banner", () => {
+  it("takes the headline discount from the whole catalogue, not the filtered list", async () => {
+    // The banner advertises the shop. Narrowing to one design must not shrink
+    // the figure it prints, so it has to read the unfiltered catalogue.
+    const catalogue = [
+      product("p1", [{ price: 800, originalPrice: 1000 }]),   // 20%
+      product("p2", [{ price: 1200, originalPrice: 2000 }]),  // 40%
+    ];
+    getProducts.mockReset()
+      .mockResolvedValueOnce(catalogue)                        // the counts read
+      .mockResolvedValueOnce([catalogue[0]]);                  // the filtered read
+
+    const banner = find(await render({ category: "cat" }), OfferBanner);
+    expect(banner?.props.offer).toEqual({ pct: 40, count: 2 });
+  });
+
+  it("tells the banner nothing is reduced when nothing is", async () => {
+    // OfferBanner drops the whole panel on pct 0 rather than printing an empty
+    // sale — and the page must never invent a figure to avoid that.
+    getProducts.mockResolvedValue([product("p1", [{ price: 500, originalPrice: null }])]);
+    expect(find(await render(), OfferBanner)?.props.offer).toEqual({ pct: 0, count: 0 });
+  });
+});
+
+describe("home page sort", () => {
+  it("opens on best sellers, and keeps that default out of the URL", async () => {
+    // The first screenful is what most visitors judge the shop on, so the
+    // catalogue opens on rating. Serialising the default would put ?sort=rating
+    // on every link for no gain.
+    getProducts.mockResolvedValue(Array.from({ length: 30 }, (_, i) => product(`p${i}`)));
+    const tree = await render();
+
+    expect(getProducts).toHaveBeenCalledWith({ sortBy: "rating" });
+    expect(find(tree, FilterRail)?.props.sortBy).toBe("rating");
+    expect(find(tree, FilterRail)?.props.defaultSort).toBe("rating");
+    expect(collectHrefs(tree)).toContain("/?page=2");
+  });
+
+  it("serialises any other order, so paging does not silently reset it", async () => {
+    getProducts.mockResolvedValue(Array.from({ length: 30 }, (_, i) => product(`p${i}`)));
+    const hrefs = collectHrefs(await render({ sort: "name" }));
+    expect(hrefs).toContain("/?sort=name&page=2");
   });
 });
 
@@ -205,9 +256,9 @@ describe("home page filters", () => {
 
     // First read is the whole catalogue — the sidebar counts must not move
     // when a filter is applied.
-    expect(getProducts).toHaveBeenNthCalledWith(1, { sortBy: "newest" });
+    expect(getProducts).toHaveBeenNthCalledWith(1, { sortBy: "rating" });
     expect(getProducts).toHaveBeenNthCalledWith(2, {
-      sortBy: "newest",
+      sortBy: "rating",
       designSlug: undefined,
       minPrice: 1000,
       maxPrice: 4500,
@@ -219,20 +270,20 @@ describe("home page filters", () => {
     // Sort reorders, it never hides — counting it would tell a phone that a
     // filter is on when nothing is being held back.
     const tree = await render({
-      category: "cat", minPrice: "1000", inStockOnly: "true", sort: "rating",
+      category: "cat", minPrice: "1000", inStockOnly: "true", sort: "name",
     });
     expect(find(tree, FilterDisclosure)?.props.activeCount).toBe(3);
   });
 
   it("counts nothing when the page is unfiltered", async () => {
-    expect(find(await render({ sort: "rating" }), FilterDisclosure)?.props.activeCount).toBe(0);
+    expect(find(await render({ sort: "name" }), FilterDisclosure)?.props.activeCount).toBe(0);
   });
 
   it("ignores a price that is not a number rather than passing NaN to the query", async () => {
     await render({ minPrice: "abc" });
     // Nothing is being filtered, so the catalogue read is the only read.
     expect(getProducts).toHaveBeenCalledTimes(1);
-    expect(getProducts).toHaveBeenCalledWith({ sortBy: "newest" });
+    expect(getProducts).toHaveBeenCalledWith({ sortBy: "rating" });
   });
 });
 
