@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 test("add-to-cart popup reveals and hides the size chart", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/categories");
 
   // Open the quick Add-to-cart dialog on the first product card.
   await page.getByRole("button", { name: /^Add to cart$/i }).first().click();

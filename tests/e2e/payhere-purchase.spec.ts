@@ -137,7 +137,7 @@ test("success page shows not-found for non-existent order", async ({ page }) => 
 
 test("guest checkout with PayHere creates PENDING order", async ({ page }) => {
   // Add item to cart without logging in.
-  await page.goto("/");
+  await page.goto("/categories");
   const addBtn = page.getByRole("button", { name: /^Add to cart$/i }).first();
   await expect(addBtn).toBeVisible({ timeout: 10_000 });
   await addBtn.click();
@@ -207,7 +207,7 @@ test("full PayHere checkout creates PENDING order, then verified state confirms"
   await page.waitForURL("**/", { timeout: 10_000 });
 
   // Add item to cart.
-  await page.goto("/");
+  await page.goto("/categories");
   const addBtn = page.getByRole("button", { name: /^Add to cart$/i }).first();
   await expect(addBtn).toBeVisible({ timeout: 10_000 });
   await addBtn.click();
