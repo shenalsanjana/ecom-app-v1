@@ -1,16 +1,12 @@
-import Link from "next/link";
 import { getProducts, parseSortBy } from "@/app/_lib/products";
 import { getDepartments, showsNavDropdown } from "@/app/_lib/taxonomy";
 import { OfferBanner } from "@/app/_components/home/offer-banner";
-import { ProductCard } from "@/app/_components/home/product-card";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { DealsSection } from "@/app/_components/home/deals-section";
 import { TrustStrip } from "@/app/_components/home/trust-strip";
 import { countsByDesign, countsByDepartment } from "@/app/_lib/taxonomy-counts";
-import { FilterRail, SORT_OPTIONS } from "@/app/_components/categories/filter-rail";
-import { FilterDisclosure } from "@/app/_components/categories/filter-disclosure";
-import { SortSelect } from "@/app/_components/shared/sort-select";
+import { CatalogueBrowser } from "@/app/_components/catalogue/catalogue-browser";
 import { parsePrice } from "@/app/_lib/parse-price";
 import { catalogueDiscount } from "@/app/_lib/catalogue-discount";
 
@@ -126,6 +122,11 @@ export default async function Home({ searchParams }: HomePageProps) {
     (maxPrice !== undefined ? 1 : 0) +
     (inStockOnly ? 1 : 0);
 
+  const countLabel =
+    isFiltered && displayProducts.length !== allProducts.length
+      ? `${displayProducts.length} of ${allProducts.length} products`
+      : `${displayProducts.length} product${displayProducts.length === 1 ? "" : "s"}`;
+
   const heading = selectedCategory
     ? designNames.get(selectedCategory) || "Category"
     : "The whole rack";
@@ -144,94 +145,28 @@ export default async function Home({ searchParams }: HomePageProps) {
           }
         />
 
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          {/* Sits above the grid rather than up in the band because it
-              describes the grid: it is the filter's answer, and it moves. */}
-          <p className="text-sm tabular-nums text-muted-foreground">
-            {isFiltered && displayProducts.length !== allProducts.length
-              ? `${displayProducts.length} of ${allProducts.length} products`
-              : `${displayProducts.length} product${displayProducts.length === 1 ? "" : "s"}`}
-          </p>
-
-          <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-4">
-            <aside className="lg:col-span-1">
-              <div className="sticky top-24">
-                <FilterDisclosure
-                  activeCount={activeCount}
-                  sort={
-                    <SortSelect
-                      value={sortBy}
-                      options={SORT_OPTIONS}
-                      className="rounded-lg border bg-background py-2 pl-3 pr-8 text-sm focus:border-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    />
-                  }
-                >
-                  <FilterRail
-                    departments={linkedDepartments}
-                    byDesign={byDesign}
-                    byDepartment={byDepartment}
-                    totalCount={allProducts.length}
-                    selectedDesign={selectedCategory}
-                    minPrice={minPrice}
-                    maxPrice={maxPrice}
-                    inStockOnly={inStockOnly}
-                    sortBy={sortBy}
-                    defaultSort={DEFAULT_SORT}
-                    allHref={buildLink({ category: "" })}
-                    clearHref={isFiltered ? "/" : null}
-                  />
-                </FilterDisclosure>
-              </div>
-            </aside>
-
-            <div className="lg:col-span-3">
-              {paginatedProducts.length === 0 ? (
-                <div className="rounded-xl border border-dashed px-6 py-20 text-center">
-                  <p className="text-base font-medium">Nothing matches these filters</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Widen the price range or clear the filters to see the full catalogue.
-                  </p>
-                  <Link
-                    href="/"
-                    className="mt-4 inline-block text-sm font-medium text-brand underline-offset-4 hover:underline"
-                  >
-                    Clear all filters
-                  </Link>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {paginatedProducts.map((product) => (
-                    <ProductCard key={product.id} product={product} fromPath="/" />
-                  ))}
-                </div>
-              )}
-
-              {totalPages > 1 && (
-                <div className="mt-12 flex justify-center">
-                  <nav className="flex items-center gap-1" aria-label="Pagination">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                      const here = page === currentPage;
-                      return (
-                        <Link
-                          key={page}
-                          href={buildLink({ page })}
-                          {...(here ? { "aria-current": "page" as const } : {})}
-                          className={`flex h-10 w-10 items-center justify-center rounded-lg border-b-2 text-sm tabular-nums transition-colors duration-(--duration-fast) ${
-                            here
-                              ? "border-brand bg-secondary font-medium text-foreground"
-                              : "border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
-                          }`}
-                        >
-                          {page}
-                        </Link>
-                      );
-                    })}
-                  </nav>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <CatalogueBrowser
+          departments={linkedDepartments}
+          byDesign={byDesign}
+          byDepartment={byDepartment}
+          totalCount={allProducts.length}
+          selectedDesign={selectedCategory}
+          minPrice={minPrice}
+          maxPrice={maxPrice}
+          inStockOnly={inStockOnly}
+          sortBy={sortBy}
+          defaultSort={DEFAULT_SORT}
+          action="/"
+          allHref={buildLink({ category: "" })}
+          clearHref={isFiltered ? "/" : null}
+          products={paginatedProducts}
+          countLabel={countLabel}
+          activeCount={activeCount}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          buildPageLink={(page) => buildLink({ page })}
+          fromPath="/"
+        />
 
         <DealsSection />
         <TrustStrip />

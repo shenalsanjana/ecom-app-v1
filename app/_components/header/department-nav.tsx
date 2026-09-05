@@ -53,14 +53,24 @@ export function DepartmentNav({
   const isHere = (href: string) =>
     href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 
+  // Two leading links can share an href — "Home" and "Shop the collection"
+  // both go to "/", because the catalogue is the home page. Underlining both
+  // would read as a rendering fault, so at most one is marked: the last that
+  // matches, which is the label describing the page rather than the one that
+  // merely points home. Keyed by label for the same reason — hrefs collide.
+  const activeLeading = leadingLinks.reduce(
+    (found, l, i) => (isHere(l.href) ? i : found),
+    -1,
+  );
+
   return (
     <nav aria-label="Departments" className="hidden h-full items-stretch gap-6 lg:flex">
-      {leadingLinks.map((l) => (
+      {leadingLinks.map((l, i) => (
         <Link
-          key={l.href}
+          key={l.label}
           href={l.href}
-          data-active={isHere(l.href)}
-          className={`${ITEM} ${isHere(l.href) ? ITEM_ACTIVE : ITEM_IDLE}`}
+          data-active={i === activeLeading}
+          className={`${ITEM} ${i === activeLeading ? ITEM_ACTIVE : ITEM_IDLE}`}
         >
           {l.label}
         </Link>

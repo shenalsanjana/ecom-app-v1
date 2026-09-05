@@ -1,10 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { DepartmentView } from "@/app/_lib/taxonomy";
 
-// The home page IS the shop-all catalogue. This file is the old
-// app/categories/__tests__/index-page.test.ts — every browse behaviour it
-// guarded still applies, it just applies to "/" now — plus the composition
-// checks that used to live here.
+// The home page IS the shop-all catalogue. Every browse behaviour the old
+// /categories page guarded still applies, it just applies to "/" now.
+//
+// The browse layout itself lives in CatalogueBrowser, shared with the
+// department pages, and has its own test. A tree walk does not enter a child
+// component, so what this file checks is the contract between the two: the
+// page reads the right things and hands the browser the right props.
 //
 // BLOCKER 2 (carried over) — the catalogue must not link to departments that
 // hold no designs. scripts/deploy.sh runs `prisma migrate deploy` and never
@@ -38,10 +41,12 @@ vi.mock("@/app/_lib/products", () => ({
   parseSortBy: (v: string | undefined, fallback: string) =>
     v && ["name", "price_asc", "price_desc", "rating", "newest"].includes(v) ? v : fallback,
 }));
+// Imported for identity comparison only, but importing CatalogueBrowser runs
+// its import chain — ProductCard reaches next-auth through the session hooks.
 vi.mock("@/app/_components/home/product-card", () => ({ ProductCard: () => null }));
+vi.mock("@/app/_components/shared/sort-select", () => ({ SortSelect: () => null }));
 vi.mock("@/app/_components/home/site-header", () => ({ SiteHeader: () => null }));
 vi.mock("@/app/_components/home/site-footer", () => ({ SiteFooter: () => null }));
-vi.mock("@/app/_components/shared/sort-select", () => ({ SortSelect: () => null }));
 // Both hit the database; this file is about the catalogue and the page's
 // composition, so they are stubbed to identity-only placeholders.
 vi.mock("@/app/_components/home/deals-section", () => ({ DealsSection: () => null }));
@@ -49,11 +54,9 @@ vi.mock("@/app/_components/home/trust-strip", () => ({ TrustStrip: () => null })
 
 import Home from "../(home)/page";
 import { OfferBanner } from "@/app/_components/home/offer-banner";
-import { FilterRail } from "@/app/_components/categories/filter-rail";
-import { FilterDisclosure } from "@/app/_components/categories/filter-disclosure";
+import { CatalogueBrowser } from "@/app/_components/catalogue/catalogue-browser";
 import { DealsSection } from "@/app/_components/home/deals-section";
 import { TrustStrip } from "@/app/_components/home/trust-strip";
-import { ProductCard } from "@/app/_components/home/product-card";
 
 const dept = (over: Partial<DepartmentView>): DepartmentView => ({
   slug: "women", name: "Women", navLabel: "Women", tileName: "Women",
@@ -64,21 +67,6 @@ const dept = (over: Partial<DepartmentView>): DepartmentView => ({
 
 const product = (id: string, variants: { price: number; originalPrice: number | null }[] = []) =>
   ({ id, name: id, slug: id, variants });
-
-/** Walk the returned element tree and collect every `href` prop. */
-function collectHrefs(node: unknown, out: string[] = []): string[] {
-  if (node === null || node === undefined || typeof node !== "object") return out;
-  if (Array.isArray(node)) {
-    for (const child of node) collectHrefs(child, out);
-    return out;
-  }
-  const props = (node as { props?: Record<string, unknown> }).props;
-  if (props) {
-    if (typeof props.href === "string") out.push(props.href);
-    collectHrefs(props.children, out);
-  }
-  return out;
-}
 
 /** Every element in the tree, depth-first, in render order. */
 function collectElements(
@@ -103,13 +91,8 @@ function find(tree: unknown, type: unknown) {
   return collectElements(tree).find((e) => e.type === type);
 }
 
-/** The sidebar's links live inside FilterRail, and a tree walk does not enter
- *  child components — so they never appear in the page's own tree. Read the
- *  departments the page hands the rail from its props instead;
- *  filter-tree.test.ts proves the rail's tree links every one it is given. */
-function filterRailDepartments(tree: unknown): { slug: string }[] | undefined {
-  return find(tree, FilterRail)?.props.departments as { slug: string }[] | undefined;
-}
+/** The props the page hands the shared browse layout. */
+const browser = (tree: unknown) => find(tree, CatalogueBrowser)?.props;
 
 const render = (searchParams: Record<string, string> = {}) =>
   Home({ searchParams: Promise.resolve(searchParams) });
@@ -123,7 +106,6 @@ beforeEach(() => {
 
 describe("home page composition", () => {
   it("puts the catalogue above deals and trust, so products come first", async () => {
-    getProducts.mockResolvedValue([product("p1")]);
     const tree = await render();
     const types = collectElements(tree).map((e) => e.type);
 
@@ -133,18 +115,16 @@ describe("home page composition", () => {
     expect(collectElements(main?.props.children)[0]?.type).toBe(OfferBanner);
 
     const band = types.indexOf(OfferBanner);
-    const card = types.indexOf(ProductCard);
+    const grid = types.indexOf(CatalogueBrowser);
     const deals = types.indexOf(DealsSection);
     const trust = types.indexOf(TrustStrip);
 
-    expect(card).toBeGreaterThan(band);
-    expect(deals).toBeGreaterThan(card);
+    expect(grid).toBeGreaterThan(band);
+    expect(deals).toBeGreaterThan(grid);
     expect(trust).toBeGreaterThan(deals);
   });
 
   it("carries no second <h1>, because OfferBanner holds the page's only one", async () => {
-    // The band renders the heading it is handed. A heading in the catalogue
-    // below it — where "All products" used to sit — would be a second h1.
     const headings = collectElements(await render()).filter((e) => e.type === "h1");
     expect(headings).toHaveLength(0);
     expect(find(await render(), OfferBanner)).toBeDefined();
@@ -165,8 +145,7 @@ describe("home page composition", () => {
   });
 
   it("falls back to a generic heading for a category slug that no longer exists", async () => {
-    const band = find(await render({ category: "ghost" }), OfferBanner);
-    expect(band?.props.heading).toBe("Category");
+    expect(find(await render({ category: "ghost" }), OfferBanner)?.props.heading).toBe("Category");
   });
 });
 
@@ -182,8 +161,8 @@ describe("home page offer banner", () => {
       .mockResolvedValueOnce(catalogue)                        // the counts read
       .mockResolvedValueOnce([catalogue[0]]);                  // the filtered read
 
-    const banner = find(await render({ category: "cat" }), OfferBanner);
-    expect(banner?.props.offer).toEqual({ pct: 40, count: 2 });
+    expect(find(await render({ category: "cat" }), OfferBanner)?.props.offer)
+      .toEqual({ pct: 40, count: 2 });
   });
 
   it("tells the banner nothing is reduced when nothing is", async () => {
@@ -200,18 +179,18 @@ describe("home page sort", () => {
     // catalogue opens on rating. Serialising the default would put ?sort=rating
     // on every link for no gain.
     getProducts.mockResolvedValue(Array.from({ length: 30 }, (_, i) => product(`p${i}`)));
-    const tree = await render();
+    const b = browser(await render());
 
     expect(getProducts).toHaveBeenCalledWith({ sortBy: "rating" });
-    expect(find(tree, FilterRail)?.props.sortBy).toBe("rating");
-    expect(find(tree, FilterRail)?.props.defaultSort).toBe("rating");
-    expect(collectHrefs(tree)).toContain("/?page=2");
+    expect(b?.sortBy).toBe("rating");
+    expect(b?.defaultSort).toBe("rating");
+    expect((b?.buildPageLink as (p: number) => string)(2)).toBe("/?page=2");
   });
 
   it("serialises any other order, so paging does not silently reset it", async () => {
     getProducts.mockResolvedValue(Array.from({ length: 30 }, (_, i) => product(`p${i}`)));
-    const hrefs = collectHrefs(await render({ sort: "name" }));
-    expect(hrefs).toContain("/?sort=name&page=2");
+    const b = browser(await render({ sort: "name" }));
+    expect((b?.buildPageLink as (p: number) => string)(2)).toBe("/?sort=name&page=2");
   });
 });
 
@@ -227,17 +206,10 @@ describe("home page department lists", () => {
       dept({ slug: "accessories", name: "Accessories", subName: null, sortOrder: 3, designs: [] }),
     ]);
 
-    const tree = await render();
-
-    // The rail is only ever handed the departments that survive
+    // The browser is only ever handed the departments that survive
     // showsNavDropdown, so the three empty ones are unreachable from here.
-    expect(filterRailDepartments(tree)?.map((d) => d.slug)).toEqual(["women"]);
-
-    // And the page itself links no department directly.
-    const hrefs = collectHrefs(tree);
-    expect(hrefs).not.toContain("/categories/men");
-    expect(hrefs).not.toContain("/categories/plain");
-    expect(hrefs).not.toContain("/categories/accessories");
+    const given = browser(await render())?.departments as { slug: string }[];
+    expect(given.map((d) => d.slug)).toEqual(["women"]);
   });
 
   it("hands the rail every department once designs exist under each", async () => {
@@ -245,8 +217,8 @@ describe("home page department lists", () => {
       dept({ slug: "women", designs: [{ slug: "cat", name: "Cats", hex: "#EFC4C4", image: null }] }),
       dept({ slug: "men", name: "Men", designs: [{ slug: "car", name: "Car", hex: "#C4D3EF", image: null }] }),
     ]);
-
-    expect(filterRailDepartments(await render())?.map((d) => d.slug)).toEqual(["women", "men"]);
+    const given = browser(await render())?.departments as { slug: string }[];
+    expect(given.map((d) => d.slug)).toEqual(["women", "men"]);
   });
 });
 
@@ -269,14 +241,14 @@ describe("home page filters", () => {
   it("counts what is applied for the collapsed Filters button, ignoring sort", async () => {
     // Sort reorders, it never hides — counting it would tell a phone that a
     // filter is on when nothing is being held back.
-    const tree = await render({
+    const b = browser(await render({
       category: "cat", minPrice: "1000", inStockOnly: "true", sort: "name",
-    });
-    expect(find(tree, FilterDisclosure)?.props.activeCount).toBe(3);
+    }));
+    expect(b?.activeCount).toBe(3);
   });
 
   it("counts nothing when the page is unfiltered", async () => {
-    expect(find(await render({ sort: "name" }), FilterDisclosure)?.props.activeCount).toBe(0);
+    expect(browser(await render({ sort: "name" }))?.activeCount).toBe(0);
   });
 
   it("ignores a price that is not a number rather than passing NaN to the query", async () => {
@@ -292,23 +264,21 @@ describe("home page links", () => {
     // /categories 308s here (next.config.ts). A link from this page to it would
     // cost a redirect hop on every filter and page click.
     getProducts.mockResolvedValue(Array.from({ length: 30 }, (_, i) => product(`p${i}`)));
-    const hrefs = collectHrefs(await render({ category: "cat", minPrice: "1000" }));
+    const b = browser(await render({ category: "cat", minPrice: "1000" }));
 
-    expect(hrefs).not.toContain("/categories");
-    expect(hrefs.filter((h) => h.startsWith("/categories?"))).toEqual([]);
-    // Pagination is rendered here, so it lands in the walk...
-    expect(hrefs).toContain("/?category=cat&minPrice=1000&page=2");
-    // ...while the rail's "All products" target is a prop on a child
-    // component, which the walk does not enter. Read it off the props.
-    expect(find(await render({ category: "cat", minPrice: "1000" }), FilterRail)?.props.allHref)
-      .toBe("/?minPrice=1000");
+    expect(b?.action).toBe("/");
+    expect(b?.allHref).toBe("/?minPrice=1000");
+    expect((b?.buildPageLink as (p: number) => string)(2))
+      .toBe("/?category=cat&minPrice=1000&page=2");
+    expect(b?.fromPath).toBe("/");
   });
 
   it("offers a bare '/' as the way out when filters match nothing", async () => {
     getProducts.mockResolvedValueOnce([product("p1")]).mockResolvedValueOnce([]);
-    const tree = await render({ category: "cat" });
+    expect(browser(await render({ category: "cat" }))?.clearHref).toBe("/");
+  });
 
-    expect(find(tree, FilterRail)?.props.clearHref).toBe("/");
-    expect(collectHrefs(tree)).toContain("/");
+  it("has no clear link to offer when nothing is filtered", async () => {
+    expect(browser(await render())?.clearHref).toBeNull();
   });
 });

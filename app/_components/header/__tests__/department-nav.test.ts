@@ -114,6 +114,26 @@ describe("DepartmentNav", () => {
       .filter((f) => f.active === true).map((f) => f.href)).toEqual(["/categories/women"]);
   });
 
+  it("underlines only one of two leading links that share a destination", () => {
+    // "Home" and "Shop the collection" both go to "/" — the catalogue is the
+    // home page. Underlining both would read as a rendering fault, so the mark
+    // falls on the label that describes the page.
+    usePathname.mockReturnValue("/");
+    const leadingLinks = [
+      { href: "/", label: "Home" },
+      { href: "/", label: "Shop the collection" },
+    ];
+    const flags = activeFlags(DepartmentNav({ columns, leadingLinks }));
+    expect(flags.filter((f) => f.active === true)).toHaveLength(1);
+
+    // Both are still rendered, and still both link home.
+    const text = collectText(DepartmentNav({ columns, leadingLinks }));
+    expect(text).toContain("Home");
+    expect(text).toContain("Shop the collection");
+    expect(collectHrefs(DepartmentNav({ columns, leadingLinks })).filter((h) => h === "/"))
+      .toHaveLength(2);
+  });
+
   it("marks nothing when you are somewhere else entirely", () => {
     usePathname.mockReturnValue("/cart");
     const flags = activeFlags(DepartmentNav({ columns, links: [{ href: "/deals", label: "Deals" }] }));

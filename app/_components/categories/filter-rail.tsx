@@ -26,6 +26,12 @@ type Props = {
   maxPrice?: number;
   inStockOnly: boolean;
   sortBy: string;
+  /** The department whose own page this is; threaded to FilterTree. */
+  selectedDepartment?: string;
+  /** Where the plain-GET filter form posts — "/" for the shop-all page, the
+   *  department's own path on a department page. A hardcoded target would
+   *  bounce a department's filters back to the whole catalogue. */
+  action: string;
   /** The page's default order. The hidden input below is omitted when sortBy
    *  matches it, so a plain-GET filter never pins the default into the URL.
    *  Passed in rather than assumed: the page owns which order it opens on. */
@@ -36,9 +42,9 @@ type Props = {
   clearHref: string | null;
 };
 
-/** The browse rail. Price and stock post a plain GET back to "/" — the
- *  shop-all page, which is the home page — so they filter with or without
- *  JavaScript — the category rows are links and
+/** The browse rail. Price and stock post a plain GET back to `action` — "/"
+ *  on the shop-all page, the department's own path on a department page — so
+ *  they filter with or without JavaScript — the category rows are links and
  *  navigate on their own, and sort sits outside the form because SortSelect
  *  pushes the URL itself. */
 export function FilterRail({
@@ -51,13 +57,15 @@ export function FilterRail({
   maxPrice,
   inStockOnly,
   sortBy,
+  selectedDepartment = "",
   defaultSort,
+  action,
   allHref,
   clearHref,
 }: Props) {
   return (
     <div className="space-y-6">
-      <form action="/" className="space-y-6">
+      <form action={action} className="space-y-6">
         {/* Carried so applying a price never silently resets where you are or
             how the list is ordered. Paging restarts by simply not being sent. */}
         {selectedDesign && <input type="hidden" name="category" value={selectedDesign} />}
@@ -67,6 +75,7 @@ export function FilterRail({
 
         <FilterTree
           departments={departments}
+          selectedDepartment={selectedDepartment}
           byDesign={byDesign}
           byDepartment={byDepartment}
           totalCount={totalCount}
