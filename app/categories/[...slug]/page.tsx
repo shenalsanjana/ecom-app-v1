@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { notFound, permanentRedirect } from "next/navigation";
 import Link from "next/link";
-import { getProducts, parseSortBy, type SortBy } from "@/app/_lib/products";
+import { getProducts, parseSortBy, type ProductView, type SortBy } from "@/app/_lib/products";
 import {
   getDepartments,
   getDepartmentSlugRedirect,
@@ -18,6 +18,10 @@ import { DesignTile } from "@/app/_components/home/design-tile";
 import { designCountNote, designSlides, productNote } from "@/app/_components/home/design-grid";
 import { SlideClock } from "@/app/_components/ui/slide-clock";
 import { FILTER_HEADING } from "@/app/_components/shared/filter-fields";
+import { CatalogueBrowser } from "@/app/_components/catalogue/catalogue-browser";
+import { countsByDesign, countsByDepartment } from "@/app/_lib/taxonomy-counts";
+import { showsNavDropdown } from "@/app/_lib/taxonomy";
+import { parsePrice } from "@/app/_lib/parse-price";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { SortSelect } from "@/app/_components/shared/sort-select";
@@ -95,7 +99,13 @@ export async function generateMetadata(
 
 type CategoryPageProps = {
   params: Promise<{ slug: string[] }>;
-  searchParams: Promise<{ sort?: string; page?: string }>;
+  searchParams: Promise<{
+    sort?: string;
+    page?: string;
+    minPrice?: string;
+    maxPrice?: string;
+    inStockOnly?: string;
+  }>;
 };
 
 /**
@@ -112,6 +122,9 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   const [{ slug: segments }, sp] = await Promise.all([params, searchParams]);
   const sortBy = parseSortBy(sp.sort, "newest");
   const currentPage = Math.max(parseInt(sp.page || "1", 10), 1);
+  const minPrice = parsePrice(sp.minPrice);
+  const maxPrice = parsePrice(sp.maxPrice);
+  const inStockOnly = sp.inStockOnly === "true";
 
   const { resolved, departments } = await resolveSegments(segments);
   if (resolved.kind === "redirect") permanentRedirect(resolved.to);
@@ -120,15 +133,40 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   if (resolved.kind === "department") {
     const department = findDepartment(departments, resolved.slug);
     if (!department) notFound();
+
     // Read here rather than inside DepartmentBody so the body stays a plain
     // sync function — testable by calling it — and so a design route never
     // pays for a read only the department view uses.
-    const media = await getDesignMedia();
+    const designSlugs = department.designs.map((g) => g.slug);
+    const [media, allProducts, departmentProducts] = await Promise.all([
+      getDesignMedia(),
+      // The whole catalogue, never narrowed: the rail's counts are the totals
+      // and must not move as this department's filters are applied.
+      getProducts({ sortBy }),
+      // A department with no designs owns no products. Guarded because
+      // getProducts ignores an empty designSlugs and would hand back the
+      // entire catalogue as if it were this department's.
+      designSlugs.length === 0
+        ? Promise.resolve([])
+        : getProducts({ designSlugs, sortBy, minPrice, maxPrice, inStockOnly }),
+    ]);
+
     return (
       <>
         <SiteHeader />
         <TrackCategoryView name={department.name} />
-        <DepartmentBody department={department} media={media} />
+        <DepartmentBody
+          department={department}
+          departments={departments.filter(showsNavDropdown)}
+          media={media}
+          allProducts={allProducts}
+          products={departmentProducts}
+          sortBy={sortBy}
+          currentPage={currentPage}
+          minPrice={minPrice}
+          maxPrice={maxPrice}
+          inStockOnly={inStockOnly}
+        />
         <SiteFooter />
       </>
     );
@@ -325,21 +363,79 @@ function DesignBodySkeleton() {
   );
 }
 
-/** Mirrors the grid below: columns half again as wide as the home page's, so
- *  the tiles ask for a correspondingly larger photo. */
-const DESIGN_SLIDE_SIZES = "(min-width:1024px) 16vw, (min-width:640px) 30vw, 45vw";
+/** The tiles sit in a fixed-width scrolling row, so their rendered width is
+ *  known rather than a fraction of the viewport. */
+const DESIGN_SLIDE_SIZES = "170px";
 
-/** A department lists its designs — it has no products of its own. The tiles
- *  are the home page's "Shop by design" cards: the design's own product
- *  photography, its name, and how many products sit under it. Exported so it
+/** A department page: its products, the browse rail, and its designs as tiles
+ *  above the grid — the shape a Shopify collection page uses, where the
+ *  sub-collections sit over the product list rather than replacing it.
+ *
+ *  It used to list ONLY the design tiles, on the reasoning that a department
+ *  "has no products of its own". It does: they are the products of its
+ *  designs, and a shopper who picks Women expects to see clothes, not a menu.
+ *  The tiles stay because browsing by design is still worth one click.
+ *
+ *  Sync, and handed everything it needs: the route does the reading so this
  *  can be tested by calling it, the way mobile-nav's TaxonomySection is. */
 export function DepartmentBody({
   department,
+  departments,
   media,
+  allProducts,
+  products,
+  sortBy,
+  currentPage,
+  minPrice,
+  maxPrice,
+  inStockOnly,
 }: {
   department: DepartmentView;
+  /** Every department that holds designs — the rail lists them all, so a
+   *  shopper can cross to another without going back to the home page. */
+  departments: DepartmentView[];
   media: Map<string, DesignMedia>;
+  /** The unfiltered catalogue, for the rail's counts. */
+  allProducts: ProductView[];
+  /** This department's products, already filtered and sorted. */
+  products: ProductView[];
+  sortBy: SortBy;
+  currentPage: number;
+  minPrice?: number;
+  maxPrice?: number;
+  inStockOnly: boolean;
 }) {
+  const basePath = `/categories/${department.slug}`;
+
+  const byDesign = countsByDesign(allProducts);
+  const byDepartment = countsByDepartment(departments, byDesign);
+
+  // Price and stock are the only things that can narrow this page — the
+  // department is the page, not a filter on it, so it is never counted here.
+  const activeCount =
+    (minPrice !== undefined ? 1 : 0) + (maxPrice !== undefined ? 1 : 0) + (inStockOnly ? 1 : 0);
+
+  const departmentTotal = byDepartment.get(department.slug) ?? 0;
+  const countLabel =
+    activeCount > 0 && products.length !== departmentTotal
+      ? `${products.length} of ${departmentTotal} products`
+      : `${products.length} product${products.length === 1 ? "" : "s"}`;
+
+  const totalPages = Math.ceil(products.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginated = products.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  const buildLink = (page = 1) => {
+    const params = new URLSearchParams();
+    if (sortBy !== "newest") params.set("sort", sortBy);
+    if (minPrice !== undefined) params.set("minPrice", String(minPrice));
+    if (maxPrice !== undefined) params.set("maxPrice", String(maxPrice));
+    if (inStockOnly) params.set("inStockOnly", "true");
+    if (page > 1) params.set("page", String(page));
+    const qs = params.toString();
+    return qs ? `${basePath}?${qs}` : basePath;
+  };
+
   return (
     <main className="flex-1">
       <section className="border-b bg-muted/30">
@@ -352,43 +448,68 @@ export function DepartmentBody({
         </div>
       </section>
 
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {department.designs.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-lg text-muted-foreground">Nothing here yet. Check back soon.</p>
-          </div>
-        ) : (
-          <>
-            <div className="mb-4 flex items-baseline gap-2.5">
-              {department.subName && (
-                <h2 className="font-heading text-[15px] font-semibold">{department.subName}</h2>
-              )}
-              <span className="font-mono text-[10px] uppercase tracking-[.14em] text-muted-foreground">
-                {designCountNote(department.designs.length)}
-              </span>
+      <CatalogueBrowser
+        departments={departments}
+        byDesign={byDesign}
+        byDepartment={byDepartment}
+        totalCount={allProducts.length}
+        selectedDepartment={department.slug}
+        minPrice={minPrice}
+        maxPrice={maxPrice}
+        inStockOnly={inStockOnly}
+        sortBy={sortBy}
+        defaultSort="newest"
+        action={basePath}
+        allHref="/"
+        clearHref={activeCount > 0 ? basePath : null}
+        products={paginated}
+        countLabel={countLabel}
+        activeCount={activeCount}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        buildPageLink={buildLink}
+        fromPath={basePath}
+        aboveGrid={
+          department.designs.length > 0 ? (
+            <div className="mb-8">
+              <div className="mb-4 flex items-baseline gap-2.5">
+                {department.subName && (
+                  <h2 className="font-heading text-[15px] font-semibold">{department.subName}</h2>
+                )}
+                <span className="font-mono text-[10px] uppercase tracking-[.14em] text-muted-foreground">
+                  {designCountNote(department.designs.length)}
+                </span>
+              </div>
+              {/* The home page hoists one SlideClock over both taxonomy sections
+                  so their tiles share a single interval. This page has one grid,
+                  so the clock sits directly over it — without a provider the
+                  tiles would hold on their first photo forever. */}
+              {/* One scrolling row, not a wrapping grid. Women carries sixteen
+                  designs: as a grid they stacked four rows deep and pushed the
+                  first product most of a screen down, which is the exact thing
+                  dropping the photo hero was meant to fix. A row bounds the
+                  tiles to their own height and hides nothing — the rail's
+                  Categories tree lists every one of them, unfolded, because
+                  this is their department's own page. */}
+              <SlideClock>
+                <ul className="-mx-4 flex snap-x gap-3.5 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
+                  {department.designs.map((g) => (
+                    <li key={g.slug} className="w-[42vw] max-w-[170px] shrink-0 snap-start sm:w-[170px]">
+                      <DesignTile
+                        href={designPath(department.slug, g.slug)}
+                        name={g.name}
+                        note={productNote(media.get(g.slug)?.count ?? 0)}
+                        slides={designSlides(g, media.get(g.slug))}
+                        sizes={DESIGN_SLIDE_SIZES}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </SlideClock>
             </div>
-            {/* The home page hoists one SlideClock over both taxonomy sections
-                so their tiles share a single interval. This page has one grid,
-                so the clock sits directly over it — without a provider the
-                tiles would hold on their first photo forever. */}
-            <SlideClock>
-              <ul className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3.5">
-                {department.designs.map((g) => (
-                  <li key={g.slug}>
-                    <DesignTile
-                      href={designPath(department.slug, g.slug)}
-                      name={g.name}
-                      note={productNote(media.get(g.slug)?.count ?? 0)}
-                      slides={designSlides(g, media.get(g.slug))}
-                      sizes={DESIGN_SLIDE_SIZES}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </SlideClock>
-          </>
-        )}
-      </div>
+          ) : null
+        }
+      />
     </main>
   );
 }

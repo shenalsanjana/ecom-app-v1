@@ -15,6 +15,12 @@ type Props = {
   byDepartment: Map<string, number>;
   totalCount: number;
   selectedDesign: string;
+  /** The department whose own page this is. A department page selects no
+   *  design, so without this nothing in the tree would look active and the
+   *  department's designs would stay folded away on the very page they
+   *  belong to. Ignored when a design is selected — that design's department
+   *  is derived instead, which keeps the two from disagreeing. */
+  selectedDepartment?: string;
   /** Where "All products" points, carrying the price and stock filters that
    *  are in force. Defaults to the bare shop-all page, which is "/". */
   allHref?: string;
@@ -38,6 +44,7 @@ export function FilterTree({
   byDepartment,
   totalCount,
   selectedDesign,
+  selectedDepartment = "",
   allHref = "/",
 }: Props) {
   return (
@@ -47,16 +54,19 @@ export function FilterTree({
         <li>
           <Link
             href={allHref}
-            data-active={!selectedDesign}
-            className={`${ROW} ${!selectedDesign ? ROW_ACTIVE : ROW_IDLE}`}
+            data-active={!selectedDesign && !selectedDepartment}
+            className={`${ROW} ${!selectedDesign && !selectedDepartment ? ROW_ACTIVE : ROW_IDLE}`}
           >
             <span>All products</span>
             <span className={COUNT}>{totalCount}</span>
           </Link>
         </li>
         {departments.map((d) => {
-          // A department is active because the selected design lives under it.
-          const deptActive = d.designs.some((g) => g.slug === selectedDesign);
+          // A department is active because the selected design lives under it,
+          // or because this is its own page.
+          const deptActive = selectedDesign
+            ? d.designs.some((g) => g.slug === selectedDesign)
+            : d.slug === selectedDepartment;
           return (
             <li key={d.slug}>
               <Link

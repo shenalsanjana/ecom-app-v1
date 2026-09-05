@@ -131,6 +131,33 @@ describe("FilterTree", () => {
     expect(active).toEqual(["/categories/women", "/categories/women/cat"]);
   });
 
+  it("marks a department active on its own page, and unfolds its designs there", () => {
+    // A department page selects no design. Without selectedDepartment nothing
+    // in the tree would look active and the department's own designs would
+    // stay folded away on the very page they belong to.
+    const tree = FilterTree({
+      departments, byDesign, byDepartment, totalCount: 6,
+      selectedDesign: "", selectedDepartment: "women",
+    });
+    expect(collectHrefs(tree)).toEqual([
+      "/",
+      "/categories/women", "/categories/women/cat", "/categories/women/dino",
+      "/categories/men",
+    ]);
+    expect(activeFlags(tree).filter((f) => f.active === true).map((f) => f.href))
+      .toEqual(["/categories/women"]);
+  });
+
+  it("lets a selected design decide the department, so the two cannot disagree", () => {
+    // Both props set, pointing at different departments: the design wins.
+    const flags = activeFlags(FilterTree({
+      departments, byDesign, byDepartment,
+      totalCount: 6, selectedDesign: "cat", selectedDepartment: "men",
+    }));
+    expect(flags.filter((f) => f.active === true).map((f) => f.href))
+      .toEqual(["/categories/women", "/categories/women/cat"]);
+  });
+
   it("marks All active when no design is selected", () => {
     const flags = activeFlags(
       FilterTree({ departments, byDesign, byDepartment, totalCount: 6, selectedDesign: "" }),

@@ -15,9 +15,10 @@ import { Button } from "@/components/ui/button";
 import { Accordion } from "@base-ui/react/accordion";
 import type { NavColumn } from "@/app/_lib/taxonomy-nav-model";
 
-// "Home" and "All products" pointed at two different pages and now point at
-// one, so the sheet lists it once, under the name that says what is there.
+// Both point at "/" — the catalogue is the home page. Listed twice on purpose:
+// "Home" is the word people look for to get back to the front.
 const NAV_LINKS = [
+  { href: "/", label: "Home" },
   { href: "/", label: "Shop the collection" },
   { href: "/deals", label: "Deals" },
   { href: "/about", label: "About" },

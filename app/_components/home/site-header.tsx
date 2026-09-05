@@ -14,9 +14,13 @@ import { DepartmentNav } from "@/app/_components/header/department-nav";
 // they already were, so the bar names only what there is to shop.
 const NAV_LINKS = [{ href: "/deals", label: "Deals" }];
 
-// The catalogue is the home page, so this is both "shop everything" and the
-// way back to the front — which is why the row carries no separate Home link.
-const LEADING_NAV_LINKS = [{ href: "/", label: "Shop the collection" }];
+// Both point at "/", because the catalogue IS the home page. Two labels for
+// one destination is deliberate: "Home" is the word people look for to get
+// back to the front, and "Shop the collection" is what the page actually is.
+const LEADING_NAV_LINKS = [
+  { href: "/", label: "Home" },
+  { href: "/", label: "Shop the collection" },
+];
 
 export async function SiteHeader() {
   // One cached read (same key the footer already uses on every page), turned
