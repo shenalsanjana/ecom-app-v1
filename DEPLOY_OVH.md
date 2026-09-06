@@ -18,32 +18,42 @@ OVH emails the initial root password on provisioning:
 ssh root@<VPS_IP>
 ```
 
-### 1.2 Create a non-root sudo user
+### 1.2 The non-root sudo user
+
+The live VPS uses the `ubuntu` account that OVH's Ubuntu image ships with,
+already in the `sudo` group. Nothing to create — confirm it and move on:
 
 ```bash
-adduser deploy
-usermod -aG sudo deploy
+id ubuntu
 ```
+
+> This document previously specified a dedicated `deploy` account and a
+> `/opt/dressingbear` checkout owned by it. Neither was ever created on this
+> VPS — the application was set up under `ubuntu` at
+> `/home/ubuntu/devops/ecom-app-v1` instead. The doc now describes the box as it actually exists. A dedicated
+> account is still the better posture — it can be revoked without touching
+> human access — but adopting it now means relocating a running stack,
+> including the Postgres volumes, so it is deliberately not done here.
 
 ### 1.3 Configure SSH key authentication
 
 From your **local machine** (not the VPS):
 
 ```bash
-ssh-copy-id deploy@<VPS_IP>
+ssh-copy-id ubuntu@<VPS_IP>
 ```
 
 If `ssh-copy-id` isn't available, append your public key manually:
 
 ```bash
-ssh root@<VPS_IP> "mkdir -p /home/deploy/.ssh && cat >> /home/deploy/.ssh/authorized_keys" < ~/.ssh/id_ed25519.pub
-ssh root@<VPS_IP> "chown -R deploy:deploy /home/deploy/.ssh && chmod 700 /home/deploy/.ssh && chmod 600 /home/deploy/.ssh/authorized_keys"
+ssh root@<VPS_IP> "mkdir -p /home/ubuntu/.ssh && cat >> /home/ubuntu/.ssh/authorized_keys" < ~/.ssh/id_ed25519.pub
+ssh root@<VPS_IP> "chown -R ubuntu:ubuntu /home/ubuntu/.ssh && chmod 700 /home/ubuntu/.ssh && chmod 600 /home/ubuntu/.ssh/authorized_keys"
 ```
 
 Confirm key login works **before** disabling password auth:
 
 ```bash
-ssh deploy@<VPS_IP>
+ssh ubuntu@<VPS_IP>
 ```
 
 ### 1.4 Disable root login and password authentication
@@ -96,10 +106,10 @@ docker compose version   # MUST be >= 2.23 — the `secrets: environment:` sourc
 ### 1.7 Clone the repository
 
 ```bash
-sudo mkdir -p /opt/dressingbear
-sudo chown deploy:deploy /opt/dressingbear
-git clone git@github.com:shenalsanjana/ecom-app-v1.git /opt/dressingbear
-cd /opt/dressingbear
+sudo mkdir -p /home/ubuntu/devops/ecom-app-v1
+sudo chown ubuntu:ubuntu /home/ubuntu/devops/ecom-app-v1
+git clone git@github.com:shenalsanjana/ecom-app-v1.git /home/ubuntu/devops/ecom-app-v1
+cd /home/ubuntu/devops/ecom-app-v1
 ```
 
 (Add the VPS's SSH public key as a **read-only deploy key** on the GitHub repo — Settings → Deploy keys — or clone over HTTPS with a personal access token instead.)
@@ -155,7 +165,7 @@ pg_dump "<NEON_DIRECT_URL>" -Fc --no-owner --no-acl -f /out/dump.bak`.)
 If you dumped on a different machine than the VPS, copy it over:
 
 ```bash
-scp dump.bak deploy@<VPS_IP>:/opt/dressingbear/dump.bak
+scp dump.bak ubuntu@<VPS_IP>:/home/ubuntu/devops/ecom-app-v1/dump.bak
 ```
 
 `--no-owner --no-acl` avoids restore failing on Neon-managed roles (e.g.
@@ -166,7 +176,7 @@ data, and migration history all arrive together.
 ### 2.3 Start Postgres and restore
 
 ```bash
-cd /opt/dressingbear
+cd /home/ubuntu/devops/ecom-app-v1
 docker compose up -d postgres
 until docker compose exec -T postgres pg_isready -U "$(grep '^POSTGRES_USER=' .env | cut -d= -f2)"; do sleep 2; done
 
@@ -322,7 +332,7 @@ because the authenticator is recorded per-certificate in
 `/etc/letsencrypt/renewal/dressingbear.com.conf`. Migrate it:
 
 ```bash
-cd /opt/dressingbear
+cd /home/ubuntu/devops/ecom-app-v1
 ./scripts/certbot-issue.sh <your-email>
 ```
 
@@ -343,7 +353,7 @@ sudo crontab -e
 ```
 
 ```cron
-0 3 * * * cd /opt/dressingbear && ./scripts/certbot-renew.sh --quiet >> /var/log/certbot-renew.log 2>&1
+0 3 * * * cd /home/ubuntu/devops/ecom-app-v1 && ./scripts/certbot-renew.sh --quiet >> /var/log/certbot-renew.log 2>&1
 ```
 
 `scripts/certbot-renew.sh` passes `--webroot --webroot-path /var/www/certbot`
@@ -396,26 +406,39 @@ must do the following (none of it is automatable from a workflow run):
 
    | Secret | Value |
    |---|---|
-   | `VPS_HOST` | The VPS IP or hostname |
-   | `VPS_USER` | `deploy` |
-   | `VPS_SSH_KEY` | Contents of `ci_deploy_key` (the private half) |
+   | `VPS_HOST` | `139.99.91.133` |
+   | `VPS_USER` | `ubuntu` |
+   | `VPS_SSH_KEY` | Contents of `ci_deploy_key` (the private half, including the `-----BEGIN`/`-----END` lines) |
    | `VPS_SSH_KNOWN_HOSTS` | Contents of `known_hosts_ci` |
 
-5. **Restrict the CI key on the VPS — required, not optional.** The
-   `deploy` user is in both the `sudo` and `docker` groups (§1.2, §1.6), and
-   docker-group membership is root-equivalent (a container can bind-mount
-   the host filesystem). An unrestricted key in `authorized_keys` therefore
-   grants the CI key root-equivalent shell access if it ever leaks.
+   `VPS_USER` must be `ubuntu`, not `deploy`: no `deploy` account exists on
+   this VPS (§1.2). Setting it to anything else makes every deploy fail at
+   the SSH step with exit code 255 — OpenSSH's code for a session it could
+   not establish — which is exactly how this pipeline failed on all 25 runs
+   between 2026-08-15 and 2026-09-06.
 
-   First, once this work is merged, pull `main` on the VPS so
-   `scripts/ci-deploy-dispatch.sh` exists and is executable:
-   ```bash
-   cd /opt/dressingbear && git pull origin main
+5. **Install the CI key on the VPS.** Append the CI public key to
+   `/home/ubuntu/.ssh/authorized_keys`:
    ```
-   Then append the CI public key to `/home/deploy/.ssh/authorized_keys`,
-   restricted with a forced command:
+   ssh-ed25519 AAAA... github-actions-deploy
    ```
-   restrict,command="/opt/dressingbear/scripts/ci-deploy-dispatch.sh" ssh-ed25519 AAAA... github-actions-deploy
+
+   **This key is currently installed unrestricted, by the repository
+   owner's decision.** The `ubuntu` user is in both the `sudo` and `docker`
+   groups (§1.2, §1.6), and docker-group membership is root-equivalent (a
+   container can bind-mount the host filesystem). The account also runs an
+   unrelated `telegram-trading-bot` stack. So a leaked CI key grants
+   root-equivalent shell on this box and reaches that stack too. The
+   mitigation is key hygiene: the keypair is dedicated to CI, exists only in
+   GitHub Actions secrets, and can be revoked by deleting its
+   `authorized_keys` line.
+
+   **To turn the restriction on later**, replace that line with a
+   forced-command form. `scripts/ci-deploy-dispatch.sh` is already in the
+   repo with its allow-list kept in sync with the workflow, so this prefix is
+   the only change needed:
+   ```
+   restrict,command="/home/ubuntu/devops/ecom-app-v1/scripts/ci-deploy-dispatch.sh" ssh-ed25519 AAAA... github-actions-deploy
    ```
    `restrict` is OpenSSH's umbrella option: it implies `no-port-forwarding`,
    `no-agent-forwarding`, `no-pty`, `no-X11-forwarding`, and `no-user-rc`
@@ -454,7 +477,7 @@ The manual path still works and remains the fallback when GitHub is
 unavailable or you are mid-incident:
 
 ```bash
-cd /opt/dressingbear
+cd /home/ubuntu/devops/ecom-app-v1
 ./scripts/deploy.sh
 # or: make deploy
 ```
@@ -528,7 +551,7 @@ sudo crontab -e
 ```
 
 ```cron
-0 2 * * * cd /opt/dressingbear && ./scripts/backup-db.sh >> /var/log/dressingbear-backup.log 2>&1
+0 2 * * * cd /home/ubuntu/devops/ecom-app-v1 && ./scripts/backup-db.sh >> /var/log/dressingbear-backup.log 2>&1
 ```
 
 **Also keep an off-server copy** — sync `/var/backups/dressingbear` to OVH
