@@ -46,27 +46,26 @@ test.describe("HTTP contract", () => {
     expect(html).toContain('href="/categories/women/dino"');
   });
 
-  test("bare /categories serves the catalogue rather than redirecting", async ({ request }) => {
-    // The shop-all list spent a while on "/" with /categories 308ing to it.
-    // It is back at its own URL, and that redirect is gone.
+  test("bare /categories 308s to the home page, carrying its query", async ({ request }) => {
+    // The shop-all list moved onto "/". Everything below /categories is
+    // untouched — the redirect matches the bare path only.
     const bare = await request.get("/categories", { maxRedirects: 0 });
-    expect(bare.status()).toBe(200);
+    expect(bare.status()).toBe(308);
+    expect(new URL(bare.headers()["location"], "http://x").pathname).toBe("/");
 
     const filtered = await request.get("/categories?category=cat&page=2", { maxRedirects: 0 });
-    expect(filtered.status()).toBe(200);
+    expect(filtered.status()).toBe(308);
+    const to = new URL(filtered.headers()["location"], "http://x");
+    expect(to.pathname).toBe("/");
+    expect(to.searchParams.get("category")).toBe("cat");
+    expect(to.searchParams.get("page")).toBe("2");
   });
 
-  test("the category index links each department to its nested route", async ({ request }) => {
-    const html = await (await request.get("/categories")).text();
+  test("the shop-all home page links each department to its nested route", async ({ request }) => {
+    const html = await (await request.get("/")).text();
     for (const slug of ["men", "women", "plain", "accessories"]) {
       expect(html).toContain(`href="/categories/${slug}"`);
     }
-  });
-
-  test("the home page opens on the hero and sends its CTA to the catalogue", async ({ request }) => {
-    const html = await (await request.get("/")).text();
-    expect(html).toContain("Unleash your inner");
-    expect(html).toContain('href="/categories"');
   });
 });
 

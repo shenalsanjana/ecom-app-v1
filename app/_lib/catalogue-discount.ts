@@ -1,5 +1,5 @@
 // app/_lib/catalogue-discount.ts
-// The offer banner's headline figure, derived from the catalogue that page
+// The offer banner's headline figure, derived from the catalogue the home page
 // has already read — no extra query, no new cache key.
 //
 // Every number here comes off real rows for the same reason product-signals.ts

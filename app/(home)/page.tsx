@@ -10,15 +10,18 @@ import { CatalogueBrowser } from "@/app/_components/catalogue/catalogue-browser"
 import { parsePrice } from "@/app/_lib/parse-price";
 import { catalogueDiscount } from "@/app/_lib/catalogue-discount";
 
-// The shop-all catalogue. It briefly lived at "/" (app/(home)/page.tsx) with
-// /categories 308ing to it; it is back here, and "/" is the marketing home
-// page again — the photo hero, the featured grid and the taxonomy tile
-// sections that open a visit. The catalogue keeps everything it gained while
-// it was the home page: the offer banner, the best-seller default order, and
-// the filter rail. Deals and trust still close the page, below the grid.
+// The catalogue is the home page. This file is the former
+// app/categories/(index)/page.tsx moved onto "/" with its links repointed;
+// /categories now 308s here (see next.config.ts) so there is one shop-all URL,
+// not two serving the same list. The marketing sections that used to open this
+// page — the photo hero, the featured-products grid, and the department and
+// design tile sections — are gone from it: the first three put the catalogue
+// below the fold, and the last two navigate to exactly what the filter rail
+// now navigates to, on the same screen. Deals and trust survive, below the
+// grid, where they no longer stand between a visitor and a product.
 //
-// revalidate is this page's own 3600, an hour tuned for a catalogue that
-// changes when stock does, not the home page's 300.
+// revalidate is the browse page's 3600, not the old home page's 300: this
+// renders the catalogue, and the catalogue is what that hour was tuned for.
 export const revalidate = 3600;
 
 const ITEMS_PER_PAGE = 12;
@@ -32,7 +35,7 @@ const ITEMS_PER_PAGE = 12;
 // worth serialising into a link.
 const DEFAULT_SORT = "rating";
 
-type CataloguePageProps = {
+type HomePageProps = {
   searchParams: Promise<{
     category?: string;
     sort?: string;
@@ -43,7 +46,7 @@ type CataloguePageProps = {
   }>;
 };
 
-export default async function CataloguePage({ searchParams }: CataloguePageProps) {
+export default async function Home({ searchParams }: HomePageProps) {
   const sp = await searchParams;
   const selectedCategory = sp.category || "";
   const sortBy = parseSortBy(sp.sort, DEFAULT_SORT);
@@ -108,7 +111,7 @@ export default async function CataloguePage({ searchParams }: CataloguePageProps
     if (inStockOnly) params.set("inStockOnly", "true");
     if (page > 1) params.set("page", String(page));
     const qs = params.toString();
-    return qs ? `/categories?${qs}` : "/categories";
+    return qs ? `/?${qs}` : "/";
   };
 
   // Shown on the collapsed Filters button, so a narrowed list is never a
@@ -153,16 +156,16 @@ export default async function CataloguePage({ searchParams }: CataloguePageProps
           inStockOnly={inStockOnly}
           sortBy={sortBy}
           defaultSort={DEFAULT_SORT}
-          action="/categories"
+          action="/"
           allHref={buildLink({ category: "" })}
-          clearHref={isFiltered ? "/categories" : null}
+          clearHref={isFiltered ? "/" : null}
           products={paginatedProducts}
           countLabel={countLabel}
           activeCount={activeCount}
           currentPage={currentPage}
           totalPages={totalPages}
           buildPageLink={(page) => buildLink({ page })}
-          fromPath="/categories"
+          fromPath="/"
         />
 
         <DealsSection />

@@ -1,7 +1,11 @@
-// app/categories/(index)/loading.tsx
+// app/(home)/loading.tsx
 //
-// The catalogue's own loading boundary, scoped by the (index) route group so
-// it covers the bare /categories list and not app/categories/[...slug].
+// Scoped to the (home) group on purpose. This file used to live at
+// app/categories/(index)/loading.tsx; moving the catalogue to "/" would have
+// put it at app/loading.tsx, where it is the ROOT loading boundary and every
+// route without its own — /contact, /search, /cart — would flash a product
+// grid skeleton on the way in. The route group keeps the boundary on "/" while
+// leaving the URL alone.
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { ProductGridSkeleton } from "@/app/_components/shared/product-grid-skeleton";
