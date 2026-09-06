@@ -10,7 +10,7 @@ export async function ProductGrid() {
       <SectionHeader
         eyebrow="Editor's picks"
         title="Featured products"
-        action={{ label: "View all", href: "/categories" }}
+        action={{ label: "View all", href: "/" }}
       />
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {products.map((p) => (

@@ -100,28 +100,38 @@ describe("DepartmentNav", () => {
       .toContain("Shop the collection");
   });
 
-  it("marks the leading link active only on its own page, not on the departments under it", () => {
-    // "Shop the collection" points at /categories, which prefixes every
-    // department path, so the startsWith rule the departments use would
-    // underline it alongside Women on /categories/women.
-    const leadingLinks = [{ href: "/categories", label: "Shop the collection" }];
+  it("marks the root link active only on the root, not on every page under it", () => {
+    // "/" is a prefix of every path, so the startsWith rule the departments
+    // use would light "Shop all" up on the whole site.
+    const leadingLinks = [{ href: "/", label: "Shop the collection" }];
 
-    usePathname.mockReturnValue("/categories");
+    usePathname.mockReturnValue("/");
     expect(activeFlags(DepartmentNav({ columns, leadingLinks }))
-      .filter((f) => f.active === true).map((f) => f.href)).toEqual(["/categories"]);
+      .filter((f) => f.active === true).map((f) => f.href)).toEqual(["/"]);
 
     usePathname.mockReturnValue("/categories/women/cat");
     expect(activeFlags(DepartmentNav({ columns, leadingLinks }))
       .filter((f) => f.active === true).map((f) => f.href)).toEqual(["/categories/women"]);
   });
 
-  it("carries no Home link — the brand mark beside it goes home", () => {
-    // The row names what there is to shop. A "Home" entry duplicating the logo
-    // spent a slot on a destination nobody has to look for.
+  it("underlines only one of two leading links that share a destination", () => {
+    // "Home" and "Shop the collection" both go to "/" — the catalogue is the
+    // home page. Underlining both would read as a rendering fault, so the mark
+    // falls on the label that describes the page.
     usePathname.mockReturnValue("/");
-    const leadingLinks = [{ href: "/categories", label: "Shop the collection" }];
-    expect(collectText(DepartmentNav({ columns, leadingLinks }))).not.toContain("Home");
-    expect(collectHrefs(DepartmentNav({ columns, leadingLinks }))).not.toContain("/");
+    const leadingLinks = [
+      { href: "/", label: "Home" },
+      { href: "/", label: "Shop the collection" },
+    ];
+    const flags = activeFlags(DepartmentNav({ columns, leadingLinks }));
+    expect(flags.filter((f) => f.active === true)).toHaveLength(1);
+
+    // Both are still rendered, and still both link home.
+    const text = collectText(DepartmentNav({ columns, leadingLinks }));
+    expect(text).toContain("Home");
+    expect(text).toContain("Shop the collection");
+    expect(collectHrefs(DepartmentNav({ columns, leadingLinks })).filter((h) => h === "/"))
+      .toHaveLength(2);
   });
 
   it("marks nothing when you are somewhere else entirely", () => {

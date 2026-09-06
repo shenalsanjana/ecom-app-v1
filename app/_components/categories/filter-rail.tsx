@@ -28,9 +28,9 @@ type Props = {
   sortBy: string;
   /** The department whose own page this is; threaded to FilterTree. */
   selectedDepartment?: string;
-  /** Where the plain-GET filter form posts — "/categories" for the shop-all
-   *  page, the department's own path on a department page. A hardcoded target
-   *  would bounce a department's filters back to the whole catalogue. */
+  /** Where the plain-GET filter form posts — "/" for the shop-all page, the
+   *  department's own path on a department page. A hardcoded target would
+   *  bounce a department's filters back to the whole catalogue. */
   action: string;
   /** The page's default order. The hidden input below is omitted when sortBy
    *  matches it, so a plain-GET filter never pins the default into the URL.
@@ -42,9 +42,8 @@ type Props = {
   clearHref: string | null;
 };
 
-/** The browse rail. Price and stock post a plain GET back to `action` —
- *  "/categories" on the shop-all page, the department's own path on a
- *  department page — so
+/** The browse rail. Price and stock post a plain GET back to `action` — "/"
+ *  on the shop-all page, the department's own path on a department page — so
  *  they filter with or without JavaScript — the category rows are links and
  *  navigate on their own, and sort sits outside the form because SortSelect
  *  pushes the URL itself. */
