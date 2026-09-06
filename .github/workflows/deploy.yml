@@ -109,7 +109,7 @@ jobs:
               -o StrictHostKeyChecking=yes \
               -o BatchMode=yes \
               "$VPS_USER@$VPS_HOST" \
-              'cd /opt/dressingbear && ./scripts/deploy.sh'
+              'cd /home/ubuntu/devops/ecom-app-v1 && ./scripts/deploy.sh'
 
       - name: Verify the site is healthy
         run: |
@@ -160,7 +160,7 @@ jobs:
               -o StrictHostKeyChecking=yes \
               -o BatchMode=yes \
               "$VPS_USER@$VPS_HOST" \
-              'cd /opt/dressingbear && git rev-parse HEAD')"
+              'cd /home/ubuntu/devops/ecom-app-v1 && git rev-parse HEAD')"
           if [ "$deployed_sha" != "$EXPECTED_SHA" ]; then
             echo "ERROR: the VPS deployed a different commit than this run approved." >&2
             echo "Expected $EXPECTED_SHA, but the VPS is now at $deployed_sha." >&2
