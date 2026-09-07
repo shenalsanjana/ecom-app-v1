@@ -40,7 +40,7 @@ export function DepartmentNav({
 }: {
   columns: NavColumn[];
   links?: PlainLink[];
-  /** Links that open the row, ahead of the departments. "Shop all" belongs
+  /** Links that open the row, ahead of the departments. "Shop All" belongs
    *  here and not in `links`: the row reads as a narrowing — everything, then
    *  each department — and putting it last would file the widest entry behind
    *  the narrow ones. */
@@ -53,11 +53,10 @@ export function DepartmentNav({
   const isHere = (href: string) =>
     href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 
-  // Two leading links can share an href — "Home" and "Shop the collection"
-  // both go to "/", because the catalogue is the home page. Underlining both
-  // would read as a rendering fault, so at most one is marked: the last that
-  // matches, which is the label describing the page rather than the one that
-  // merely points home. Keyed by label for the same reason — hrefs collide.
+  // Two leading links may share an href. Underlining both would read as a
+  // rendering fault, so at most one is marked: the last that matches, which is
+  // the label describing the page rather than one that merely points at it.
+  // Keyed by label for the same reason — hrefs can collide.
   const activeLeading = leadingLinks.reduce(
     (found, l, i) => (isHere(l.href) ? i : found),
     -1,

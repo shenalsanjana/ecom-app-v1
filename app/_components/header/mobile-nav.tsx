@@ -15,11 +15,10 @@ import { Button } from "@/components/ui/button";
 import { Accordion } from "@base-ui/react/accordion";
 import type { NavColumn } from "@/app/_lib/taxonomy-nav-model";
 
-// Both point at "/" — the catalogue is the home page. Listed twice on purpose:
-// "Home" is the word people look for to get back to the front.
+// "Shop All" points at "/" — the catalogue is the home page, and the brand
+// mark in the bar behind this sheet is the way back to the front.
 const NAV_LINKS = [
-  { href: "/", label: "Home" },
-  { href: "/", label: "Shop the collection" },
+  { href: "/", label: "Shop All" },
   { href: "/deals", label: "Deals" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },

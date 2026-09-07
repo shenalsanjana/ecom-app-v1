@@ -8,12 +8,12 @@ type TrailInput = {
   productName?: string | null;
 };
 
-/** Shop the collection › Department › [sub-category] › [Design] › [Product].
+/** Shop All › Department › [sub-category] › [Design] › [Product].
  *
  *  One crumb at the root, not two: this used to open "Home › Categories", and
  *  those became the same page when the catalogue moved onto "/". It carries
- *  the catalogue's name rather than "Home" so the root reads the same here as
- *  it does in the header nav and the mobile sheet.
+ *  the catalogue's own name rather than "Home" so the root reads the same here
+ *  as it does in the header nav, the mobile sheet, and the footer.
  *
  *  Two rules the callers rely on:
  *  - The sub-category is never a link and appears only alongside a design.
@@ -22,7 +22,7 @@ type TrailInput = {
  *    linking to itself.
  *  - The final crumb never carries an href — it is the page you are on. */
 export function taxonomyTrail({ department, design, productName }: TrailInput): Crumb[] {
-  const crumbs: Crumb[] = [{ label: "Shop the collection", href: "/" }];
+  const crumbs: Crumb[] = [{ label: "Shop All", href: "/" }];
 
   if (department) {
     crumbs.push({ label: department.name, href: `/categories/${department.slug}` });
