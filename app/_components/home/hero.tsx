@@ -33,10 +33,6 @@ export function Hero() {
                 bear.
               </span>
             </h1>
-            <p className="text-lg text-white/90">
-              Premium oversize tees, cut for the drape that fits how you actually
-              wear it. Delivered island-wide — Cash on Delivery, or Pay in 3.
-            </p>
             <div className="flex flex-wrap items-center gap-3">
               <Link href="/categories" className={buttonVariants({ size: "lg" })}>
                 Shop All <ArrowRight className="ml-2 h-4 w-4" />
