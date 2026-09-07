@@ -1,21 +1,22 @@
 import { getProducts, parseSortBy } from "@/app/_lib/products";
 import { getDepartments, showsNavDropdown } from "@/app/_lib/taxonomy";
-import { OfferBanner } from "@/app/_components/home/offer-banner";
 import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
-import { DealsSection } from "@/app/_components/home/deals-section";
-import { TrustStrip } from "@/app/_components/home/trust-strip";
 import { countsByDesign, countsByDepartment } from "@/app/_lib/taxonomy-counts";
 import { CatalogueBrowser } from "@/app/_components/catalogue/catalogue-browser";
+import { Breadcrumb } from "@/app/_components/ui/breadcrumb";
+import { taxonomyTrail } from "@/app/_lib/taxonomy-trail";
 import { parsePrice } from "@/app/_lib/parse-price";
-import { catalogueDiscount } from "@/app/_lib/catalogue-discount";
 
-// The shop-all catalogue. It briefly lived at "/" (app/(home)/page.tsx) with
-// /categories 308ing to it; it is back here, and "/" is the marketing home
-// page again — the photo hero, the featured grid and the taxonomy tile
-// sections that open a visit. The catalogue keeps everything it gained while
-// it was the home page: the offer banner, the best-seller default order, and
-// the filter rail. Deals and trust still close the page, below the grid.
+// The shop-all catalogue: a breadcrumb, a heading, and the browse layout.
+// Nothing else. The offer banner, the deals band and the trust strip that used
+// to wrap it are gone from this page — they are marketing, and this is where
+// someone who already wants to browse arrives. "/" still carries all three, so
+// none of them were lost, they were only taken off the list.
+//
+// The heading is this page's own <h1> now that the banner is not here to hold
+// one, and it is a plain heading in the band every department page uses, so
+// the shop-all list and a department read as the same kind of page.
 //
 // revalidate is this page's own 3600, an hour tuned for a catalogue that
 // changes when stock does, not the home page's 300.
@@ -86,10 +87,6 @@ export default async function CataloguePage({ searchParams }: CataloguePageProps
   // "Nothing here yet" pages. showsNavDropdown is the spec's derived rule.
   const linkedDepartments = departments.filter(showsNavDropdown);
 
-  // Off the full catalogue, never the filtered list: the banner advertises the
-  // shop, so narrowing to one design must not shrink the headline discount.
-  const offer = catalogueDiscount(allProducts);
-
   const byDesign = countsByDesign(allProducts);
   const byDepartment = countsByDepartment(linkedDepartments, byDesign);
 
@@ -124,23 +121,28 @@ export default async function CataloguePage({ searchParams }: CataloguePageProps
       ? `${displayProducts.length} of ${allProducts.length} products`
       : `${displayProducts.length} product${displayProducts.length === 1 ? "" : "s"}`;
 
+  // Named for the link that gets you here, so the nav item, the last crumb and
+  // the heading are one word for one place. A filter renames it to the design
+  // being shown: the page is no longer all of anything.
   const heading = selectedCategory
     ? designNames.get(selectedCategory) || "Category"
-    : "The whole rack";
+    : "Shop All";
 
   return (
     <>
       <SiteHeader />
       <main className="flex-1">
-        <OfferBanner
-          heading={heading}
-          offer={offer}
-          blurb={
-            selectedCategory
-              ? null
-              : "Oversize graphic tees and heavyweight basics, cut for the drape you actually wear."
-          }
-        />
+        {/* The same band a department page opens with — same ground, same
+            type scale, breadcrumb over heading — because they are the same
+            kind of page and should not look like two. */}
+        <section className="border-b bg-muted/30">
+          <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+            <Breadcrumb items={taxonomyTrail({})} className="mb-4" />
+            <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
+              {heading}
+            </h1>
+          </div>
+        </section>
 
         <CatalogueBrowser
           departments={linkedDepartments}
@@ -164,9 +166,6 @@ export default async function CataloguePage({ searchParams }: CataloguePageProps
           buildPageLink={(page) => buildLink({ page })}
           fromPath="/categories"
         />
-
-        <DealsSection />
-        <TrustStrip />
       </main>
       <SiteFooter />
     </>
