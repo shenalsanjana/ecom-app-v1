@@ -38,8 +38,8 @@ export function Hero() {
               wear it. Delivered island-wide — Cash on Delivery, or Pay in 3.
             </p>
             <div className="flex flex-wrap items-center gap-3">
-              <Link href="/" className={buttonVariants({ size: "lg" })}>
-                Shop the collection <ArrowRight className="ml-2 h-4 w-4" />
+              <Link href="/categories" className={buttonVariants({ size: "lg" })}>
+                Shop All <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
               <Link
                 href="/deals"

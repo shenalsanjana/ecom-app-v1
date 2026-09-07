@@ -22,7 +22,7 @@ type Props = {
    *  is derived instead, which keeps the two from disagreeing. */
   selectedDepartment?: string;
   /** Where "All products" points, carrying the price and stock filters that
-   *  are in force. Defaults to the bare shop-all page, which is "/". */
+   *  are in force. Defaults to the bare browse page. */
   allHref?: string;
 };
 
@@ -45,7 +45,7 @@ export function FilterTree({
   totalCount,
   selectedDesign,
   selectedDepartment = "",
-  allHref = "/",
+  allHref = "/categories",
 }: Props) {
   return (
     <div>
