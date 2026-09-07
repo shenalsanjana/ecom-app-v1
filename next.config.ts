@@ -2,15 +2,6 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  // /categories was the shop-all page; "/" is now. A 308 here rather than a
-  // canonical tag on a surviving duplicate: one list, one URL, and every link
-  // still in the wild (the footer, old search results, indexed pages) lands on
-  // it. redirects() runs before filesystem routing, so app/categories/[...slug]
-  // is untouched — only the bare /categories matches. Next forwards the query
-  // string automatically, so /categories?category=cat&page=2 keeps its filters.
-  async redirects() {
-    return [{ source: "/categories", destination: "/", permanent: true }];
-  },
   typescript: {
     // Type checking runs in CI (`npx tsc --noEmit` in .github/workflows/deploy.yml),
     // NOT here. The deploy job declares `needs: test`, so a type error fails CI

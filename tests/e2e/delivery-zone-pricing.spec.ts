@@ -9,7 +9,7 @@ import { test, expect, type Page } from "@playwright/test";
 // checkout — no login, no DB writes; products are read from the catalogue DB.
 
 async function addFirstProductToCart(page: Page) {
-  await page.goto("/");
+  await page.goto("/categories");
   await page.getByRole("button", { name: /^Add to cart$/i }).first().click();
   const sizeButtons = page.locator('[role="dialog"] button[aria-pressed]');
   if ((await sizeButtons.count()) > 0) await sizeButtons.first().click();

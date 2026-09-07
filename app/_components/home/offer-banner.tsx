@@ -4,7 +4,7 @@ import { Banknote, Check, CreditCard, Star } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { DealsCountdown } from "@/app/_components/home/deals-countdown";
 
-/** The masthead of the shop-all home page: who this is, why it is safe to buy,
+/** The masthead of the shop-all catalogue: who this is, why it is safe to buy,
  *  and what is currently reduced — in one band, above the catalogue.
  *
  *  It replaced a 640px photo hero, and it stays short for the same reason the

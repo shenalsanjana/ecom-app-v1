@@ -15,10 +15,10 @@ import { Button } from "@/components/ui/button";
 import { Accordion } from "@base-ui/react/accordion";
 import type { NavColumn } from "@/app/_lib/taxonomy-nav-model";
 
-// "Shop All" points at "/" — the catalogue is the home page, and the brand
-// mark in the bar behind this sheet is the way back to the front.
+// No "Home" row: the brand mark stays visible behind the sheet and goes home,
+// so the list names the places you cannot already reach in one tap.
 const NAV_LINKS = [
-  { href: "/", label: "Shop All" },
+  { href: "/categories", label: "Shop All" },
   { href: "/deals", label: "Deals" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },

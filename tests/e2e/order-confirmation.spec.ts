@@ -46,8 +46,8 @@ test("COD order shows RB number and payment-status badge on /account/orders", as
   await page.getByRole("button", { name: /Sign in/i }).click();
   await page.waitForURL("**/", { timeout: 10_000 });
 
-  // Add an item to the cart via the shop-all home page quick-add dialog.
-  await page.goto("/");
+  // Add an item to the cart via the categories page quick-add dialog.
+  await page.goto("/categories");
 
   // Wait for at least one product card trigger to be visible before clicking.
   const firstTrigger = page.getByRole("button", { name: /^Add to cart$/i }).first();
