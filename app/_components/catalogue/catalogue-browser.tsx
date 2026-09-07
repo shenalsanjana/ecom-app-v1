@@ -10,14 +10,13 @@ import type { ProductView } from "@/app/_lib/products";
 
 /** The browse layout: filter rail, result count, product grid, pagination.
  *
- *  Shared by "/" and every department page so the two cannot drift — they had
- *  the same ninety lines of JSX between them otherwise. Everything it needs is
- *  a prop: it reads nothing and computes no counts, so both callers keep
- *  ownership of their own queries and their own URL shapes.
+ *  Shared by /categories and every department page so the two cannot drift —
+ *  they had the same ninety lines of JSX between them otherwise. Everything it
+ *  needs is a prop: it reads nothing and computes no counts, so both callers
+ *  keep ownership of their own queries and their own URL shapes.
  *
- *  It deliberately renders no heading. "/" puts its <h1> in the offer banner
- *  and a department page puts its own above this; a heading here would be a
- *  second one on both. */
+ *  It deliberately renders no heading. Both callers put their own <h1> in the
+ *  band above it; a heading here would be a second one on every page. */
 export function CatalogueBrowser({
   departments,
   byDesign,

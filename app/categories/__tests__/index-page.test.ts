@@ -48,16 +48,8 @@ vi.mock("@/app/_components/home/product-card", () => ({ ProductCard: () => null 
 vi.mock("@/app/_components/shared/sort-select", () => ({ SortSelect: () => null }));
 vi.mock("@/app/_components/home/site-header", () => ({ SiteHeader: () => null }));
 vi.mock("@/app/_components/home/site-footer", () => ({ SiteFooter: () => null }));
-// Both hit the database; this file is about the catalogue and the page's
-// composition, so they are stubbed to identity-only placeholders.
-vi.mock("@/app/_components/home/deals-section", () => ({ DealsSection: () => null }));
-vi.mock("@/app/_components/home/trust-strip", () => ({ TrustStrip: () => null }));
-
 import CataloguePage from "../(index)/page";
-import { OfferBanner } from "@/app/_components/home/offer-banner";
 import { CatalogueBrowser } from "@/app/_components/catalogue/catalogue-browser";
-import { DealsSection } from "@/app/_components/home/deals-section";
-import { TrustStrip } from "@/app/_components/home/trust-strip";
 
 const dept = (over: Partial<DepartmentView>): DepartmentView => ({
   slug: "women", name: "Women", navLabel: "Women", tileName: "Women",
@@ -105,72 +97,38 @@ beforeEach(() => {
   ]);
 });
 
+/** The page's own heading element. */
+const h1 = (tree: unknown) => collectElements(tree).filter((e) => e.type === "h1");
+
 describe("catalogue page composition", () => {
-  it("puts the catalogue above deals and trust, so products come first", async () => {
+  it("is a heading band and the catalogue, and nothing after it", async () => {
     const tree = await render();
-    const types = collectElements(tree).map((e) => e.type);
-
-    // The band opens <main>: nothing stands between the header and it, which
-    // is the whole point of dropping the photo hero.
     const main = collectElements(tree).find((e) => e.type === "main");
-    expect(collectElements(main?.props.children)[0]?.type).toBe(OfferBanner);
+    const inMain = collectElements(main?.props.children).map((e) => e.type);
 
-    const band = types.indexOf(OfferBanner);
-    const grid = types.indexOf(CatalogueBrowser);
-    const deals = types.indexOf(DealsSection);
-    const trust = types.indexOf(TrustStrip);
-
-    expect(grid).toBeGreaterThan(band);
-    expect(deals).toBeGreaterThan(grid);
-    expect(trust).toBeGreaterThan(deals);
+    // The band opens <main>, the browse layout follows it, and <main> ends
+    // there: the offer banner, the deals band and the trust strip were taken
+    // off this page. They still run on "/" — see app/__tests__/home-page.test.ts.
+    expect(inMain[0]).toBe("section");
+    expect(inMain.indexOf(CatalogueBrowser)).toBeGreaterThan(0);
+    expect(inMain.filter((t) => t === CatalogueBrowser)).toHaveLength(1);
+    expect(inMain.at(-1)).toBe(CatalogueBrowser);
   });
 
-  it("carries no second <h1>, because OfferBanner holds the page's only one", async () => {
-    const headings = collectElements(await render()).filter((e) => e.type === "h1");
-    expect(headings).toHaveLength(0);
-    expect(find(await render(), OfferBanner)).toBeDefined();
+  it("carries exactly one <h1>, its own, now that no banner holds one", async () => {
+    // CatalogueBrowser renders no heading precisely so this is the only one.
+    const headings = h1(await render());
+    expect(headings).toHaveLength(1);
+    expect(headings[0].props.children).toBe("Shop All");
   });
 
-  it("names the whole catalogue in the band, with the brand line beside it", async () => {
-    const band = find(await render(), OfferBanner);
-    expect(band?.props.heading).toBe("The whole rack");
-    expect(band?.props.blurb).toEqual(expect.stringContaining("Oversize graphic tees"));
-  });
-
-  it("swaps the heading for the design and drops the blurb once a filter is on", async () => {
-    // The blurb describes the whole catalogue; on a narrowed page it would be
-    // describing something the grid is no longer showing.
-    const band = find(await render({ category: "cat" }), OfferBanner);
-    expect(band?.props.heading).toBe("Cats");
-    expect(band?.props.blurb).toBeNull();
+  it("swaps the heading for the design once a filter is on", async () => {
+    // The page is no longer all of anything, so it stops saying it is.
+    expect(h1(await render({ category: "cat" }))[0].props.children).toBe("Cats");
   });
 
   it("falls back to a generic heading for a category slug that no longer exists", async () => {
-    expect(find(await render({ category: "ghost" }), OfferBanner)?.props.heading).toBe("Category");
-  });
-});
-
-describe("catalogue page offer banner", () => {
-  it("takes the headline discount from the whole catalogue, not the filtered list", async () => {
-    // The banner advertises the shop. Narrowing to one design must not shrink
-    // the figure it prints, so it has to read the unfiltered catalogue.
-    const catalogue = [
-      product("p1", [{ price: 800, originalPrice: 1000 }]),   // 20%
-      product("p2", [{ price: 1200, originalPrice: 2000 }]),  // 40%
-    ];
-    getProducts.mockReset()
-      .mockResolvedValueOnce(catalogue)                        // the counts read
-      .mockResolvedValueOnce([catalogue[0]]);                  // the filtered read
-
-    expect(find(await render({ category: "cat" }), OfferBanner)?.props.offer)
-      .toEqual({ pct: 40, count: 2 });
-  });
-
-  it("tells the banner nothing is reduced when nothing is", async () => {
-    // OfferBanner drops the whole panel on pct 0 rather than printing an empty
-    // sale — and the page must never invent a figure to avoid that.
-    getProducts.mockResolvedValue([product("p1", [{ price: 500, originalPrice: null }])]);
-    expect(find(await render(), OfferBanner)?.props.offer).toEqual({ pct: 0, count: 0 });
+    expect(h1(await render({ category: "ghost" }))[0].props.children).toBe("Category");
   });
 });
 
