@@ -123,6 +123,7 @@ export default async function ProductPage({
               plainStockRows={detail.plainStockRows}
               designStockRows={detail.designStockRows}
               defaultColorSlug={detail.variants[0].colorSlug}
+              departmentSlug={detail.product.design.department.slug}
               ratingAvg={detail.ratingAvg}
               ratingCount={detail.ratingCount}
               shareUrl={absoluteUrl(`/products/${detail.product.id}`)}

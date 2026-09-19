@@ -40,6 +40,7 @@ type Props = {
   plainStockRows: { id: string; colorSlug: string; size: string; quantity: number }[];
   designStockRows: { id: string; quantity: number }[];
   defaultColorSlug: string;
+  departmentSlug: string;
   ratingAvg: number;
   ratingCount: number;
   shareUrl: string;
@@ -50,7 +51,7 @@ function discountPct(price: number, original: number): number {
 }
 
 export function BuyBoxClient({
-  productId, name, variants, plainStockRows, designStockRows, defaultColorSlug, ratingAvg, ratingCount, shareUrl,
+  productId, name, variants, plainStockRows, designStockRows, defaultColorSlug, departmentSlug, ratingAvg, ratingCount, shareUrl,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -188,7 +189,7 @@ export function BuyBoxClient({
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">Size:</span>
             <span className="text-sm text-muted-foreground">{selectedSize || "Select a size"}</span>
-            <SizeChartDialog />
+            {departmentSlug !== "accessories" && <SizeChartDialog />}
           </div>
           <div className="flex flex-wrap gap-2">
             {sizeList.map((size) => {
