@@ -1,3 +1,4 @@
+import { POS_PAYMENT_LABELS } from "@/app/_lib/pos";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/app/_lib/admin-auth";
@@ -40,12 +41,12 @@ export default async function PosReceiptPage({ params }: { params: Promise<{ id:
         </ul>
         <div className="space-y-2 border-b border-dashed border-gray-400 py-3">
           <div className="flex justify-between text-base font-bold"><span>TOTAL</span><span>{formatPrice(order.total)}</span></div>
-          <div className="flex justify-between"><span>Payment</span><span>{order.paymentMethod === "CASH" ? "Cash" : "Card terminal"}</span></div>
+          <div className="flex justify-between"><span>Payment</span><span>{POS_PAYMENT_LABELS[order.paymentMethod as keyof typeof POS_PAYMENT_LABELS] ?? order.paymentMethodDisplay}</span></div>
           {order.paymentMethod === "CASH" && <>
             <div className="flex justify-between"><span>Cash received</span><span>{formatPrice(order.posTendered ?? order.total)}</span></div>
             <div className="flex justify-between"><span>Change</span><span>{formatPrice(Math.max(0, Math.round(((order.posTendered ?? order.total) - order.total) * 100) / 100))}</span></div>
           </>}
-          {order.posPaymentReference && <p className="break-all text-xs">Terminal reference: {order.posPaymentReference}</p>}
+          {order.posPaymentReference && <p className="break-all text-xs">{order.paymentMethod === "CARD" ? "Terminal reference" : "Payment reference"}: {order.posPaymentReference}</p>}
         </div>
         <p className="mt-4 text-center text-xs">Paid · Collected in store</p>
         <p className="mt-2 text-center text-xs">Thank you for shopping with us!</p>

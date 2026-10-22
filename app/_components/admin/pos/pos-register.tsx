@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Search, ShoppingBasket, Plus, Minus, Trash2, ReceiptText } from "lucide-react";
 import { completePosSale, searchPosProducts } from "@/app/admin/pos/actions";
 import { formatPrice } from "@/app/_lib/format";
-import { POS_MAX_CENTS, posTotal, PosSaleSchema, type PosCartLine, type PosProduct, type PosSaleInput } from "@/app/_lib/pos";
+import { POS_MAX_CENTS, POS_PAYMENT_LABELS, PosPaymentMethodSchema, type PosPaymentMethod, posTotal, PosSaleSchema, type PosCartLine, type PosProduct, type PosSaleInput } from "@/app/_lib/pos";
 import { PosCatalogue } from "./pos-catalogue";
 
 const DRAFT_KEY = "dressing-bear-pos-draft-v1";
@@ -14,7 +14,7 @@ const field = "w-full rounded-md border bg-background px-3 py-2 text-sm disabled
 const subscribe = () => () => {};
 
 function readDraft() {
-  const fresh = { cart: [] as PosCartLine[], method: "CASH" as "CASH" | "CARD", tendered: "", reference: "", customer: "",
+  const fresh = { cart: [] as PosCartLine[], method: "CASH" as PosPaymentMethod, tendered: "", reference: "", customer: "",
     operationKey: crypto.randomUUID() as string, pendingSale: null as PosSaleInput | null };
   try {
     const stored = JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? "null");
@@ -22,7 +22,7 @@ function readDraft() {
       line && [line.sizeStockId, line.name, line.sku, line.color, line.size].every(value => typeof value === "string") &&
       Number.isSafeInteger(line.price) && line.price > 0 && Number.isInteger(line.quantity) && line.quantity > 0 && line.quantity <= 99)) return fresh;
     const pending = PosSaleSchema.safeParse(stored.pendingSale);
-    return { cart: stored.cart as PosCartLine[], method: stored.method === "CARD" ? "CARD" as const : "CASH" as const,
+    return { cart: stored.cart as PosCartLine[], method: PosPaymentMethodSchema.catch("CASH").parse(stored.method),
       tendered: typeof stored.tendered === "string" ? stored.tendered : "",
       reference: typeof stored.reference === "string" ? stored.reference : "",
       customer: typeof stored.customer === "string" ? stored.customer : "",
@@ -62,7 +62,7 @@ function Register({ initialProducts }: { initialProducts: PosProduct[] }) {
   const receivedCents = Math.round(received);
   const validCash = Number.isFinite(received) && Math.abs(received - receivedCents) < 0.00001 && receivedCents >= total && receivedCents <= POS_MAX_CENTS;
   const canSubmit = cart.length > 0 && total > 0 && total <= POS_MAX_CENTS &&
-    (method === "CARD" ? !!reference.trim() : validCash);
+    (method !== "CASH" ? !!reference.trim() : validCash);
 
   useEffect(() => {
     try {
@@ -190,15 +190,15 @@ function Register({ initialProducts }: { initialProducts: PosProduct[] }) {
             <label className="block space-y-1 text-sm"><span>Customer name <span className="text-muted-foreground">(optional)</span></span><input value={customer} onChange={e => setCustomer(e.target.value)} disabled={locked} maxLength={100} placeholder="Walk-in customer" className={field} /></label>
             <fieldset disabled={locked}>
               <legend className="mb-2 text-sm">Payment method</legend>
-              <div className="flex gap-2">{(["CASH", "CARD"] as const).map(value => <label key={value} className={`flex flex-1 cursor-pointer items-center gap-2 rounded-md border p-3 text-sm ${method === value ? "border-primary bg-secondary" : ""}`}><input type="radio" name="pos-payment" checked={method === value} onChange={() => setMethod(value)} />{value === "CASH" ? "Cash" : "Card terminal"}</label>)}</div>
+              <div className="grid grid-cols-2 gap-2">{(["CASH", "CARD", "KOKO", "MINTPAY"] as const).map(value => <label key={value} className={`flex flex-1 cursor-pointer items-center gap-2 rounded-md border p-3 text-sm ${method === value ? "border-primary bg-secondary" : ""}`}><input type="radio" name="pos-payment" checked={method === value} onChange={() => { setMethod(value); setReference(""); }} />{POS_PAYMENT_LABELS[value]}</label>)}</div>
             </fieldset>
             {method === "CASH" ? <>
               <label className="block space-y-1 text-sm"><span>Cash received (LKR)</span><input value={tendered} onChange={e => setTendered(e.target.value)} type="number" min="0" max={POS_MAX_CENTS / 100} step="0.01" inputMode="decimal" disabled={locked} className={field} /></label>
               <button type="button" disabled={locked || !cart.length} onClick={() => setTendered((total / 100).toFixed(2))} className="text-xs underline underline-offset-4 disabled:opacity-50">Exact cash</button>
               <div className="flex justify-between text-sm"><span>Change</span><strong>{validCash ? money(receivedCents - total) : "—"}</strong></div>
             </> : <>
-              <p className="text-xs text-muted-foreground">Take {money(total)} on your card terminal first, then enter its approved payment reference.</p>
-              <label className="block space-y-1 text-sm"><span>Approved terminal reference</span><input value={reference} onChange={e => setReference(e.target.value)} maxLength={100} disabled={locked} className={field} /></label>
+              <p className="text-xs text-muted-foreground">Approve {money(total)} {method === "CARD" ? "on your card terminal" : `through ${POS_PAYMENT_LABELS[method]}`} first, then enter its payment reference.</p>
+              <label className="block space-y-1 text-sm"><span>{method === "CARD" ? "Approved terminal reference" : `Approved ${POS_PAYMENT_LABELS[method]} reference`}</span><input value={reference} onChange={e => setReference(e.target.value)} maxLength={100} disabled={locked} className={field} /></label>
             </>}
             <button type="button" onClick={() => void submitSale()} disabled={saving || (!pendingSale && !canSubmit)} className="w-full rounded-md bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">
               {saving ? "Completing sale…" : pendingSale ? "Retry sale confirmation" : `Complete sale · ${money(total)}`}

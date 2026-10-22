@@ -117,7 +117,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
               <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span>{order.paymentMethodDisplay}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span>{paymentStatusLabel(order.paymentStatus) ?? "—"}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">{order.salesChannel === "POS" ? "Receipt #" : "Web #"}</span><span>{order.posNumber ?? order.webNumber ?? "—"}</span></div>
-              {order.posPaymentReference && <div className="flex justify-between gap-2"><span className="text-muted-foreground">Terminal reference</span><span className="break-all">{order.posPaymentReference}</span></div>}
+              {order.posPaymentReference && <div className="flex justify-between gap-2"><span className="text-muted-foreground">{order.paymentMethod === "CARD" ? "Terminal reference" : "Payment reference"}</span><span className="break-all">{order.posPaymentReference}</span></div>}
               {order.rbNumber && <div className="flex justify-between"><span className="text-muted-foreground">RB #</span><span>{order.rbNumber}</span></div>}
               {order.salesChannel !== "POS" && <div className="flex justify-between"><span className="text-muted-foreground">Waybill</span><span>{order.courierWaybillNumber ?? "— (after dispatch)"}</span></div>}
             </div>

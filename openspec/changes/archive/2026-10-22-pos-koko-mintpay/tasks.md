@@ -1,0 +1,2 @@
+- [x] Implement methods, references, draft recovery and receipts.
+- [x] Validate and prepare protected app-only release.

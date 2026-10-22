@@ -147,6 +147,31 @@ test("requires card approval and prevents cash underpayment", async ({ page }) =
   expect(order).toMatchObject({ total: 1999.99, paymentMethod: "CARD", paymentStatus: "PAID", shippingCost: 0 });
 });
 
+for (const [paymentMethod, label] of [["KOKO", "Koko"], ["MINTPAY", "Mintpay"]] as const) {
+  test(`records approved ${label} payments and prints the provider on receipts`, async ({ page, context }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await login(page);
+    await scan(page);
+    await page.getByRole("radio", { name: label, exact: true }).check();
+    await expect(page.getByRole("button", { name: /Complete sale/ })).toBeDisabled();
+    const reference = `BROWSER-${paymentMethod}-123`;
+    await page.getByLabel(`Approved ${label} reference`).fill(reference);
+    await page.reload();
+    await expect(page.getByRole("radio", { name: label, exact: true })).toBeChecked();
+    await expect(page.getByLabel(`Approved ${label} reference`)).toHaveValue(reference);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.getByRole("button", { name: /Complete sale/ }).click();
+    await expect(page.getByRole("status")).toContainText(/Sale POS\d+ completed/);
+    const order = await db.order.findFirstOrThrow({ where: { cashierId: adminId, posPaymentReference: reference } });
+    expect(order).toMatchObject({ paymentMethod, total: 1999.99, paymentStatus: "PAID", paymentStartedAt: null });
+    const popup = context.waitForEvent("page");
+    await page.getByRole("link", { name: "View / print receipt" }).click();
+    const receipt = await popup;
+    await expect(receipt.locator(".pos-receipt")).toContainText(label);
+    await expect(receipt.locator(".pos-receipt")).toContainText(`Payment reference: ${reference}`);
+  });
+}
+
 test("recovers a committed sale after its response is lost without deducting stock twice", async ({ page }) => {
   await login(page);
   await scan(page);

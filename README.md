@@ -283,3 +283,7 @@ full setup and deployment procedure.
   against a dev database).
 - **Admin user** is ensured via `make admin-ensure`, or manually with
   `npm run admin:create`.
+
+POS supports Cash, Card terminal, Koko and Mintpay. For non-cash sales, approve
+the full amount using the terminal/provider first, then record its reference.
+POS records the approved payment; it does not initiate an online payment.

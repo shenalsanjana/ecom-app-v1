@@ -122,6 +122,17 @@ describe.skipIf(!shared.url)("POS with PostgreSQL", () => {
     await expect(savePosSale(sale(), "cashier-one")).rejects.toThrow("not configured");
     expect(await balances()).toEqual({ blank: 10, print: 10 });
   });
+  it.each(["KOKO", "MINTPAY"] as const)("records %s approval and safely retries the same sale", async paymentMethod => {
+    const input = sale({ paymentMethod, tendered: 399998, paymentReference: "PROVIDER-123" });
+    const result = await savePosSale(input, "cashier-one");
+    expect(await savePosSale(input, "cashier-one")).toEqual(result);
+    expect(await db().order.findUniqueOrThrow({ where: { id: result.orderId } })).toMatchObject({
+      paymentMethod, paymentMethodDisplay: `${paymentMethod === "KOKO" ? "Koko" : "Mintpay"} (in store)`,
+      paymentStatus: "PAID", salesChannel: "POS", posPaymentReference: "PROVIDER-123", paymentStartedAt: null,
+    });
+    expect(await balances()).toEqual({ blank: 8, print: 8 });
+    await expect(savePosSale(sale({ paymentMethod, tendered: 400000, paymentReference: "OTHER" }), "cashier-one")).rejects.toThrow("match");
+  });
   it("records external card approval without starting a gateway payment", async () => {
     const result = await savePosSale(sale({ paymentMethod: "CARD", tendered: 399998, paymentReference: "AUTH-123" }), "cashier-one");
     expect(await db().order.findUniqueOrThrow({ where: { id: result.orderId } })).toMatchObject({
