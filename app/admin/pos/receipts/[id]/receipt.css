@@ -1,0 +1,18 @@
+@media print {
+  body:has(.pos-receipt) * { visibility: hidden; }
+  body:has(.pos-receipt) .pos-receipt,
+  body:has(.pos-receipt) .pos-receipt * { visibility: visible; }
+  body:has(.pos-receipt) .pos-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 76mm;
+    max-width: 76mm;
+    margin: 0;
+    padding: 3mm;
+    border: 0;
+    border-radius: 0;
+    font-size: 11px;
+  }
+  .pos-receipt-controls { display: none; }
+}

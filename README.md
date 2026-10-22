@@ -16,6 +16,7 @@ A modern e-commerce platform for oversize t-shirts built with Next.js 16.
 - **Wishlist:** Save products for later
 - **Checkout:** Multiple payment options
 - **Order Management:** Orders sent to RoyalExpress delivery service
+- **Shop POS:** Admin register with SKU scanning/search, cash and external card terminal records, shared stock, and printable receipts
 
 ## Payment Methods
 
@@ -23,6 +24,48 @@ A modern e-commerce platform for oversize t-shirts built with Next.js 16.
 - PayHere
 - Koko
 - MintPay
+
+## Shop point of sale
+
+After deploying the migrations, sign in as an admin and open **Shop POS**
+(`/admin/pos`). Search products by name/colour or scan an existing size SKU with
+a keyboard-style scanner and press Enter. Add quantities, enter an optional
+customer name, and complete the sale:
+
+- **Cash:** enter cash received or choose Exact cash; change is calculated in LKR.
+- **Card terminal:** take payment on your external terminal and enter its approved
+  reference. The POS records that payment; it does not charge the card itself.
+
+The register uses the published catalogue's current product/colour prices.
+Online promotions and coupon codes are not applied to POS sales. Each sale is
+saved as paid and collected, with no shipping charge or courier booking, and
+deducts from the same physical/print stock used by online checkout. Prices,
+stock and cashier permissions are checked on the server. Repeated submissions
+use the same sale reference and do not deduct stock again. A register tab keeps
+its cart and any unconfirmed submission in session storage; use **Retry sale
+confirmation** after a connection interruption.
+
+Open **Shop sales & receipts** or select **Shop POS sales** in Orders to find
+sales by their `POS0001` receipt number and reprint an 80 mm receipt. Completed
+POS sales retain their item/payment snapshots and cannot be edited or cancelled
+through the online dispatch workflow. Refunds and returns are outside this
+initial POS integration.
+
+The migration `20261022100000_shop_pos` adds POS fields to existing orders and a
+separate receipt-number sequence. Run the normal `npm run db:deploy` migration
+step before starting the updated application. Existing orders default to the
+Online sales channel.
+
+POS database and browser tests require a disposable local PostgreSQL database
+named `pos_test` on `127.0.0.1:55432`. They refuse other database locations. Set
+`POS_TEST_DATABASE_URL`, apply migrations to that database using `DATABASE_URL`,
+then run `npm run test:pos:db`. Build the app against that same isolated database
+and run `npm run test:pos:e2e` for the register/receipt browser tests on port 3101.
+Use `AUTH_SECRET=isolated-local-pos-browser-test-secret`,
+`AUTH_URL=http://localhost:3101`, `APP_URL=http://localhost:3101` and an empty
+`NEXT_PUBLIC_META_PIXEL_ID` for that test build. Install Playwright Chromium
+before running browser tests. Test builds and fixture data are disposable;
+production deployment builds the application again with the shop's settings.
 
 ## Getting Started
 

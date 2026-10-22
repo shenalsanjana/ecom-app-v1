@@ -2,6 +2,11 @@ import { describe, it, expect } from "vitest";
 import { buildOrderWhere } from "../admin-orders";
 
 describe("buildOrderWhere", () => {
+  it("filters shop sales and ignores invalid sales channels", () => {
+    expect(buildOrderWhere({ channel: "POS" })).toEqual({ deletedAt: null, salesChannel: "POS" });
+    expect(buildOrderWhere({ channel: "ONLINE" })).toEqual({ deletedAt: null, salesChannel: "ONLINE" });
+    expect(buildOrderWhere({ channel: "invalid" as "POS" })).toEqual({ deletedAt: null });
+  });
   it("excludes deleted orders from normal lists", () => {
     expect(buildOrderWhere({ tab: "all" })).toEqual({ deletedAt: null });
     expect(buildOrderWhere({})).toEqual({ deletedAt: null });
@@ -42,6 +47,7 @@ describe("buildOrderWhere", () => {
     expect(where.OR).toEqual([
       { webNumber: { contains: "nimali", mode: "insensitive" } },
       { rbNumber: { contains: "nimali", mode: "insensitive" } },
+      { posNumber: { contains: "nimali", mode: "insensitive" } },
       { guestName: { contains: "nimali", mode: "insensitive" } },
       { guestEmail: { contains: "nimali", mode: "insensitive" } },
       { customerPhone: { contains: "nimali", mode: "insensitive" } },

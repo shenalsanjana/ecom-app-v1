@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import { orderReference } from "../order-reference";
 
 describe("orderReference", () => {
+  it("uses the POS receipt number for shop sales", () => {
+    expect(orderReference({ posNumber: "POS0001", id: "internal-id" })).toBe("POS0001");
+  });
   it("prefers webNumber when set", () => {
     expect(
       orderReference({ webNumber: "WEB0042", rbNumber: "RB1001", orderId: "ORD-X" }),

@@ -11,6 +11,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "test:pos:db": "vitest run app/_lib/__tests__/pos-postgres.test.ts",
+    "test:pos:e2e": "playwright test --config playwright.pos.config.ts",
     "test:nginx": "bash tests/nginx/acme-and-canonical.sh",
     "check:contrast": "tsx scripts/check-contrast.ts",
     "admin:create": "tsx scripts/create-admin.ts",

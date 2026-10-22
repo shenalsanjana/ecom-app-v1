@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Link from "next/link";
 import { formatPrice } from "@/app/_lib/format";
+import { orderReference } from "@/app/_lib/order-reference";
 import { paymentStatusLabel } from "@/app/_lib/order-status";
 import { formatOrderItemLine, omittedItemCount } from "@/app/_lib/order-item-display";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,7 @@ import { bulkConfirm, bulkDispatch, bulkCancel, bulkDelete, type BulkResult } fr
 
 type Row = {
   id: string; webNumber: string | null; createdAt: Date; customerPhone: string;
+  posNumber?: string | null; salesChannel?: string;
   guestName: string | null; user: { name: string | null } | null;
   total: number; paymentMethod: string; paymentStatus: string | null; status: string;
   courierBookedAt: Date | null; courierWaybillNumber: string | null;
@@ -137,10 +139,11 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
             <tr key={o.id} className="border-b hover:bg-secondary/40">
               <td className="p-2">
                 <input type="checkbox" checked={selected.has(o.id)} onChange={() => toggle(o.id)}
-                  aria-label={`Select ${o.webNumber ?? o.id}`} />
+                  aria-label={`Select ${orderReference(o)}`} />
               </td>
               <td className="p-2 font-medium">
-                <Link href={`/admin/orders/${o.id}`} className="hover:underline">{o.webNumber ?? o.id}</Link>
+                <Link href={`/admin/orders/${o.id}`} className="hover:underline">{orderReference(o)}</Link>
+                {o.salesChannel === "POS" && <div className="mt-1 text-xs font-normal text-muted-foreground">Shop POS · <Link href={`/admin/pos/receipts/${o.id}`} className="underline">Receipt</Link></div>}
               </td>
               <td className="p-2">{o.createdAt.toLocaleString("en-GB", { timeZone: "Asia/Colombo" })}</td>
               <td className="p-2">{o.user?.name ?? o.guestName ?? "—"}<br /><span className="text-muted-foreground">{o.customerPhone}</span></td>

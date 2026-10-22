@@ -11,6 +11,7 @@ export type ListParams = {
   tab?: OrderTab;
   q?: string;
   payment?: string;
+  channel?: "ONLINE" | "POS";
   sort?: "newest" | "oldest";
 };
 
@@ -46,12 +47,14 @@ export function buildOrderWhere(params: ListParams): Prisma.OrderWhereInput {
   }
 
   if (params.payment) where.paymentStatus = params.payment;
+  if (params.channel === "ONLINE" || params.channel === "POS") where.salesChannel = params.channel;
 
   const q = params.q?.trim();
   if (q) {
     where.OR = [
       { webNumber: { contains: q, mode: "insensitive" } },
       { rbNumber: { contains: q, mode: "insensitive" } },
+      { posNumber: { contains: q, mode: "insensitive" } },
       { guestName: { contains: q, mode: "insensitive" } },
       { guestEmail: { contains: q, mode: "insensitive" } },
       { customerPhone: { contains: q, mode: "insensitive" } },
