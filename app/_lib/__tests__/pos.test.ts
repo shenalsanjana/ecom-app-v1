@@ -23,6 +23,10 @@ describe("POS validation and money", () => {
     expect(PosSaleSchema.safeParse({ ...input, items: [{ ...input.items[0], quantity: 0.5 }] }).success).toBe(false);
     expect(PosSaleSchema.safeParse({ ...input, tendered: POS_MAX_CENTS + 1 }).success).toBe(false);
   });
+  it.each(["KOKO", "MINTPAY"])("requires a trimmed approval reference for %s", paymentMethod => {
+    expect(PosSaleSchema.safeParse({ ...sale(), paymentMethod, paymentReference: "  " }).success).toBe(false);
+    expect(PosSaleSchema.parse({ ...sale(), paymentMethod, paymentReference: " APPROVED-123 " })).toMatchObject({ paymentMethod, paymentReference: "APPROVED-123" });
+  });
   it("requires an approved reference for card sales and excludes browser-supplied totals/status", () => {
     expect(PosSaleSchema.safeParse({ ...sale(), paymentMethod: "CARD", paymentReference: " " }).success).toBe(false);
     expect(PosSaleSchema.parse({ ...sale(), paymentMethod: "CARD", paymentReference: " AUTH123 " }).paymentReference).toBe("AUTH123");

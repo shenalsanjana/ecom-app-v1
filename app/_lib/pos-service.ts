@@ -5,7 +5,7 @@ import { acquireItemPools } from "@/app/_lib/inventory-pools";
 import { assertProductsPublished } from "@/app/_lib/product-publication";
 import { setStockMovementContext } from "@/app/_lib/stock-movements";
 import { effectivePrintId, requiresPrint } from "@/app/_lib/stock-policy";
-import { PosError, posChange, posTotal, type PosProduct, type PosSale } from "@/app/_lib/pos";
+import { POS_PAYMENT_LABELS, PosError, posChange, posTotal, type PosProduct, type PosSale } from "@/app/_lib/pos";
 
 export async function getPosProducts(query = ""): Promise<PosProduct[]> {
   const q = query.trim().slice(0, 120);
@@ -103,8 +103,8 @@ export async function savePosSale(sale: PosSale, cashierId: string) {
         });
         const total = posTotal(lines.map(line => ({ price: toCents(line.price), quantity: line.quantity })));
         posChange(total, sale.paymentMethod === "CASH" ? sale.tendered : total);
-        if (sale.paymentMethod === "CARD" && sale.tendered !== total) {
-          throw new PosError("The card amount must match the sale total.");
+        if (sale.paymentMethod !== "CASH" && sale.tendered !== total) {
+          throw new PosError("The payment amount must match the sale total.");
         }
 
         const orderId = randomUUID();
@@ -121,9 +121,9 @@ export async function savePosSale(sale: PosSale, cashierId: string) {
           guestName: sale.customerName || "Walk-in customer", customerPhone: "",
           shippingLine1: "In-store collection", shippingCity: "", shippingCountry: "Sri Lanka",
           subtotal: fromCents(total), shippingCost: 0, total: fromCents(total),
-          paymentMethod: sale.paymentMethod, paymentMethodDisplay: sale.paymentMethod === "CASH" ? "Cash (in store)" : "Card terminal (in store)",
+          paymentMethod: sale.paymentMethod, paymentMethodDisplay: `${POS_PAYMENT_LABELS[sale.paymentMethod]} (in store)`,
           paymentStatus: "PAID", status: "DELIVERED", posTendered: fromCents(sale.tendered),
-          posPaymentReference: sale.paymentMethod === "CARD" ? sale.paymentReference : null,
+          posPaymentReference: sale.paymentMethod !== "CASH" ? sale.paymentReference : null,
           items: { create: lines },
         } });
         return { orderId, posNumber };

@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+export const POS_PAYMENT_LABELS = { CASH: "Cash", CARD: "Card terminal", KOKO: "Koko", MINTPAY: "Mintpay" } as const;
+export const PosPaymentMethodSchema = z.enum(["CASH", "CARD", "KOKO", "MINTPAY"]);
+export type PosPaymentMethod = z.infer<typeof PosPaymentMethodSchema>;
+
 // POS amounts cross the client boundary as integer LKR cents.
 export const POS_MAX_CENTS = 1_000_000_000;
 const cents = z.number().int().min(0).max(POS_MAX_CENTS);
@@ -10,7 +14,7 @@ export const PosSaleSchema = z.object({
     quantity: z.number().int().min(1).max(99),
     expectedPrice: cents.positive(),
   }).strict()).min(1, "Add at least one item.").max(100),
-  paymentMethod: z.enum(["CASH", "CARD"]),
+  paymentMethod: PosPaymentMethodSchema,
   tendered: cents,
   paymentReference: z.string().trim().max(100).default(""),
   customerName: z.string().trim().max(100).default(""),
@@ -18,8 +22,8 @@ export const PosSaleSchema = z.object({
   if (new Set(sale.items.map(item => item.sizeStockId)).size !== sale.items.length) {
     ctx.addIssue({ code: "custom", path: ["items"], message: "Combine duplicate sizes into one cart line." });
   }
-  if (sale.paymentMethod === "CARD" && !sale.paymentReference) {
-    ctx.addIssue({ code: "custom", path: ["paymentReference"], message: "Enter the approved card terminal reference." });
+  if (sale.paymentMethod !== "CASH" && !sale.paymentReference) {
+    ctx.addIssue({ code: "custom", path: ["paymentReference"], message: `Enter the approved ${POS_PAYMENT_LABELS[sale.paymentMethod]} payment reference.` });
   }
 });
 export type PosSaleInput = z.input<typeof PosSaleSchema>;
