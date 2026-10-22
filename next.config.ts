@@ -2,6 +2,16 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  experimental: {
+    webpackMemoryOptimizations: true,
+    webpackBuildWorker: false,
+    parallelServerBuildTraces: false,
+  },
+  webpack: process.env.OVH_LOW_MEMORY_BUILD === "1" ? (config) => {
+    // Avoid loading a large filesystem cache on the memory-limited OVH host.
+    config.cache = false;
+    return config;
+  } : undefined,
   typescript: {
     // Type checking runs in CI (`npx tsc --noEmit` in .github/workflows/deploy.yml),
     // NOT here. The deploy job declares `needs: test`, so a type error fails CI

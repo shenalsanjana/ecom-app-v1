@@ -25,6 +25,7 @@ export const PosSaleSchema = z.object({
 export type PosSaleInput = z.input<typeof PosSaleSchema>;
 export type PosSale = z.output<typeof PosSaleSchema>;
 export type PosProduct = {
+  productId: string; categoryId: string; categoryName: string;
   sizeStockId: string; sku: string; name: string; color: string; size: string;
   price: number; available: number; image: string | null;
 };

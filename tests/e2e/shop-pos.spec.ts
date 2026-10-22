@@ -11,7 +11,9 @@ const db = new PrismaClient({ datasourceUrl: isolatedUrl });
 const prefix = `pos-browser-${randomUUID()}`;
 const email = `${prefix}@example.test`;
 const password = "LocalPosTest123!";
-let sku: string, stockId: string, adminId: string;
+let sku: string, stockId: string, adminId: string, largeSku: string;
+const shirtCategoryName = `Shirts ${prefix}`;
+const bagCategoryName = `Bags ${prefix}`;
 
 async function login(page: Page) {
   await page.goto("/login?callbackUrl=/about");
@@ -32,23 +34,73 @@ test.beforeAll(async () => {
   adminId = (await db.user.create({ data: { name: "POS browser cashier", email, role: "ADMIN", passwordHash: await bcrypt.hash(password, 10) } })).id;
   await db.department.create({ data: { slug: prefix, name: prefix, navLabel: prefix, tileName: prefix, hex: "#fff" } });
   await db.design.create({ data: { slug: prefix, name: prefix, departmentSlug: prefix, hex: "#fff" } });
-  const category = await db.inventoryCategory.create({ data: { name: prefix } });
+  const category = await db.inventoryCategory.create({ data: { name: shirtCategoryName } });
   const family = await db.inventoryProduct.create({ data: { name: prefix, categoryId: category.id } });
   stockId = (await db.plainTshirtStock.create({ data: { inventoryProductId: family.id, color: "Blue", colorSlug: "blue", size: "M", quantity: 20 } })).id;
+  const large = await db.plainTshirtStock.create({ data: { inventoryProductId: family.id, color: "Blue", colorSlug: "blue", size: "L", quantity: 10 } });
+  const soldOut = await db.plainTshirtStock.create({ data: { inventoryProductId: family.id, color: "Blue", colorSlug: "blue", size: "XL", quantity: 0 } });
+  const pink = await db.plainTshirtStock.create({ data: { inventoryProductId: family.id, color: "Pink", colorSlug: "pink", size: "M", quantity: 5 } });
   const product = await db.product.create({ data: {
     id: prefix, name: "POS Browser Shirt", price: 1999.99, description: "Isolated POS browser test",
     departmentSlug: prefix, designSlug: prefix, inventoryProductId: family.id, status: "PUBLISHED", stockMode: "PLAIN",
-    variants: { create: { color: "Blue", colorSlug: "blue", sizeStocks: { create: { size: "M", plainTshirtStockId: stockId } } } },
+    variants: { create: [
+      { color: "Blue", colorSlug: "blue", sizeStocks: { create: [
+        { size: "M", plainTshirtStockId: stockId }, { size: "L", plainTshirtStockId: large.id }, { size: "XL", plainTshirtStockId: soldOut.id },
+      ] } },
+      { color: "Pink", colorSlug: "pink", sizeStocks: { create: { size: "M", plainTshirtStockId: pink.id } } },
+    ] },
   }, include: { variants: { include: { sizeStocks: true } } } });
-  sku = product.variants[0].sizeStocks[0].sku;
+  sku = product.variants.find(variant => variant.color === "Blue")!.sizeStocks.find(size => size.size === "M")!.sku;
+  largeSku = product.variants.find(variant => variant.color === "Blue")!.sizeStocks.find(size => size.size === "L")!.sku;
+  const bags = await db.inventoryCategory.create({ data: { name: bagCategoryName } });
+  const bagFamily = await db.inventoryProduct.create({ data: { name: "Canvas Bag", categoryId: bags.id } });
+  const bagStock = await db.plainTshirtStock.create({ data: { inventoryProductId: bagFamily.id,
+    color: "Natural", colorSlug: "natural", size: "One size", stockGroup: "ACCESSORY", quantity: 10 } });
+  await db.product.create({ data: { id: `${prefix}-bag`, name: "POS Browser Bag", description: "Isolated bag",
+    price: 750, departmentSlug: prefix, designSlug: prefix, inventoryProductId: bagFamily.id,
+    status: "PUBLISHED", stockMode: "PLAIN", variants: { create: { color: "Natural", colorSlug: "natural",
+      sizeStocks: { create: { size: "One size", plainTshirtStockId: bagStock.id } } } } } });
 });
 test.afterAll(async () => { await db.$disconnect(); });
+test.beforeEach(async ({ context }) => {
+  await context.route(/^https?:\/\//, route => new URL(route.request().url()).hostname === "localhost"
+    ? route.continue() : route.abort());
+});
 
 test("blocks anonymous access to the register and receipts", async ({ page }) => {
   await page.goto("/admin/pos");
   await expect(page).toHaveURL(/\/login\?callbackUrl=/);
   await page.goto("/admin/pos/receipts/not-an-order");
   await expect(page).toHaveURL(/\/login\?callbackUrl=/);
+});
+
+test("groups products by category and chooses colour and size without duplicate cards", async ({ page }) => {
+  await login(page);
+  const categories = page.getByRole("navigation", { name: "Product categories" });
+  await categories.getByRole("button", { name: `${shirtCategoryName} 1`, exact: true }).click();
+  const shirt = page.getByRole("button", { name: "Choose POS Browser Shirt", exact: true });
+  await expect(shirt).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Add POS Browser Bag", exact: true })).toHaveCount(0);
+  await shirt.click();
+  const picker = page.getByRole("dialog");
+  await picker.getByRole("combobox", { name: /Colour/ }).selectOption("Blue");
+  await expect(picker.getByRole("button", { name: "Add to sale", exact: true })).toBeDisabled();
+  await expect(picker.getByRole("button", { name: "XL", exact: true })).toBeDisabled();
+  await picker.getByRole("combobox", { name: /Colour/ }).selectOption("Pink");
+  await expect(picker.getByRole("button", { name: "M", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await picker.getByRole("combobox", { name: /Colour/ }).selectOption("Blue");
+  await picker.getByRole("button", { name: "L", exact: true }).click();
+  await page.screenshot({ path: test.info().outputPath("pos-colour-size.png") });
+  await picker.getByRole("button", { name: "Add to sale", exact: true }).click();
+  await expect(page.getByRole("button", { name: `Remove ${largeSku}` })).toBeVisible();
+  await expect(picker).toHaveCount(0);
+  await categories.getByRole("button", { name: `${bagCategoryName} 1`, exact: true }).click();
+  await expect(shirt).toHaveCount(0);
+  await page.getByRole("button", { name: "Add POS Browser Bag", exact: true }).click();
+  await expect(page.getByText("POS Browser Bag", { exact: true })).toHaveCount(2);
+  await page.screenshot({ path: test.info().outputPath("pos-categories-desktop.png"), fullPage: true });
+  await page.getByRole("textbox", { name: "Search products or scan SKU" }).fill("does not exist");
+  await expect(page.getByText("No products match. Try another name or SKU.")).toBeVisible();
 });
 
 test("scans a SKU, restores the cart, takes cash, and prints a persisted receipt", async ({ page, context }) => {

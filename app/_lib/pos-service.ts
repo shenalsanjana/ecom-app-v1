@@ -19,15 +19,21 @@ export async function getPosProducts(query = ""): Promise<PosProduct[]> {
         { variant: { color: { contains: q, mode: "insensitive" as const } } },
       ] } : {}),
     },
-    include: {
-      plainTshirtStock: true,
-      variant: { include: {
-        images: { where: { role: "CARD" }, orderBy: { sortOrder: "asc" }, take: 1 },
-        product: { include: { dtfDesign: { select: { quantity: true } } } },
+    select: {
+      id: true, sku: true, size: true,
+      plainTshirtStock: { select: { colorSlug: true, size: true, quantity: true } },
+      variant: { select: {
+        color: true, colorSlug: true, price: true,
+        images: { where: { role: "CARD" }, orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } },
+        product: { select: {
+          id: true, name: true, price: true, stockMode: true,
+          dtfDesign: { select: { quantity: true } },
+          inventoryProduct: { select: { category: { select: { id: true, name: true } } } },
+          department: { select: { slug: true, name: true } },
+        } },
       } },
     },
     orderBy: { sku: "asc" },
-    take: 60,
   });
   return rows.map(cell => {
     const { variant, plainTshirtStock: blank } = cell;
@@ -36,6 +42,9 @@ export async function getPosProducts(query = ""): Promise<PosProduct[]> {
     const available = matches ? (requiresPrint(product.stockMode)
       ? Math.min(blank.quantity, product.dtfDesign?.quantity ?? 0) : blank.quantity) : 0;
     return {
+      productId: product.id,
+      categoryId: product.inventoryProduct?.category.id ?? product.department.slug,
+      categoryName: product.inventoryProduct?.category.name ?? product.department.name,
       sizeStockId: cell.id, sku: cell.sku, name: product.name, color: variant.color, size: cell.size,
       price: toCents(variant.price ?? product.price), available: Math.max(0, available),
       image: variant.images[0]?.url ?? null,

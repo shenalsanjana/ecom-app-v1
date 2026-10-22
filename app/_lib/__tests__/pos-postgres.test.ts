@@ -68,9 +68,17 @@ describe.skipIf(!shared.url)("POS with PostgreSQL", () => {
     await db().dtfDesign.update({ where: { id: print }, data: { quantity: 3 } });
     const products = await getPosProducts(product.variants[0].sizeStocks[0].sku);
     expect(products).toHaveLength(1);
-    expect(products[0]).toMatchObject({ price: 199999, available: 3, color: "White", size: "M" });
+    expect(products[0]).toMatchObject({ productId: product.id, categoryName: prefix,
+      price: 199999, available: 3, color: "White", size: "M" });
     await db().product.update({ where: { id: product.id }, data: { status: "DRAFT" } });
     expect(await getPosProducts(product.variants[0].sizeStocks[0].sku)).toEqual([]);
+  });
+  it("returns the complete catalogue when there are more than 60 size options", async () => {
+    await db().variantSizeStock.createMany({ data: Array.from({ length: 65 }, (_, index) => ({
+      variantId: product.variants[0].id, size: `extra-${index}`,
+    })) });
+    const products = await getPosProducts(prefix);
+    expect(products.filter(option => option.productId === product.id)).toHaveLength(66);
   });
   it("records a paid, collected sale, frozen SKU and staff stock audit atomically", async () => {
     const input = sale();

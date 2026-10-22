@@ -11,7 +11,7 @@ export default async function PosPage() {
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Shop POS</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Sell in store using your live product catalogue and shared inventory.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Choose products, add to the sale, and take payment.</p>
         </div>
         <Link href="/admin/orders?channel=POS" className="rounded-md border px-3 py-2 text-sm hover:bg-secondary">Shop sales & receipts</Link>
       </div>

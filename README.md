@@ -28,8 +28,10 @@ A modern e-commerce platform for oversize t-shirts built with Next.js 16.
 ## Shop point of sale
 
 After deploying the migrations, sign in as an admin and open **Shop POS**
-(`/admin/pos`). Search products by name/colour or scan an existing size SKU with
-a keyboard-style scanner and press Enter. Add quantities, enter an optional
+(`/admin/pos`). Choose a category, then a product. Each product appears once;
+choose its colour and size to add it, or add a single-option item directly.
+Search by name/colour or scan an existing size SKU with a keyboard-style scanner
+and press Enter. All published products are included. Add quantities, enter an optional
 customer name, and complete the sale:
 
 - **Cash:** enter cash received or choose Exact cash; change is calculated in LKR.
