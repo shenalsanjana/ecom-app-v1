@@ -1,12 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Search, ShoppingBasket, Plus, Minus, Trash2, ReceiptText } from "lucide-react";
 import { completePosSale, searchPosProducts } from "@/app/admin/pos/actions";
 import { formatPrice } from "@/app/_lib/format";
 import { POS_MAX_CENTS, posTotal, PosSaleSchema, type PosCartLine, type PosProduct, type PosSaleInput } from "@/app/_lib/pos";
+import { PosCatalogue } from "./pos-catalogue";
 
 const DRAFT_KEY = "dressing-bear-pos-draft-v1";
 const money = (cents: number) => formatPrice(cents / 100);
@@ -70,11 +70,11 @@ function Register({ initialProducts }: { initialProducts: PosProduct[] }) {
     } catch { /* The register still works when browser storage is unavailable. */ }
   }, [cart, method, tendered, reference, customer, operationKey, pendingSale]);
 
-  async function refreshProducts(value: string) {
+  async function refreshProducts() {
     const version = ++searchVersion.current;
     setSearching(true);
     try {
-      const result = await searchPosProducts(value);
+      const result = await searchPosProducts("");
       if (version === searchVersion.current) setProducts(result);
       return result;
     } catch {
@@ -123,7 +123,7 @@ function Register({ initialProducts }: { initialProducts: PosProduct[] }) {
       setOperationKey(crypto.randomUUID()); setPendingSale(null);
       pendingIntent.current = null;
       try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
-      await refreshProducts(query);
+      await refreshProducts();
       searchInput.current?.focus();
     } catch {
       setError("The sale is awaiting confirmation. Retry with the same details to avoid a duplicate sale.");
@@ -138,7 +138,7 @@ function Register({ initialProducts }: { initialProducts: PosProduct[] }) {
       <div className="space-y-4">
         <form onSubmit={async e => {
           e.preventDefault();
-          const result = await refreshProducts(query);
+          const result = await refreshProducts();
           const exact = result.find(product => product.sku.toLowerCase() === query.trim().toLowerCase());
           if (exact && exact.available > 0) { addProduct(exact); setQuery(""); }
         }} className="flex gap-2">
@@ -152,30 +152,10 @@ function Register({ initialProducts }: { initialProducts: PosProduct[] }) {
           </button>
         </form>
         <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span>{products.length} colour / size options · Prices in LKR</span>
-          <button type="button" onClick={() => void refreshProducts(query)} disabled={searching} className="underline underline-offset-4">Refresh products</button>
+          <span>Choose a category, then a product.</span>
+          <button type="button" onClick={() => void refreshProducts()} disabled={searching} className="underline underline-offset-4">Refresh products</button>
         </div>
-        {products.length === 0 ? (
-          <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">No published products match. Add products and configure their stock in Inventory.</div>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3">
-            {products.map(product => (
-              <button key={product.sizeStockId} type="button" disabled={locked || product.available <= 0}
-                onClick={() => addProduct(product)} aria-label={`Add ${product.name}, ${product.color}, ${product.size}`}
-                className="flex flex-col overflow-hidden rounded-xl border bg-card text-left transition hover:border-primary disabled:opacity-50">
-                {product.image && <div className="relative aspect-[4/3] w-full bg-secondary"><Image src={product.image} alt="" fill sizes="(max-width: 640px) 100vw, 240px" className="object-cover" /></div>}
-                <span className="flex flex-1 flex-col gap-1 p-3">
-                  <span className="text-sm font-medium">{product.name}</span>
-                  <span className="text-xs text-muted-foreground">{product.color} · {product.size}</span>
-                  <span className="font-mono text-xs text-muted-foreground">{product.sku}</span>
-                  <span className="mt-2 flex items-center justify-between gap-2"><span className="text-sm font-semibold">{money(product.price)}</span>
-                    <span className="text-xs text-muted-foreground">{product.available > 0 ? `${product.available} available` : "Out of stock"}</span></span>
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-        <p className="text-xs text-muted-foreground">Showing up to 60 options. Search by SKU for a specific item. Stock is checked again when the sale completes.</p>
+        <PosCatalogue options={products} query={query} locked={locked} onAdd={addProduct} onClearSearch={() => setQuery("")} />
       </div>
 
       <div className="space-y-4 xl:sticky xl:top-4">
