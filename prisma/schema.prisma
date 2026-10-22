@@ -76,6 +76,8 @@ model Design {
   department  Department          @relation(fields: [departmentSlug], references: [slug])
   dtfDesign   DtfDesign?          @relation(fields: [dtfDesignId], references: [id], onDelete: SetNull)
   products    Product[]
+  discountTargets DiscountCategory[]
+  additionalProducts ProductCollection[]
   slugHistory DesignSlugHistory[]
 
   @@index([departmentSlug])
@@ -89,6 +91,16 @@ model DesignSlugHistory {
   @@index([currentSlug])
 }
 
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum StockMode {
+  PRINTED_TO_ORDER
+  PLAIN
+}
+
 model Product {
   id            String   @id
   name          String
@@ -98,21 +110,40 @@ model Product {
   designSlug    String
   departmentSlug String
   archived      Boolean  @default(false)
+  status        ProductStatus @default(DRAFT)
+  stockMode     StockMode @default(PRINTED_TO_ORDER)
   dtfDesignId   String?
+  inventoryProductId String?
 
   design        Design         @relation(fields: [designSlug], references: [slug])
   department    Department     @relation(fields: [departmentSlug], references: [slug])
   dtfDesign     DtfDesign?     @relation(fields: [dtfDesignId], references: [id], onDelete: Restrict)
+  inventoryProduct InventoryProduct? @relation(fields: [inventoryProductId], references: [id], onDelete: Restrict)
   wishlistItems WishlistItem[]
   reviews       Review[]
   orderItems    OrderItem[]
   slugHistory   ProductSlugHistory[]
   variants      ProductVariant[]
+  discountTargets DiscountProduct[]
+  additionalCollections ProductCollection[]
 
   @@index([designSlug])
   @@index([departmentSlug])
   @@index([archived])
+  @@index([status, archived])
   @@index([dtfDesignId])
+  @@index([inventoryProductId])
+}
+
+// Extra storefront placements only. The primary collection stays on Product.
+model ProductCollection {
+  productId  String
+  designSlug String
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  design  Design  @relation(fields: [designSlug], references: [slug], onDelete: Restrict, onUpdate: Cascade)
+
+  @@id([productId, designSlug])
+  @@index([designSlug])
 }
 
 model ProductSlugHistory {
@@ -160,11 +191,51 @@ model VariantSizeStock {
   id        String @id @default(cuid())
   variantId String
   size      String
+  sku       String @unique @default(dbgenerated("next_sale_sku()"))
+  archived  Boolean @default(false)
+  plainTshirtStockId String?
 
   variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  plainTshirtStock PlainTshirtStock? @relation(fields: [plainTshirtStockId], references: [id], onDelete: Restrict)
 
   @@unique([variantId, size])
   @@index([variantId])
+  @@index([variantId, archived])
+  @@index([plainTshirtStockId])
+}
+
+// Inventory navigation is independent of storefront departments/design URLs.
+model InventoryCategory {
+  id        String @id @default(cuid())
+  name      String
+  parentId  String?
+  systemKey String? @unique
+  version   Int @default(0)
+  parent    InventoryCategory? @relation("InventoryCategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children  InventoryCategory[] @relation("InventoryCategoryTree")
+  products  InventoryProduct[]
+
+  @@unique([parentId, name])
+  @@index([parentId])
+}
+
+// One physical product/blank family; existing store products are its designs.
+model InventoryProduct {
+  id         String @id @default(cuid())
+  name       String
+  categoryId String
+  version    Int @default(0)
+  category   InventoryCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  designs    Product[]
+  stock      PlainTshirtStock[]
+
+  @@unique([categoryId, name])
+  @@index([categoryId])
+}
+
+enum StockGroup {
+  PLAIN_TSHIRT
+  ACCESSORY
 }
 
 model PlainTshirtStock {
@@ -174,12 +245,20 @@ model PlainTshirtStock {
   colorSlug String
   size      String
   quantity  Int      @default(0)
+  version   Int      @default(0)
+  stockGroup StockGroup @default(PLAIN_TSHIRT)
+  inventoryProductId String?
+  inventoryProduct InventoryProduct? @relation(fields: [inventoryProductId], references: [id], onDelete: Restrict)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   orderItems OrderItem[]
+  variantSizes VariantSizeStock[]
+  movements StockMovement[]
 
-  @@unique([colorSlug, size])
+  @@unique([inventoryProductId, colorSlug, size])
+  // A partial SQL index keeps unassigned legacy colour/size entries unique.
+  @@index([inventoryProductId])
 }
 
 model DtfDesign {
@@ -187,12 +266,14 @@ model DtfDesign {
   name      String
   slug      String   @unique
   quantity  Int      @default(0)
+  version   Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   designs    Design[]
   products   Product[]
   orderItems OrderItem[]
+  movements StockMovement[]
 }
 
 model Review {
@@ -246,9 +327,14 @@ model Order {
   paymentMethod         String
   paymentMethodDisplay  String
   paymentStatus         String?
+  version               Int      @default(0)
+  paymentStartedAt      DateTime?
+  paymentReviewRequired Boolean  @default(false)
+  paymentReviewReason   String?
   webNumber             String?   @unique
   rbNumber              String?   @unique
   status                String   @default("PENDING")
+  deletedAt             DateTime?
   trackingCode          String?
   royalExpressSubmitted Boolean  @default(false)
   emailSent             Boolean  @default(false)
@@ -271,15 +357,36 @@ model Order {
   items                 OrderItem[]
   notesLog              OrderNote[]
   adjustments           OrderAdjustment[]
+  paymentEvents         PaymentEvent[]
+  discountRedemption    DiscountRedemption?
 
   @@index([userId])
   @@index([createdAt])
   @@index([status])
   @@index([paymentStatus])
   @@index([status, courierBookedAt])
+  @@index([paymentStatus, createdAt])
+  @@index([deletedAt, createdAt])
+}
+
+// Verified gateway outcomes and reconciliation decisions, including late payments.
+model PaymentEvent {
+  id                String   @id @default(cuid())
+  eventKey          String   @unique
+  orderId           String
+  provider          String
+  outcome           String
+  result            String
+  providerReference String?
+  createdAt         DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([orderId, createdAt])
 }
 
 model OrderItem {
+  stockMode          StockMode @default(PRINTED_TO_ORDER)
   id                 String  @id @default(cuid())
   orderId            String
   // Nullable: a product may be hard-deleted while its order history lives on.
@@ -299,8 +406,8 @@ model OrderItem {
   order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product          Product?          @relation(fields: [productId], references: [id], onDelete: SetNull)
   variant          ProductVariant?   @relation(fields: [variantId], references: [id], onDelete: SetNull)
-  plainTshirtStock PlainTshirtStock? @relation(fields: [plainTshirtStockId], references: [id], onDelete: SetNull)
-  dtfDesign        DtfDesign?        @relation(fields: [dtfDesignId], references: [id], onDelete: SetNull)
+  plainTshirtStock PlainTshirtStock? @relation(fields: [plainTshirtStockId], references: [id], onDelete: Restrict)
+  dtfDesign        DtfDesign?        @relation(fields: [dtfDesignId], references: [id], onDelete: Restrict)
 
   @@index([orderId])
   @@index([productId])
@@ -322,6 +429,7 @@ model OrderNote {
 }
 
 model OrderAdjustment {
+  promotion Boolean @default(false)
   id        String   @id @default(cuid())
   orderId   String
   label     String
@@ -383,4 +491,97 @@ model StoreSettings {
   otherDeliveryCost     Int
   freeDeliveryThreshold Int
   updatedAt             DateTime @updatedAt
+}
+
+// Available-balance audit. Pool identities and labels are frozen at the event.
+model StockMovement {
+  id String @id @default(dbgenerated("gen_random_uuid()::text"))
+  plainTshirtStockId String?
+  dtfDesignId String?
+  plainTshirtStock PlainTshirtStock? @relation(fields: [plainTshirtStockId], references: [id], onDelete: Restrict)
+  dtfDesign DtfDesign? @relation(fields: [dtfDesignId], references: [id], onDelete: Restrict)
+  stockLabel String
+  stockVersion Int
+  before Int
+  after Int
+  delta Int
+  reason String
+  actorType String
+  actorId String?
+  orderId String?
+  operationKey String
+  createdAt DateTime @default(now())
+
+  @@unique([plainTshirtStockId, stockVersion])
+  @@unique([dtfDesignId, stockVersion])
+  @@index([createdAt, id])
+  @@index([orderId])
+  @@index([operationKey])
+}
+
+// Idempotent staff stock-write intents; recorded in the same transaction.
+model StockOperation {
+  key String @id
+  actorId String
+  payloadHash String
+  createdAt DateTime @default(now())
+}
+
+// Promotion money is stored as integer LKR cents; PERCENTAGE value is basis points.
+model Discount {
+  id               String @id @default(cuid())
+  name             String
+  code             String? @unique
+  type             String @db.VarChar(16)
+  scope            String @db.VarChar(16)
+  value            Int
+  active           Boolean @default(false)
+  publicOffer      Boolean @default(false)
+  paymentMethods   String[] @default([])
+  startsAt         DateTime?
+  expiresAt        DateTime?
+  usageLimit       Int?
+  usedCount        Int @default(0)
+  minimumOrder     Int @default(0)
+  maximumDiscount  Int?
+  version          Int @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  products         DiscountProduct[]
+  categories       DiscountCategory[]
+  redemptions      DiscountRedemption[]
+
+  @@index([active, code])
+}
+
+model DiscountProduct {
+  discountId String
+  productId String
+  discount Discount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  @@id([discountId, productId])
+  @@index([productId])
+}
+
+model DiscountCategory {
+  discountId String
+  designSlug String
+  discount Discount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  design Design @relation(fields: [designSlug], references: [slug], onDelete: Cascade, onUpdate: Cascade)
+  @@id([discountId, designSlug])
+  @@index([designSlug])
+}
+
+// Immutable snapshot survives editing/deleting the promotion. One promotion per order.
+model DiscountRedemption {
+  id           String @id @default(cuid())
+  discountId   String?
+  orderId      String @unique
+  name         String
+  code         String?
+  amount       Int
+  createdAt    DateTime @default(now())
+  discount Discount? @relation(fields: [discountId], references: [id], onDelete: SetNull)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  @@index([discountId, createdAt])
 }

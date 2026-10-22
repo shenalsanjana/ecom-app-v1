@@ -79,6 +79,29 @@ describe("designAvailable", () => {
   });
 });
 
+describe("explicit physical blank stock", () => {
+  const stock = buildPlainStockMap([
+    { id: "regular-white-m", inventoryProductId: "regular", colorSlug: "white", size: "M", quantity: 2 },
+    { id: "oversized-white-m", inventoryProductId: "oversized", colorSlug: "white", size: "M", quantity: 7 },
+    { id: "raglan-white-m", inventoryProductId: "raglan", colorSlug: "white", size: "M", quantity: 0 },
+  ]);
+  const prints = buildDesignStockMap([{ id: "print", quantity: 20 }]);
+  it("separates the same colour and size across all three shirt styles", () => {
+    expect(stockForSize("white", "M", "print", stock, prints, "regular-white-m")).toBe(2);
+    expect(stockForSize("white", "M", "print", stock, prints, "oversized-white-m")).toBe(7);
+    expect(stockForSize("white", "M", "print", stock, prints, "raglan-white-m")).toBe(0);
+    expect(stock.get("white::M")).toBeUndefined();
+  });
+  it("does not borrow another style's stock when a cell is unconfigured", () => {
+    expect(stockForSize("white", "M", "print", stock, prints, null)).toBe(0);
+    expect(stockForSize("white", "M", "print", stock, prints, "removed")).toBe(0);
+  });
+  it("passes explicit stock identity through size and product availability", () => {
+    expect(availableSizes([{ size: "M", plainTshirtStockId: "oversized-white-m" }], "white", "print", stock, prints)).toEqual(["M"]);
+    expect(productInStock([{ colorSlug: "white", sizes: [{ size: "M", plainTshirtStockId: "raglan-white-m" }] }], "print", stock, prints)).toBe(false);
+  });
+});
+
 describe("availableSizes / variantInStock / productInStock (two-pool)", () => {
   const plainStock = buildPlainStockMap([
     { id: "ps1", colorSlug: "white", size: "S", quantity: 0 },

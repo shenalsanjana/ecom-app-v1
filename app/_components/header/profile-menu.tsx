@@ -30,7 +30,7 @@ export function ProfileMenu() {
       ? {
           name: session.user.name ?? "",
           email: session.user.email ?? "",
-          isAdmin: session.user.role === "ADMIN",
+          isAdmin: "role" in session.user && session.user.role === "ADMIN",
         }
       : null;
 

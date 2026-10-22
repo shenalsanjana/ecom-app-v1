@@ -408,7 +408,7 @@ export function DepartmentBody({
   const basePath = `/categories/${department.slug}`;
 
   const byDesign = countsByDesign(allProducts);
-  const byDepartment = countsByDepartment(departments, byDesign);
+  const byDepartment = countsByDepartment(departments, allProducts);
 
   // Price and stock are the only things that can narrow this page — the
   // department is the page, not a filter on it, so it is never counted here.

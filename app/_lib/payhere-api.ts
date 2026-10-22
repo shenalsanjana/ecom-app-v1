@@ -84,11 +84,11 @@ async function getAccessToken(): Promise<string> {
   console.log("[payhere-api] Requesting new OAuth access token", {
     endpoint: `${baseUrl}/merchant/v1/oauth/token`,
     app_id,
-    auth_code_prefix: payHereAuthCode().substring(0, 10) + "...",
   });
 
   const res = await fetch(`${baseUrl}/merchant/v1/oauth/token`, {
     method: "POST",
+    signal: AbortSignal.timeout(5_000),
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
       Authorization: `Basic ${payHereAuthCode()}`,
@@ -110,7 +110,6 @@ async function getAccessToken(): Promise<string> {
   console.log("[payhere-api] OAuth access token obtained", {
     token_type: data.token_type,
     expires_in: data.expires_in,
-    token_prefix: data.access_token?.substring(0, 10) + "...",
   });
 
   cachedToken = {
@@ -286,6 +285,7 @@ export async function verifyPayment(orderId: string): Promise<PaymentVerificatio
     `${baseUrl}/merchant/v1/payment/search?order_id=${encodeURIComponent(orderId)}`,
     {
       method: "GET",
+      signal: AbortSignal.timeout(5_000),
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },

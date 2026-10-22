@@ -15,9 +15,22 @@ export function GalleryEditor({ urls, onChange }: { urls: string[]; onChange: (u
     <div className="space-y-2">
       {urls.map((u, i) => (
         <div key={i} className="flex items-center gap-1">
+          {u.trim() && (
+            <a
+              href={u.trim()}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`View full-size image ${i + 1}`}
+              className="h-16 w-16 shrink-0 overflow-hidden rounded border bg-muted"
+            >
+              {/* A pasted admin URL may be outside next/image's allowlist. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={u.trim()} alt={`Image ${i + 1} preview`} loading="lazy" className="h-full w-full object-contain" />
+            </a>
+          )}
           <button type="button" onClick={() => move(i, -1)} className="px-1 text-muted-foreground">↑</button>
           <button type="button" onClick={() => move(i, 1)} className="px-1 text-muted-foreground">↓</button>
-          <input value={u} onChange={(e) => set(i, e.target.value)} placeholder="/products/…/2.jpg" className="flex-1 rounded border px-2 py-1 text-sm" />
+          <input value={u} onChange={(e) => set(i, e.target.value)} placeholder="/products/…/2.jpg" className="min-w-0 flex-1 rounded border px-2 py-1 text-sm" />
           <button type="button" onClick={() => remove(i)} className="px-1 text-destructive">✕</button>
         </div>
       ))}

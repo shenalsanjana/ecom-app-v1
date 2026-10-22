@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/app/_lib/prisma";
 import { buildPlainStockMap, buildDesignStockMap } from "@/app/_lib/variants";
+import { inCollections } from "@/app/_lib/product-collections";
 
 export { slugify, uniqueSlug, parseSizes, serializeSizes } from "@/app/_lib/product-helpers";
 import { PRODUCT_TABS, type ProductTab } from "@/app/_lib/product-helpers";
@@ -23,19 +24,25 @@ export function buildProductWhere(params: ProductListParams): Prisma.ProductWher
       break;
     case "all":
       break;
+    case "draft":
+      where.archived = false;
+      where.status = "DRAFT";
+      break;
     case "low-stock":
     case "active":
     default:
       where.archived = false;
+      where.status = "PUBLISHED";
   }
 
-  if (params.category) where.designSlug = params.category;
+  if (params.category) where.AND = [inCollections([params.category])];
 
   const q = params.q?.trim();
   if (q) {
     where.OR = [
       { name: { contains: q, mode: "insensitive" } },
       { id: { contains: q, mode: "insensitive" } },
+      { variants: { some: { archived: false, sizeStocks: { some: { archived: false, sku: { contains: q, mode: "insensitive" } } } } } },
     ];
   }
 
@@ -48,27 +55,29 @@ export function buildProductWhere(params: ProductListParams): Prisma.ProductWher
 // product side, and this catalog is small enough to scan in full.
 export async function getLowStockProductIds(): Promise<string[]> {
   const [lowPlainRows, lowDesignRows] = await Promise.all([
-    prisma.plainTshirtStock.findMany({ where: { quantity: { lte: LOW_STOCK_THRESHOLD } }, select: { colorSlug: true, size: true } }),
+    prisma.plainTshirtStock.findMany({ where: { quantity: { lte: LOW_STOCK_THRESHOLD } }, select: { id: true, colorSlug: true, size: true, inventoryProductId: true } }),
     prisma.dtfDesign.findMany({ where: { quantity: { lte: LOW_STOCK_THRESHOLD } }, select: { id: true } }),
   ]);
-  const lowColorSizes = new Set(lowPlainRows.map((r) => `${r.colorSlug}::${r.size}`));
+  const lowStockIds = new Set(lowPlainRows.map(r => r.id));
+  const lowColorSizes = new Set(lowPlainRows.filter(r => !r.inventoryProductId).map((r) => `${r.colorSlug}::${r.size}`));
   const lowDesignIds = new Set(lowDesignRows.map((r) => r.id));
-  if (lowColorSizes.size === 0 && lowDesignIds.size === 0) return [];
+  if (lowStockIds.size === 0 && lowColorSizes.size === 0 && lowDesignIds.size === 0) return [];
 
   const products = await prisma.product.findMany({
-    where: { archived: false },
+    where: { archived: false, status: "PUBLISHED" },
     select: {
       id: true,
-      dtfDesignId: true,
-      variants: { where: { archived: false }, select: { colorSlug: true, sizeStocks: { select: { size: true } } } },
+      dtfDesignId: true, stockMode: true,
+      variants: { where: { archived: false }, select: { colorSlug: true, sizeStocks: { where: { archived: false }, select: { size: true, plainTshirtStockId: true } } } },
     },
   });
 
   const ids: string[] = [];
   for (const p of products) {
-    if (p.dtfDesignId && lowDesignIds.has(p.dtfDesignId)) { ids.push(p.id); continue; }
+    if (p.stockMode !== "PLAIN" && p.dtfDesignId && lowDesignIds.has(p.dtfDesignId)) { ids.push(p.id); continue; }
     const touchesLowPlain = p.variants.some((v) =>
-      v.sizeStocks.some((s) => lowColorSizes.has(`${v.colorSlug}::${s.size}`)),
+      v.sizeStocks.some((s) => s.plainTshirtStockId ? lowStockIds.has(s.plainTshirtStockId) :
+        s.plainTshirtStockId === undefined && lowColorSizes.has(`${v.colorSlug}::${s.size}`)),
     );
     if (touchesLowPlain) ids.push(p.id);
   }
@@ -102,6 +111,7 @@ export async function listProducts(
       skip: (page - 1) * pageSize,
       include: {
         design: { select: { name: true } },
+        additionalCollections: { select: { designSlug: true, design: { select: { name: true, department: { select: { name: true } } } } }, orderBy: { designSlug: "asc" } },
         variants: {
           // Deleting a color archives (soft-deletes) it; the admin list must show
           // only live colors, so its count/thumbnail/availability exclude archived rows.
@@ -111,7 +121,7 @@ export async function listProducts(
             sortOrder: true,
             archived: true,
             colorSlug: true,
-            sizeStocks: { select: { size: true } },
+            sizeStocks: { where: { archived: false }, select: { size: true, plainTshirtStockId: true } },
             images: { where: { role: "CARD" }, orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } },
           },
         },
@@ -119,7 +129,7 @@ export async function listProducts(
       },
     }),
     prisma.product.count({ where }),
-    prisma.plainTshirtStock.findMany({ select: { id: true, colorSlug: true, size: true, quantity: true } }),
+    prisma.plainTshirtStock.findMany({ select: { id: true, colorSlug: true, size: true, quantity: true, inventoryProductId: true } }),
     prisma.dtfDesign.findMany({ select: { id: true, quantity: true } }),
   ]);
 
@@ -131,12 +141,13 @@ export async function getProduct(id: string) {
     where: { id },
     include: {
       design: true,
+      additionalCollections: { select: { designSlug: true }, orderBy: { designSlug: "asc" } },
       variants: {
         where: { archived: false },
         orderBy: { sortOrder: "asc" },
         include: {
           images: { orderBy: { sortOrder: "asc" } },
-          sizeStocks: { orderBy: { size: "asc" } },
+          sizeStocks: { where: { archived: false }, orderBy: { size: "asc" } },
         },
       },
     },

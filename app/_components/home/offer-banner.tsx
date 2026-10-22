@@ -2,7 +2,6 @@
 import Link from "next/link";
 import { Banknote, Check, CreditCard, Star } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
-import { DealsCountdown } from "@/app/_components/home/deals-countdown";
 
 /** The masthead of the shop-all catalogue: who this is, why it is safe to buy,
  *  and what is currently reduced — in one band, above the catalogue.
@@ -74,11 +73,7 @@ export function OfferBanner({
         </div>
 
         {onSale && (
-          // Cocoa, not terracotta: it is the same ground DealsSection uses at
-          // the foot of the page, so the two read as one promotion rather than
-          // two, and DealsCountdown's white-on-dark styling lands unchanged.
-          // Terracotta stays what globals.css reserves it for — the price cut
-          // itself, here on the button.
+          // Catalogue markdowns have no expiry unless a separate offer defines one.
           <div className="order-2 rounded-2xl bg-primary p-6 text-primary-foreground shadow-card lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-center">
             <p className="font-heading text-[1.5rem] font-semibold leading-tight tracking-[-0.01em]">
               Up to {offer.pct}% off
@@ -86,9 +81,6 @@ export function OfferBanner({
             <p className="mt-1 text-sm text-primary-foreground/70">
               {offer.count} {offer.count === 1 ? "piece" : "pieces"} reduced right now.
             </p>
-            <div className="mt-4">
-              <DealsCountdown />
-            </div>
             <Link
               href="/deals"
               className={`${buttonVariants({ variant: "brand", size: "lg" })} mt-4 w-full`}

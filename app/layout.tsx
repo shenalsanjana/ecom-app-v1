@@ -10,6 +10,9 @@ import { AnnouncementBar } from "@/app/_components/shared/announcement-bar";
 import { NavigationProgress } from "@/app/_components/shared/navigation-progress";
 import { DeliveryConfigProvider } from "@/app/_components/delivery/delivery-config-provider";
 import { getDeliveryConfig } from "@/app/_lib/store-settings";
+import { getStorefrontPromotions } from "@/app/_lib/storefront-promotion-service";
+import { PromotionProvider } from "@/app/_components/discounts/promotion-provider";
+import { PromotionBanner } from "@/app/_components/discounts/promotion-banner";
 import "./globals.css";
 
 // Poppins is the single brand typeface: Regular (body), Medium (buttons),
@@ -58,7 +61,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const deliveryConfig = await getDeliveryConfig();
+  const [deliveryConfig, promotions] = await Promise.all([getDeliveryConfig(), getStorefrontPromotions()]);
 
   return (
     <html
@@ -70,7 +73,8 @@ export default async function RootLayout({
         <Suspense fallback={null}>
           <NavigationProgress />
         </Suspense>
-        <AnnouncementBar freeThreshold={deliveryConfig.freeThreshold} />
+        <PromotionProvider initial={promotions}>
+        <PromotionBanner announcement><AnnouncementBar freeThreshold={deliveryConfig.freeThreshold} /></PromotionBanner>
         <DeliveryConfigProvider value={deliveryConfig}>
           <SessionProvider>
             <WishlistProvider>
@@ -78,6 +82,7 @@ export default async function RootLayout({
             </WishlistProvider>
           </SessionProvider>
         </DeliveryConfigProvider>
+        </PromotionProvider>
         <WhatsAppFloatButton />
       </body>
     </html>

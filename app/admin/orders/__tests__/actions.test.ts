@@ -1,12 +1,14 @@
+vi.mock("@/app/_lib/stock-movements", () => ({ setStockMovementContext: vi.fn() }));
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const { requireAdmin } = vi.hoisted(() => ({ requireAdmin: vi.fn() }));
 const {
-  orderFindUnique, orderUpdate, orderDelete, noteCreate, plainStockUpdateMany, plainStockFindUnique,
+  orderFindUnique, orderUpdate, orderUpdateMany, orderDelete, noteCreate, plainStockUpdateMany, plainStockFindUnique,
   dtfDesignUpdateMany, txn, orderAdjustmentCreate, orderAdjustmentDelete, productFindMany, variantFindUnique,
 } = vi.hoisted(() => ({
   orderFindUnique: vi.fn(),
   orderUpdate: vi.fn(),
+  orderUpdateMany: vi.fn(),
   orderDelete: vi.fn(),
   noteCreate: vi.fn(),
   plainStockUpdateMany: vi.fn(),
@@ -25,7 +27,8 @@ const { orderItemUpdate, orderItemDelete, orderItemCreate } = vi.hoisted(() => (
 }));
 
 vi.mock("@/app/_lib/admin-auth", () => ({ requireAdmin }));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/app/_lib/product-publication", async importOriginal => ({ ...await importOriginal<typeof import("@/app/_lib/product-publication")>(), assertProductsPublished: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 vi.mock("@/app/_lib/store-settings", () => ({
   getDeliveryConfig: vi.fn().mockResolvedValue({ colombo: 350, other: 450, freeThreshold: 5000 }),
 }));
@@ -48,9 +51,9 @@ vi.mock("@/app/_lib/order-notifications", () => ({ notifyOrderDispatched, notify
 
 vi.mock("@/app/_lib/prisma", () => {
   const client = {
-    order: { findUnique: orderFindUnique, update: orderUpdate, delete: orderDelete },
+    order: { findUnique: orderFindUnique, update: orderUpdate, updateMany: orderUpdateMany, delete: orderDelete },
     orderNote: { create: noteCreate },
-    plainTshirtStock: { updateMany: plainStockUpdateMany, findUnique: plainStockFindUnique },
+    plainTshirtStock: { updateMany: plainStockUpdateMany, findUnique: plainStockFindUnique, findFirst: plainStockFindUnique },
     dtfDesign: { updateMany: dtfDesignUpdateMany },
     orderItem: { update: orderItemUpdate, delete: orderItemDelete, create: orderItemCreate },
     orderAdjustment: { create: orderAdjustmentCreate, delete: orderAdjustmentDelete },
@@ -67,6 +70,7 @@ beforeEach(() => {
   requireAdmin.mockReset().mockResolvedValue({ user: { email: "admin@x.test" } });
   orderFindUnique.mockReset();
   orderUpdate.mockReset();
+  orderUpdateMany.mockReset().mockResolvedValue({ count: 1 });
   orderDelete.mockReset();
   noteCreate.mockReset();
   plainStockUpdateMany.mockReset().mockResolvedValue({ count: 1 });
@@ -81,9 +85,9 @@ beforeEach(() => {
   variantFindUnique.mockReset();
   txn.mockReset().mockImplementation(async (fn: (c: unknown) => unknown) => {
     const client = {
-      order: { findUnique: orderFindUnique, update: orderUpdate, delete: orderDelete },
+      order: { findUnique: orderFindUnique, update: orderUpdate, updateMany: orderUpdateMany, delete: orderDelete },
       orderNote: { create: noteCreate },
-      plainTshirtStock: { updateMany: plainStockUpdateMany, findUnique: plainStockFindUnique },
+      plainTshirtStock: { updateMany: plainStockUpdateMany, findUnique: plainStockFindUnique, findFirst: plainStockFindUnique },
       dtfDesign: { updateMany: dtfDesignUpdateMany },
       orderItem: { update: orderItemUpdate, delete: orderItemDelete, create: orderItemCreate },
       orderAdjustment: { create: orderAdjustmentCreate, delete: orderAdjustmentDelete },
@@ -200,9 +204,12 @@ describe("cancelOrder", () => {
       adjustments: [],
     });
     const res = await cancelOrder("o1");
-    expect(plainStockUpdateMany).toHaveBeenCalledWith({ where: { id: "ps1" }, data: { quantity: { increment: 2 } } });
-    expect(dtfDesignUpdateMany).toHaveBeenCalledWith({ where: { id: "d1" }, data: { quantity: { increment: 2 } } });
-    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CANCELLED" } });
+    expect(plainStockUpdateMany).toHaveBeenCalledWith({ where: { id: "ps1" }, data: { quantity: { increment: 2 }, version: { increment: 1 } } });
+    expect(dtfDesignUpdateMany).toHaveBeenCalledWith({ where: { id: "d1" }, data: { quantity: { increment: 2 }, version: { increment: 1 } } });
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: {
+      status: "CANCELLED", paymentReviewRequired: true,
+      paymentReviewReason: "A paid order was cancelled. Verify and record the manual refund before closing payment review.",
+    } });
     expect(res).toEqual({ success: true, warning: "Order was paid — refund must be handled manually." });
   });
 
@@ -219,7 +226,7 @@ describe("cancelOrder", () => {
     });
     const res = await cancelOrder("o1");
     expect(plainStockUpdateMany).toHaveBeenCalledTimes(1);
-    expect(plainStockUpdateMany).toHaveBeenCalledWith({ where: { id: "ps1" }, data: { quantity: { increment: 1 } } });
+    expect(plainStockUpdateMany).toHaveBeenCalledWith({ where: { id: "ps1" }, data: { quantity: { increment: 1 }, version: { increment: 1 } } });
     expect(dtfDesignUpdateMany).toHaveBeenCalledTimes(2); // items 2 and 3 both carry a dtfDesignId
     expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CANCELLED" } });
     expect(res).toEqual({ success: true });
@@ -272,8 +279,8 @@ describe("editItems", () => {
     orderUpdate.mockResolvedValueOnce({});
     orderItemUpdate.mockResolvedValueOnce({});
     const res = await editItems("o1", [{ id: "i1", quantity: 1 }]);
-    expect(plainStockUpdateMany).toHaveBeenNthCalledWith(1, { where: { id: "ps1" }, data: { quantity: { increment: 2 } } });
-    expect(plainStockUpdateMany).toHaveBeenNthCalledWith(2, { where: { id: "ps1", quantity: { gte: 1 } }, data: { quantity: { decrement: 1 } } });
+    expect(plainStockUpdateMany).toHaveBeenNthCalledWith(1, { where: { id: "ps1" }, data: { quantity: { increment: 2 }, version: { increment: 1 } } });
+    expect(plainStockUpdateMany).toHaveBeenNthCalledWith(2, { where: { id: "ps1", quantity: { gte: 1 } }, data: { quantity: { decrement: 1 }, version: { increment: 1 } } });
     expect(orderItemUpdate).toHaveBeenCalledWith({ where: { id: "i1" }, data: { quantity: 1, size: "M", plainTshirtStockId: "ps1" } });
     // subtotal 2000 (qty 2→1 at price 2000), Colombo, below the 5000 free-shipping threshold → 350 shipping
     expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
@@ -288,8 +295,8 @@ describe("editItems", () => {
     orderUpdate.mockResolvedValueOnce({});
     orderItemDelete.mockResolvedValueOnce({});
     const res = await editItems("o1", [{ id: "i1", remove: true }]);
-    expect(plainStockUpdateMany).toHaveBeenCalledWith({ where: { id: "ps1" }, data: { quantity: { increment: 2 } } });
-    expect(dtfDesignUpdateMany).toHaveBeenCalledWith({ where: { id: "d1" }, data: { quantity: { increment: 2 } } });
+    expect(plainStockUpdateMany).toHaveBeenCalledWith({ where: { id: "ps1" }, data: { quantity: { increment: 2 }, version: { increment: 1 } } });
+    expect(dtfDesignUpdateMany).toHaveBeenCalledWith({ where: { id: "d1" }, data: { quantity: { increment: 2 }, version: { increment: 1 } } });
     expect(orderItemDelete).toHaveBeenCalledWith({ where: { id: "i1" } });
     expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "o1" },
@@ -311,13 +318,13 @@ describe("editItems", () => {
   it("a size change resolves the new color+size pool from the frozen row's colorSlug, not the variant's current color", async () => {
     orderFindUnique.mockResolvedValueOnce(ORDER);
     plainStockFindUnique
-      .mockResolvedValueOnce({ colorSlug: "white" }) // lookup of the OLD pool row's colorSlug, by id "ps1"
+      .mockResolvedValueOnce({ colorSlug: "white", inventoryProductId: "blank-oversized" }) // frozen physical family, regardless of current product edits
       .mockResolvedValueOnce({ id: "ps-white-l" });   // lookup of the NEW (white, L) pool row
     orderUpdate.mockResolvedValueOnce({});
     orderItemUpdate.mockResolvedValueOnce({});
     const res = await editItems("o1", [{ id: "i1", size: "L" }]);
-    expect(plainStockFindUnique).toHaveBeenNthCalledWith(1, { where: { id: "ps1" }, select: { colorSlug: true } });
-    expect(plainStockFindUnique).toHaveBeenNthCalledWith(2, { where: { colorSlug_size: { colorSlug: "white", size: "L" } }, select: { id: true } });
+    expect(plainStockFindUnique).toHaveBeenNthCalledWith(1, { where: { id: "ps1" }, select: { colorSlug: true, inventoryProductId: true } });
+    expect(plainStockFindUnique).toHaveBeenNthCalledWith(2, { where: { inventoryProductId: "blank-oversized", colorSlug: "white", size: "L" }, select: { id: true } });
     expect(orderItemUpdate).toHaveBeenCalledWith({ where: { id: "i1" }, data: { quantity: 2, size: "L", plainTshirtStockId: "ps-white-l" } });
     expect(res).toEqual({ success: true });
   });
@@ -484,12 +491,13 @@ describe("addAdjustment", () => {
     expect(res).toEqual({ success: true });
   });
 
-  it("warns when the order was already paid", async () => {
+  it("locks charges when an online order was already paid", async () => {
     orderFindUnique.mockResolvedValueOnce({ ...BASE, paymentStatus: "PAID" });
     orderAdjustmentCreate.mockResolvedValueOnce({});
     orderUpdate.mockResolvedValueOnce({});
     const res = await addAdjustment("o1", { label: "Rush fee", amount: 500, kind: "CHARGE" });
-    expect(res).toEqual({ success: true, warning: "Order was paid — any price difference must be settled manually." });
+    expect(res).toEqual({ success: false, error: "Payment has started. Items and charges are locked to the payment amount." });
+    expect(orderAdjustmentCreate).not.toHaveBeenCalled();
   });
 });
 
@@ -777,7 +785,7 @@ describe("bulkCancel", () => {
     const res = await bulkCancel(["o1", "o2", "o3"]);
 
     expect(plainStockUpdateMany).toHaveBeenCalledTimes(1);
-    expect(plainStockUpdateMany).toHaveBeenCalledWith({ where: { id: "ps1" }, data: { quantity: { increment: 2 } } });
+    expect(plainStockUpdateMany).toHaveBeenCalledWith({ where: { id: "ps1" }, data: { quantity: { increment: 2 }, version: { increment: 1 } } });
     expect(orderUpdate).toHaveBeenCalledTimes(1);
     expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { status: "CANCELLED" } });
     expect(res.okCount).toBe(1);
@@ -790,14 +798,15 @@ describe("bulkCancel", () => {
   });
 });
 
-import { deleteOrder, bulkDelete } from "../actions";
+import { deleteOrder, bulkDelete, restoreDeletedOrder } from "../actions";
 
 describe("deleteOrder", () => {
   it("deletes a cancelled order without touching stock", async () => {
     orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "CANCELLED" });
     orderDelete.mockResolvedValueOnce({});
     const res = await deleteOrder("o1");
-    expect(orderDelete).toHaveBeenCalledWith({ where: { id: "o1" } });
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { deletedAt: expect.any(Date) } });
+    expect(orderDelete).not.toHaveBeenCalled();
     expect(plainStockUpdateMany).not.toHaveBeenCalled();
     expect(dtfDesignUpdateMany).not.toHaveBeenCalled();
     expect(res).toEqual({ success: true });
@@ -807,7 +816,8 @@ describe("deleteOrder", () => {
     orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "DELIVERED" });
     orderDelete.mockResolvedValueOnce({});
     const res = await deleteOrder("o1");
-    expect(orderDelete).toHaveBeenCalledWith({ where: { id: "o1" } });
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { deletedAt: expect.any(Date) } });
+    expect(orderDelete).not.toHaveBeenCalled();
     // delivered goods shipped — deletion must NOT return them to inventory
     expect(plainStockUpdateMany).not.toHaveBeenCalled();
     expect(dtfDesignUpdateMany).not.toHaveBeenCalled();
@@ -820,6 +830,34 @@ describe("deleteOrder", () => {
     expect(res).toEqual({ success: false, error: "Only cancelled or delivered orders can be deleted" });
     expect(orderDelete).not.toHaveBeenCalled();
   });
+
+  it("retains cancelled orders with unresolved payment evidence", async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: "o1", version: 3, status: "CANCELLED", paymentStatus: "PENDING", paymentReviewRequired: true });
+    expect(await deleteOrder("o1")).toEqual({ success: true });
+    expect(orderUpdateMany).toHaveBeenCalledWith({ where: { id: "o1", version: 3, status: "CANCELLED", paymentStatus: "PENDING" }, data: { version: { increment: 1 } } });
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { deletedAt: expect.any(Date) } });
+    expect(orderDelete).not.toHaveBeenCalled();
+    expect(notifyOrderCancelled).not.toHaveBeenCalled();
+  });
+
+  it("rejects a stale deletion after a payment changes the order", async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: "o1", version: 3, status: "CANCELLED", paymentStatus: "PENDING" });
+    orderUpdateMany.mockResolvedValueOnce({ count: 0 });
+    expect(await deleteOrder("o1")).toEqual({ success: false, error: "This order changed while you were working. Refresh and try again." });
+    expect(orderUpdate).not.toHaveBeenCalled();
+  });
+
+  it("does not mutate an already deleted order", async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: "o1", status: "CANCELLED", deletedAt: new Date() });
+    expect(await deleteOrder("o1")).toEqual({ success: true });
+    expect(txn).not.toHaveBeenCalled();
+  });
+
+  it("requires admin before reading or deleting an order", async () => {
+    requireAdmin.mockRejectedValueOnce(new Error("Unauthorized"));
+    await expect(deleteOrder("o1")).rejects.toThrow("Unauthorized");
+    expect(orderFindUnique).not.toHaveBeenCalled();
+  });
 });
 
 describe("bulkDelete", () => {
@@ -830,9 +868,10 @@ describe("bulkDelete", () => {
       .mockResolvedValueOnce({ id: "o3", status: "CONFIRMED" });
     orderDelete.mockResolvedValue({});
     const res = await bulkDelete(["o1", "o2", "o3"]);
-    expect(orderDelete).toHaveBeenCalledTimes(2);
-    expect(orderDelete).toHaveBeenCalledWith({ where: { id: "o1" } });
-    expect(orderDelete).toHaveBeenCalledWith({ where: { id: "o2" } });
+    expect(orderUpdate).toHaveBeenCalledTimes(2);
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { deletedAt: expect.any(Date) } });
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o2" }, data: { deletedAt: expect.any(Date) } });
+    expect(orderDelete).not.toHaveBeenCalled();
     expect(plainStockUpdateMany).not.toHaveBeenCalled(); // delete must never restore stock
     expect(dtfDesignUpdateMany).not.toHaveBeenCalled(); // delete must never restore stock
     expect(res.okCount).toBe(2);
@@ -842,6 +881,24 @@ describe("bulkDelete", () => {
       { id: "o2", ok: true },
       { id: "o3", ok: false, error: "Not deletable" },
     ]);
+  });
+});
+
+describe("restoreDeletedOrder", () => {
+  it("restores visibility without changing stock, status or payment review", async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: "o1", version: 4, status: "CANCELLED", paymentStatus: "PENDING", paymentReviewRequired: true, deletedAt: new Date() });
+    expect(await restoreDeletedOrder("o1")).toEqual({ success: true });
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { deletedAt: null } });
+    expect(plainStockUpdateMany).not.toHaveBeenCalled();
+    expect(dtfDesignUpdateMany).not.toHaveBeenCalled();
+    expect(notifyOrderCancelled).not.toHaveBeenCalled();
+  });
+
+  it("rejects a missing or active order", async () => {
+    orderFindUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "o1", deletedAt: null });
+    expect(await restoreDeletedOrder("missing")).toEqual({ success: false, error: "Order not found" });
+    expect(await restoreDeletedOrder("o1")).toEqual({ success: false, error: "Order is not deleted" });
+    expect(txn).not.toHaveBeenCalled();
   });
 });
 
@@ -865,7 +922,7 @@ describe("searchProductsForOrder", () => {
     ]);
     const res = await searchProductsForOrder("cat");
     expect(productFindMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { archived: false, name: { contains: "cat", mode: "insensitive" } },
+      where: { archived: false, status: "PUBLISHED", OR: [{ name: { contains: "cat", mode: "insensitive" } }, { variants: { some: { archived: false, sizeStocks: { some: { archived: false, sku: { contains: "cat", mode: "insensitive" } } } } } }] },
       take: 20,
     }));
     expect(res).toEqual([
@@ -882,7 +939,7 @@ describe("addOrderItem", () => {
   const VARIANT = {
     id: "v1", productId: "p1", color: "White", colorSlug: "white", sku: "DB-CAT-WHT", price: null,
     sizeStocks: [{ size: "M" }, { size: "L" }],
-    product: { id: "p1", name: "Cat Tee", price: 2000, dtfDesignId: "d1", archived: false },
+    product: { id: "p1", name: "Cat Tee", price: 2000, dtfDesignId: "d1", status: "PUBLISHED", archived: false },
   };
 
   it("is blocked once the courier is booked", async () => {
@@ -914,11 +971,11 @@ describe("addOrderItem", () => {
 
     const res = await addOrderItem("o1", { productId: "p1", variantId: "v1", size: "M", quantity: 2 });
 
-    expect(plainStockFindUnique).toHaveBeenCalledWith({ where: { colorSlug_size: { colorSlug: "white", size: "M" } }, select: { id: true } });
-    expect(plainStockUpdateMany).toHaveBeenCalledWith({ where: { id: "ps-white-m", quantity: { gte: 2 } }, data: { quantity: { decrement: 2 } } });
-    expect(dtfDesignUpdateMany).toHaveBeenCalledWith({ where: { id: "d1", quantity: { gte: 2 } }, data: { quantity: { decrement: 2 } } });
+    expect(plainStockFindUnique).toHaveBeenCalledWith({ where: { inventoryProductId: null, colorSlug: "white", size: "M" }, select: { id: true } });
+    expect(plainStockUpdateMany).toHaveBeenCalledWith({ where: { id: "ps-white-m", quantity: { gte: 2 } }, data: { quantity: { decrement: 2 }, version: { increment: 1 } } });
+    expect(dtfDesignUpdateMany).toHaveBeenCalledWith({ where: { id: "d1", quantity: { gte: 2 } }, data: { quantity: { decrement: 2 }, version: { increment: 1 } } });
     expect(orderItemCreate).toHaveBeenCalledWith({
-      data: {
+      data: { stockMode: "PRINTED_TO_ORDER",
         orderId: "o1", productId: "p1", variantId: "v1", color: "White", sku: "DB-CAT-WHT",
         name: "Cat Tee", size: "M", price: 2000, quantity: 2,
         plainTshirtStockId: "ps-white-m", dtfDesignId: "d1",
@@ -943,21 +1000,12 @@ describe("addOrderItem", () => {
     expect(orderItemCreate).not.toHaveBeenCalled();
   });
 
-  it("adds a sizeless item without touching the plain-tee pool", async () => {
-    const sizelessVariant = { ...VARIANT, sizeStocks: [] };
+  it("rejects an item without configured stock", async () => {
     orderFindUnique.mockResolvedValueOnce(BASE);
-    variantFindUnique.mockResolvedValueOnce(sizelessVariant);
-    orderItemCreate.mockResolvedValueOnce({});
-    orderUpdate.mockResolvedValueOnce({});
-
+    variantFindUnique.mockResolvedValueOnce({ ...VARIANT, sizeStocks: [] });
     const res = await addOrderItem("o1", { productId: "p1", variantId: "v1", size: null, quantity: 1 });
-
-    expect(plainStockFindUnique).not.toHaveBeenCalled();
-    expect(plainStockUpdateMany).not.toHaveBeenCalled();
-    expect(orderItemCreate).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ size: null, plainTshirtStockId: null }),
-    }));
-    expect(res).toEqual({ success: true });
+    expect(res).toEqual({ success: false, error: "Stock is not configured for this color" });
+    expect(orderItemCreate).not.toHaveBeenCalled();
   });
 });
 
@@ -972,7 +1020,7 @@ describe("swapOrderItem", () => {
   const VARIANT = {
     id: "v2", productId: "p2", color: "Black", colorSlug: "black", sku: "DB-DOG-BLK", price: null,
     sizeStocks: [{ size: "S" }, { size: "M" }],
-    product: { id: "p2", name: "Dog Tee", price: 1800, dtfDesignId: "d-new", archived: false },
+    product: { id: "p2", name: "Dog Tee", price: 1800, dtfDesignId: "d-new", status: "PUBLISHED", archived: false },
   };
 
   it("is blocked once the courier is booked", async () => {
@@ -996,13 +1044,13 @@ describe("swapOrderItem", () => {
 
     const res = await swapOrderItem("o1", "i1", { productId: "p2", variantId: "v2", size: "S", quantity: 3 });
 
-    expect(plainStockUpdateMany).toHaveBeenNthCalledWith(1, { where: { id: "ps-old" }, data: { quantity: { increment: 1 } } });
-    expect(dtfDesignUpdateMany).toHaveBeenNthCalledWith(1, { where: { id: "d-old" }, data: { quantity: { increment: 1 } } });
-    expect(plainStockFindUnique).toHaveBeenCalledWith({ where: { colorSlug_size: { colorSlug: "black", size: "S" } }, select: { id: true } });
-    expect(plainStockUpdateMany).toHaveBeenNthCalledWith(2, { where: { id: "ps-black-s", quantity: { gte: 3 } }, data: { quantity: { decrement: 3 } } });
+    expect(plainStockUpdateMany).toHaveBeenNthCalledWith(1, { where: { id: "ps-old" }, data: { quantity: { increment: 1 }, version: { increment: 1 } } });
+    expect(dtfDesignUpdateMany).toHaveBeenNthCalledWith(1, { where: { id: "d-old" }, data: { quantity: { increment: 1 }, version: { increment: 1 } } });
+    expect(plainStockFindUnique).toHaveBeenCalledWith({ where: { inventoryProductId: null, colorSlug: "black", size: "S" }, select: { id: true } });
+    expect(plainStockUpdateMany).toHaveBeenNthCalledWith(2, { where: { id: "ps-black-s", quantity: { gte: 3 } }, data: { quantity: { decrement: 3 }, version: { increment: 1 } } });
     expect(orderItemUpdate).toHaveBeenCalledWith({
       where: { id: "i1" },
-      data: {
+      data: { stockMode: "PRINTED_TO_ORDER",
         productId: "p2", variantId: "v2", color: "Black", sku: "DB-DOG-BLK",
         name: "Dog Tee", size: "S", price: 1800, quantity: 3,
         plainTshirtStockId: "ps-black-s", dtfDesignId: "d-new",
@@ -1026,5 +1074,63 @@ describe("swapOrderItem", () => {
 
     expect(res).toEqual({ success: false, error: 'Insufficient stock for "Dog Tee"' });
     expect(orderItemUpdate).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("stage 01 concurrency and stock regression cases", () => {
+  const ORDER = { id: "o1", version: 0, status: "PENDING", paymentMethod: "COD", paymentStatus: "COD_PENDING", courierBookedAt: null, shippingCity: "Colombo", items: [{ id: "i1", name: "Tee", variantId: "v1", size: "M", price: 2000, quantity: 1, plainTshirtStockId: "ps1", dtfDesignId: "d1" }], adjustments: [] };
+  it("does not restore anything when another cancellation wins the claim", async () => {
+    orderFindUnique.mockResolvedValue(ORDER);
+    orderUpdateMany.mockResolvedValue({ count: 0 });
+    expect((await cancelOrder("o1")).success).toBe(false);
+    expect(plainStockUpdateMany).not.toHaveBeenCalled();
+    expect(dtfDesignUpdateMany).not.toHaveBeenCalled();
+    expect(notifyOrderCancelled).not.toHaveBeenCalled();
+  });
+  it("requires the version read by the editor when cancelling", async () => {
+    orderFindUnique.mockResolvedValue(ORDER);
+    await cancelOrder("o1");
+    expect(orderUpdateMany).toHaveBeenCalledWith({ where: { id: "o1", version: 0, status: "PENDING", paymentStatus: "COD_PENDING" }, data: { version: { increment: 1 } } });
+    expect(orderUpdateMany.mock.invocationCallOrder[0]).toBeLessThan(plainStockUpdateMany.mock.invocationCallOrder[0]);
+  });
+  it("rejects a new shirt line if the blank stock mapping is missing", async () => {
+    orderFindUnique.mockResolvedValue(ORDER);
+    variantFindUnique.mockResolvedValue({ id: "v1", productId: "p1", archived: false, color: "White", colorSlug: "white", price: null, sizeStocks: [{ size: "M" }], product: { id: "p1", name: "Tee", price: 2000, status: "PUBLISHED", archived: false, dtfDesignId: "d1" } });
+    plainStockFindUnique.mockResolvedValue(null);
+    expect((await addOrderItem("o1", { productId: "p1", variantId: "v1", size: "M", quantity: 1 })).success).toBe(false);
+    expect(dtfDesignUpdateMany).not.toHaveBeenCalled();
+    expect(orderItemCreate).not.toHaveBeenCalled();
+  });
+  it("rejects quantity edits after a gateway session has started", async () => {
+    orderFindUnique.mockResolvedValue({ ...ORDER, paymentMethod: "PAYHERE", paymentStatus: "PENDING", paymentStartedAt: new Date() });
+    expect((await editItems("o1", [{ id: "i1", quantity: 2 }])).success).toBe(false);
+    expect(orderUpdateMany).not.toHaveBeenCalled();
+  });
+  it("does not restore stock for a dispatched order", async () => {
+    orderFindUnique.mockResolvedValue({ ...ORDER, status: "DISPATCHED" });
+    expect((await cancelOrder("o1")).success).toBe(false);
+    expect(plainStockUpdateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("promotion snapshots during admin order edits", () => {
+  const promotionOrder = { id: "promo-order", status: "PENDING", paymentStatus: "COD_PENDING", paymentMethod: "COD", version: 0, shippingCity: "Colombo", items: [{ id: "i1", price: 1000, quantity: 1 }], adjustments: [{ id: "promo", label: "Coupon SAVE", amount: -100, promotion: true }] };
+  it("blocks quantity edits, product additions and swaps that would invalidate eligibility", async () => {
+    orderFindUnique.mockResolvedValue(promotionOrder);
+    const selection = { productId: "p", variantId: "v", size: "M", quantity: 1 };
+    for (const action of [() => editItems("promo-order", [{ id: "i1", quantity: 2 }]), () => addOrderItem("promo-order", selection), () => swapOrderItem("promo-order", "i1", selection)]) expect(await action()).toMatchObject({ success: false, error: expect.stringContaining("eligibility") });
+    expect(txn).not.toHaveBeenCalled();
+  });
+  it("protects the saved promotion from removal and extra manual discounts", async () => {
+    orderFindUnique.mockResolvedValue(promotionOrder);
+    expect(await removeAdjustment("promo-order", "promo")).toMatchObject({ success: false, error: expect.stringContaining("cannot be removed") });
+    expect(await addAdjustment("promo-order", { label: "Extra", amount: 50, kind: "DISCOUNT" })).toMatchObject({ success: false, error: expect.stringContaining("cannot be combined") });
+    expect(orderAdjustmentDelete).not.toHaveBeenCalled(); expect(orderAdjustmentCreate).not.toHaveBeenCalled();
+  });
+  it("keeps the original savings when only the delivery address changes", async () => {
+    orderFindUnique.mockResolvedValue(promotionOrder);
+    expect((await editAddress("promo-order", ADDR)).success).toBe(true);
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ shippingCost: 450, total: 1350 }) }));
   });
 });

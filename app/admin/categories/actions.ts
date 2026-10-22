@@ -6,6 +6,7 @@ import { prisma } from "@/app/_lib/prisma";
 import { requireAdmin } from "@/app/_lib/admin-auth";
 import { slugify, uniqueSlug } from "@/app/_lib/admin-products";
 import { tintForSlug } from "@/app/_lib/taxonomy-tint";
+import { inCollections } from "@/app/_lib/product-collections";
 
 export type CategoryActionResult =
   | { success: true; slug?: string; name?: string }
@@ -37,7 +38,8 @@ const CategoryUpdateSchema = z.object({
 function revalidate() {
   revalidatePath("/admin/categories");
   revalidatePath("/admin/products"); // product form's category dropdown
-  revalidateTag("catalog", "max"); // bust storefront category caches (catalog/categories tags)
+  revalidatePath("/admin/inventory");
+  revalidateTag("catalog", { expire: 0 });
 }
 
 export async function createCategory(
@@ -150,9 +152,11 @@ export async function updateCategory(
 
 export async function deleteCategory(slug: string): Promise<CategoryActionResult> {
   await requireAdmin();
-  const productCount = await prisma.product.count({ where: { designSlug: slug } });
+  const productCount = await prisma.product.count({ where: inCollections([slug]) });
   if (productCount > 0) {
-    return { success: false, error: "This category has products. Reassign or remove them first." };
+    const products = await prisma.product.findMany({ where: inCollections([slug]), orderBy: { name: "asc" }, take: 3, select: { name: true } });
+    const names = products.map(product => product.name).join(", ");
+    return { success: false, error: `This collection has ${productCount} product${productCount === 1 ? "" : "s"}${names ? `: ${names}${productCount > products.length ? ", …" : ""}` : ""}. Reassign their primary collection or remove their additional membership first.` };
   }
   try {
     await prisma.design.delete({ where: { slug } });

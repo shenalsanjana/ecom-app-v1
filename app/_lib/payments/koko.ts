@@ -166,6 +166,7 @@ export async function fetchKokoOrderStatus(orderId: string): Promise<KokoStatus>
     try {
       response = await fetch(cfg.orderViewUrl, {
         method: "POST",
+        signal: AbortSignal.timeout(10_000),
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body,
       });

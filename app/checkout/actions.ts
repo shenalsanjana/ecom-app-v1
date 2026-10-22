@@ -1,7 +1,13 @@
 // app/checkout/actions.ts
 "use server";
 
+import { requiresPrint, effectivePrintId } from "@/app/_lib/stock-policy";
+import { setStockMovementContext } from "@/app/_lib/stock-movements";
+import { saleSkuForSize } from "@/app/_lib/sale-skus";
+
 import { z } from "zod";
+import { DiscountError, toCents, fromCents, type AppliedDiscount, type DiscountLine } from "@/app/_lib/discounts";
+import { priceDiscount, claimDiscount } from "@/app/_lib/discount-service";
 import { LkPhoneSchema, LkMobileSchema } from "@/app/_lib/validation";
 import { validateCartItems, type VariantStock } from "@/app/_lib/order-validation";
 import {
@@ -21,12 +27,15 @@ import { initialPaymentStatus } from "@/app/_lib/order-status";
 import { nextWebNumber } from "@/app/_lib/web-number";
 import { acquireItemPools, InsufficientStockError } from "@/app/_lib/inventory-pools";
 import { buildPlainStockMap, buildDesignStockMap, plainStockKey } from "@/app/_lib/variants";
+import { effectivePrice } from "@/app/_lib/variants";
+import { invalidateStock } from "@/app/_lib/invalidate-stock";
+import { assertProductsPublished, PublicationError } from "@/app/_lib/product-publication";
 
 export type PaymentMethod = "COD" | "PAYHERE" | "KOKO" | "MINTPAY";
 
 export type CheckoutResult =
   | { success: true; orderId: string; webNumber?: string | null; trackingCode?: string; isGuest?: boolean }
-  | { success: false; error: string };
+  | { success: false; error: string; priceChanges?: { variantId: string; price: number }[] };
 
 const PAYMENT_METHOD_DISPLAY: Record<PaymentMethod, string> = {
   COD: "Cash on Delivery",
@@ -41,7 +50,7 @@ const ItemInputSchema = z.object({
   color: z.string().nullable().optional(),
   name: z.string().min(1),
   price: z.number().nonnegative(),
-  quantity: z.number().int().positive(),
+  quantity: z.number().int().positive().max(10),
   size: z.string().nullable().optional(),
 });
 
@@ -59,7 +68,9 @@ const GuestInfoSchema = z.object({
 });
 
 const ProcessOrderSchema = z.object({
-  items: z.array(ItemInputSchema).min(1, "Cart is empty"),
+  items: z.array(ItemInputSchema).min(1, "Cart is empty").max(100),
+  couponCode: z.string().trim().max(40).optional(),
+  discountExpectation: z.object({ id: z.string().nullable(), amount: z.number().int().nonnegative() }).optional(),
   shippingAddress: AddressSchema,
   paymentMethod: z.enum(["COD", "PAYHERE", "KOKO", "MINTPAY"]),
   contactPhone: LkMobileSchema,
@@ -130,8 +141,9 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
     const first = parsed.error.issues[0];
     return { success: false, error: first?.message ?? "Invalid order data" };
   }
-  const { items, shippingAddress, paymentMethod, contactPhone, alternatePhone, guestInfo, idempotencyKey, notes } =
+  const { items: submittedItems, shippingAddress, paymentMethod, contactPhone, alternatePhone, guestInfo, idempotencyKey, notes, couponCode, discountExpectation } =
     parsed.data;
+  let items = submittedItems;
 
   let userId: string | null = null;
   let customerName: string;
@@ -180,6 +192,15 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
       where: { idempotencyKey },
     });
     if (existing) {
+      if (existing.userId !== userId || (!userId && existing.customerPhone !== contactPhone)) {
+        return { success: false, error: "This checkout reference is unavailable. Please reload checkout." };
+      }
+      if (existing.status === "CANCELLED" || existing.paymentStatus === "PAYMENT_FAILED") {
+        return { success: false, error: "This order is closed. Please reload checkout to place a new order." };
+      }
+      if (existing.paymentMethod !== paymentMethod) {
+        return { success: false, error: "This order was already placed with a different payment method. Complete its original payment or contact the store." };
+      }
       return {
         success: true,
         orderId: existing.id,
@@ -190,50 +211,69 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
     }
   }
 
-  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const deliveryConfig = await getDeliveryConfig();
-  const shippingCost = calculateDelivery(subtotal, zoneForCity(shippingAddress.city), deliveryConfig, paymentMethod);
-  const total = subtotal + shippingCost;
   const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
   // Validate each line against the two raw-material pools its variant/design draw from.
   const variantIds = Array.from(new Set(items.map((i) => i.variantId)));
   const dbVariants = await prisma.productVariant.findMany({
-    where: { id: { in: variantIds } },
+    where: { id: { in: variantIds }, archived: false, product: { archived: false, status: "PUBLISHED" } },
     select: {
       id: true,
       productId: true,
       color: true,
       colorSlug: true,
       sku: true,
-      sizeStocks: { select: { size: true } },
-      product: { select: { dtfDesignId: true } },
+      price: true,
+      originalPrice: true,
+      archived: true,
+      sizeStocks: { where: { archived: false }, select: { size: true, sku: true, plainTshirtStockId: true } },
+      product: { select: { dtfDesignId: true, stockMode: true, name: true, price: true, originalPrice: true, designSlug: true, additionalCollections: { select: { designSlug: true } }, archived: true, status: true } },
     },
   });
   const variantMap = new Map<
     string,
-    VariantStock & { productId: string; color: string; colorSlug: string; sku: string | null }
+    VariantStock & { productId: string; color: string; colorSlug: string; sku: string | null; name: string; price: number }
   >(
-    dbVariants.map((v) => [
+    dbVariants.filter((v) => !v.archived && !v.product.archived && v.product.status === "PUBLISHED").map((v) => [
       v.id,
       {
         productId: v.productId,
         color: v.color,
         colorSlug: v.colorSlug,
         sku: v.sku,
-        dtfDesignId: v.product.dtfDesignId,
+        name: v.product.name,
+        price: effectivePrice(v, v.product),
+        dtfDesignId: effectivePrintId(v.product),
+        stockMode: v.product.stockMode,
         sizes: v.sizeStocks,
       },
     ]),
   );
   for (const item of items) {
     const variant = variantMap.get(item.variantId);
-    if (variant && variant.productId !== item.productId) {
+    if (!variant) return { success: false, error: `"${item.name}" is no longer available. Please remove it from your cart.` };
+    if (variant.productId !== item.productId) {
       return { success: false, error: `Selected variant does not belong to "${item.name}"` };
     }
   }
+  const priceChanges = items.filter((item) => item.price !== variantMap.get(item.variantId)!.price)
+    .map((item) => ({ variantId: item.variantId, price: variantMap.get(item.variantId)!.price }));
+  if (priceChanges.length) {
+    return { success: false, error: "Some prices changed. Your cart has been updated; please review the total and place your order again.", priceChanges };
+  }
+  items = items.map((item) => ({ ...item, name: variantMap.get(item.variantId)!.name, price: variantMap.get(item.variantId)!.price }));
+  const subtotal = fromCents(items.reduce((sum, item) => sum + toCents(item.price) * item.quantity, 0));
+  const dbVariantMap = new Map(dbVariants.map(v => [v.id, v]));
+  const discountLines: DiscountLine[] = items.map(item => {
+    const v = dbVariantMap.get(item.variantId)!;
+    return { productId: item.productId, price: item.price, originalPrice: v.originalPrice ?? v.product.originalPrice ?? null,
+      quantity: item.quantity, categorySlugs: [v.product.designSlug, ...(v.product.additionalCollections ?? []).map(c => c.designSlug)] };
+  });
+  const deliveryConfig = await getDeliveryConfig();
+  const shippingCost = calculateDelivery(subtotal, zoneForCity(shippingAddress.city), deliveryConfig, paymentMethod);
+  let total = fromCents(toCents(subtotal) + toCents(shippingCost));
   const [plainStockRows, designStockRows] = await Promise.all([
-    prisma.plainTshirtStock.findMany({ select: { id: true, colorSlug: true, size: true, quantity: true } }),
+    prisma.plainTshirtStock.findMany({ select: { id: true, colorSlug: true, size: true, quantity: true, inventoryProductId: true } }),
     prisma.dtfDesign.findMany({ select: { id: true, quantity: true } }),
   ]);
   const plainStock = buildPlainStockMap(plainStockRows);
@@ -249,16 +289,26 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
   // Create the order + acquire both raw-material pools atomically. Each
   // guarded decrement re-checks the row's current quantity, so concurrent
   // purchases of the last unit can't oversell.
-  let created: { webNumber: string | null; paymentStatus: string | null };
+  let created: { webNumber: string | null; paymentStatus: string | null; appliedDiscount: AppliedDiscount | null };
   try {
     created = await prisma.$transaction(async (tx) => {
+      const appliedDiscount = await priceDiscount(tx, discountLines, couponCode, paymentMethod);
+      if (discountExpectation && (discountExpectation.id !== (appliedDiscount?.id ?? null) || discountExpectation.amount !== (appliedDiscount?.amount ?? 0))) {
+        throw new DiscountError("Your offer changed. Please review the updated total and place your order again.");
+      }
+      total = fromCents(Math.max(0, toCents(subtotal) - (appliedDiscount?.amount ?? 0)) + toCents(shippingCost));
+      if (total === 0 && paymentMethod !== "COD") throw new DiscountError("Your order total is zero. Choose Cash on Delivery to place it without an online payment.");
+      if (appliedDiscount) await claimDiscount(tx, appliedDiscount);
+      await assertProductsPublished(tx, items.map(item => item.productId), [...variantMap.values()].map(value => ({ id: value.productId, stockMode: value.stockMode, dtfDesignId: value.dtfDesignId })));
+      await setStockMovementContext(tx, { actorType: userId ? "CUSTOMER" : "SYSTEM", actorId: userId, reason: "Online order allocation", orderId });
       const poolByIndex = new Map<number, { plainTshirtStockId: string | null; dtfDesignId: string | null }>();
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         if (!item.size) continue; // sizeless variants carry no per-size pool
         const variant = variantMap.get(item.variantId)!;
-        const plainEntry = plainStock.get(plainStockKey(variant.colorSlug, item.size));
+        const plainEntry = plainStock.get(plainStockKey(variant.colorSlug, item.size, variant.sizes.find(s => s.size === item.size)?.plainTshirtStockId));
         const pool = { plainTshirtStockId: plainEntry?.id ?? null, dtfDesignId: variant.dtfDesignId };
+        if (!pool.plainTshirtStockId || (requiresPrint(variant.stockMode) && !pool.dtfDesignId)) throw new InsufficientStockError(item.name);
         await acquireItemPools(tx, { ...pool, quantity: item.quantity, name: item.name });
         poolByIndex.set(i, pool);
       }
@@ -266,7 +316,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
       const webNumber = await nextWebNumber(tx);
       const paymentStatus = initialPaymentStatus(paymentMethod);
 
-      return tx.order.create({
+      const order = await tx.order.create({
         data: {
           id: orderId,
           userId,
@@ -278,6 +328,10 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
           shippingLine2: shippingAddress.line2 ?? null,
           shippingCity: shippingAddress.city,
           shippingCountry: shippingAddress.country,
+          ...(appliedDiscount ? {
+            adjustments: { create: { label: `${appliedDiscount.code ? `Coupon ${appliedDiscount.code}` : "Automatic discount"}: ${appliedDiscount.name}`, amount: -fromCents(appliedDiscount.amount), promotion: true } },
+            discountRedemption: { create: { discountId: appliedDiscount.id, name: appliedDiscount.name, code: appliedDiscount.code, amount: appliedDiscount.amount } },
+          } : {}),
           subtotal,
           shippingCost,
           total,
@@ -293,17 +347,19 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
               productId: item.productId,
               variantId: item.variantId,
               color: variantMap.get(item.variantId)?.color ?? null,
-              sku: variantMap.get(item.variantId)?.sku ?? null,
+              sku: saleSkuForSize(variantMap.get(item.variantId)?.sizes ?? [], item.size, variantMap.get(item.variantId)?.sku),
               name: item.name,
               size: item.size ?? null,
               price: item.price,
               quantity: item.quantity,
+              stockMode: variantMap.get(item.variantId)?.stockMode ?? "PRINTED_TO_ORDER",
               plainTshirtStockId: poolByIndex.get(i)?.plainTshirtStockId ?? null,
               dtfDesignId: poolByIndex.get(i)?.dtfDesignId ?? null,
             })),
           },
         },
       });
+      return { ...order, appliedDiscount };
     });
   } catch (error) {
     // Stock shortfalls are written for the shopper and name the item, so pass
@@ -311,7 +367,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
     // context (this catch previously logged nothing, leaving production failures
     // invisible) and show the shopper a safe message rather than raw Prisma
     // internals.
-    if (error instanceof InsufficientStockError) {
+    if (error instanceof DiscountError || error instanceof InsufficientStockError || error instanceof PublicationError) {
       return { success: false, error: error.message };
     }
     console.error("[checkout] order creation failed", {
@@ -329,13 +385,15 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
     };
   }
 
+  invalidateStock();
+
   // ── Branch on payment method (Option B2) ────────────────────────────
   const orderItems: OrderItem[] = items.map((item) => {
     const variant = variantMap.get(item.variantId);
     return {
       name: item.name,
       color: variant?.color ?? null,
-      sku: variant?.sku ?? null,
+      sku: saleSkuForSize(variant?.sizes ?? [], item.size, variant?.sku),
       size: item.size ?? null,
       price: item.price,
       quantity: item.quantity,
@@ -349,6 +407,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
     customerPhone: contactPhone,
     alternatePhone: alternatePhone ?? null,
     items: orderItems,
+    adjustments: created.appliedDiscount ? [{ label: created.appliedDiscount.code ? `Coupon ${created.appliedDiscount.code}` : created.appliedDiscount.name, amount: -fromCents(created.appliedDiscount.amount) }] : [],
     subtotal,
     shipping: shippingCost,
     total,

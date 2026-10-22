@@ -10,6 +10,7 @@ export type DesignMedia = { photos: string[]; count: number };
 /** One non-archived product, with its default variant's first CARD image. */
 export type ProductMediaRow = {
   designSlug: string;
+  additionalCollections?: { designSlug: string }[];
   variants: { images: { url: string }[] }[];
 };
 
@@ -28,11 +29,14 @@ export function designMedia(
 ): Map<string, DesignMedia> {
   const media = new Map<string, DesignMedia>();
   for (const row of rows) {
-    const entry = media.get(row.designSlug) ?? { photos: [], count: 0 };
-    entry.count += 1;
-    const url = row.variants[0]?.images[0]?.url;
-    if (url && entry.photos.length < maxSlides) entry.photos.push(url);
-    media.set(row.designSlug, entry);
+    const slugs = new Set([row.designSlug, ...(row.additionalCollections ?? []).map(link => link.designSlug)]);
+    for (const slug of slugs) {
+      const entry = media.get(slug) ?? { photos: [], count: 0 };
+      entry.count += 1;
+      const url = row.variants[0]?.images[0]?.url;
+      if (url && entry.photos.length < maxSlides) entry.photos.push(url);
+      media.set(slug, entry);
+    }
   }
   return media;
 }
@@ -57,10 +61,11 @@ export function designMedia(
 const getDesignMediaEntries = unstable_cache(
   async (): Promise<[string, DesignMedia][]> => {
     const rows = await prisma.product.findMany({
-      where: { archived: false },
+      where: { archived: false, status: "PUBLISHED" },
       orderBy: [{ designSlug: "asc" }, { id: "asc" }], // deterministic slide order
       select: {
         designSlug: true,
+        additionalCollections: { select: { designSlug: true } },
         variants: {
           where: { archived: false },
           orderBy: { sortOrder: "asc" },

@@ -6,6 +6,10 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/app/_lib/prisma";
 import { requireAdmin } from "@/app/_lib/admin-auth";
 import { slugify, uniqueSlug } from "@/app/_lib/admin-products";
+import { inventoryRoot, inventorySection } from "@/app/_lib/inventory-structure";
+import { reconcileSizeStocks, SaleIdentityError } from "@/app/_lib/reconcile-size-stocks";
+import { syncAdditionalCollections, CollectionMembershipError } from "@/app/_lib/product-collections";
+import { assertReadyToPublish, PublicationError } from "@/app/_lib/product-publication";
 
 export type ActionResult =
   | { success: true; slug?: string; name?: string }
@@ -19,8 +23,13 @@ const TX_OPTIONS = { maxWait: 5_000, timeout: 10_000 };
 
 function revalidate(id?: string) {
   revalidatePath("/admin/products");
+  revalidatePath("/admin/inventory");
+  revalidatePath("/admin/categories");
+  revalidatePath("/");
+  revalidatePath("/feed/meta-catalog.csv");
+  if (id) revalidatePath(`/products/${id}`);
   if (id) revalidatePath(`/admin/products/${id}/edit`);
-  revalidateTag("catalog", "max"); // bust the storefront unstable_cache readers
+  revalidateTag("catalog", { expire: 0 }); // bust the storefront unstable_cache readers
 }
 
 export async function archiveProduct(id: string): Promise<ActionResult> {
@@ -37,9 +46,23 @@ export async function archiveProduct(id: string): Promise<ActionResult> {
 export async function unarchiveProduct(id: string): Promise<ActionResult> {
   await requireAdmin();
   try {
-    await prisma.product.update({ where: { id }, data: { archived: false } });
+    await prisma.$transaction(async tx => {
+      const product = await tx.product.update({ where: { id }, data: { archived: false } });
+      if (product.status === "PUBLISHED") await assertReadyToPublish(tx, id);
+    }, TX_OPTIONS);
+  } catch (error) {
+    return { success: false, error: error instanceof PublicationError ? error.message : "Something went wrong. Please try again." };
+  }
+  revalidate(id);
+  return { success: true };
+}
+
+export async function unpublishProduct(id: string): Promise<ActionResult> {
+  await requireAdmin();
+  try {
+    await prisma.product.update({ where: { id }, data: { status: "DRAFT" } });
   } catch {
-    return { success: false, error: "Something went wrong. Please try again." };
+    return { success: false, error: "Could not unpublish the product. Please try again." };
   }
   revalidate(id);
   return { success: true };
@@ -60,7 +83,9 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
 }
 
 const VariantSizeInputSchema = z.object({
+  id: z.string().min(1).optional(),
   size: z.string().trim().min(1),
+  plainTshirtStockId: z.string().trim().min(1).nullable().optional(),
 });
 
 const VariantInputSchema = z.object({
@@ -71,23 +96,77 @@ const VariantInputSchema = z.object({
   sku: z.string().trim().nullable().optional(),
   price: z.number().positive().nullable().optional(),
   originalPrice: z.number().positive().nullable().optional(),
-  cardImages: z.array(z.string().trim().min(1)).min(1, "Each color needs at least one card image"),
-  detailImages: z.array(z.string().trim().min(1)).min(1, "Each color needs at least one detail image"),
-  sizeStocks: z.array(VariantSizeInputSchema).min(1, "Each color needs at least one size"),
+  cardImages: z.array(z.string().trim().min(1)),
+  detailImages: z.array(z.string().trim().min(1)),
+  sizeStocks: z.array(VariantSizeInputSchema),
 });
 
 const ProductInputSchema = z.object({
   name: z.string().trim().min(1),
+  status: z.enum(["DRAFT", "PUBLISHED"]).optional(),
+  stockMode: z.enum(["PRINTED_TO_ORDER", "PLAIN"]).optional(),
   slug: z.string().trim().optional(),
   designSlug: z.string().trim().min(1),
+  additionalCollectionSlugs: z.array(z.string().trim().min(1)).max(100).optional(),
   price: z.number().positive(),
   originalPrice: z.number().positive().nullable().optional(),
-  description: z.string().trim().min(1),
-  dtfDesignId: z.string().trim().min(1, "Choose a DTF design"),
-  variants: z.array(VariantInputSchema).min(1, "Add at least one color variant"),
+  description: z.string().trim().default(""),
+  dtfDesignId: z.string().trim().min(1).nullable().default(null),
+  inventoryProductId: z.string().trim().min(1).nullable().optional(),
+  variants: z.array(VariantInputSchema).default([]),
 });
 export type VariantInput = z.infer<typeof VariantInputSchema>;
 export type ProductInput = z.infer<typeof ProductInputSchema>;
+
+class InventoryBindingError extends Error {}
+
+async function bindStock(
+  tx: Prisma.TransactionClient, parentId: string | null,
+  variants: VariantInput[], existingProductId?: string,
+): Promise<VariantInput[]> {
+  // Compatibility for legacy callers and fixtures. Unassigned records are the
+  // only ones allowed to use the old colour/size lookup during this transition.
+  if (!parentId && !variants.some(v => v.sizeStocks.some(s => s.plainTshirtStockId !== undefined))) return variants;
+  const categories = await tx.inventoryCategory.findMany();
+  let expectedGroup: "ACCESSORY" | "PLAIN_TSHIRT" | null = null;
+  let expectedSection: string | null = null;
+  if (parentId) {
+    const parent = await tx.inventoryProduct.findUnique({ where: { id: parentId } });
+    if (!parent) throw new InventoryBindingError("Choose an existing inventory parent product.");
+    const root = inventoryRoot(categories, parent.categoryId);
+    if (root?.systemKey !== "accessories" && root?.systemKey !== "tshirts") throw new InventoryBindingError("Choose an inventory parent under T-Shirts or Accessories.");
+    expectedGroup = root.systemKey === "accessories" ? "ACCESSORY" : "PLAIN_TSHIRT";
+    expectedSection = inventorySection(categories, parent.categoryId);
+    if (!expectedSection) throw new InventoryBindingError("Choose an inventory parent under a T-shirt style or Accessories.");
+  }
+  const previous = existingProductId ? await tx.variantSizeStock.findMany({
+    where: { variant: { productId: existingProductId } },
+    select: { variantId: true, size: true, plainTshirtStockId: true },
+  }) : [];
+  const ids = [...new Set([
+    ...variants.flatMap(v => v.sizeStocks.flatMap(s => s.plainTshirtStockId ? [s.plainTshirtStockId] : [])),
+    ...previous.flatMap(s => s.plainTshirtStockId ? [s.plainTshirtStockId] : []),
+  ])];
+  const stock = await tx.plainTshirtStock.findMany({ where: { OR: [{ inventoryProductId: parentId }, { id: { in: ids } }] }, include: { inventoryProduct: { select: { categoryId: true } } } });
+  return variants.map(variant => ({ ...variant, sizeStocks: variant.sizeStocks.map(cell => {
+    const colorSlug = slugify(variant.colorSlug || variant.color);
+    let id = cell.plainTshirtStockId;
+    if (id === undefined) {
+      const old = previous.find(s => s.variantId === variant.id && s.size === cell.size);
+      const pinned = stock.find(row => row.id === old?.plainTshirtStockId && row.colorSlug === colorSlug && row.size === cell.size);
+      id = pinned?.id ?? stock.find(row => row.inventoryProductId === parentId && row.colorSlug === colorSlug && row.size === cell.size)?.id ?? null;
+    }
+    if (id) {
+      const row = stock.find(row => row.id === id);
+      if (!row || row.colorSlug !== colorSlug || row.size !== cell.size) throw new InventoryBindingError("Each size must use a blank with the same colour and size.");
+      // A design may deliberately use another parent's physical blank, but
+      // accessories and apparel must not be bound to each other's stock.
+      if (expectedGroup && row.stockGroup !== expectedGroup) throw new InventoryBindingError("The selected blank belongs to a different inventory group.");
+      if (expectedSection && row.inventoryProduct && inventorySection(categories, row.inventoryProduct.categoryId) !== expectedSection) throw new InventoryBindingError("Choose a blank from the same T-shirt style as the inventory parent.");
+    }
+    return { ...cell, plainTshirtStockId: id ?? null };
+  }) }));
+}
 
 // Product.departmentSlug is denormalised from the product's design so that
 // department listings are a single indexed read. The form only picks a design,
@@ -114,9 +193,12 @@ function variantConflict(d: ProductInput): string | null {
     slugs.add(cs);
     const sku = v.sku?.trim();
     if (sku) {
+      if (/^DBV-/i.test(sku)) return "DBV- codes are reserved for automatically generated size SKUs.";
       if (skus.has(sku)) return `Duplicate SKU "${sku}"`;
       skus.add(sku);
     }
+    const sizes = v.sizeStocks.map(cell => cell.size);
+    if (new Set(sizes).size !== sizes.length) return `Duplicate size in "${v.color}"`;
   }
   return null;
 }
@@ -151,7 +233,7 @@ async function writeVariants(
       ],
     });
     await tx.variantSizeStock.createMany({
-      data: v.sizeStocks.map((s) => ({ variantId: variant.id, size: s.size })),
+      data: v.sizeStocks.map((s) => ({ variantId: variant.id, size: s.size, ...(s.plainTshirtStockId !== undefined ? { plainTshirtStockId: s.plainTshirtStockId } : {}) })),
     });
   }
 }
@@ -159,8 +241,8 @@ async function writeVariants(
 // UPDATE path: preserve ProductVariant row identity so OrderItem.variantId
 // (onDelete: SetNull) survives edits. Existing variants are updated in place;
 // new ones created; removed ones ARCHIVED (not deleted) so historical order
-// stock-restore still resolves their (variantId,size) cell. Images and size
-// cells have no incoming order FK, so they're safe to rebuild.
+// stock-restore still resolves their (variantId,size) cell. Size identities
+// and SKUs are permanent; only gallery images are rebuilt.
 async function reconcileVariants(
   tx: Prisma.TransactionClient,
   productId: string,
@@ -172,6 +254,9 @@ async function reconcileVariants(
     select: { id: true },
   });
   const existingIds = new Set(existing.map((v) => v.id));
+  if (variants.some(variant => variant.id && !existingIds.has(variant.id))) {
+    throw new SaleIdentityError("A colour changed or belongs to another product. Reload the product and try again.");
+  }
 
   // Release every active variant's unique slots first (colorSlug + sku) so the
   // reassignments below can't collide mid-transaction on the immediate unique
@@ -182,7 +267,6 @@ async function reconcileVariants(
 
   const keptIds = new Set<string>();
   const imageRows: Prisma.VariantImageCreateManyInput[] = [];
-  const sizeRows: Prisma.VariantSizeStockCreateManyInput[] = [];
   for (let i = 0; i < variants.length; i++) {
     const v = variants[i];
     const data = {
@@ -206,18 +290,13 @@ async function reconcileVariants(
     keptIds.add(variantId);
     v.cardImages.forEach((url, j) => imageRows.push({ variantId, url, role: "CARD", sortOrder: j }));
     v.detailImages.forEach((url, j) => imageRows.push({ variantId, url, role: "DETAIL", sortOrder: j }));
-    v.sizeStocks.forEach((s) => sizeRows.push({ variantId, size: s.size }));
+    await reconcileSizeStocks(tx, variantId, v.sizeStocks);
   }
 
-  // Rebuild every kept variant's images + size cells with one delete + one insert
-  // apiece, rather than two writes per variant. This keeps the interactive
-  // transaction short: a product with N colors dropped from ~4N round-trips to 4,
-  // so edits no longer risk exceeding the interactive-transaction time limit.
+  // Gallery rows can be rebuilt; offered sizes above retain their IDs and SKUs.
   const keptIdList = [...keptIds];
   await tx.variantImage.deleteMany({ where: { variantId: { in: keptIdList } } });
-  await tx.variantSizeStock.deleteMany({ where: { variantId: { in: keptIdList } } });
   if (imageRows.length) await tx.variantImage.createMany({ data: imageRows });
-  if (sizeRows.length) await tx.variantSizeStock.createMany({ data: sizeRows });
 
   // Archive removed variants; free their unique colorSlug/sku so those values
   // can be reused by a future variant without a unique-constraint collision.
@@ -255,12 +334,16 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
         data: {
           id: slug, name: d.name, designSlug: d.designSlug, departmentSlug, dtfDesignId: d.dtfDesignId,
           price: d.price, originalPrice: d.originalPrice ?? null,
-          description: d.description, archived: false,
+          description: d.description, archived: false, status: d.status ?? "DRAFT", stockMode: d.stockMode ?? "PRINTED_TO_ORDER",
+          ...(d.inventoryProductId !== undefined ? { inventoryProductId: d.inventoryProductId } : {}),
         },
       });
-      await writeVariants(tx, slug, d.variants);
+      await syncAdditionalCollections(tx, slug, d.designSlug, d.additionalCollectionSlugs);
+      await writeVariants(tx, slug, await bindStock(tx, d.inventoryProductId ?? null, d.variants));
+      if (d.status === "PUBLISHED") await assertReadyToPublish(tx, slug);
     }, TX_OPTIONS);
   } catch (e) {
+    if (e instanceof InventoryBindingError || e instanceof SaleIdentityError || e instanceof CollectionMembershipError || e instanceof PublicationError) return { success: false, error: e.message };
     console.error("createProduct failed", { slug, designSlug: d.designSlug, error: e });
     return { success: false, error: "Could not create product (check the category and that SKUs are unique)." };
   }
@@ -296,11 +379,17 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
             name: d.name, designSlug: d.designSlug, departmentSlug, dtfDesignId: d.dtfDesignId,
             price: d.price, originalPrice: d.originalPrice ?? null,
             description: d.description,
+            ...(d.status !== undefined ? { status: d.status } : {}),
+            ...(d.stockMode !== undefined ? { stockMode: d.stockMode } : {}),
+            ...(d.inventoryProductId !== undefined ? { inventoryProductId: d.inventoryProductId } : {}),
           },
         });
-        await reconcileVariants(tx, id, d.variants);
+        await syncAdditionalCollections(tx, id, d.designSlug, d.additionalCollectionSlugs);
+        await reconcileVariants(tx, id, await bindStock(tx, d.inventoryProductId === undefined ? existing.inventoryProductId ?? null : d.inventoryProductId, d.variants, d.inventoryProductId === undefined || d.inventoryProductId === existing.inventoryProductId ? id : undefined));
+        if ((d.status ?? existing.status) === "PUBLISHED") await assertReadyToPublish(tx, id);
       }, TX_OPTIONS);
     } catch (e) {
+      if (e instanceof InventoryBindingError || e instanceof SaleIdentityError || e instanceof CollectionMembershipError || e instanceof PublicationError) return { success: false, error: e.message };
       console.error("updateProduct failed (field-only)", { id, designSlug: d.designSlug, error: e });
       return { success: false, error: "Could not save the product. Please try again — if you changed a SKU, make sure it isn't already used by another product." };
     }
@@ -322,9 +411,14 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
           id: newSlug, name: d.name, designSlug: d.designSlug, departmentSlug, dtfDesignId: d.dtfDesignId,
           price: d.price, originalPrice: d.originalPrice ?? null,
           description: d.description,
+          ...(d.status !== undefined ? { status: d.status } : {}),
+            ...(d.stockMode !== undefined ? { stockMode: d.stockMode } : {}),
+          ...(d.inventoryProductId !== undefined ? { inventoryProductId: d.inventoryProductId } : {}),
         },
       });
-      await reconcileVariants(tx, newSlug, d.variants);
+      await syncAdditionalCollections(tx, newSlug, d.designSlug, d.additionalCollectionSlugs);
+      await reconcileVariants(tx, newSlug, await bindStock(tx, d.inventoryProductId === undefined ? existing.inventoryProductId ?? null : d.inventoryProductId, d.variants, d.inventoryProductId === undefined || d.inventoryProductId === existing.inventoryProductId ? newSlug : undefined));
+      if ((d.status ?? existing.status) === "PUBLISHED") await assertReadyToPublish(tx, newSlug);
       await tx.productSlugHistory.upsert({
         where: { oldSlug: id },
         update: { currentId: newSlug },
@@ -333,6 +427,7 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
       await tx.productSlugHistory.deleteMany({ where: { oldSlug: newSlug } });
     }, TX_OPTIONS);
   } catch (e) {
+    if (e instanceof InventoryBindingError || e instanceof SaleIdentityError || e instanceof CollectionMembershipError || e instanceof PublicationError) return { success: false, error: e.message };
     console.error("updateProduct failed (rename)", { id, newSlug, designSlug: d.designSlug, error: e });
     return { success: false, error: "Could not save the product. Please try again — if you changed a SKU, make sure it isn't already used by another product." };
   }

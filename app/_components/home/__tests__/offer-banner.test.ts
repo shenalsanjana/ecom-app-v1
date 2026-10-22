@@ -85,8 +85,8 @@ describe("OfferBanner", () => {
     expect(els.map((e) => e.props.href).filter(Boolean)).not.toContain("/deals");
   });
 
-  it("runs one countdown, in the panel, and only while a sale is on", () => {
-    expect(collect(render()).filter((e) => e.type === DealsCountdown)).toHaveLength(1);
+  it("does not invent an expiry for catalogue markdowns", () => {
+    expect(collect(render()).filter((e) => e.type === DealsCountdown)).toHaveLength(0);
   });
 
   it("says piece, not pieces, for a single reduced product", () => {
@@ -113,7 +113,7 @@ describe("OfferBanner", () => {
     // back into a right-hand column.
     const els = collect(render());
     const h1 = els.findIndex((e) => e.type === "h1");
-    const panel = els.findIndex((e) => e.type === DealsCountdown);
+    const panel = els.findIndex((e) => String(e.props.className ?? "").includes("order-2 rounded-2xl"));
     const signals = els.findIndex((e) => e.type === "ul");
 
     expect(h1).toBeGreaterThanOrEqual(0);

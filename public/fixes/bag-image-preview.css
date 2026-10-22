@@ -1,0 +1,20 @@
+/* Temporary live bag display fix; remove after the React image fixes deploy. */
+img:is([src*="/uploads/canvas-cotton-tote-bag-"], [src*="/uploads/keep-smiling-canvas-tote-bag-"], [src*="/uploads/WhatsApp-Image-2026-10-14-at-8-18-54-PM--989f0f4b.webp"], [src*="/uploads/WhatsApp-Image-2026-10-14-at-8-18-54-PM--fd5dc94f.webp"], [src*="/uploads/Keep-Smiling-Canvas-Tote-Gallery-9be468e9.webp"], [src*="/uploads/Measurments-b010330d.webp"]) {
+  object-fit: contain !important;
+  object-position: center !important;
+  transform: none !important;
+  scale: 1 !important;
+}
+
+/* Let each selected detail image determine the gallery's height. */
+div.aspect-square:has(> img[alt$="Canvas Cotton Tote Bag"]) {
+  aspect-ratio: auto !important;
+}
+
+div.aspect-square > img[alt$="Canvas Cotton Tote Bag"] {
+  position: relative !important;
+  inset: auto !important;
+  display: block;
+  width: 100% !important;
+  height: auto !important;
+}

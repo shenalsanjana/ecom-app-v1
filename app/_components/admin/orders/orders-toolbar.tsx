@@ -4,7 +4,9 @@ import { ORDER_TABS, type OrderTab } from "@/app/_lib/admin-orders";
 
 const TAB_LABEL: Record<OrderTab, string> = {
   all: "All", pending: "Pending", "needs-dispatch": "Needs dispatch",
+  "payment-review": "Payment review",
   "pending-cod": "Pending COD", delivered: "Delivered", cancelled: "Cancelled",
+  deleted: "Deleted",
 };
 
 export function OrdersToolbar({ counts }: { counts: Record<OrderTab, number> }) {

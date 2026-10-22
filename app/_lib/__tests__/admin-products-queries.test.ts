@@ -37,9 +37,9 @@ describe("listProducts", () => {
     productFindMany.mockResolvedValueOnce([{ id: "cat-white" }]);
     productCount.mockResolvedValueOnce(42);
     const res = await listProducts({ tab: "active", page: 2, pageSize: 25 });
-    expect(productCount).toHaveBeenCalledWith({ where: { archived: false } });
+    expect(productCount).toHaveBeenCalledWith({ where: { archived: false, status: "PUBLISHED" } });
     const arg = productFindMany.mock.calls[0][0];
-    expect(arg.where).toEqual({ archived: false });
+    expect(arg.where).toEqual({ archived: false, status: "PUBLISHED" });
     expect(arg.take).toBe(25);
     expect(arg.skip).toBe(25);
     expect(arg.orderBy).toEqual({ name: "asc" });
@@ -71,7 +71,7 @@ describe("listProducts", () => {
     const res = await listProducts({ tab: "low-stock" });
 
     const listArg = productFindMany.mock.calls[1][0];
-    expect(listArg.where).toEqual({ archived: false, id: { in: ["p1"] } });
+    expect(listArg.where).toEqual({ archived: false, status: "PUBLISHED", id: { in: ["p1"] } });
     expect(res.rows).toEqual([{ id: "p1" }]);
   });
 });
@@ -101,7 +101,7 @@ describe("getLowStockProductIds", () => {
 describe("resolveProductWhere", () => {
   it("passes through non-low-stock tabs unchanged", async () => {
     const where = await resolveProductWhere({ tab: "active" });
-    expect(where).toEqual({ archived: false });
+    expect(where).toEqual({ archived: false, status: "PUBLISHED" });
     expect(plainFindMany).not.toHaveBeenCalled();
   });
 
@@ -109,7 +109,7 @@ describe("resolveProductWhere", () => {
     plainFindMany.mockResolvedValueOnce([{ colorSlug: "white", size: "M" }]);
     productFindMany.mockResolvedValueOnce([{ id: "p1", dtfDesignId: null, variants: [{ colorSlug: "white", sizeStocks: [{ size: "M" }] }] }]);
     const where = await resolveProductWhere({ tab: "low-stock" });
-    expect(where).toEqual({ archived: false, id: { in: ["p1"] } });
+    expect(where).toEqual({ archived: false, status: "PUBLISHED", id: { in: ["p1"] } });
   });
 });
 

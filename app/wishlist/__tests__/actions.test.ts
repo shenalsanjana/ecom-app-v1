@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { wishlistFindUnique, wishlistCreate, wishlistDelete } = vi.hoisted(() => ({
+const { wishlistFindUnique, wishlistCreate, wishlistDelete, productFindUnique } = vi.hoisted(() => ({
   wishlistFindUnique: vi.fn(async (): Promise<{ id: string } | null> => null),
   wishlistCreate: vi.fn(async () => ({})),
   wishlistDelete: vi.fn(async () => ({})),
+  productFindUnique: vi.fn(),
 }));
 
 vi.mock("@/app/_lib/session-user", () => ({
@@ -11,6 +12,7 @@ vi.mock("@/app/_lib/session-user", () => ({
 }));
 vi.mock("@/app/_lib/prisma", () => ({
   prisma: {
+    product: { findUnique: productFindUnique },
     wishlistItem: {
       findUnique: wishlistFindUnique,
       create: wishlistCreate,
@@ -39,10 +41,17 @@ beforeEach(() => {
   wishlistFindUnique.mockReset().mockResolvedValue(null);
   wishlistCreate.mockReset().mockResolvedValue({});
   wishlistDelete.mockReset().mockResolvedValue({});
+  productFindUnique.mockReset().mockResolvedValue({ id: "P1" });
   vi.mocked(getVerifiedSessionUser).mockReset().mockResolvedValue({ id: "U1", name: "Jane", email: "j@example.com" });
 });
 
 describe("toggleWishlistAction", () => {
+  it("does not add an unpublished product to a wishlist", async () => {
+    productFindUnique.mockResolvedValue(null);
+    await toggleWishlistAction(formData("DRAFT1"));
+    expect(wishlistCreate).not.toHaveBeenCalled();
+    expect(productFindUnique).toHaveBeenCalledWith({ where: { id: "DRAFT1", archived: false, status: "PUBLISHED" }, select: { id: true } });
+  });
   it("creates the wishlist item for a verified user", async () => {
     await toggleWishlistAction(formData("P1"));
 

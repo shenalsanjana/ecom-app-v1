@@ -28,6 +28,8 @@ export async function toggleWishlistAction(formData: FormData): Promise<void> {
   if (existing) {
     await prisma.wishlistItem.delete({ where: { id: existing.id } });
   } else {
+    const product = await prisma.product.findUnique({ where: { id: productId, archived: false, status: "PUBLISHED" }, select: { id: true } });
+    if (!product) return;
     await prisma.wishlistItem.create({ data: { userId, productId } });
   }
 

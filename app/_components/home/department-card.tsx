@@ -18,7 +18,7 @@ export function DepartmentCard({
       style={{ boxShadow: "0 0 0 1px color-mix(in oklab, var(--foreground) 6%, transparent)" }}
     >
       <div className="relative aspect-square overflow-hidden">
-        <SlideShow slides={slides} dots="bottom-right" fadeMs={700} subject={name} sizes={SLIDE_SIZES} />
+        <SlideShow slides={slides} dots="bottom-right" fadeMs={700} subject={name} sizes={SLIDE_SIZES} imageFit={href === "/categories/accessories" ? "contain" : "cover"} />
       </div>
       <div className="flex items-center justify-between gap-2.5 px-[18px] pb-[18px] pt-4">
         <div className="flex min-w-0 flex-col gap-[3px]">

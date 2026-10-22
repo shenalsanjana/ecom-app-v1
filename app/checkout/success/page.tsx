@@ -23,7 +23,7 @@ function firstString(value: string | string[] | undefined): string | undefined {
 async function OrderDetails({ orderId, paymentStatus }: { orderId: string; paymentStatus?: string }) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: { items: true },
+    include: { items: true, adjustments: true },
   });
 
   if (!order) {
@@ -185,6 +185,11 @@ async function OrderDetails({ orderId, paymentStatus }: { orderId: string; payme
                 <span className="font-medium">{formatPrice(item.price * item.quantity)}</span>
               </div>
             ))}
+          </div>
+          <div className="mt-4 space-y-2 border-t pt-4 text-sm">
+            <div className="flex justify-between"><span>Subtotal</span><span>{formatPrice(order.subtotal)}</span></div>
+            {order.adjustments.map(adjustment => <div key={adjustment.id} className={`flex justify-between gap-3 ${adjustment.amount < 0 ? "text-brand" : ""}`}><span>{adjustment.label}</span><span>{adjustment.amount < 0 ? "−" : "+"}{formatPrice(Math.abs(adjustment.amount))}</span></div>)}
+            <div className="flex justify-between"><span>Delivery</span><span>{order.shippingCost === 0 ? "Free" : formatPrice(order.shippingCost)}</span></div>
           </div>
           <div className="border-t mt-4 pt-4 flex justify-between font-semibold">
             <span>Total</span>

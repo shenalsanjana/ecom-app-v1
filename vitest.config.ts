@@ -5,6 +5,8 @@ import path from "node:path";
 export default defineConfig({
   test: {
     environment: "node",
+    maxWorkers: 1,
+    fileParallelism: false,
     globals: false,
     include: ["app/**/__tests__/**/*.test.ts", "app/**/*.test.ts"],
     coverage: {

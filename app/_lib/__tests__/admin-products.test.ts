@@ -33,10 +33,10 @@ describe("sizes", () => {
 
 describe("buildProductWhere", () => {
   it("active tab → archived:false", () => {
-    expect(buildProductWhere({ tab: "active" })).toEqual({ archived: false });
+    expect(buildProductWhere({ tab: "active" })).toEqual({ archived: false, status: "PUBLISHED" });
   });
   it("low-stock tab behaves like active (archived:false) — id filtering is layered on by resolveProductWhere, not this function", () => {
-    expect(buildProductWhere({ tab: "low-stock" })).toEqual({ archived: false });
+    expect(buildProductWhere({ tab: "low-stock" })).toEqual({ archived: false, status: "PUBLISHED" });
   });
   it("archived tab → archived:true", () => {
     expect(buildProductWhere({ tab: "archived" })).toEqual({ archived: true });
@@ -44,13 +44,21 @@ describe("buildProductWhere", () => {
   it("all tab → no archived constraint", () => {
     expect(buildProductWhere({ tab: "all" })).toEqual({});
   });
-  it("adds category and case-insensitive search on name + id", () => {
+  it("keeps draft and published tabs separate from archived", () => {
+    expect(buildProductWhere({ tab: "draft" })).toEqual({ archived: false, status: "DRAFT" });
+    expect(buildProductWhere({ tab: "published" })).toEqual({ archived: false, status: "PUBLISHED" });
+  });
+  it("adds category and case-insensitive search on name + id + active size SKU", () => {
     const w = buildProductWhere({ tab: "active", category: "cat", q: "white" });
     expect(w.archived).toBe(false);
-    expect(w.designSlug).toBe("cat");
+    expect(w.AND).toEqual([{ OR: [
+      { designSlug: { in: ["cat"] } },
+      { additionalCollections: { some: { designSlug: { in: ["cat"] } } } },
+    ] }]);
     expect(w.OR).toEqual([
       { name: { contains: "white", mode: "insensitive" } },
       { id: { contains: "white", mode: "insensitive" } },
+      { variants: { some: { archived: false, sizeStocks: { some: { archived: false, sku: { contains: "white", mode: "insensitive" } } } } } },
     ]);
   });
 });

@@ -17,7 +17,7 @@ export function SocialProof() {
         <li className="flex items-center gap-2">
           <Check className="h-4 w-4 shrink-0 text-brand" aria-hidden />
           <span>
-            <b className="font-semibold">12,000+</b> tees delivered
+            <b className="font-semibold">12,000+</b> delivered
           </span>
         </li>
         <li className="flex items-center gap-2">

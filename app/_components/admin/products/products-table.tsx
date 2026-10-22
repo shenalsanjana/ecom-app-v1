@@ -1,3 +1,4 @@
+import type { StockMode } from "@/app/_lib/stock-policy";
 import Link from "next/link";
 import Image from "next/image";
 import { formatPrice } from "@/app/_lib/format";
@@ -9,7 +10,10 @@ import { resolveDefaultVariant, productInStock, type PlainStockMap, type DesignS
 type Row = {
   id: string; name: string; price: number; originalPrice: number | null;
   archived: boolean; dtfDesignId: string | null;
+  status?: "DRAFT" | "PUBLISHED";
+  stockMode?: StockMode;
   design: { name: string } | null;
+  additionalCollections?: { designSlug: string; design: { name: string; department: { name: string } } }[];
   variants: {
     sortOrder: number;
     archived: boolean;
@@ -33,7 +37,7 @@ export function ProductsTable({
     <table className="w-full border-collapse text-sm">
       <thead>
         <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-          <th className="p-2"></th><th className="p-2">Name</th><th className="p-2">Category</th>
+          <th className="p-2"></th><th className="p-2">Name</th><th className="p-2">Store collections</th>
           <th className="p-2">Price</th><th className="p-2">Colors</th><th className="p-2">Available</th><th className="p-2">Status</th><th className="p-2 text-right">Actions</th>
         </tr>
       </thead>
@@ -43,20 +47,20 @@ export function ProductsTable({
           // { colorSlug, sizeStocks } shape rather than renaming the query field.
           const inStock = productInStock(
             p.variants.map((v) => ({ colorSlug: v.colorSlug, sizes: v.sizeStocks })),
-            p.dtfDesignId, plainStock, designStock,
+            p.dtfDesignId, plainStock, designStock, p.stockMode,
           );
           return (
             <tr key={p.id} className={"border-b hover:bg-secondary/40 " + (p.archived ? "opacity-60" : "")}>
-              <td className="p-2">{thumbnail(p) && <Image src={thumbnail(p)} alt="" width={36} height={36} unoptimized={isUploadedImage(thumbnail(p))} className="rounded object-cover" />}</td>
+              <td className="p-2">{thumbnail(p) && <Image src={thumbnail(p)} alt="" width={36} height={36} unoptimized={isUploadedImage(thumbnail(p))} className="h-9 w-9 rounded bg-muted object-contain" />}</td>
               <td className="p-2 font-medium">
                 <Link href={`/admin/products/${p.id}/edit`} className="hover:underline">{p.name}</Link>
                 <br /><span className="text-muted-foreground">{p.id}</span>
               </td>
-              <td className="p-2">{p.design?.name ?? "—"}</td>
+              <td className="p-2">{p.design?.name ?? "—"}{p.additionalCollections?.map(link => <span key={link.designSlug} className="mt-1 block text-xs text-muted-foreground">Also: {link.design.department.name} → {link.design.name}</span>)}</td>
               <td className="p-2 font-medium">{formatPrice(p.price)}{p.originalPrice ? <span className="ml-1 text-xs text-muted-foreground line-through">{formatPrice(p.originalPrice)}</span> : null}</td>
               <td className="p-2">{p._count.variants}</td>
               <td className="p-2"><Badge variant={inStock ? "secondary" : "outline"}>{inStock ? "Available" : "Unavailable"}</Badge></td>
-              <td className="p-2"><Badge variant={p.archived ? "outline" : "secondary"}>{p.archived ? "Archived" : "Active"}</Badge></td>
+              <td className="p-2"><Badge variant={p.archived || p.status === "DRAFT" ? "outline" : "secondary"}>{p.archived ? "Archived" : p.status === "DRAFT" ? "Draft" : "Published"}</Badge></td>
               <td className="p-2 text-right"><DeleteProductButton id={p.id} name={p.name} /></td>
             </tr>
           );

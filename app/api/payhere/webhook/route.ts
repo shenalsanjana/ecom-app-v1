@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/app/_lib/prisma";
 import { createHash } from "crypto";
 import { payHereMerchantId, payHereMerchantSecret } from "@/app/_lib/payhere-config";
-import { finalizePaidPayment } from "@/app/_lib/payments/order-finalization";
+import { finalizeFailedPayment, finalizePaidPayment } from "@/app/_lib/payments/order-finalization";
 
 /**
  * Verifies the MD5 signature PayHere sends with each webhook.
@@ -100,7 +100,7 @@ export async function POST(req: Request) {
   console.log("[payhere/webhook] Signature verified successfully", { order_id });
 
   // Only process completed payments (status_code "2" = success)
-  if (paymentStatusCode !== "2") {
+  if (paymentStatusCode !== "2" && paymentStatusCode !== "-1" && paymentStatusCode !== "-2") {
     console.log("[payhere/webhook] Non-success status code — ignoring", {
       order_id,
       status_code: paymentStatusCode,
@@ -125,12 +125,6 @@ export async function POST(req: Request) {
       paymentMethod: order.paymentMethod,
     });
     return NextResponse.json({ status: "ignored", reason: "payment_method_mismatch" });
-  }
-
-  // Idempotency: if already PAID, skip
-  if (order.paymentStatus === "PAID") {
-    console.log("[payhere/webhook] Order already marked as PAID — skipping", { order_id });
-    return NextResponse.json({ status: "already_processed" });
   }
 
   // Verify amount and currency match before confirming the order. The signed
@@ -163,6 +157,9 @@ export async function POST(req: Request) {
     });
   }
 
-  const result = await finalizePaidPayment(order_id, "PAYHERE");
+  const evidence = { reference: payment_id || undefined, amount: callbackAmount, currency };
+  const result = paymentStatusCode === "2"
+    ? await finalizePaidPayment(order_id, "PAYHERE", evidence)
+    : await finalizeFailedPayment(order_id, "PAYHERE", `PayHere ${paymentStatusCode}`, evidence);
   return NextResponse.json(result.status === "success" ? { status: "success" } : result);
 }

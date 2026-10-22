@@ -27,6 +27,7 @@ export function CartPageClient() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
       <h1 className="mb-8 font-heading text-2xl font-semibold tracking-tight">Shopping Cart</h1>
+      {items.length > 0 && <p className="mb-4 text-xs text-muted-foreground">Item prices are before order offers. Savings appear in the order summary.</p>}
 
       {items.length === 0 ? (
         <div className="rounded border p-10 text-center">

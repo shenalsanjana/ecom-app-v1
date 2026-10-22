@@ -4,15 +4,15 @@ import { isUploadedImage } from "@/app/_lib/uploaded-image";
 import { DeleteCategoryButton } from "./delete-category-button";
 import { CopyAdLinkButton } from "./copy-ad-link-button";
 
-type Row = { slug: string; name: string; image: string | null; productCount: number; adUrl: string };
+type Row = { slug: string; name: string; image: string | null; productCount: number; adUrl: string; departmentName: string };
 
 export function CategoriesTable({ rows }: { rows: Row[] }) {
-  if (rows.length === 0) return <p className="text-sm text-muted-foreground">No categories yet.</p>;
+  if (rows.length === 0) return <p className="text-sm text-muted-foreground">No store collections yet.</p>;
   return (
     <table className="w-full border-collapse text-sm">
       <thead>
         <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-          <th className="p-2"></th><th className="p-2">Name</th><th className="p-2">Slug</th>
+          <th className="p-2"></th><th className="p-2">Collection</th><th className="p-2">Shop department</th><th className="p-2">Slug</th>
           <th className="p-2">Products</th><th className="p-2">Ad link</th><th className="p-2 text-right">Actions</th>
         </tr>
       </thead>
@@ -28,6 +28,7 @@ export function CategoriesTable({ rows }: { rows: Row[] }) {
             <td className="p-2 font-medium">
               <Link href={`/admin/categories/${c.slug}/edit`} className="hover:underline">{c.name}</Link>
             </td>
+            <td className="p-2">{c.departmentName}</td>
             <td className="p-2 text-muted-foreground">{c.slug}</td>
             <td className="p-2">{c.productCount}</td>
             <td className="p-2"><CopyAdLinkButton url={c.adUrl} /></td>

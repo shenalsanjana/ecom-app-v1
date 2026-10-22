@@ -1,3 +1,4 @@
+import { requiresPrint, type StockMode } from "./stock-policy";
 // app/_lib/product-signals.ts
 // Display-only conversion signals for product cards. Pure — the DB reads live
 // in app/_lib/products.ts and pass their results in.
@@ -26,19 +27,20 @@ export const BESTSELLER_COUNT = 3;
  * design or the design pool is empty.
  */
 export function unitsForVariant(
-  sizes: { size: string }[],
+  sizes: { size: string; plainTshirtStockId?: string | null }[],
   colorSlug: string,
   dtfDesignId: string | null,
   plainStock: PlainStockMap,
   designStock: DesignStockMap,
+  stockMode?: StockMode,
 ): number {
-  if (!designAvailable(dtfDesignId, designStock)) return 0;
+  if (requiresPrint(stockMode) && !designAvailable(dtfDesignId, designStock)) return 0;
   const designQty = designStock.get(dtfDesignId as string) ?? 0;
   const totalPlain = sizes.reduce(
-    (sum, s) => sum + (plainStock.get(plainStockKey(colorSlug, s.size))?.quantity ?? 0),
+    (sum, s) => sum + (plainStock.get(plainStockKey(colorSlug, s.size, s.plainTshirtStockId))?.quantity ?? 0),
     0,
   );
-  return Math.min(designQty, totalPlain);
+  return requiresPrint(stockMode) ? Math.min(designQty, totalPlain) : totalPlain;
 }
 
 /**

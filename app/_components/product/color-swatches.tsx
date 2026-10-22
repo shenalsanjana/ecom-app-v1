@@ -14,11 +14,13 @@ export function ColorSwatches({
   selected,
   onSelect,
   className = "",
+  showLabels = false,
 }: {
   options: SwatchOption[];
   selected: string;
   onSelect: (slug: string) => void;
   className?: string;
+  showLabels?: boolean;
 }) {
   if (options.length <= 1) return null;
   return (
@@ -34,13 +36,27 @@ export function ColorSwatches({
             aria-label={o.color}
             title={o.color}
             className={
-              "relative h-8 w-8 overflow-hidden rounded-full border transition-[box-shadow,transform] duration-(--duration-fast) " +
+              "relative flex items-center gap-2 rounded-full border transition-[box-shadow,transform] duration-(--duration-fast) " +
+              (showLabels ? "min-h-10 max-w-full px-2 py-1.5 text-left text-sm" : "h-8 w-8 overflow-hidden") + " " +
               (active ? "ring-2 ring-ring ring-offset-2 ring-offset-background" : "hover:scale-105 border-border")
             }
-            style={o.swatchHex ? { backgroundColor: o.swatchHex } : undefined}
+            style={!showLabels && o.swatchHex ? { backgroundColor: o.swatchHex } : undefined}
           >
-            {!o.swatchHex && (
-              <Image src={o.image} alt="" fill unoptimized={isUploadedImage(o.image)} sizes="32px" className="object-cover" />
+            {showLabels ? (
+              <>
+                <span
+                  aria-hidden="true"
+                  className={"relative h-6 w-6 shrink-0 overflow-hidden border " + (o.swatchHex ? "rounded-full" : "rounded-md bg-muted")}
+                  style={o.swatchHex ? { backgroundColor: o.swatchHex } : undefined}
+                >
+                  {!o.swatchHex && o.image && (
+                    <Image src={o.image} alt="" fill unoptimized={isUploadedImage(o.image)} sizes="24px" className="object-contain" />
+                  )}
+                </span>
+                <span className="min-w-0">{o.color}</span>
+              </>
+            ) : !o.swatchHex && o.image && (
+              <Image src={o.image} alt="" fill unoptimized={isUploadedImage(o.image)} sizes="32px" className="object-contain" />
             )}
           </button>
         );

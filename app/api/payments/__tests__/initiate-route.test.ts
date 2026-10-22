@@ -1,12 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { orderFindUnique, initiate } = vi.hoisted(() => ({
+const { orderFindUnique, initiate, claim } = vi.hoisted(() => ({
   orderFindUnique: vi.fn(),
   initiate: vi.fn(),
+  claim: vi.fn(),
 }));
 
 vi.mock("@/app/_lib/prisma", () => ({
-  prisma: { order: { findUnique: orderFindUnique } },
+  prisma: { order: { findUnique: orderFindUnique },
+    $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn({ order: {
+      updateMany: claim, update: async () => ({}),
+    } }),
+  },
 }));
 
 vi.mock("@/app/_lib/payments/registry", async (orig) => {
@@ -30,6 +35,7 @@ const ORDER = {
 describe("POST /api/payments/initiate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    claim.mockResolvedValue({ count: 1 });
     process.env.APP_URL = "https://shop.example.com";
     initiate.mockResolvedValue({
       provider: "KOKO",
@@ -63,6 +69,18 @@ describe("POST /api/payments/initiate", () => {
     }));
 
     expect(res.status).toBe(409);
+  });
+  it("does not issue a gateway session if cancellation or expiry wins the claim", async () => {
+    orderFindUnique.mockResolvedValue(ORDER);
+    claim.mockResolvedValue({ count: 0 });
+    const result = await POST(new Request("https://example.test/api/payments/initiate", { method: "POST", body: JSON.stringify({ orderId: "ORD-1" }) }));
+    expect(result.status).toBe(409);
+    expect(initiate).not.toHaveBeenCalled();
+  });
+  it("rejects closed orders and orders requiring payment review", async () => {
+    orderFindUnique.mockResolvedValue({ ...ORDER, paymentReviewRequired: true });
+    expect((await POST(new Request("https://example.test/api/payments/initiate", { method: "POST", body: JSON.stringify({ orderId: "ORD-1" }) }))).status).toBe(409);
+    expect(initiate).not.toHaveBeenCalled();
   });
 
   it("returns 404 when the order does not exist", async () => {

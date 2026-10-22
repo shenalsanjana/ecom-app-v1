@@ -1,189 +1,132 @@
+vi.mock("@/app/_lib/stock-movements", () => ({ setStockMovementContext: vi.fn() }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const {
-  orderFindUnique,
-  orderUpdate,
-  orderUpdateMany,
-  plainStockUpdateMany,
-  dtfDesignUpdateMany,
-  orderItemFindMany,
-  sendOrderConfirmationEmail,
-  sendAdminFailureAlertEmail,
-  bookCourierAndNotify,
-} = vi.hoisted(() => ({
-  orderFindUnique: vi.fn(),
-  orderUpdate: vi.fn(),
-  orderUpdateMany: vi.fn(),
-  plainStockUpdateMany: vi.fn(),
-  dtfDesignUpdateMany: vi.fn(),
-  orderItemFindMany: vi.fn(),
-  sendOrderConfirmationEmail: vi.fn(),
-  sendAdminFailureAlertEmail: vi.fn(),
-  bookCourierAndNotify: vi.fn(),
+const mock = vi.hoisted(() => ({
+  order: null as Record<string, unknown> | null,
+  find: vi.fn(), claim: vi.fn(), update: vi.fn(), event: vi.fn(), previousEvent: vi.fn(), plain: vi.fn(), design: vi.fn(), notify: vi.fn(),
 }));
-
-vi.mock("@/app/_lib/prisma", () => ({
-  prisma: {
-    order: { findUnique: orderFindUnique, update: orderUpdate, updateMany: orderUpdateMany },
-    orderItem: { findMany: orderItemFindMany },
-    plainTshirtStock: { updateMany: plainStockUpdateMany },
-    dtfDesign: { updateMany: dtfDesignUpdateMany },
-    $transaction: vi.fn(async (fn) =>
-      fn({
-        order: { findUnique: orderFindUnique, update: orderUpdate, updateMany: orderUpdateMany },
-        plainTshirtStock: { updateMany: plainStockUpdateMany },
-        dtfDesign: { updateMany: dtfDesignUpdateMany },
-      }),
-    ),
-  },
-}));
-
-vi.mock("@/app/_lib/mailer", () => ({
-  sendOrderConfirmationEmail,
-  sendAdminFailureAlertEmail,
-  logMailerError: vi.fn(),
-}));
-
-const { notifyOrderConfirmed } = vi.hoisted(() => ({ notifyOrderConfirmed: vi.fn() }));
-vi.mock("@/app/_lib/order-notifications", () => ({ notifyOrderConfirmed }));
-
-vi.mock("@/app/checkout/book-courier", () => ({ bookCourierAndNotify }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
+vi.mock("@/app/_lib/prisma", () => {
+  const tx = {
+    order: { findUnique: mock.find, updateMany: mock.claim, update: mock.update },
+    paymentEvent: { upsert: mock.event, findFirst: mock.previousEvent },
+    plainTshirtStock: { updateMany: mock.plain }, dtfDesign: { updateMany: mock.design },
+  };
+  return { prisma: { ...tx, $transaction: async (fn: (client: unknown) => unknown) => fn(tx) } };
+});
+vi.mock("@/app/_lib/order-notifications", () => ({ notifyOrderConfirmed: mock.notify }));
+vi.mock("@/app/_lib/mailer", () => ({ logMailerError: vi.fn() }));
 
 import { finalizeFailedPayment, finalizePaidPayment } from "../order-finalization";
-
-const ORDER = {
-  id: "ORD-1",
-  total: 1000,
-  subtotal: 900,
-  shippingCost: 100,
-  paymentMethod: "KOKO",
-  paymentMethodDisplay: "Koko",
-  paymentStatus: "PENDING",
-  status: "PENDING",
-  guestName: "Jane",
-  guestEmail: "jane@example.com",
-  user: null,
-  customerPhone: "0771234567",
-  shippingLine1: "1 Main Street",
-  shippingLine2: null,
-  shippingCity: "Colombo",
-  shippingCountry: "Sri Lanka",
-  webNumber: "WEB1001",
-  rbNumber: null,
-  emailSent: false,
-};
-
-const ITEMS = [
-  {
-    variantId: "V1",
-    plainTshirtStockId: "PS1",
-    dtfDesignId: "D1",
-    color: "White",
-    sku: "DB-TEE-WHT-M",
-    name: "Tee",
-    size: "M",
-    price: 1000,
-    quantity: 2,
-  },
-];
+import { OrderConflictError } from "@/app/_lib/order-concurrency";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  process.env.ROYAL_EXPRESS_ENABLED = "false";
-  orderFindUnique.mockResolvedValue(ORDER);
-  orderUpdate.mockResolvedValue({ ...ORDER, paymentStatus: "PAID" });
-  orderUpdateMany.mockResolvedValue({ count: 1 });
-  orderItemFindMany.mockResolvedValue(ITEMS);
+  mock.order = {
+    id: "o1", version: 0, status: "PENDING", paymentStatus: "PENDING", paymentMethod: "KOKO",
+    paymentStartedAt: new Date(), paymentReviewRequired: false, courierBookedAt: null,
+    total: 2500, subtotal: 2150, shippingCost: 350, customerPhone: "+94770000000", user: null,
+    items: [{ name: "Tee", quantity: 1, plainTshirtStockId: "blank", dtfDesignId: "print" }],
+  };
+  mock.find.mockReset().mockImplementation(async () => mock.order ? structuredClone(mock.order) : null);
+  mock.claim.mockReset().mockImplementation(async ({ where }: { where: { version: number; status: string; paymentStatus: string } }) => {
+    if (!mock.order || where.version !== mock.order.version || where.status !== mock.order.status || where.paymentStatus !== mock.order.paymentStatus) return { count: 0 };
+    mock.order.version = Number(mock.order.version) + 1;
+    return { count: 1 };
+  });
+  mock.update.mockReset().mockImplementation(async ({ data }: { data: Record<string, unknown> }) => Object.assign(mock.order!, data));
+  mock.event.mockReset().mockResolvedValue({});
+  mock.previousEvent.mockReset().mockResolvedValue(null);
+  mock.plain.mockReset().mockResolvedValue({ count: 1 });
+  mock.design.mockReset().mockResolvedValue({ count: 1 });
+  mock.notify.mockReset().mockResolvedValue(undefined);
 });
 
-describe("order finalization", () => {
-  it("marks paid and sends confirmation email", async () => {
-    await finalizePaidPayment("ORD-1", "KOKO");
-
-    expect(orderUpdateMany).toHaveBeenCalledWith({
-      where: { id: "ORD-1", paymentStatus: { not: "PAID" } },
-      data: { paymentStatus: "PAID" },
+describe("verified payment transitions", () => {
+  it("records payment and dispatches a confirmation without restoring stock", async () => {
+    expect(await finalizePaidPayment("o1", "KOKO")).toEqual({ status: "success" });
+    expect(mock.order?.paymentStatus).toBe("PAID");
+    expect(mock.notify).toHaveBeenCalledOnce();
+    expect(mock.plain).not.toHaveBeenCalled();
+    expect(mock.event).toHaveBeenCalledWith(expect.objectContaining({ create: expect.objectContaining({ outcome: "PAID", result: "success" }) }));
+  });
+  it("restores each pool once on repeated verified failure", async () => {
+    expect((await finalizeFailedPayment("o1", "KOKO", "failed")).status).toBe("failed");
+    expect((await finalizeFailedPayment("o1", "KOKO", "failed")).status).toBe("already_failed");
+    expect(mock.plain).toHaveBeenCalledOnce();
+    expect(mock.design).toHaveBeenCalledOnce();
+    expect(mock.order?.status).toBe("CANCELLED");
+  });
+  it("does not restore stock after payment has succeeded", async () => {
+    await finalizePaidPayment("o1", "KOKO");
+    expect((await finalizeFailedPayment("o1", "KOKO", "failed")).status).toBe("already_paid");
+    expect(mock.plain).not.toHaveBeenCalled();
+    expect(mock.order?.status).toBe("PENDING");
+  });
+  it("flags a second captured payment reference instead of treating it as a callback retry", async () => {
+    await finalizePaidPayment("o1", "KOKO", { reference: "payment-1" });
+    mock.previousEvent.mockResolvedValue({ providerReference: "payment-1" });
+    expect((await finalizePaidPayment("o1", "KOKO", { reference: "payment-2" })).status).toBe("review_required");
+    expect(mock.order).toMatchObject({ paymentStatus: "PAID", paymentReviewRequired: true });
+    expect(mock.plain).not.toHaveBeenCalled();
+  });
+  it("records late payment for review without reviving a closed order", async () => {
+    await finalizeFailedPayment("o1", "KOKO", "failed");
+    expect((await finalizePaidPayment("o1", "KOKO")).status).toBe("review_required");
+    expect(mock.order).toMatchObject({ status: "CANCELLED", paymentStatus: "PAYMENT_FAILED", paymentReviewRequired: true });
+    expect(mock.plain).toHaveBeenCalledOnce();
+    expect(mock.notify).not.toHaveBeenCalled();
+  });
+  it("rechecks a cancellation that wins between lookup and the payment claim", async () => {
+    mock.claim.mockImplementationOnce(async () => {
+      Object.assign(mock.order!, { version: 1, status: "CANCELLED", paymentStatus: "PAYMENT_FAILED" });
+      return { count: 0 };
     });
-    expect(notifyOrderConfirmed).toHaveBeenCalledOnce();
-    expect(notifyOrderConfirmed.mock.calls[0][0].items[0]).toMatchObject({
-      color: "White",
-      sku: "DB-TEE-WHT-M",
-    });
+    expect((await finalizePaidPayment("o1", "KOKO")).status).toBe("review_required");
+    expect(mock.order?.paymentStatus).toBe("PAYMENT_FAILED");
+    expect(mock.plain).not.toHaveBeenCalled();
   });
-
-  it("marks failed, cancels order, and restores both pools once", async () => {
-    orderFindUnique.mockResolvedValueOnce({ ...ORDER, items: ITEMS });
-
-    await finalizeFailedPayment("ORD-1", "KOKO", "cancelled");
-
-    expect(orderUpdateMany).toHaveBeenCalledWith({
-      where: {
-        id: "ORD-1",
-        paymentStatus: { notIn: ["PAID", "PAYMENT_FAILED"] },
-        status: { not: "CANCELLED" },
-      },
-      data: { paymentStatus: "PAYMENT_FAILED", status: "CANCELLED" },
-    });
-    expect(plainStockUpdateMany).toHaveBeenCalledWith({
-      where: { id: "PS1" }, data: { quantity: { increment: 2 } },
-    });
-    expect(dtfDesignUpdateMany).toHaveBeenCalledWith({
-      where: { id: "D1" }, data: { quantity: { increment: 2 } },
-    });
-    expect(notifyOrderConfirmed).not.toHaveBeenCalled();
+  it("keeps prepared stock held when a failure arrives after confirmation", async () => {
+    mock.order!.status = "CONFIRMED";
+    expect((await finalizeFailedPayment("o1", "KOKO", "failed")).status).toBe("review_required");
+    expect(mock.plain).not.toHaveBeenCalled();
   });
-
-  it("does not restore stock when already failed", async () => {
-    orderFindUnique.mockResolvedValueOnce({ ...ORDER, paymentStatus: "PAYMENT_FAILED", status: "CANCELLED", items: ITEMS });
-
-    await finalizeFailedPayment("ORD-1", "KOKO", "cancelled");
-
-    expect(plainStockUpdateMany).not.toHaveBeenCalled();
+  it("does not expire a hold if initiation won the race", async () => {
+    expect((await finalizeFailedPayment("o1", "KOKO", "expired", { uninitiatedOnly: true })).status).toBe("not_expired");
+    expect(mock.plain).not.toHaveBeenCalled();
   });
-
-  it("ignores failure when already paid", async () => {
-    orderFindUnique.mockResolvedValueOnce({ ...ORDER, paymentStatus: "PAID", items: ITEMS });
-
-    await finalizeFailedPayment("ORD-1", "KOKO", "cancelled");
-
-    expect(orderUpdateMany).not.toHaveBeenCalled();
-    expect(plainStockUpdateMany).not.toHaveBeenCalled();
+  it("rejects mismatched gateway amounts and currencies", async () => {
+    expect((await finalizePaidPayment("o1", "KOKO", { amount: 1, currency: "LKR" })).status).toBe("review_required");
+    expect(mock.order?.paymentStatus).toBe("PENDING");
+    expect(mock.notify).not.toHaveBeenCalled();
   });
-
-  it("never books the courier on payment, even when RoyalExpress is enabled", async () => {
-    process.env.ROYAL_EXPRESS_ENABLED = "true";
-
-    const result = await finalizePaidPayment("ORD-1", "KOKO");
-
-    expect(bookCourierAndNotify).not.toHaveBeenCalled();
-    expect(notifyOrderConfirmed).toHaveBeenCalledOnce();
-    expect(result).toEqual({ status: "success" });
-
-    process.env.ROYAL_EXPRESS_ENABLED = "false";
+  it("returns an error after repeated conflicts so callers can retry", async () => {
+    mock.claim.mockResolvedValue({ count: 0 });
+    await expect(finalizePaidPayment("o1", "KOKO")).rejects.toBeInstanceOf(OrderConflictError);
+    expect(mock.event).not.toHaveBeenCalled();
   });
-
-  it("returns payment_method_mismatch when method differs", async () => {
-    const result = await finalizePaidPayment("ORD-1", "PAYHERE");
-
-    expect(result).toEqual({ status: "payment_method_mismatch" });
-    expect(orderUpdateMany).not.toHaveBeenCalled();
+  it("retries notification delivery on a duplicate verified success", async () => {
+    mock.order!.paymentStatus = "PAID";
+    expect((await finalizePaidPayment("o1", "KOKO")).status).toBe("already_processed");
+    expect(mock.notify).toHaveBeenCalledOnce();
   });
-
-  it("returns order_not_found when order is missing", async () => {
-    orderFindUnique.mockResolvedValueOnce(null);
-
-    const result = await finalizePaidPayment("ORD-1", "KOKO");
-
-    expect(result).toEqual({ status: "order_not_found" });
+  it("does not send a confirmation when a paid order was subsequently cancelled", async () => {
+    Object.assign(mock.order!, { paymentStatus: "PAID", status: "CANCELLED" });
+    expect((await finalizePaidPayment("o1", "KOKO")).status).toBe("already_processed");
+    expect(mock.notify).not.toHaveBeenCalled();
   });
+  it("ignores missing orders and mismatched providers", async () => {
+    expect((await finalizePaidPayment("o1", "PAYHERE")).status).toBe("payment_method_mismatch");
+    mock.order = null;
+    expect((await finalizePaidPayment("missing", "KOKO")).status).toBe("order_not_found");
+  });
+});
 
-  it("returns already_failed when failure claim is a no-op", async () => {
-    orderFindUnique.mockResolvedValueOnce({ ...ORDER, items: ITEMS });
-    orderUpdateMany.mockResolvedValueOnce({ count: 0 });
 
-    const result = await finalizeFailedPayment("ORD-1", "KOKO", "duplicate callback");
-
-    expect(result).toEqual({ status: "already_failed" });
-    expect(plainStockUpdateMany).not.toHaveBeenCalled();
+describe("promotion payment notifications", () => {
+  it("preserves saved coupon savings in the paid confirmation", async () => {
+    mock.order!.adjustments = [{ id: "adj", label: "Coupon SAVE", amount: -100, promotion: true }];
+    await finalizePaidPayment("o1", "KOKO");
+    expect(mock.notify).toHaveBeenCalledWith(expect.objectContaining({ adjustments: [expect.objectContaining({ label: "Coupon SAVE", amount: -100 })], total: 2500 }));
   });
 });

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/app/_lib/prisma";
 import { isPaymentConfigError } from "@/app/_lib/payments/config";
 import { getPaymentProvider, isOnlinePaymentMethod } from "@/app/_lib/payments/registry";
+import { claimOrderMutation, OrderConflictError } from "@/app/_lib/order-concurrency";
 
 export const runtime = "nodejs";
 
@@ -48,11 +49,19 @@ export async function POST(req: Request) {
   if (order.paymentStatus === "PAID") {
     return NextResponse.json({ error: "Order is already paid" }, { status: 409 });
   }
+  if (order.status === "CANCELLED" || order.paymentStatus !== "PENDING" || order.paymentReviewRequired) {
+    return NextResponse.json({ error: "This order is closed or awaiting payment review. Please contact the store." }, { status: 409 });
+  }
 
   try {
+    await prisma.$transaction(async (tx) => {
+      await claimOrderMutation(tx, order);
+      await tx.order.update({ where: { id: order.id }, data: { paymentStartedAt: order.paymentStartedAt ?? new Date() } });
+    });
     const provider = getPaymentProvider(method);
     return NextResponse.json(await provider.initiate(order, appBaseUrl(req)));
   } catch (error) {
+    if (error instanceof OrderConflictError) return NextResponse.json({ error: error.message }, { status: 409 });
     console.error("[payments/initiate] failure", { order_id: order.id, provider: method, error });
     if (isPaymentConfigError(error)) {
       return NextResponse.json({ error: "Payment gateway is not configured" }, { status: 500 });

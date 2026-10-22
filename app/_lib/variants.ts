@@ -1,3 +1,5 @@
+import { requiresPrint, type StockMode } from "./stock-policy";
+
 // Pure variant domain helpers. No DB, no React — unit-tested in isolation.
 export function effectivePrice(
   variant: { price: number | null },
@@ -17,14 +19,27 @@ export type PlainStockEntry = { id: string; quantity: number };
 export type PlainStockMap = Map<string, PlainStockEntry>; // key: plainStockKey(colorSlug, size)
 export type DesignStockMap = Map<string, number>;         // key: dtfDesignId -> quantity
 
-export function plainStockKey(colorSlug: string, size: string): string {
+export type StockSize = { sku?: string | null; size: string; plainTshirtStockId?: string | null };
+
+export function plainStockKey(colorSlug: string, size: string, stockId?: string | null): string {
+  if (stockId) return `stock-id:${stockId}`;
+  // Explicitly unconfigured cells must never borrow another product's blank.
+  if (stockId === null) return `unconfigured:${colorSlug}::${size}`;
   return `${colorSlug}::${size}`;
 }
 
 export function buildPlainStockMap(
-  rows: { id: string; colorSlug: string; size: string; quantity: number }[],
+  rows: { id: string; colorSlug: string; size: string; quantity: number; inventoryProductId?: string | null }[],
 ): PlainStockMap {
-  return new Map(rows.map((r) => [plainStockKey(r.colorSlug, r.size), { id: r.id, quantity: r.quantity }]));
+  const result: PlainStockMap = new Map();
+  for (const row of rows) {
+    const entry = { id: row.id, quantity: row.quantity };
+    result.set(plainStockKey(row.colorSlug, row.size, row.id), entry);
+    // Compatibility for old/unassigned records only. Categorized pools always
+    // require their explicit ID, even when two shirt styles have the same colour.
+    if (!row.inventoryProductId) result.set(plainStockKey(row.colorSlug, row.size), entry);
+  }
+  return result;
 }
 
 export function buildDesignStockMap(rows: { id: string; quantity: number }[]): DesignStockMap {
@@ -46,42 +61,47 @@ export function stockForSize(
   dtfDesignId: string | null,
   plainStock: PlainStockMap,
   designStock: DesignStockMap,
+  stockId?: string | null,
+  stockMode?: StockMode,
 ): number {
-  if (!designAvailable(dtfDesignId, designStock)) return 0;
+  if (requiresPrint(stockMode) && !designAvailable(dtfDesignId, designStock)) return 0;
   const designQty = designStock.get(dtfDesignId as string) ?? 0;
-  const plainQty = plainStock.get(plainStockKey(colorSlug, size))?.quantity ?? 0;
-  return Math.min(plainQty, designQty);
+  const plainQty = plainStock.get(plainStockKey(colorSlug, size, stockId))?.quantity ?? 0;
+  return requiresPrint(stockMode) ? Math.min(plainQty, designQty) : plainQty;
 }
 
 export function availableSizes(
-  sizes: { size: string }[],
+  sizes: StockSize[],
   colorSlug: string,
   dtfDesignId: string | null,
   plainStock: PlainStockMap,
   designStock: DesignStockMap,
+  stockMode?: StockMode,
 ): string[] {
   return sizes
-    .filter((s) => stockForSize(colorSlug, s.size, dtfDesignId, plainStock, designStock) > 0)
+    .filter((s) => stockForSize(colorSlug, s.size, dtfDesignId, plainStock, designStock, s.plainTshirtStockId, stockMode) > 0)
     .map((s) => s.size);
 }
 
 export function variantInStock(
-  sizes: { size: string }[],
+  sizes: StockSize[],
   colorSlug: string,
   dtfDesignId: string | null,
   plainStock: PlainStockMap,
   designStock: DesignStockMap,
+  stockMode?: StockMode,
 ): boolean {
-  return availableSizes(sizes, colorSlug, dtfDesignId, plainStock, designStock).length > 0;
+  return availableSizes(sizes, colorSlug, dtfDesignId, plainStock, designStock, stockMode).length > 0;
 }
 
 export function productInStock(
-  variants: { colorSlug: string; sizes: { size: string }[] }[],
+  variants: { colorSlug: string; sizes: StockSize[] }[],
   dtfDesignId: string | null,
   plainStock: PlainStockMap,
   designStock: DesignStockMap,
+  stockMode?: StockMode,
 ): boolean {
-  return variants.some((v) => variantInStock(v.sizes, v.colorSlug, dtfDesignId, plainStock, designStock));
+  return variants.some((v) => variantInStock(v.sizes, v.colorSlug, dtfDesignId, plainStock, designStock, stockMode));
 }
 
 export function resolveDefaultVariant<T extends { sortOrder: number; archived: boolean }>(

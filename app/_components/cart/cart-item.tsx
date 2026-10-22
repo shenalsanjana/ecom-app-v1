@@ -26,11 +26,11 @@ export function CartItemRow({ item }: Props) {
       >
         <Image
           src={item.image}
-          alt={item.name}
+          alt={[item.name, item.color].filter(Boolean).join(", ")}
           fill
           unoptimized={isUploadedImage(item.image)}
           sizes="96px"
-          className="object-cover"
+          className="object-contain"
         />
       </Link>
 

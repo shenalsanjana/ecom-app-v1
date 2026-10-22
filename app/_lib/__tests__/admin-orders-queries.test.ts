@@ -25,9 +25,9 @@ describe("listOrders", () => {
 
     const res = await listOrders({ tab: "needs-dispatch", page: 2, pageSize: 25 });
 
-    expect(count).toHaveBeenCalledWith({ where: { status: "CONFIRMED", courierBookedAt: null } });
+    expect(count).toHaveBeenCalledWith({ where: { deletedAt: null, status: "CONFIRMED", courierBookedAt: null } });
     const arg = findMany.mock.calls[0][0];
-    expect(arg.where).toEqual({ status: "CONFIRMED", courierBookedAt: null });
+    expect(arg.where).toEqual({ deletedAt: null, status: "CONFIRMED", courierBookedAt: null });
     expect(arg.take).toBe(25);
     expect(arg.skip).toBe(25);
     expect(arg.orderBy).toEqual({ createdAt: "desc" });

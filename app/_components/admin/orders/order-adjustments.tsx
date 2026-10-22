@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { addAdjustment, removeAdjustment } from "@/app/admin/orders/actions";
 import { formatPrice } from "@/app/_lib/format";
 
-type Adjustment = { id: string; label: string; amount: number };
+type Adjustment = { id: string; label: string; amount: number; promotion?: boolean };
 
 export function OrderAdjustments({ orderId, adjustments, editable }: { orderId: string; adjustments: Adjustment[]; editable: boolean }) {
   const [label, setLabel] = useState("");
@@ -40,7 +40,7 @@ export function OrderAdjustments({ orderId, adjustments, editable }: { orderId: 
             <span>{a.label}</span>
             <span className="flex items-center gap-2">
               <span>{a.amount < 0 ? "−" : "+"}{formatPrice(Math.abs(a.amount))}</span>
-              {editable && <button className="text-destructive" disabled={pending} onClick={() => remove(a.id)}>✕</button>}
+              {editable && !a.promotion && <button className="text-destructive" disabled={pending} onClick={() => remove(a.id)}>✕</button>}
             </span>
           </li>
         ))}
@@ -50,7 +50,7 @@ export function OrderAdjustments({ orderId, adjustments, editable }: { orderId: 
           <div className="flex gap-2">
             <button type="button" onClick={() => setKind("CHARGE")}
               className={`rounded border px-2 py-1 text-xs ${kind === "CHARGE" ? "bg-primary text-primary-foreground" : ""}`}>Charge</button>
-            <button type="button" onClick={() => setKind("DISCOUNT")}
+            <button type="button" disabled={adjustments.some(a => a.promotion)} onClick={() => setKind("DISCOUNT")}
               className={`rounded border px-2 py-1 text-xs ${kind === "DISCOUNT" ? "bg-primary text-primary-foreground" : ""}`}>Discount</button>
           </div>
           <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label (e.g. Rush fee)"

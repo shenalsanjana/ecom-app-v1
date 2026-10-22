@@ -151,22 +151,43 @@ async function main() {
     designIdBySlug.set(d.slug, row.id);
   }
 
-  // Plain T-shirt stock — one row per distinct (colorSlug,size) the catalog
-  // offers. Same create-only quantity rule as designs above.
-  const distinctPlainCells = new Map<string, { color: string; colorSlug: string; size: string }>();
+  // Keep an existing inventory parent on reseed. New demo products receive a
+  // physical family, independently of their storefront category/design URL.
+  const existingParents = new Map((await prisma.product.findMany({
+    where: { id: { in: catalogProducts.map(p => p.id) } }, select: { id: true, inventoryProductId: true },
+  })).map(p => [p.id, p.inventoryProductId]));
+  const parentByProduct = new Map<string, string>();
+  for (const p of catalogProducts) {
+    const accessory = departmentByDesign.get(p.category) === "accessories";
+    const style = /raglan/i.test(p.name) ? "raglan" : /oversiz/i.test(p.name) ? "oversized" : "regular";
+    const id = existingParents.get(p.id) ?? (accessory ? `blank-accessory-${p.category}` : `blank-${style}`);
+    const categoryName = designs.find(([slug]) => slug === p.category)?.[1] ?? p.category;
+    const categoryId = accessory ? /pouch/i.test(categoryName) ? "inventory-pouches" : /bag|tote/i.test(categoryName) ? "inventory-bags" : "inventory-accessories" : `inventory-${style}`;
+    await prisma.inventoryProduct.upsert({ where: { id }, update: {}, create: {
+      id, name: accessory ? categoryName : style === "raglan" ? "Oversized Raglan T-Shirt" : style === "oversized" ? "Oversized T-Shirt" : "Regular T-Shirt", categoryId,
+    } });
+    parentByProduct.set(p.id, id);
+  }
+
+  // Quantity is created only once for a physical parent + colour + size.
+  const cellKey = (parent: string, color: string, size: string) => JSON.stringify([parent, color, size]);
+  const distinctPlainCells = new Map<string, { inventoryProductId: string; color: string; colorSlug: string; size: string; stockGroup: "ACCESSORY" | "PLAIN_TSHIRT" }>();
+  const stockIds = new Map<string, string>();
   for (const p of catalogProducts) {
     for (const v of p.variants) {
       for (const s of v.sizes) {
-        distinctPlainCells.set(`${v.colorSlug}::${s.size}`, { color: v.color, colorSlug: v.colorSlug, size: s.size });
+        const inventoryProductId = parentByProduct.get(p.id)!;
+        distinctPlainCells.set(cellKey(inventoryProductId, v.colorSlug, s.size), { inventoryProductId, color: v.color, colorSlug: v.colorSlug, size: s.size, stockGroup: departmentByDesign.get(p.category) === "accessories" ? "ACCESSORY" : "PLAIN_TSHIRT" });
       }
     }
   }
   for (const cell of distinctPlainCells.values()) {
-    await prisma.plainTshirtStock.upsert({
-      where: { colorSlug_size: { colorSlug: cell.colorSlug, size: cell.size } },
+    const row = await prisma.plainTshirtStock.upsert({
+      where: { inventoryProductId_colorSlug_size: { inventoryProductId: cell.inventoryProductId, colorSlug: cell.colorSlug, size: cell.size } },
       update: { color: cell.color },
-      create: { color: cell.color, colorSlug: cell.colorSlug, size: cell.size, quantity: plainStockFor(cell.colorSlug, cell.size) },
+      create: { ...cell, quantity: plainStockFor(cell.colorSlug, cell.size) },
     });
+    stockIds.set(cellKey(cell.inventoryProductId, cell.colorSlug, cell.size), row.id);
   }
 
   for (const p of catalogProducts) {
@@ -177,12 +198,15 @@ async function main() {
         description: DEFAULT_DESCRIPTION, designSlug: p.category,
         departmentSlug: departmentByDesign.get(p.category)!,
         dtfDesignId: designIdBySlug.get(p.design.slug)!,
+        inventoryProductId: parentByProduct.get(p.id)!,
       },
       create: {
         id: p.id, name: p.name, price: p.price, originalPrice: p.originalPrice ?? null,
+        status: "PUBLISHED",
         description: DEFAULT_DESCRIPTION, designSlug: p.category,
         departmentSlug: departmentByDesign.get(p.category)!,
         dtfDesignId: designIdBySlug.get(p.design.slug)!,
+        inventoryProductId: parentByProduct.get(p.id)!,
       },
     });
 
@@ -213,7 +237,7 @@ async function main() {
       await prisma.variantImage.createMany({ data: imageRows });
 
       await prisma.variantSizeStock.createMany({
-        data: v.sizes.map((s) => ({ variantId: variant.id, size: s.size })),
+        data: v.sizes.map((s) => ({ variantId: variant.id, size: s.size, plainTshirtStockId: stockIds.get(cellKey(parentByProduct.get(p.id)!, v.colorSlug, s.size))! })),
       });
     }
 

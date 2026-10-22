@@ -13,6 +13,9 @@ vi.mock("@/app/_lib/payhere-config", () => ({
 
 vi.mock("@/app/_lib/prisma", () => ({
   prisma: {
+    $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn({ order: {
+      updateMany: async () => ({ count: 1 }), update: async () => ({}),
+    } }),
     order: {
       findUnique: orderFindUnique,
     },

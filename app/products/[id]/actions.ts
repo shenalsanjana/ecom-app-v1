@@ -49,7 +49,7 @@ export async function submitReview(
   }
 
   const product = await prisma.product.findUnique({
-    where: { id: productId },
+    where: { id: productId, archived: false, status: "PUBLISHED" },
     select: { id: true },
   });
   if (!product) return { error: "Product not found." };

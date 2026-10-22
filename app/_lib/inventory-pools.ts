@@ -2,8 +2,8 @@
 // creates, cancels, edits, or fails an order: checkout, admin cancel/edit,
 // and the payment-failure webhook all call these two functions so stock
 // math never diverges between paths. Both skip a pool whose id is null —
-// a sizeless line, an order predating this feature, or a pool row since
-// deleted (OrderItem.plainTshirtStockId/dtfDesignId is onDelete: SetNull).
+// a legacy sizeless line, an order predating this feature, or a reference
+// nulled before pool deletion was restricted. New sales validate the pools required by their plain/printed rule.
 import type { Prisma } from "@prisma/client";
 
 export type PoolItem = {
@@ -18,13 +18,13 @@ export async function restoreItemPools(tx: Prisma.TransactionClient, item: PoolI
   if (item.plainTshirtStockId) {
     await tx.plainTshirtStock.updateMany({
       where: { id: item.plainTshirtStockId },
-      data: { quantity: { increment: item.quantity } },
+      data: { quantity: { increment: item.quantity }, version: { increment: 1 } },
     });
   }
   if (item.dtfDesignId) {
     await tx.dtfDesign.updateMany({
       where: { id: item.dtfDesignId },
-      data: { quantity: { increment: item.quantity } },
+      data: { quantity: { increment: item.quantity }, version: { increment: 1 } },
     });
   }
 }
@@ -47,14 +47,14 @@ export async function acquireItemPools(tx: Prisma.TransactionClient, item: Acqui
   if (item.plainTshirtStockId) {
     const r = await tx.plainTshirtStock.updateMany({
       where: { id: item.plainTshirtStockId, quantity: { gte: item.quantity } },
-      data: { quantity: { decrement: item.quantity } },
+      data: { quantity: { decrement: item.quantity }, version: { increment: 1 } },
     });
     if (r.count === 0) throw new InsufficientStockError(item.name);
   }
   if (item.dtfDesignId) {
     const r = await tx.dtfDesign.updateMany({
       where: { id: item.dtfDesignId, quantity: { gte: item.quantity } },
-      data: { quantity: { decrement: item.quantity } },
+      data: { quantity: { decrement: item.quantity }, version: { increment: 1 } },
     });
     if (r.count === 0) throw new InsufficientStockError(item.name);
   }

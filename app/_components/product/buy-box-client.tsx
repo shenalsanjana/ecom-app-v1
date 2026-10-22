@@ -1,5 +1,6 @@
 // app/_components/product/buy-box-client.tsx
 "use client";
+import type { StockMode } from "@/app/_lib/stock-policy";
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -19,6 +20,8 @@ import { trackViewContent, trackAddToCart } from "@/app/_lib/meta-pixel";
 import { useCart } from "@/app/_lib/cart-context";
 import { ShareButtons } from "@/app/_components/product/share-buttons";
 import { variantInStock, availableSizes, stockForSize, buildPlainStockMap, buildDesignStockMap } from "@/app/_lib/variants";
+import { Price } from "@/app/_components/ui/price";
+import { ProductOfferNote, useProductPromotion } from "@/app/_components/discounts/product-offer";
 
 export type VariantDetail = {
   id: string;
@@ -29,8 +32,9 @@ export type VariantDetail = {
   price: number;
   originalPrice: number | null;
   detailImages: string[];
+  stockMode?: StockMode;
   dtfDesignId: string | null;
-  sizeStocks: { size: string }[];
+  sizeStocks: { size: string; plainTshirtStockId?: string | null }[];
 };
 
 type Props = {
@@ -41,6 +45,7 @@ type Props = {
   designStockRows: { id: string; quantity: number }[];
   defaultColorSlug: string;
   departmentSlug: string;
+  collectionSlugs?: string[];
   ratingAvg: number;
   ratingCount: number;
   shareUrl: string;
@@ -51,7 +56,7 @@ function discountPct(price: number, original: number): number {
 }
 
 export function BuyBoxClient({
-  productId, name, variants, plainStockRows, designStockRows, defaultColorSlug, departmentSlug, ratingAvg, ratingCount, shareUrl,
+  productId, name, variants, plainStockRows, designStockRows, defaultColorSlug, departmentSlug, collectionSlugs = [], ratingAvg, ratingCount, shareUrl,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -74,25 +79,32 @@ export function BuyBoxClient({
   const [quantity, setQuantity] = useState(1);
   const [isBuying, setIsBuying] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string>("");
+  const [previousColorSlug, setPreviousColorSlug] = useState(selectedVariant.colorSlug);
 
-  // Clear size + quantity when the color changes (availability differs per color).
-  useEffect(() => { setSelectedSize(""); setQuantity(1); }, [selectedVariant.colorSlug]);
+  // Reset before committing a new color, including back/forward navigation, so
+  // the new images and stock never appear with the previous color's size.
+  if (previousColorSlug !== selectedVariant.colorSlug) {
+    setPreviousColorSlug(selectedVariant.colorSlug);
+    setSelectedSize("");
+    setQuantity(1);
+  }
 
   const price = selectedVariant.price;
   const originalPrice = selectedVariant.originalPrice;
+  const promotion = useProductPromotion({ productId, price, originalPrice, quantity: 1, categorySlugs: collectionSlugs });
   const image = selectedVariant.detailImages[0] ?? "";
-  const inStock = variantInStock(selectedVariant.sizeStocks, selectedVariant.colorSlug, selectedVariant.dtfDesignId, plainStock, designStock);
+  const inStock = variantInStock(selectedVariant.sizeStocks, selectedVariant.colorSlug, selectedVariant.dtfDesignId, plainStock, designStock, selectedVariant.stockMode);
   const sizeList = selectedVariant.sizeStocks.map((s) => s.size);
-  const inStockSizes = new Set(availableSizes(selectedVariant.sizeStocks, selectedVariant.colorSlug, selectedVariant.dtfDesignId, plainStock, designStock));
-  const sizeStock = selectedSize ? stockForSize(selectedVariant.colorSlug, selectedSize, selectedVariant.dtfDesignId, plainStock, designStock) : 0;
+  const inStockSizes = new Set(availableSizes(selectedVariant.sizeStocks, selectedVariant.colorSlug, selectedVariant.dtfDesignId, plainStock, designStock, selectedVariant.stockMode));
+  const sizeStock = selectedSize ? stockForSize(selectedVariant.colorSlug, selectedSize, selectedVariant.dtfDesignId, plainStock, designStock, selectedVariant.sizeStocks.find(s => s.size === selectedSize)?.plainTshirtStockId, selectedVariant.stockMode) : 0;
   const qtyMax = Math.min(selectedSize ? sizeStock : 10, 10);
   // Show the exact per-size count only once a size is chosen; before that, a
   // generic "in stock" (a value above the low-stock threshold) so we never
   // falsely render "Only 1 left" on a product that simply has no size selected.
   const displayStock = selectedSize ? sizeStock : inStock ? 999 : 0;
 
-  const onSale = originalPrice != null && originalPrice > price;
-  const pct = onSale ? discountPct(price, originalPrice as number) : 0;
+  const onSale = promotion.originalPrice != null && promotion.originalPrice > promotion.price;
+  const pct = promotion.exact && promotion.offer ? promotion.offer.value / 100 : onSale ? discountPct(promotion.price, promotion.originalPrice!) : 0;
   const fromPath = `/products/${productId}`;
 
   useEffect(() => { trackViewContent(productId, price); }, [productId, price]);
@@ -160,16 +172,13 @@ export function BuyBoxClient({
         <span>({ratingCount.toLocaleString()})</span>
       </a>
 
-      <div className="flex items-baseline gap-3">
-        <span className={"font-heading text-2xl font-semibold " + (onSale ? "text-brand" : "")}>{formatPrice(price)}</span>
-        {onSale && (
-          <>
-            <span className="text-base text-muted-foreground line-through">{formatPrice(originalPrice as number)}</span>
-            <Badge variant="brand">-{pct}%</Badge>
-          </>
-        )}
+      <div className="flex flex-wrap items-baseline gap-3">
+        <Price price={promotion.price} originalPrice={promotion.originalPrice} className="[&>span]:text-2xl" />
+        {onSale && <Badge variant="brand">-{pct}%</Badge>}
+        {!onSale && promotion.offer && <Badge variant="secondary">{promotion.offer.code ? "Code offer" : "Offer"}</Badge>}
       </div>
-      <InstallmentNote total={price} />
+      <ProductOfferNote promotion={promotion} />
+      <InstallmentNote total={promotion.price} />
 
       {/* Color selector */}
       <div className="space-y-2">
@@ -178,7 +187,7 @@ export function BuyBoxClient({
           <span className="text-muted-foreground">{selectedVariant.color}</span>
           {selectedVariant.sku && <span className="ml-auto text-xs text-muted-foreground">SKU {selectedVariant.sku}</span>}
         </div>
-        <ColorSwatches options={swatchOptions} selected={selectedVariant.colorSlug} onSelect={selectColor} />
+        <ColorSwatches options={swatchOptions} selected={selectedVariant.colorSlug} onSelect={selectColor} showLabels={departmentSlug === "accessories"} />
       </div>
 
       <div><StockIndicator stock={displayStock} /></div>
@@ -272,7 +281,7 @@ export function BuyBoxClient({
           <div className="mx-auto flex max-w-7xl items-center gap-3">
             <div className="min-w-0 shrink">
               <p className="truncate text-sm font-medium">{name}</p>
-              <p className={"font-heading text-base font-semibold " + (onSale ? "text-brand" : "")}>{formatPrice(price)}</p>
+              <Price price={promotion.price} originalPrice={promotion.originalPrice} />
             </div>
             <div className="ml-auto shrink-0">
               {sizeList.length > 0 && !selectedSize ? (

@@ -26,6 +26,7 @@ type CartAction =
   | { type: "REMOVE_ITEM"; payload: string } // key
   | { type: "UPDATE_QUANTITY"; payload: { key: string; quantity: number } }
   | { type: "CLEAR_CART" }
+  | { type: "UPDATE_PRICES"; payload: { variantId: string; price: number }[] }
   | { type: "LOAD_CART"; payload: CartItem[] };
 
 type CartContextType = CartState & {
@@ -33,6 +34,7 @@ type CartContextType = CartState & {
   removeItem: (key: string) => void;
   updateQuantity: (key: string, quantity: number) => void;
   clearCart: () => void;
+  updatePrices: (prices: { variantId: string; price: number }[]) => void;
   totalItems: number;
   subtotal: number;
 };
@@ -91,6 +93,10 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       };
     case "CLEAR_CART":
       return { ...state, items: [] };
+    case "UPDATE_PRICES": {
+      const prices = new Map(action.payload.map((item) => [item.variantId, item.price]));
+      return { ...state, items: state.items.map((item) => ({ ...item, price: prices.get(item.variantId) ?? item.price })) };
+    }
     case "LOAD_CART":
       return { ...state, items: action.payload, isLoading: false };
     default:
@@ -182,6 +188,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const clearCart = useCallback(() => {
     dispatch({ type: "CLEAR_CART" });
   }, []);
+  const updatePrices = useCallback((prices: { variantId: string; price: number }[]) => {
+    dispatch({ type: "UPDATE_PRICES", payload: prices });
+  }, []);
 
   const totalItems = state.items.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = state.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -194,6 +203,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         removeItem,
         updateQuantity,
         clearCart,
+        updatePrices,
         totalItems,
         subtotal,
       }}

@@ -15,6 +15,7 @@ type Row = {
   guestName: string | null; user: { name: string | null } | null;
   total: number; paymentMethod: string; paymentStatus: string | null; status: string;
   courierBookedAt: Date | null; courierWaybillNumber: string | null;
+  deletedAt?: Date | null;
   items: { id: string; name: string; color: string | null; size: string | null; quantity: number }[];
   _count: { items: number };
 };
@@ -83,11 +84,10 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
     });
 
   const selectedRows = rows.filter((o) => selected.has(o.id));
-  // Both terminal states are hard-deletable; "Delete selected" only appears when
+  // Both terminal states can be removed; "Delete selected" only appears when
   // every selected order qualifies, so the action never silently skips rows.
   const allDeletable =
-    selectedRows.length > 0 && selectedRows.every((o) => o.status === "CANCELLED" || o.status === "DELIVERED");
-  const anyDeliveredSelected = selectedRows.some((o) => o.status === "DELIVERED");
+    selectedRows.length > 0 && selectedRows.every((o) => !o.deletedAt && (o.status === "CANCELLED" || o.status === "DELIVERED"));
   // A bulk action is only offered (enabled) when at least one selected order is
   // eligible for it; otherwise the button is greyed out (standard disabled state).
   const canConfirmAny = selectedRows.some((o) => o.status === "PENDING");
@@ -98,10 +98,7 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
     start(async () => {
       const ids = [...selected];
       if (ids.length === 0) return;
-      const warning = anyDeliveredSelected
-        ? ` Delivered orders among them will lose their sale records.`
-        : "";
-      if (!window.confirm(`Permanently delete ${ids.length} order(s)?${warning} This cannot be undone.`)) return;
+      if (!window.confirm(`Move ${ids.length} order(s) to Deleted? Payment history and stock balances will be preserved. You can restore them from the Deleted tab.`)) return;
       report(await bulkDelete(ids), "deleted");
     });
 
@@ -120,7 +117,7 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
             title={canCancelAny ? undefined : "Selected orders are delivered or cancelled"}
             className="rounded-md border border-destructive px-3 py-1 text-xs text-destructive disabled:opacity-50">Cancel selected</button>
           {allDeletable && (
-            <button disabled={pending} onClick={deleteSelected} aria-label="Permanently delete selected orders"
+            <button disabled={pending} onClick={deleteSelected} aria-label="Move selected orders to Deleted"
               className="rounded-md bg-destructive px-3 py-1 text-xs font-semibold text-destructive-foreground disabled:opacity-50">Delete selected</button>
           )}
           <button onClick={() => setSelected(new Set())} className="ml-auto text-xs text-muted-foreground">Clear</button>
@@ -161,7 +158,7 @@ export function OrdersTable({ rows }: { rows: Row[] }) {
               <td className="p-2"><Badge variant="outline">{o.status}</Badge></td>
               <td className="p-2">
                 <RowActions orderId={o.id} status={o.status} paymentMethod={o.paymentMethod}
-                  paymentStatus={o.paymentStatus} courierBooked={!!o.courierBookedAt} waybill={o.courierWaybillNumber} />
+                  paymentStatus={o.paymentStatus} courierBooked={!!o.courierBookedAt} waybill={o.courierWaybillNumber} deleted={!!o.deletedAt} />
               </td>
             </tr>
           ))}

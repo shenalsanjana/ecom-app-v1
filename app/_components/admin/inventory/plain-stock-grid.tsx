@@ -2,11 +2,14 @@
 import { useState, useTransition } from "react";
 import { upsertPlainTshirtStock, deletePlainTshirtStock } from "@/app/admin/inventory/actions";
 import { slugify } from "@/app/_lib/product-helpers";
+import { AvailableCountEditor } from "./available-count-editor";
+import { useStockOperation } from "./use-stock-operation";
 
-type Row = { id: string; color: string; colorSlug: string; size: string; quantity: number };
+type Row = { id: string; color: string; colorSlug: string; size: string; quantity: number; version: number };
 
 export function PlainStockGrid({ rows, lowStockThreshold }: { rows: Row[]; lowStockThreshold: number }) {
   const [pending, start] = useTransition();
+  const operation = useStockOperation();
   const [newColor, setNewColor] = useState("");
   const [newSize, setNewSize] = useState("");
   const [newQty, setNewQty] = useState("0");
@@ -16,13 +19,6 @@ export function PlainStockGrid({ rows, lowStockThreshold }: { rows: Row[]; lowSt
     const list = byColor.get(r.colorSlug) ?? [];
     list.push(r);
     byColor.set(r.colorSlug, list);
-  }
-
-  function saveQuantity(row: Row, quantity: number) {
-    start(async () => {
-      const r = await upsertPlainTshirtStock({ id: row.id, color: row.color, colorSlug: row.colorSlug, size: row.size, quantity });
-      if (!r.success) alert(r.error);
-    });
   }
 
   function remove(row: Row) {
@@ -39,9 +35,9 @@ export function PlainStockGrid({ rows, lowStockThreshold }: { rows: Row[]; lowSt
     const quantity = Math.max(0, Math.trunc(Number(newQty) || 0));
     if (!color || !size) return;
     start(async () => {
-      const r = await upsertPlainTshirtStock({ color, colorSlug: slugify(color), size, quantity });
+      const r = await upsertPlainTshirtStock({ color, colorSlug: slugify(color), size, quantity, operationKey: operation.keyFor({ color, size, quantity }) });
       if (!r.success) { alert(r.error); return; }
-      setNewColor(""); setNewSize(""); setNewQty("0");
+      operation.complete(); setNewColor(""); setNewSize(""); setNewQty("0");
     });
   }
 
@@ -54,16 +50,8 @@ export function PlainStockGrid({ rows, lowStockThreshold }: { rows: Row[]; lowSt
             {cells.map((row) => (
               <div key={row.id} className="flex items-center gap-2">
                 <span className="w-16 text-sm text-muted-foreground">{row.size}</span>
-                <input
-                  type="number" min={0} defaultValue={row.quantity}
-                  onBlur={(e) => saveQuantity(row, Math.max(0, Math.trunc(Number(e.target.value) || 0)))}
-                  className={
-                    "w-24 rounded border px-2 py-1 text-sm " +
-                    (row.quantity <= 0 ? "border-destructive text-destructive" :
-                      row.quantity <= lowStockThreshold ? "border-amber-500 text-amber-600" : "")
-                  }
-                  disabled={pending}
-                />
+                <AvailableCountEditor quantity={row.quantity} version={row.version} label={`${row.color} ${row.size}`} disabled={pending} lowStockThreshold={lowStockThreshold}
+                  onSave={(quantity, expectedVersion, intent) => upsertPlainTshirtStock({ id: row.id, color: row.color, colorSlug: row.colorSlug, size: row.size, quantity, expectedVersion, ...intent })} />
                 <button type="button" onClick={() => remove(row)} className="px-1 text-destructive">✕</button>
               </div>
             ))}

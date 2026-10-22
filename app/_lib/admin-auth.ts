@@ -7,6 +7,7 @@
 import { redirect } from "next/navigation";
 import type { Session } from "next-auth";
 import { auth } from "@/app/_lib/auth";
+import { prisma } from "@/app/_lib/prisma";
 
 /**
  * Server-component / server-action guard. Redirects unauthenticated users
@@ -15,12 +16,15 @@ import { auth } from "@/app/_lib/auth";
  */
 export async function requireAdmin(): Promise<Session> {
   const session = await auth();
-  if (!session?.user) {
+  if (!session?.user?.id) {
     redirect(`/login?callbackUrl=/admin`);
   }
   if (session.user.role !== "ADMIN") {
     redirect("/");
   }
+  const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
+  if (!user) redirect(`/login?callbackUrl=/admin`);
+  if (user.role !== "ADMIN") redirect("/");
   return session;
 }
 
@@ -34,7 +38,10 @@ export async function requireAdmin(): Promise<Session> {
  */
 export async function requireAdminApi(): Promise<{ session: Session } | Response> {
   const session = await auth();
-  if (!session?.user) return new Response("Unauthorized", { status: 401 });
+  if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
   if (session.user.role !== "ADMIN") return new Response("Forbidden", { status: 403 });
+  const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
+  if (!user) return new Response("Unauthorized", { status: 401 });
+  if (user.role !== "ADMIN") return new Response("Forbidden", { status: 403 });
   return { session };
 }

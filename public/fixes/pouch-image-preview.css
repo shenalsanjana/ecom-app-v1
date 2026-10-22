@@ -1,0 +1,49 @@
+/* Pouch display override. Remove the nginx link after the React fixes deploy. */
+img[src*="/uploads/premium-pu-leather-zipper-pouch-"] {
+  object-fit: contain !important;
+  object-position: center !important;
+  transform: none !important;
+  scale: 1 !important;
+}
+
+/* Main gallery: retain the original proportions, including tall detail sheets. */
+div.aspect-square:has(> img[src*="/uploads/premium-pu-leather-zipper-pouch-"][alt^="Premium PU Leather Zipper Pouch"]) {
+  aspect-ratio: auto !important;
+}
+
+div.aspect-square > img[src*="/uploads/premium-pu-leather-zipper-pouch-"][alt^="Premium PU Leather Zipper Pouch"] {
+  position: relative !important;
+  inset: auto !important;
+  display: block;
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: auto 4 / 3;
+}
+
+div.aspect-square > img[src*="/uploads/premium-pu-leather-zipper-pouch-details-"][alt^="Premium PU Leather Zipper Pouch"] {
+  aspect-ratio: auto 3 / 4;
+}
+
+/* Existing color buttons retain their configured colors and selection state. */
+main:has(img[src*="/uploads/premium-pu-leather-zipper-pouch-"]) [role="group"][aria-label="Colors"] > button:is([aria-label="Light Blush Pink"], [aria-label="Caramel Brown"], [aria-label="Warm Ivory"]) {
+  display: inline-flex;
+  align-items: center;
+  width: auto !important;
+  height: auto !important;
+  min-height: 40px;
+  max-width: 100%;
+  padding: 6px 12px;
+  overflow: visible;
+  color: var(--foreground, #30231a);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+main:has(img[src*="/uploads/premium-pu-leather-zipper-pouch-"]) [role="group"][aria-label="Colors"] > button:is([aria-label="Light Blush Pink"], [aria-label="Caramel Brown"], [aria-label="Warm Ivory"])::after {
+  content: attr(aria-label);
+  font-weight: 500;
+}
+
+main:has(img[src*="/uploads/premium-pu-leather-zipper-pouch-"]) [role="group"][aria-label="Colors"] > button[aria-label="Caramel Brown"] {
+  color: #fff;
+}

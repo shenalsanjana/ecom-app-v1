@@ -24,7 +24,7 @@ export async function GET(req: Request) {
     }
     const expected = Buffer.from(mintpaySuccessHash(cfg.merchantId, amount, orderId, cfg.merchantSecret)).toString("base64");
     if (hash !== expected) return NextResponse.json({ error: "Signature verification failed" }, { status: 403 });
-    await finalizePaidPayment(orderId, "MINTPAY");
+    await finalizePaidPayment(orderId, "MINTPAY", { amount, currency: "LKR" });
     return NextResponse.redirect(checkoutSuccessUrl(req, orderId), 302);
   } else if (result === "failed") {
     const expected = Buffer.from(mintpayFailHash(orderId, cfg.merchantSecret)).toString("base64");

@@ -1,5 +1,5 @@
 "use client";
-import { advanceStatus, bookCourier, cancelOrder, deleteOrder, markCodCollected } from "@/app/admin/orders/actions";
+import { advanceStatus, bookCourier, cancelOrder, deleteOrder, restoreDeletedOrder, markCodCollected } from "@/app/admin/orders/actions";
 import { useActionRunner, Spinner } from "./use-action-runner";
 
 type Props = {
@@ -9,6 +9,7 @@ type Props = {
   paymentStatus: string | null;
   courierBooked: boolean;
   waybill: string | null;
+  deleted?: boolean;
 };
 
 export function RowActions(p: Props) {
@@ -19,12 +20,14 @@ export function RowActions(p: Props) {
   const unpaidOnline = p.paymentMethod !== "COD" && p.paymentStatus !== "PAID";
   const terminal = p.status === "DELIVERED" || p.status === "CANCELLED";
   const showCodCollected = !terminal && p.paymentMethod === "COD" && p.paymentStatus === "COD_PENDING";
-  // Both terminal states are hard-deletable. The delivered copy warns that the
-  // fulfilled-sale record is destroyed; cancelled orders carry no such history.
-  const deliveredDelete = p.status === "DELIVERED";
-  const deleteConfirm = deliveredDelete
-    ? "Permanently delete this delivered order? Its sale records will be lost. This cannot be undone."
-    : "Permanently delete this cancelled order? This cannot be undone.";
+  const deleteConfirm = "Move this order to Deleted? Payment history and stock balances will be preserved. You can restore it from the Deleted tab.";
+
+  if (p.deleted) return (
+    <button disabled={pending} onClick={() => run("restore", () => restoreDeletedOrder(p.orderId))}
+      className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs disabled:opacity-50">
+      {runningLabel === "restore" && <Spinner />} Restore
+    </button>
+  );
 
   const confirmOrder = () =>
     unpaidOnline
@@ -79,7 +82,7 @@ export function RowActions(p: Props) {
           disabled={pending}
           onClick={() => run("delete", () => deleteOrder(p.orderId), deleteConfirm)}
           className="inline-flex items-center gap-1 rounded-md border border-destructive px-2 py-1 text-xs text-destructive disabled:opacity-50"
-          aria-label={deliveredDelete ? "Permanently delete this delivered order" : "Permanently delete this cancelled order"}
+          aria-label="Move this order to Deleted"
         >
           {runningLabel === "delete" && <Spinner />} Delete
         </button>

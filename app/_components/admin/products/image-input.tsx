@@ -5,8 +5,8 @@ import type { ResizeTarget } from "@/app/_lib/resize-image";
 // A URL/path text field paired with an "Upload" button. Both write to the same
 // value, so existing /products/… paths keep working and a local-device upload
 // just fills the field with a Blob URL. Used for the category image and the
-// product main image. When `resizeTarget` is set, uploads are cropped/resized
-// to that target and the preview box mirrors the resulting aspect ratio.
+// product main image. Product uploads retain their full composition; category
+// artwork is cropped to a square. Previews mirror those display choices.
 export function ImageInput({
   value,
   onChange,
@@ -38,12 +38,12 @@ export function ImageInput({
         <UploadButton onUploaded={onChange} resizeTarget={resizeTarget} />
       </div>
       {preview && value ? (
-        <div className={`overflow-hidden rounded ${previewBox}`}>
+        <div className={`overflow-hidden rounded bg-muted ${previewBox}`}>
           {/* Plain <img>: this admin-only thumbnail must render any pasted URL
               (external host, /public path, or Blob URL) without next/image's
               remotePatterns allowlist throwing and breaking the form. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={value} alt="" className="h-full w-full object-cover" />
+          <img src={value} alt="Image preview" className={"h-full w-full " + (resizeTarget === "category" ? "object-cover" : "object-contain")} />
         </div>
       ) : null}
     </div>

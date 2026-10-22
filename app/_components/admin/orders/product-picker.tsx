@@ -21,9 +21,16 @@ export function ProductPicker({
 
   useEffect(() => {
     const q = query.trim();
-    if (!q) { setResults([]); return; }
-    const t = setTimeout(() => { searchProductsForOrder(q).then(setResults); }, 300);
-    return () => clearTimeout(t);
+    let cancelled = false;
+    const t = setTimeout(() => {
+      if (!q) { setResults([]); return; }
+      void searchProductsForOrder(q).then(rows => {
+        if (!cancelled) setResults(rows);
+      }).catch(() => {
+        if (!cancelled) setResults([]);
+      });
+    }, q ? 300 : 0);
+    return () => { cancelled = true; clearTimeout(t); };
   }, [query]);
 
   const variant = product?.variants.find((v) => v.id === variantId) ?? null;
@@ -42,7 +49,7 @@ export function ProductPicker({
   if (!product) {
     return (
       <div className="space-y-1">
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search products…"
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search products or size SKU…"
           className="w-full rounded border px-2 py-1 text-sm" disabled={disabled} />
         {results.length > 0 && (
           <ul className="max-h-48 overflow-y-auto rounded border text-sm">

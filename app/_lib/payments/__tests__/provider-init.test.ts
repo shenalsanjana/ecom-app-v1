@@ -186,3 +186,31 @@ describe("provider initiation", () => {
     );
   });
 });
+
+describe("discounted order payment amounts", () => {
+  const discounted = { ...ORDER, total: 2340 };
+  it("sends the saved discounted total to PayHere", async () => {
+    const { payHereProvider } = await import("../payhere");
+    const result = await payHereProvider.initiate(discounted, "https://shop.example.com");
+    expect(result.fields.amount).toBe("2340.00");
+    expect(payHereCheckoutHash).toHaveBeenLastCalledWith("256312", ORDER.id, 2340, "LKR");
+  });
+  it("signs the saved discounted total for Koko", async () => {
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 1024 });
+    process.env.KOKO_MERCHANT_ID = "merchant-1"; process.env.KOKO_API_KEY = "key";
+    process.env.KOKO_PRIVATE_KEY = privateKey.export({ type: "pkcs1", format: "pem" }).toString();
+    const { kokoProvider } = await import("../koko");
+    const result = await kokoProvider.initiate({ ...discounted, paymentMethod: "KOKO" }, "https://shop.example.com");
+    expect(result.fields._amount).toBe("2340.00");
+  });
+  it("sends the saved discounted total to Mintpay without recomputing item prices", async () => {
+    process.env.MINTPAY_MERCHANT_ID = "mp0001"; process.env.MINTPAY_MERCHANT_SECRET = "secret";
+    mintpayFetch.mockResolvedValue({ ok: true, json: async () => ({ message: "Success", data: "PURCHASE-DISCOUNT" }) });
+    vi.stubGlobal("fetch", mintpayFetch);
+    const { mintpayProvider } = await import("../mintpay");
+    await mintpayProvider.initiate({ ...discounted, paymentMethod: "MINTPAY" }, "https://shop.example.com");
+    const payload = JSON.parse(mintpayFetch.mock.calls.at(-1)![1].body);
+    expect(payload.total_price).toBe("2340.00");
+    expect(payload.products[0].unit_price).toBe("1045.00");
+  });
+});

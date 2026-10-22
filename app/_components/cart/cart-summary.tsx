@@ -2,6 +2,8 @@
 "use client";
 
 import Link from "next/link";
+import { useDiscountQuote } from "@/app/_lib/use-discount-quote";
+import { CouponEntry } from "@/app/_components/discounts/coupon-entry";
 import { useCart } from "@/app/_lib/cart-context";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -13,11 +15,14 @@ import { InstallmentNote } from "@/app/_components/shared/installment-note";
 import { PaymentMethodIcon } from "@/app/_components/shared/payment-method-icon";
 
 export function CartSummary() {
-  const { subtotal, totalItems } = useCart();
+  const { subtotal: cartSubtotal, totalItems, items, updatePrices } = useCart();
+  const offers = useDiscountQuote(items, updatePrices);
+  const subtotal = offers.quote ? offers.quote.subtotal / 100 : Math.round(cartSubtotal * 100) / 100;
   const deliveryConfig = useDeliveryConfig();
 
   const shipping = calculateDelivery(subtotal, "COLOMBO", deliveryConfig);
-  const total = subtotal + shipping;
+  const discountAmount = (offers.quote?.discount?.amount ?? 0) / 100;
+  const total = Math.round((Math.max(0, subtotal - discountAmount) + shipping) * 100) / 100;
 
   return (
     <div className="rounded-lg border p-4 sm:p-6">
@@ -27,11 +32,17 @@ export function CartSummary() {
 
       <FreeShippingProgress subtotal={subtotal} />
 
+      <CouponEntry state={offers} />
       <div className="space-y-2 text-sm">
+        {offers.quote && offers.quote.originalSubtotal > offers.quote.subtotal && <>
+          <div className="flex justify-between text-muted-foreground"><span>Original prices</span><del>{formatPrice(offers.quote.originalSubtotal / 100)}</del></div>
+          <div className="flex justify-between text-brand"><span>Sale savings</span><span>−{formatPrice((offers.quote.originalSubtotal - offers.quote.subtotal) / 100)}</span></div>
+        </>}
         <div className="flex justify-between">
-          <span className="text-muted-foreground">Subtotal ({totalItems} items)</span>
+          <span className="text-muted-foreground">Items subtotal ({totalItems} items)</span>
           <span className="font-heading">{formatPrice(subtotal)}</span>
         </div>
+        {discountAmount > 0 && <div className="flex justify-between gap-3 text-brand"><span className="min-w-0 break-words">{offers.quote?.discount?.name}</span><span className="shrink-0 whitespace-nowrap">−{formatPrice(discountAmount)}</span></div>}
         <div className="flex justify-between">
           <span className="text-muted-foreground">Delivery <span className="text-muted-foreground">(estimated)</span></span>
           <span className={`font-heading ${shipping === 0 ? "text-brand" : ""}`}>

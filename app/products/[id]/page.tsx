@@ -12,6 +12,8 @@ import { formatPrice } from "@/app/_lib/format";
 import { absoluteUrl } from "@/app/_lib/absolute-url";
 import { ProductJsonLd } from "@/app/_components/product/product-jsonld";
 import { auth } from "@/app/_lib/auth";
+import { getStorefrontPromotions } from "@/app/_lib/storefront-promotion-service";
+import { activePromotions, productPromotion } from "@/app/_lib/storefront-promotions";
 
 export const revalidate = 300;
 
@@ -45,7 +47,9 @@ export async function generateMetadata(
     return { title: { absolute: "Product not found — Dressing Bear" } };
   }
   const variant = detail.variants.find((v) => v.colorSlug === sp.color) ?? detail.variants[0];
-  const priceTitle = `${detail.product.name} — ${formatPrice(variant.price)}`;
+  const snapshot = await getStorefrontPromotions();
+  const promotion = productPromotion(activePromotions(snapshot.offers, snapshot.asOf), { productId: id, price: variant.price, originalPrice: variant.originalPrice, quantity: 1, categorySlugs: detail.collectionSlugs ?? [detail.product.designSlug] });
+  const priceTitle = `${detail.product.name} — ${formatPrice(promotion.price)}`;
   const description = stripMarkdown(detail.product.description);
   const imageUrl = absoluteUrl(variant.detailImages[0] ?? "");
   return {
@@ -54,7 +58,7 @@ export async function generateMetadata(
     openGraph: {
       title: priceTitle,
       description,
-      images: [{ url: imageUrl, width: 1200, height: 1500, alt: detail.product.name }],
+      images: [{ url: imageUrl, alt: `${detail.product.name}, ${variant.color}` }],
     },
     twitter: { card: "summary_large_image", title: priceTitle, description, images: [imageUrl] },
   };
@@ -76,6 +80,7 @@ export default async function ProductPage({
   }
 
   const session = await auth();
+  const promotions = await getStorefrontPromotions();
 
   const shown = clampReviews(sp.reviews);
 
@@ -95,6 +100,8 @@ export default async function ProductPage({
         designStockRows={detail.designStockRows}
         ratingAvg={detail.ratingAvg}
         ratingCount={detail.ratingCount}
+        promotions={activePromotions(promotions.offers, promotions.asOf)}
+        collectionSlugs={detail.collectionSlugs ?? [detail.product.designSlug]}
       />
       <SiteHeader />
       <main className="flex-1">
@@ -111,7 +118,7 @@ export default async function ProductPage({
         <section className="mx-auto max-w-7xl px-4 pb-10 sm:px-6 lg:px-8">
           <div className="grid gap-8 lg:grid-cols-[1.6fr_1fr] lg:gap-12">
             <ImageGallery
-              variants={detail.variants.map((v) => ({ colorSlug: v.colorSlug, detailImages: v.detailImages }))}
+              variants={detail.variants.map((v) => ({ colorSlug: v.colorSlug, color: v.color, detailImages: v.detailImages }))}
               defaultColorSlug={detail.variants[0].colorSlug}
               productName={detail.product.name}
               fallbackImage={detail.variants[0].detailImages[0] ?? ""}
@@ -124,6 +131,7 @@ export default async function ProductPage({
               designStockRows={detail.designStockRows}
               defaultColorSlug={detail.variants[0].colorSlug}
               departmentSlug={detail.product.design.department.slug}
+              collectionSlugs={detail.collectionSlugs ?? [detail.product.designSlug]}
               ratingAvg={detail.ratingAvg}
               ratingCount={detail.ratingCount}
               shareUrl={absoluteUrl(`/products/${detail.product.id}`)}

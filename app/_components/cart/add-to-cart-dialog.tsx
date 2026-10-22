@@ -16,7 +16,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { SizeChartContent } from "@/app/_components/product/size-chart-content";
 import { useCart } from "@/app/_lib/cart-context";
 import { trackAddToCart } from "@/app/_lib/meta-pixel";
-import { formatPrice } from "@/app/_lib/format";
+import { Price } from "@/app/_components/ui/price";
 
 type Props = {
   productId: string;
@@ -24,6 +24,10 @@ type Props = {
   color?: string | null;
   name: string;
   price: number;
+  /** Display previews never replace the merchandise price saved to the cart. */
+  displayPrice?: number;
+  originalPrice?: number | null;
+  offerNote?: React.ReactNode;
   image: string;
   sizes: string;
   triggerVariant?: "outline" | "default";
@@ -36,6 +40,9 @@ export function AddToCartDialog({
   color = null,
   name,
   price,
+  displayPrice = price,
+  originalPrice,
+  offerNote,
   image,
   sizes,
   triggerVariant = "outline",
@@ -114,7 +121,7 @@ export function AddToCartDialog({
           <DialogTitle>{name}</DialogTitle>
           <div className="flex items-center justify-between gap-2">
             <DialogDescription>
-              {formatPrice(price)}
+              <Price price={displayPrice} originalPrice={originalPrice} />
               {hasSizes ? " — choose your size" : ""}
             </DialogDescription>
             {hasSizes && (
@@ -130,6 +137,7 @@ export function AddToCartDialog({
               </button>
             )}
           </div>
+          {offerNote}
         </DialogHeader>
         {hasSizes && (
           <div className="flex flex-wrap gap-2">

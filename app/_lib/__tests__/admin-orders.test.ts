@@ -2,30 +2,39 @@ import { describe, it, expect } from "vitest";
 import { buildOrderWhere } from "../admin-orders";
 
 describe("buildOrderWhere", () => {
-  it("returns empty where for the 'all' tab with no filters", () => {
-    expect(buildOrderWhere({ tab: "all" })).toEqual({});
+  it("excludes deleted orders from normal lists", () => {
+    expect(buildOrderWhere({ tab: "all" })).toEqual({ deletedAt: null });
+    expect(buildOrderWhere({})).toEqual({ deletedAt: null });
   });
 
   it("maps 'needs-dispatch' to CONFIRMED + not booked", () => {
     expect(buildOrderWhere({ tab: "needs-dispatch" })).toEqual({
+      deletedAt: null,
       status: "CONFIRMED",
       courierBookedAt: null,
     });
   });
 
   it("maps 'pending' to status PENDING", () => {
-    expect(buildOrderWhere({ tab: "pending" })).toEqual({ status: "PENDING" });
+    expect(buildOrderWhere({ tab: "pending" })).toEqual({ deletedAt: null, status: "PENDING" });
   });
 
   it("maps 'pending-cod' to paymentStatus COD_PENDING", () => {
     expect(buildOrderWhere({ tab: "pending-cod" })).toEqual({
+      deletedAt: null,
       paymentStatus: "COD_PENDING",
     });
   });
 
   it("maps 'delivered' and 'cancelled' to status", () => {
-    expect(buildOrderWhere({ tab: "delivered" })).toEqual({ status: "DELIVERED" });
-    expect(buildOrderWhere({ tab: "cancelled" })).toEqual({ status: "CANCELLED" });
+    expect(buildOrderWhere({ tab: "delivered" })).toEqual({ deletedAt: null, status: "DELIVERED" });
+    expect(buildOrderWhere({ tab: "cancelled" })).toEqual({ deletedAt: null, status: "CANCELLED" });
+  });
+
+  it("keeps deleted orders searchable and unresolved payment reviews visible", () => {
+    expect(buildOrderWhere({ tab: "deleted" })).toEqual({ deletedAt: { not: null } });
+    expect(buildOrderWhere({ tab: "payment-review" })).toEqual({ paymentReviewRequired: true });
+    expect(buildOrderWhere({ tab: "deleted", q: "WEB0071" }).OR?.[0]).toEqual({ webNumber: { contains: "WEB0071", mode: "insensitive" } });
   });
 
   it("adds a case-insensitive OR search across order number, name, phone, email", () => {

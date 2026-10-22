@@ -3,11 +3,12 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const { requireAdmin } = vi.hoisted(() => ({ requireAdmin: vi.fn() }));
 const {
   designCreate, designUpdate, designFindUnique, designFindFirst, designDelete,
-  historyUpsert, historyDeleteMany, productCount, productUpdateMany, txn,
+  historyUpsert, historyDeleteMany, productCount, productFindMany, productUpdateMany, txn,
 } = vi.hoisted(() => ({
   designCreate: vi.fn(), designUpdate: vi.fn(), designFindUnique: vi.fn(),
   designFindFirst: vi.fn(), designDelete: vi.fn(),
   historyUpsert: vi.fn(), historyDeleteMany: vi.fn(), productCount: vi.fn(),
+  productFindMany: vi.fn(),
   productUpdateMany: vi.fn(), txn: vi.fn(),
 }));
 
@@ -18,7 +19,7 @@ function makeClient() {
   return {
     design: { create: designCreate, update: designUpdate, findUnique: designFindUnique, findFirst: designFindFirst, delete: designDelete },
     designSlugHistory: { upsert: historyUpsert, deleteMany: historyDeleteMany },
-    product: { count: productCount, updateMany: productUpdateMany },
+    product: { count: productCount, findMany: productFindMany, updateMany: productUpdateMany },
   };
 }
 
@@ -35,6 +36,7 @@ beforeEach(() => {
   designFindFirst.mockReset(); designDelete.mockReset();
   historyUpsert.mockReset(); historyDeleteMany.mockReset(); productCount.mockReset();
   productUpdateMany.mockReset().mockResolvedValue({ count: 0 });
+  productFindMany.mockReset().mockResolvedValue([{ name: "Keep Smiling" }]);
   txn.mockReset().mockImplementation(async (fn: (c: unknown) => unknown) => fn(makeClient()));
 });
 
@@ -243,9 +245,9 @@ describe("deleteCategory", () => {
   it("blocks deletion when the category still has products", async () => {
     productCount.mockResolvedValueOnce(4);
     const res = await deleteCategory("cats");
-    expect(productCount).toHaveBeenCalledWith({ where: { designSlug: "cats" } });
+    expect(productCount).toHaveBeenCalledWith({ where: { OR: [{ designSlug: { in: ["cats"] } }, { additionalCollections: { some: { designSlug: { in: ["cats"] } } } }] } });
     expect(designDelete).not.toHaveBeenCalled();
-    expect(res).toEqual({ success: false, error: "This category has products. Reassign or remove them first." });
+    expect(res).toEqual({ success: false, error: "This collection has 4 products: Keep Smiling, …. Reassign their primary collection or remove their additional membership first." });
   });
   it("deletes an empty category", async () => {
     productCount.mockResolvedValueOnce(0);

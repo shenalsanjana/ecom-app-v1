@@ -1,9 +1,10 @@
+import type { StockMode } from "./stock-policy";
 import type { Prisma } from "@prisma/client";
 import { calculateDelivery, DEFAULT_DELIVERY_CONFIG, type DeliveryConfig } from "@/app/_lib/checkout-config";
 import { zoneForCity } from "@/app/_lib/delivery-zones";
 import { prisma } from "@/app/_lib/prisma";
 
-export const ORDER_TABS = ["all", "pending", "needs-dispatch", "pending-cod", "delivered", "cancelled"] as const;
+export const ORDER_TABS = ["all", "pending", "needs-dispatch", "pending-cod", "payment-review", "delivered", "cancelled", "deleted"] as const;
 export type OrderTab = (typeof ORDER_TABS)[number];
 
 export type ListParams = {
@@ -14,9 +15,17 @@ export type ListParams = {
 };
 
 export function buildOrderWhere(params: ListParams): Prisma.OrderWhereInput {
-  const where: Prisma.OrderWhereInput = {};
+  const where: Prisma.OrderWhereInput = { deletedAt: null };
 
   switch (params.tab) {
+    case "payment-review":
+      // Unresolved payments remain visible even after removal from normal lists.
+      delete where.deletedAt;
+      where.paymentReviewRequired = true;
+      break;
+    case "deleted":
+      where.deletedAt = { not: null };
+      break;
     case "pending":
       where.status = "PENDING";
       break;
@@ -33,7 +42,7 @@ export function buildOrderWhere(params: ListParams): Prisma.OrderWhereInput {
     case "cancelled":
       where.status = "CANCELLED";
       break;
-    // "all" / undefined → no preset
+    // "all" / undefined → all orders that have not been deleted
   }
 
   if (params.payment) where.paymentStatus = params.payment;
@@ -84,6 +93,7 @@ export function recomputeTotals(
 }
 
 export type OrderItemRow = {
+  stockMode?: StockMode;
   id: string;
   // Null when the referenced variant was hard-deleted (FK ON DELETE SET NULL).
   variantId: string | null;
@@ -157,7 +167,7 @@ export function nextStatuses(current: string): string[] {
 }
 
 export function canEdit(order: { status: string }): boolean {
-  return order.status !== "DELIVERED" && order.status !== "CANCELLED";
+  return order.status === "PENDING" || order.status === "CONFIRMED";
 }
 
 /** Identical to canEdit today; kept separate in case cancellation rules diverge. */
@@ -169,8 +179,12 @@ export function canCancel(order: { status: string }): boolean {
  * Payment guardrail for confirming/dispatching. COD is exempt (COD_PENDING is its
  * normal pre-delivery state); online orders must be PAID before they can ship.
  */
-export function canConfirm(order: { paymentMethod: string; paymentStatus: string | null }): boolean {
-  return order.paymentMethod === "COD" || order.paymentStatus === "PAID";
+export function canConfirm(order: { paymentMethod: string; paymentStatus: string | null; paymentReviewRequired?: boolean }): boolean {
+  return !order.paymentReviewRequired && (order.paymentMethod === "COD" || order.paymentStatus === "PAID");
+}
+
+export function financialEditsLocked(order: { paymentMethod: string; paymentStatus: string | null; paymentStartedAt?: Date | null }): boolean {
+  return order.paymentMethod !== "COD" && (!!order.paymentStartedAt || order.paymentStatus === "PAID");
 }
 
 export const PAGE_SIZE = 25;
@@ -206,7 +220,7 @@ export async function getOrderDetail(id: string) {
     where: { id },
     include: {
       user: { select: { name: true, email: true } },
-      items: { include: { variant: { select: { sizeStocks: { select: { size: true } } } } } },
+      items: { include: { variant: { select: { sizeStocks: { where: { archived: false }, select: { size: true } } } } } },
       notesLog: { orderBy: { createdAt: "desc" } },
       adjustments: { orderBy: { createdAt: "asc" } },
     },

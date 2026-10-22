@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dressing Bear — Stage 3A stock proposal</title>
+  <style>
+    :root{color-scheme:light;--ink:#17352f;--muted:#546a63;--brand:#17644f;--paper:#f5f6f1;--line:#dce4dc;--gold:#f3dda6}
+    *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.6 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    a{color:var(--brand);text-underline-offset:3px}button,input,select{font:inherit}button,select,summary{cursor:pointer}button:disabled{cursor:default;opacity:.65}
+    :focus-visible{outline:3px solid #b17910;outline-offset:3px}button{border:1px solid var(--line);border-radius:9px;padding:9px 14px;background:white;color:var(--ink)}
+    h1,h2,h3,p{margin:0}h1{font-size:clamp(2rem,4.5vw,3.6rem);line-height:1.12;letter-spacing:-.045em;max-width:780px}h2{font-size:1.65rem;letter-spacing:-.025em;margin-bottom:10px}h3{font-size:1.05rem;margin-bottom:7px}
+    p+p{margin-top:12px}.muted,small{color:var(--muted)}small{font-size:.83rem}.wrap{max-width:1160px;padding:0 26px;margin:auto}
+    .top{border-bottom:1px solid var(--line);background:#fff}.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:15px;padding-bottom:15px}
+    .identity{display:flex;align-items:center;gap:10px}.mark{display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:var(--ink);color:white;font-size:12px;letter-spacing:1px;font-weight:750}
+    .pill{display:inline-block;border-radius:30px;padding:4px 10px;background:#e4eee7;color:#235c49;font-size:.76rem;font-weight:650}.pill.amber{background:#f8ebc9;color:#73521a}
+    header.hero{padding:52px 0 30px}.eyebrow{font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;font-weight:750;margin-bottom:15px;color:var(--brand)}.hero p{max-width:800px;margin-top:20px;font-size:1.05rem;color:var(--muted)}
+    .nav{display:flex;gap:8px;flex-wrap:wrap;padding-bottom:30px}.nav a{background:white;border:1px solid var(--line);border-radius:9px;padding:8px 12px;text-decoration:none;font-size:.9rem}
+    section{scroll-margin-top:20px;margin:0 0 36px}.panel{border:1px solid var(--line);border-radius:16px;padding:25px;background:#fff}.intro{margin-bottom:22px;max-width:850px;color:var(--muted)}
+    .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.card{border:1px solid var(--line);border-radius:12px;padding:20px}.number{font-size:2rem;font-weight:750;letter-spacing:-.04em;line-height:1.2}.label{font-size:.83rem;color:var(--muted);margin-top:6px}.stats{margin-top:20px}.stats .card{background:#f8faf6}
+    .notice{padding:13px 16px;border-left:4px solid #d4ac54;background:#fff7e1;border-radius:0 8px 8px 0;font-size:.9rem;margin-top:18px}.good{border-color:var(--brand);background:#edf5ef}.step{font-size:.75rem;color:var(--brand);font-weight:750;margin-bottom:13px}.flow{display:flex;gap:7px;align-items:center;flex-wrap:wrap;font-size:.85rem;margin-top:15px}.token{border-radius:7px;background:#eef3ed;padding:4px 7px}.arrow{color:#7b8e82}.flow small{display:block}
+    .table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;text-align:left;font-size:.87rem}caption{text-align:left;color:var(--muted);font-size:.82rem;margin:0 0 10px}th{font-size:.76rem;color:var(--muted);font-weight:650;background:#f5f8f3}th,td{padding:12px 13px;border-bottom:1px solid var(--line);vertical-align:top}tr:last-child td{border-bottom:0}
+    .controls{display:grid;grid-template-columns:1.5fr .6fr 1.5fr;gap:14px;margin-bottom:20px}label{display:block;font-size:.85rem;font-weight:600}select,input{width:100%;margin-top:6px;padding:10px 12px;border:1px solid #b9cbc0;background:white;color:var(--ink);border-radius:8px}output{display:block}.balance{font-size:1.75rem;font-weight:700}.delta{font-size:.8rem;padding:2px 6px;background:#eef3ed;border-radius:5px;margin-left:5px;font-weight:500}.result{border:1px solid #c9dece;border-radius:10px;background:#f3f8f1;padding:17px;margin-top:16px}.result p{font-size:.9rem}.error{color:#a23427}
+    .screen{border:1px solid var(--line);border-radius:12px;overflow:hidden}.screen-header{background:#edf2eb;padding:15px 20px;display:flex;align-items:center;gap:10px;justify-content:space-between}.screen-body{padding:20px}.view-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:17px}.view-tabs button[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}.actions{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}.actions button{font-size:.78rem;padding:6px 10px}
+    details{border:1px solid var(--line);border-radius:9px;padding:0;margin:10px 0}summary{padding:13px 15px;font-weight:600;font-size:.9rem}details .inside{border-top:1px solid var(--line);padding:16px}.sub{margin-left:12px}.tagline{font-size:.8rem;font-weight:500;color:var(--muted);margin-left:12px}ul,ol{padding-left:22px;margin:10px 0 0}li+li{margin-top:7px}.timeline{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.timeline .card{border-top:4px solid #9bb5a4}.timeline .card:first-child{border-top-color:var(--brand)}
+    .footer{padding:8px 0 38px;font-size:.83rem;color:var(--muted)}[hidden]{display:none!important}.wide-note{font-size:.86rem;color:var(--muted);margin-top:16px}.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}.review-list{margin-top:15px}.review-list label{padding:8px 0;font-weight:400}.review-list input{width:auto;margin:0 8px 0 0;accent-color:var(--brand)}
+    @media(max-width:760px){.wrap{padding:0 17px}.top .wrap{align-items:flex-start}.grid,.timeline,.two,.controls{grid-template-columns:1fr}.panel{padding:18px}header.hero{padding-top:32px}.top small{display:none}.stats{grid-template-columns:repeat(3,1fr);gap:7px}.stats .card{padding:12px}.stats .number{font-size:1.5rem}.tagline{display:block;margin:4px 0 0}.screen-body{padding:13px}}
+    @media print{body{background:white;font-size:11px}.wrap{max-width:none;padding:0}.nav,.view-tabs,.actions,.review-list{display:none}.panel,section,.card{break-inside:avoid}.top .wrap{padding:0 0 10px}header.hero{padding:20px 0}h1{font-size:30px}.panel{padding:14px}section{margin-bottom:20px}.grid,.timeline{gap:9px}.card{padding:12px}}
+  </style>
+</head>
+<body>
+<div class="top"><div class="wrap"><div class="identity"><span class="mark" aria-hidden="true">DB</span><div><strong>Dressing Bear</strong><br><small>Inventory planning · Stage 3A</small></div></div><span class="pill amber">3A.1 live · 3A.2 awaiting review</span></div></div>
+<main class="wrap">
+  <header class="hero"><div class="eyebrow">Stock rules for one shared location</div><h1>Clear stock flows.<br>One reliable inventory.</h1><p>Keep the existing categories, product pages and size SKUs. Give plain items, printed-to-order designs and ready-made goods the right stock behaviour.</p><p><span class="pill">Review only</span> This local artifact uses illustrative examples. It has no connection to the store or database.</p></header>
+  <nav class="nav" aria-label="Proposal sections"><a href="#findings">Current gaps</a><a href="#flows">Three flows</a><a href="#simulator">Try an example</a><a href="#screen">Screen concept</a><a href="#options">Options</a><a href="#rollout">Review &amp; rollout</a></nav>
+
+  <section id="findings" class="panel"><div class="eyebrow">01 · Read-only findings</div><h2>The shared-stock foundation is worth keeping.</h2><p class="intro">The current model has explicit blank links and guarded stock deductions. Its main limitation is that every sale expects a blank and a DTF print; it has no separate finished balance or production state.</p>
+    <div class="grid stats"><div class="card"><div class="number">42</div><div class="label">published products</div></div><div class="card"><div class="number">357</div><div class="label">offered size records</div></div><div class="card"><div class="number">0</div><div class="label">missing blank links</div></div></div>
+    <p class="wide-note">Live read-only snapshot · 19 October 2026: 25 blank rows, 40 print records, six physical families. Recorded blank availability: 175 units, excluding order allocations. This is not a shelf count.</p>
+    <div class="notice"><strong>The most important lifecycle gap:</strong> cancellation can restore a blank and print even if printing already happened, because there is no production record. Once materials have been used, release the reusable finished item or record waste.</div>
+    <details><summary>Other gaps to address together</summary><div class="inside"><ul><li>Plain products cannot publish or sell without a print.</li><li>Already printed goods have no independent stock pool.</li><li>Ready-made colour/size setup currently depends on blank stock choices.</li><li>Receipts and adjustments have no attributed inventory movement history.</li><li>Available quantities exclude allocations; entering a physical shelf count into that field can overstate stock.</li></ul></div></details>
+  </section>
+
+  <section id="flows"><div class="eyebrow">02 · Recommended stock rules</div><h2>Choose how each item is fulfilled.</h2><p class="intro">Categories organise items. The fulfilment rule chooses which physical stock is reserved.</p><div class="grid">
+    <article class="card"><div class="step">01 / PLAIN ITEM</div><h3>Sell the blank directly</h3><p class="muted">A plain T-shirt or unprinted bag uses its existing shared blank quantity.</p><div class="flow"><span class="token">Shared blank</span><span class="arrow">→</span><span class="token">Sale</span></div><p class="wide-note">No print required. No second copy of the blank's balance.</p></article>
+    <article class="card good"><div class="step">02 / PRINTED TO ORDER</div><h3>Reserve, then make</h3><p class="muted">Reserve the blank and print at order acceptance. Record when printing consumes them.</p><div class="flow"><span class="token">Blank + print</span><span class="arrow">→</span><span class="token">Order reservation</span><span class="arrow">→</span><span class="token">Printing</span></div><p class="wide-note">Preparation never deducts those same available materials again.</p></article>
+    <article class="card"><div class="step">03 / READY-MADE</div><h3>Sell the finished unit</h3><p class="muted">An already printed design has its own finished stock by colour and size.</p><div class="flow"><span class="token">Finished stock</span><span class="arrow">→</span><span class="token">Sale</span></div><p class="wide-note">Materials were consumed during production. Selling deducts finished stock only.</p></article>
+  </div><p class="wide-note"><strong>Make stock:</strong> turn free blanks and prints into completed finished goods in one recorded transaction. Materials held for an existing order are handled through that order's reservation.</p></section>
+
+  <section id="simulator" class="panel"><div class="eyebrow">03 · Interactive example</div><h2>See what changes — and what stays shared.</h2><p class="intro">Example only: one ivory tote size starts with 20 available blanks, 12 Keep Smiling prints and four available finished Keep Smiling totes. Each calculation starts fresh.</p>
+    <noscript><p class="notice">Enable JavaScript for the local calculator. The proposal and screen examples remain readable without it.</p></noscript>
+    <div class="controls"><label for="mode">Stock flow<select id="mode"><option value="plain">Sell a plain item</option><option value="printed" selected>Sell a printed-to-order item</option><option value="ready">Sell a ready-made item</option><option value="batch">Make finished stock</option><option value="mixed">Ready first, then print (optional)</option></select></label><label for="quantity">Units<input id="quantity" type="number" min="1" max="99" step="1" value="2"></label><label for="outcome">Action<select id="outcome"><option value="accept">Accept order / reserve stock</option><option value="before">Accept, then cancel before preparation</option><option value="after">Accept, print, then cancel (usable output)</option></select></label></div>
+    <output id="simulation" aria-live="polite"><div class="grid"><div class="card"><div class="label">Available blanks</div><div class="balance" id="blanks">20</div></div><div class="card"><div class="label">Available prints</div><div class="balance" id="prints">12</div></div><div class="card"><div class="label">Available finished totes</div><div class="balance" id="finished">4</div></div></div><div class="result"><strong id="result-title">Choose a flow</strong><p id="result-detail">The example updates locally.</p></div></output>
+    <p class="wide-note">Other designs can compete for these same blanks. Do not add each design's makeable quantity to the physical stock total. The proposal includes optional mixed fulfilment as requested. It saves both allocations under one SKU; activation would be an explicit per-product setting after implementation approval.</p>
+  </section>
+
+  <section id="screen" class="panel"><div class="eyebrow">04 · Proposed inventory screen</div><h2>Keep the tree. Make the stock type obvious.</h2><p class="intro">Switch views below and expand the categories. Example quantities are illustrative; receive/make/adjust actions are disabled in this review.</p>
+    <div class="screen"><div class="screen-header"><strong>Inventory</strong><span class="pill">One shared location</span></div><div class="screen-body">
+      <div class="view-tabs" role="group" aria-label="Inventory screen previews"><button type="button" data-view="materials" aria-pressed="true">Blanks &amp; materials</button><button type="button" data-view="finished" aria-pressed="false">Ready-made</button><button type="button" data-view="history" aria-pressed="false">Movements</button></div>
+      <div class="actions"><button disabled>+ Receive stock</button><button disabled>Make stock</button><button disabled>Adjust / count</button><span class="pill amber">Visual concept only</span></div>
+      <div data-panel="materials"><details open><summary>T-Shirts</summary><div class="inside"><details><summary>Regular T-Shirts</summary><div class="inside muted">Physical families → shared colour / size blanks → linked sale products.</div></details><details><summary>Oversized T-Shirts</summary><div class="inside muted">White / M · shared physical stock, referenced by each compatible design.</div></details><details><summary>Oversized Raglan T-Shirts</summary><div class="inside muted">Separate style stock; identical colour and size labels do not merge it with other styles.</div></details></div></details>
+        <details open><summary>Accessories → Bags</summary><div class="inside"><details open><summary>Premium Canvas Cotton Tote Bag with Zipper<span class="tagline">20 shared blanks available</span></summary><div class="inside"><div class="table-wrap"><table><caption>One blank balance used by compatible plain and printed products</caption><thead><tr><th>Physical item</th><th>Colour / size</th><th>Available</th></tr></thead><tbody><tr><td>Canvas tote blank</td><td>Natural Ivory · tote size</td><td><strong>20</strong></td></tr></tbody></table></div><details class="sub"><summary>Linked designs</summary><div class="inside">Keep Smiling · Stitch · Pooh<br><small>Separate store pages and stable sale SKUs; one shared blank source.</small></div></details></div></details></div></details>
+        <details><summary>DTF prints</summary><div class="inside">Keep Smiling print · <strong>12 available</strong><br><small>Separate component balance shared across that print's linked sizes.</small></div></details></div>
+      <div data-panel="finished" hidden><details open><summary>Accessories → Bags → Tote family</summary><div class="inside"><div class="table-wrap"><table><caption>Only physical ready-made goods appear here</caption><thead><tr><th>Design</th><th>Colour / size</th><th>Available</th><th>Reserved</th><th>On hand*</th></tr></thead><tbody><tr><td>Keep Smiling tote</td><td>Natural Ivory · tote size</td><td><strong>4</strong></td><td>1</td><td>5</td></tr></tbody></table></div><p class="wide-note">*Shown only after allocations and physical opening balances are tracked. The sale uses finished units; it does not take another blank or print.</p></div></details><p class="muted">Finished stock can come from a recorded production batch or a supplier receipt. Receipts do not pretend to consume local materials.</p></div>
+      <div data-panel="history" hidden><div class="table-wrap"><table><caption>Illustrative movement history · no real staff or orders shown</caption><thead><tr><th>Event</th><th>Available change</th><th>Reference</th><th>Actor / reason</th></tr></thead><tbody><tr><td>Make stock</td><td>−3 blanks · −3 prints · +3 finished</td><td>Example batch</td><td>Demo staff · completed batch</td></tr><tr><td>Reserve ready-made</td><td>−1 finished</td><td>Example online order</td><td>Online store · order accepted</td></tr><tr><td>Count correction</td><td>−1 finished</td><td>Example count</td><td>Demo staff · damaged item removed</td></tr></tbody></table></div><p class="wide-note">Every balance change carries a time, reason and operation reference. A retry cannot create another deduction or movement.</p></div>
+    </div></div>
+    <details><summary>Product editor: one clear stock-rule selector</summary><div class="inside"><div class="two"><div><strong>How is this item fulfilled?</strong><ul><li>Plain item → blank link</li><li>Printed to order → blank + print links</li><li>Ready-made → finished stock link</li></ul></div><div><strong>Before saving</strong><p class="muted">Show the physical source and a simple deduction preview. Ready-made colours and sizes can be configured without creating fake blank stock. Publish checks match the chosen rule.</p></div></div></div></details>
+  </section>
+
+  <section id="options" class="panel"><div class="eyebrow">05 · Options and tradeoffs</div><h2>Extend the current model in small steps.</h2><div class="table-wrap"><table><thead><tr><th>Option</th><th>Advantage</th><th>Cost / limitation</th></tr></thead><tbody><tr><td>A · Optional print only</td><td>Small change; plain sales become possible.</td><td>Finished goods, consumed materials and traceability remain unresolved.</td></tr><tr class="good"><td><strong>B · Explicit rules + movements + finished allocations</strong><br><span class="pill">Recommended</span></td><td>Retains categories, URLs, SKUs and shared stock. Supports both raw and finished goods.</td><td>Sale, edit, production, payment and cancellation paths must change together within each slice.</td></tr><tr><td>C · Full inventory / ERP redesign</td><td>Broad manufacturing and warehouse flexibility.</td><td>Large migration and training burden for one location.</td></tr></tbody></table></div></section>
+
+  <section id="rollout"><div class="eyebrow">06 · Review before implementation</div><h2>A practical rollout sequence.</h2><div class="timeline"><article class="card"><div class="step">3A.1 / FIRST SLICE</div><h3>Plain sales + movements</h3><p class="muted">Explicit plain/printed rules. Attributed movement records for every stock-writing path. Preserve all existing products as printed-to-order.</p></article><article class="card"><div class="step">3A.2 / NEXT SLICE</div><h3>Production + ready-made</h3><p class="muted">Reservations, consumed-material protection, finished balances, preparation actions and optional ready-first/print-remainder allocation under one SKU. Reconcile physical opening counts before enabling ready-made sales.</p></article><article class="card"><div class="step">3A.3 / BEFORE POS</div><h3>Counts + inspected returns</h3><p class="muted">Physical-state counts, discrepancy history and reusable/damaged returns. Then build POS on the same allocation service.</p></article></div>
+    <div class="notice"><strong>Release status:</strong> Stage 3A.1 (plain sales and movement history) was approved and deployed on 21 October 2026. Production, ready-made stock and mixed fulfilment still require review and approval. This simulator does not change live stock. Old orders cannot reveal whether their materials were physically printed; ambiguous cases need review.</div>
+    <details><summary>Cancellation rules that must be agreed</summary><div class="inside"><ul><li><strong>Before printing:</strong> release the reserved, unused materials once.</li><li><strong>Printing started:</strong> keep materials consumed; inspect work in progress.</li><li><strong>Finished and usable:</strong> release finished stock. Personalised or damaged output stays unavailable.</li><li><strong>Dispatched or delivered:</strong> receive and inspect a return. A refund alone does not restock an item.</li></ul></div></details>
+    <details><summary>Business decisions for review</summary><div class="inside"><p><strong>Recorded preference:</strong> allow both ready-made and printing-to-order under the same SKU in the proposal. Actual usage is uncertain; implementation is still pending review.</p><p>These checkboxes are local review notes. They are not saved or submitted.</p><div class="review-list"><label><input type="checkbox">Use the three stock rules and keep today's shared physical sources.</label><label><input type="checkbox">Review per-product activation and customer lead times for optional ready-first/print-remainder fulfilment.</label><label><input type="checkbox">Record printing before materials become irreversible; never restore used materials as new blanks.</label><label><input type="checkbox">Count and reconcile existing ready-made goods before enabling their balances.</label><label><input type="checkbox">Review and approve the first slice before any implementation.</label></div></div></details>
+  </section>
+  <section class="panel"><h3>Why this follows established patterns</h3><p class="muted">Separating available, reserved and physical quantities follows <a href="https://help.shopify.com/en/manual/inventory-and-locations/fundamentals/inventory-states">Shopify's inventory states</a>. Attributed changes follow its <a href="https://help.shopify.com/en/manual/inventory-and-locations/adjusting-inventory">adjustment history</a> pattern. A short component-to-finished workflow is supported by <a href="https://www.odoo.com/documentation/saas-19.3/applications/inventory_and_mrp/manufacturing/management/one_step_manufacturing.html">Odoo's one-step manufacturing</a> pattern. This proposal applies those principles to Dressing Bear's existing pools.</p></section>
+  <footer class="footer">Prepared 19 October 2026 · <a href="stock-stage3a-review.md">Full review, code evidence and acceptance criteria</a> · No application build, migration or deployment required.</footer>
+</main>
+<script>
+  'use strict';
+  function calculate(mode, quantity, outcome) {
+    const initial = { blanks: 20, prints: 12, finished: 4 };
+    const balances = { ...initial };
+    if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 99) {
+      return { initial, balances, error: 'Enter a whole quantity from 1 to 99.' };
+    }
+    const fromReady = mode === 'ready' ? quantity : mode === 'mixed' ? Math.min(quantity, initial.finished) : 0;
+    const toMake = mode === 'printed' || mode === 'batch' ? quantity : mode === 'mixed' ? quantity - fromReady : 0;
+    const fromBlank = mode === 'plain' ? quantity : toMake;
+    if (fromReady > initial.finished || fromBlank > initial.blanks || toMake > initial.prints) {
+      return { initial, balances, error: 'Not enough available stock. The transaction is rejected; every balance stays unchanged.' };
+    }
+    if (mode === 'batch') {
+      balances.blanks -= quantity; balances.prints -= quantity; balances.finished += quantity;
+      return { initial, balances, title: 'Completed batch: materials become finished goods.', detail: `${quantity} free blanks and ${quantity} prints are consumed; ${quantity} checked finished totes are added. A later finished sale deducts only finished units.` };
+    }
+    balances.blanks -= fromBlank; balances.prints -= toMake; balances.finished -= fromReady;
+    const allocation = mode === 'plain' ? `${quantity} shared blank units` : mode === 'ready' ? `${quantity} finished units` : mode === 'printed' ? `${quantity} blank and print sets` : `${fromReady} finished units and ${toMake} blank/print sets`;
+    if (outcome === 'before') {
+      return { initial, balances: { ...initial }, title: 'Cancellation releases the original unused reservation.', detail: `The ${allocation} return to their original available pools once. No production has happened.` };
+    }
+    if (outcome === 'after' && (mode === 'printed' || mode === 'mixed')) {
+      balances.finished += fromReady + toMake;
+      return { initial, balances, title: 'Reusable output returns as finished stock.', detail: `${toMake} blank/print sets were physically consumed. The ${fromReady} reserved ready-made units and ${toMake} newly printed units become available finished stock after inspection. Used blanks and prints are not recreated.` };
+    }
+    return { initial, balances, title: 'Available stock decreases; the allocation is saved.', detail: `Reserve ${allocation} for this order. ${toMake > 0 ? 'Printing later consumes the reservation without deducting free materials again.' : 'No print components are deducted.'}` };
+  }
+  function render() {
+    const mode = document.getElementById('mode').value;
+    const outcome = document.getElementById('outcome');
+    const after = outcome.querySelector('option[value="after"]');
+    after.disabled = mode !== 'printed' && mode !== 'mixed';
+    if (after.disabled && outcome.value === 'after') outcome.value = 'accept';
+    outcome.disabled = mode === 'batch';
+    const value = calculate(mode, Number(document.getElementById('quantity').value), outcome.value);
+    for (const key of ['blanks', 'prints', 'finished']) {
+      const node = document.getElementById(key); node.textContent = String(value.balances[key]);
+      const delta = value.balances[key] - value.initial[key];
+      const span = document.createElement('span'); span.className = 'delta'; span.textContent = delta > 0 ? `+${delta}` : String(delta); node.appendChild(span);
+    }
+    document.getElementById('result-title').textContent = value.error ? 'No stock change' : value.title;
+    const detail = document.getElementById('result-detail'); detail.textContent = value.error || value.detail; detail.classList.toggle('error', Boolean(value.error));
+  }
+  for (const id of ['mode', 'quantity', 'outcome']) document.getElementById(id).addEventListener('input', render);
+  for (const button of document.querySelectorAll('[data-view]')) {
+    button.addEventListener('click', () => {
+      for (const other of document.querySelectorAll('[data-view]')) other.setAttribute('aria-pressed', String(other === button));
+      for (const panel of document.querySelectorAll('[data-panel]')) panel.hidden = panel.dataset.panel !== button.dataset.view;
+    });
+  }
+  render();
+</script>
+</body>
+</html>

@@ -13,22 +13,22 @@ export const revalidate = 3600;
 export async function GET() {
   const [products, plainStockRows, designStockRows] = await Promise.all([
     prisma.product.findMany({
-      where: { archived: false },
+      where: { archived: false, status: "PUBLISHED" },
       orderBy: { id: "asc" },
       select: {
-        id: true, name: true, description: true, price: true, originalPrice: true, dtfDesignId: true,
+        id: true, name: true, description: true, price: true, originalPrice: true, dtfDesignId: true, stockMode: true,
         variants: {
           where: { archived: false },
           orderBy: { sortOrder: "asc" },
           select: {
             color: true, colorSlug: true, sku: true, price: true, originalPrice: true,
             images: { where: { role: "CARD" }, orderBy: { sortOrder: "asc" }, select: { url: true }, take: 1 },
-            sizeStocks: { select: { size: true } },
+            sizeStocks: { where: { archived: false }, select: { size: true, plainTshirtStockId: true } },
           },
         },
       },
     }),
-    prisma.plainTshirtStock.findMany({ select: { id: true, colorSlug: true, size: true, quantity: true } }),
+    prisma.plainTshirtStock.findMany({ select: { id: true, colorSlug: true, size: true, quantity: true, inventoryProductId: true } }),
     prisma.dtfDesign.findMany({ select: { id: true, quantity: true } }),
   ]);
   const plainStock = buildPlainStockMap(plainStockRows);
@@ -45,7 +45,7 @@ export async function GET() {
         sku: v.sku,
         price: v.price ?? p.price,
         originalPrice: v.originalPrice ?? p.originalPrice,
-        inStock: variantInStock(v.sizeStocks, v.colorSlug, p.dtfDesignId, plainStock, designStock),
+        inStock: variantInStock(v.sizeStocks, v.colorSlug, p.dtfDesignId, plainStock, designStock, p.stockMode),
         image: v.images[0]?.url ?? "",
       } satisfies FeedVariant),
     ),

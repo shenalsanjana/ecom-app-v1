@@ -5,6 +5,9 @@ import { SiteHeader } from "@/app/_components/home/site-header";
 import { SiteFooter } from "@/app/_components/home/site-footer";
 import { SortSelect } from "@/app/_components/shared/sort-select";
 import type { Metadata } from "next";
+import { getStorefrontPromotions } from "@/app/_lib/storefront-promotion-service";
+import { activePromotions, productPromotion } from "@/app/_lib/storefront-promotions";
+import { PromotionBanner } from "@/app/_components/discounts/promotion-banner";
 
 function defaultVariantOf(p: ProductView) {
   return p.variants.find((v) => v.colorSlug === p.defaultColorSlug) ?? p.variants[0];
@@ -14,7 +17,7 @@ export const revalidate = 120;
 
 export const metadata: Metadata = {
   title: "Deals",
-  description: "Limited-time deals on premium oversize t-shirts.",
+  description: "Current offers and reduced prices at Dressing Bear. See eligibility and terms with each product.",
   alternates: { canonical: "/deals" },
 };
 
@@ -50,16 +53,26 @@ export default async function DealsPage({ searchParams }: DealsPageProps) {
   const productsSort: SortBy =
     sortBy === "discount" ? "newest" : (sortBy as SortBy);
   const allProducts = await getProducts({ sortBy: productsSort });
-
-  const dealsProducts = allProducts.filter((p) => defaultVariantOf(p).originalPrice !== null);
+  const snapshot = await getStorefrontPromotions();
+  const offers = activePromotions(snapshot.offers, snapshot.asOf);
+  const display = new Map(allProducts.map(p => {
+    const v = defaultVariantOf(p);
+    return [p.id, productPromotion(offers, { productId: p.id, price: v.price, originalPrice: v.originalPrice, quantity: 1, categorySlugs: p.collectionSlugs ?? [p.category] })];
+  }));
+  const discountFor = (p: ProductView) => {
+    const d = display.get(p.id)!;
+    return d.exact && d.offer ? d.offer.value / 100 : d.originalPrice && d.originalPrice > d.price ? Math.round((d.originalPrice - d.price) / d.originalPrice * 100) : 0;
+  };
+  const dealsProducts = allProducts.filter(p => {
+    const d = display.get(p.id)!;
+    return !!d.offer || (d.originalPrice !== null && d.originalPrice > d.price);
+  });
   if (sortBy === "discount") {
-    dealsProducts.sort((a, b) => {
-      const va = defaultVariantOf(a), vb = defaultVariantOf(b);
-      const da = va.originalPrice ? (va.originalPrice - va.price) / va.originalPrice : 0;
-      const db = vb.originalPrice ? (vb.originalPrice - vb.price) / vb.originalPrice : 0;
-      return db - da;
-    });
+    dealsProducts.sort((a, b) => discountFor(b) - discountFor(a));
+  } else if (sortBy === "price_asc" || sortBy === "price_desc") {
+    dealsProducts.sort((a, b) => (display.get(a.id)!.price - display.get(b.id)!.price) * (sortBy === "price_desc" ? -1 : 1));
   }
+  const maximumDiscount = dealsProducts.reduce((max, p) => Math.max(max, discountFor(p)), 0);
 
   const ITEMS_PER_PAGE = 12;
   const totalPages = Math.ceil(dealsProducts.length / ITEMS_PER_PAGE);
@@ -82,17 +95,18 @@ export default async function DealsPage({ searchParams }: DealsPageProps) {
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="text-center">
             <span className="inline-block rounded-full bg-brand px-3 py-1 text-xs font-bold uppercase tracking-wider text-brand-foreground">
-              Limited Time
+              Current offers
             </span>
             <h1 className="mt-4 font-heading text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-              Deals of the Day
+              Sale &amp; offers
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-              Don&apos;t miss out on these limited-time savings. Premium oversize t-shirts at unbeatable prices.
+              Explore current offers and reduced prices. Eligibility and terms are shown with each product.
             </p>
           </div>
         </div>
       </section>
+      <PromotionBanner />
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Stats Bar */}
@@ -100,23 +114,9 @@ export default async function DealsPage({ searchParams }: DealsPageProps) {
           <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
             <div className="flex items-center gap-4 text-sm">
               <span className="font-medium text-foreground">
-                {dealsProducts.length} Deal{dealsProducts.length !== 1 ? "s" : ""} Found
+                {dealsProducts.length} style{dealsProducts.length !== 1 ? "s" : ""} with offers
               </span>
-              <span className="hidden sm:block text-muted-foreground">|</span>
-              <span className="text-muted-foreground">
-                Up to{" "}
-                {(() => {
-                  const maxDiscount = dealsProducts.reduce((max, p) => {
-                    const v = defaultVariantOf(p);
-                    if (v.originalPrice) {
-                      const discount = Math.round(((v.originalPrice - v.price) / v.originalPrice) * 100);
-                      return Math.max(max, discount);
-                    }
-                    return max;
-                  }, 0);
-                  return `${maxDiscount}% off`;
-                })()}
-              </span>
+              {maximumDiscount > 0 && <span className="text-muted-foreground">Up to {maximumDiscount}% off original prices</span>}
             </div>
 
             {/* Sort */}
@@ -155,10 +155,10 @@ export default async function DealsPage({ searchParams }: DealsPageProps) {
               </svg>
             </div>
             <p className="mt-4 text-lg font-medium text-muted-foreground">
-              No deals available right now
+              No product offers available right now
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Check back soon for new limited-time offers
+              Browse all products or check back for new offers.
             </p>
             <Link
               href="/categories"
@@ -169,23 +169,7 @@ export default async function DealsPage({ searchParams }: DealsPageProps) {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
-            {paginatedProducts.map((product) => {
-              const v = defaultVariantOf(product);
-              const discount =
-                v.originalPrice && v.originalPrice > v.price
-                  ? Math.round(((v.originalPrice - v.price) / v.originalPrice) * 100)
-                  : 0;
-              return (
-                <div key={product.id} className="group relative">
-                  {discount > 0 && (
-                    <div className="absolute left-2 top-2 z-10 rounded-full bg-brand px-2 py-0.5 text-xs font-bold text-brand-foreground shadow-lg">
-                      -{discount}%
-                    </div>
-                  )}
-                  <ProductCard product={product} fromPath="/deals" />
-                </div>
-              );
-            })}
+            {paginatedProducts.map(product => <ProductCard key={product.id} product={product} fromPath="/deals" />)}
           </div>
         )}
 

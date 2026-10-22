@@ -88,7 +88,7 @@ export default async function CataloguePage({ searchParams }: CataloguePageProps
   const linkedDepartments = departments.filter(showsNavDropdown);
 
   const byDesign = countsByDesign(allProducts);
-  const byDepartment = countsByDepartment(linkedDepartments, byDesign);
+  const byDepartment = countsByDepartment(linkedDepartments, allProducts);
 
   const totalPages = Math.ceil(displayProducts.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;

@@ -15,10 +15,10 @@ describe("restoreItemPools", () => {
   it("increments both pools when both ids are present", async () => {
     await restoreItemPools(tx as never, { plainTshirtStockId: "p1", dtfDesignId: "d1", quantity: 2 });
     expect(tx.plainTshirtStock.updateMany).toHaveBeenCalledWith({
-      where: { id: "p1" }, data: { quantity: { increment: 2 } },
+      where: { id: "p1" }, data: { quantity: { increment: 2 }, version: { increment: 1 } },
     });
     expect(tx.dtfDesign.updateMany).toHaveBeenCalledWith({
-      where: { id: "d1" }, data: { quantity: { increment: 2 } },
+      where: { id: "d1" }, data: { quantity: { increment: 2 }, version: { increment: 1 } },
     });
   });
 
@@ -48,10 +48,10 @@ describe("acquireItemPools", () => {
   it("guarded-decrements both pools when both ids are present", async () => {
     await acquireItemPools(tx as never, { plainTshirtStockId: "p1", dtfDesignId: "d1", quantity: 2, name: "Cat Tee" });
     expect(tx.plainTshirtStock.updateMany).toHaveBeenCalledWith({
-      where: { id: "p1", quantity: { gte: 2 } }, data: { quantity: { decrement: 2 } },
+      where: { id: "p1", quantity: { gte: 2 } }, data: { quantity: { decrement: 2 }, version: { increment: 1 } },
     });
     expect(tx.dtfDesign.updateMany).toHaveBeenCalledWith({
-      where: { id: "d1", quantity: { gte: 2 } }, data: { quantity: { decrement: 2 } },
+      where: { id: "d1", quantity: { gte: 2 } }, data: { quantity: { decrement: 2 }, version: { increment: 1 } },
     });
   });
 

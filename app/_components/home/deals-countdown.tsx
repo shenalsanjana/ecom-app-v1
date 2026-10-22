@@ -1,20 +1,23 @@
 // app/_components/home/deals-countdown.tsx
 "use client";
 import { useEffect, useState } from "react";
-import { msUntilEndOfDay, formatCountdown } from "@/app/_lib/countdown";
+import { formatCountdown } from "@/app/_lib/countdown";
 
 // The only client state on the home page. Renders a fixed placeholder on the
 // server and for the first client paint — computing the clock during render
 // would make server and client HTML disagree and trip a hydration mismatch.
-export function DealsCountdown() {
+export function DealsCountdown({ expiresAt }: { expiresAt?: string } = {}) {
   const [remaining, setRemaining] = useState<number | null>(null);
 
   useEffect(() => {
-    const tick = () => setRemaining(msUntilEndOfDay(new Date()));
+    if (!expiresAt || !Number.isFinite(Date.parse(expiresAt))) return;
+    const tick = () => setRemaining(Math.max(0, Date.parse(expiresAt) - Date.now()));
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [expiresAt]);
+
+  if (!expiresAt || !Number.isFinite(Date.parse(expiresAt)) || remaining === 0) return null;
 
   return (
     <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm">

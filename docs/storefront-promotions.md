@@ -1,0 +1,19 @@
+# Storefront promotions
+
+Eligible products share one promotion resolver across home, catalogue, search, wishlist, related items, product pages, and quick-add dialogs. The sale page includes eligible public offers as well as catalogue reductions, sorts using the displayed prices, and reuses the card's single discount badge. Existing sale prices keep their original-price comparison and cannot receive another offer. Cart items keep their merchandise price; the authoritative order discount is deducted once in the summary.
+
+An automatic percentage without a minimum spend or savings cap can show a badge, crossed-out merchandise price, and reduced price. If multiple automatic rules compete across different targets, or any automatic rule has order conditions, products retain merchandise prices and display offer terms instead. This avoids promising a combination of product discounts when checkout permits only one promotion per order. Selecting a coupon also removes automatic price previews because a coupon replaces automatic offers.
+
+Coupons stay private by default, including all existing codes. Administrators can select **Advertise this coupon on the website** when creating or editing a code. Public coupons show the code explicitly and retain base prices until the cart quote validates the order. Automatic offers are discoverable while available. One available store-wide campaign appears in a static announcement strip and a compact homepage panel. Targeted offers appear only on eligible products.
+
+Conditional offers state minimum merchandise spend, maximum savings, per-order fixed amounts, sale exclusions, and the actual expiry in Sri Lanka time. Cart and checkout reuse `CouponEntry` for application, removal, errors, qualification guidance, and a notice when removing a weaker code would restore a better automatic saving. A public code is never applied without the shopper choosing it. Minimum-order qualification matches checkout's merchandise subtotal before delivery, including existing sale merchandise, while the discount itself excludes sale items.
+
+Payment-restricted offers show a small **Conditions apply** disclosure on eligible product cards, product pages and quick-add dialogs. The offer headline names the eligible methods (for example, **15% off full-price items with PayHere or Koko**), and expanded terms list the methods before checkout. Payment conditions also appear in campaign banners. Conditional savings never replace the guaranteed merchandise price or enter product structured data. Restricted public coupons remain discoverable alongside an unconditional automatic price preview.
+
+Cart totals exclude restricted savings until a payment method is selected at checkout. Checkout quotes include the selected method, remove or restore savings when it changes, and explain an unmatched method without discarding an otherwise valid coupon. Only eligible automatic offers compete for the order discount. Delivery rules and the single-promotion policy remain unchanged.
+
+Public data omits private codes, usage counters, and rule versions. One provider fetches availability for the page, refreshes on focus and every 30 seconds, and starts/expires visible campaigns at their scheduled boundaries. Failed refreshes remove marketing previews. Admin mutations and stock/order invalidation expire the server promotion cache. Checkout always validates current prices, discount versions, expiry, eligibility, and remaining uses again before placing an order.
+
+Catalogue markdowns have no implied deadline. The old midnight-reset countdown has been removed from sale panels. Expiry is shown only when an actual promotion defines it.
+
+Schema change: `Discount.publicOffer` defaults to `false`. No promotion is created, activated, or made public by the migration. Existing one-offer, coupon-replacement, and redemption rules are unchanged.

@@ -15,6 +15,7 @@
     "check:contrast": "tsx scripts/check-contrast.ts",
     "admin:create": "tsx scripts/create-admin.ts",
     "admin:ensure": "tsx scripts/ensure-admin.ts",
+    "orders:reconcile": "tsx scripts/reconcile-unpaid-orders.ts",
     "curfox:seed": "tsx scripts/seed-curfox-cities.ts",
     "migrate:images": "tsx scripts/migrate-images-from-blob.ts",
     "db:push": "prisma db push",

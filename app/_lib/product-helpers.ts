@@ -1,5 +1,10 @@
-export const PRODUCT_TABS = ["active", "low-stock", "archived", "all"] as const;
-export type ProductTab = (typeof PRODUCT_TABS)[number];
+export const PRODUCT_TABS = ["all", "published", "draft", "low-stock", "archived"] as const;
+export type ProductTab = (typeof PRODUCT_TABS)[number] | "active";
+
+export function parseProductTab(value?: string | null): (typeof PRODUCT_TABS)[number] {
+  if (value === "active") return "published";
+  return PRODUCT_TABS.find(tab => tab === value) ?? "all";
+}
 
 export function slugify(name: string): string {
   return name

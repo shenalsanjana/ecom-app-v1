@@ -6,6 +6,8 @@ import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ShoppingBag, Truck, CreditCard, User, FileText, Loader2 } from "lucide-react";
+import { useDiscountQuote } from "@/app/_lib/use-discount-quote";
+import { CouponEntry } from "@/app/_components/discounts/coupon-entry";
 import { useCart } from "@/app/_lib/cart-context";
 import { trackInitiateCheckout, trackPurchaseOnce } from "@/app/_lib/meta-pixel";
 import { processOrder, type PaymentMethod } from "./actions";
@@ -47,7 +49,7 @@ function generateIdempotencyKey(): string {
 
 export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
   const router = useRouter();
-  const { items, clearCart } = useCart();
+  const { items, clearCart, updatePrices } = useCart();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -57,6 +59,8 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
   // (network blip, gateway init error) can be retried without creating a
   // duplicate order.
   const [pendingOnlineOrderId, setPendingOnlineOrderId] = useState<string | null>(null);
+  // Keep the accepted quote while an order is being placed or payment retried.
+  const offers = useDiscountQuote(items, updatePrices, !isSubmitting && !pendingOnlineOrderId, paymentMethod);
   const [redirectingProvider, setRedirectingProvider] = useState<string | null>(null);
   const idempotencyKey = useMemo(() => generateIdempotencyKey(), []);
 
@@ -82,9 +86,10 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
 
   const deliveryConfig = useDeliveryConfig();
   const { freeThreshold: FREE_DELIVERY_THRESHOLD } = deliveryConfig;
-  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const subtotal = offers.quote ? offers.quote.subtotal / 100 : items.reduce((sum, item) => sum + Math.round(item.price * 100) * item.quantity, 0) / 100;
   const shipping = calculateDelivery(subtotal, zoneForCity(address.city ?? ""), deliveryConfig, paymentMethod);
-  const total = subtotal + shipping;
+  const discountAmount = (offers.quote?.discount?.amount ?? 0) / 100;
+  const total = Math.round((Math.max(0, subtotal - discountAmount) + shipping) * 100) / 100;
 
   // Fire InitiateCheckout once, when the checkout form first has items. Guarded
   // by a ref so cart hydration / re-renders don't refire it.
@@ -212,6 +217,7 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!offers.ready) { offers.refresh(); setError("Please wait for prices and offers to be checked."); return; }
     setError(null);
     setIsSubmitting(true);
 
@@ -230,6 +236,8 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
           quantity: it.quantity,
           size: it.size,
         })),
+        couponCode: offers.code || undefined,
+        discountExpectation: { id: offers.quote?.discount?.id ?? null, amount: offers.quote?.discount?.amount ?? 0 },
         shippingAddress: normalizedAddress,
         paymentMethod,
         contactPhone: phone,
@@ -254,6 +262,8 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
         setOrderReference(result.webNumber ?? result.orderId);
         await trackPurchaseOnce(result.orderId, purchaseValue, purchaseContentIds);
       } else {
+        if (result.priceChanges) updatePrices(result.priceChanges);
+        offers.refresh();
         setError(result.error);
       }
     } catch {
@@ -500,7 +510,9 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
                           name="payment"
                           value={option.id}
                           checked={paymentMethod === option.id}
+                          disabled={isSubmitting || !!pendingOnlineOrderId}
                           onChange={() => {
+                            if (isSubmitting || pendingOnlineOrderId) return;
                             setPaymentMethod(option.id);
                             setPendingOnlineOrderId(null);
                             setError(null);
@@ -530,6 +542,7 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
               <div>
                 <div className="rounded-lg border p-6 sticky top-24">
                   <h2 className="font-heading text-lg font-semibold mb-4">Order Summary</h2>
+                  {discountAmount > 0 && <p className="mb-3 text-xs text-muted-foreground">Item prices are before order offers. Your saving is deducted below.</p>}
 
                   <div className="space-y-3 text-sm">
                     {items.map((item) => (
@@ -545,11 +558,17 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
 
                   <Separator className="my-4" />
 
+                  <CouponEntry state={offers} disabled={isSubmitting || !!pendingOnlineOrderId} />
                   <div className="space-y-2 text-sm">
+                    {offers.quote && offers.quote.originalSubtotal > offers.quote.subtotal && <>
+                      <div className="flex justify-between text-muted-foreground"><span>Original prices</span><del>{formatPrice(offers.quote.originalSubtotal / 100)}</del></div>
+                      <div className="flex justify-between text-brand"><span>Sale savings</span><span>−{formatPrice((offers.quote.originalSubtotal - offers.quote.subtotal) / 100)}</span></div>
+                    </>}
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Subtotal</span>
+                      <span className="text-muted-foreground">Items subtotal</span>
                       <span>{formatPrice(subtotal)}</span>
                     </div>
+                    {discountAmount > 0 && <div className="flex justify-between gap-3 text-brand"><span className="min-w-0 break-words">{offers.quote?.discount?.name}</span><span className="shrink-0 whitespace-nowrap">−{formatPrice(discountAmount)}</span></div>}
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Delivery</span>
                       <span>{shipping === 0 ? "Free" : formatPrice(shipping)}</span>
@@ -595,7 +614,7 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
                     </Button>
                   )}
 
-                  <Button type="submit" className="w-full mt-6" size="lg" disabled={isSubmitting}>
+                  <Button type="submit" className="w-full mt-6" size="lg" disabled={isSubmitting || !offers.ready || !!pendingOnlineOrderId}>
                     {isSubmitting
                       ? "Processing..."
                       : paymentMethod === "COD"

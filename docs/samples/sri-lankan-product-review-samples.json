@@ -1,0 +1,1152 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Fictional Sri Lankan product-review examples for preview/testing only. Not customer feedback; do not include in live customer ratings.",
+  "generatedAt": "2026-10-22T02:00:28.211906+00:00",
+  "sampleOnly": true,
+  "products": [
+    {
+      "productId": "cotton-canvas-zipper-pouch-stitch-1",
+      "productName": "Cotton Canvas Zipper Pouch Stitch 1",
+      "productUrl": "https://www.dressingbear.com/products/cotton-canvas-zipper-pouch-stitch-1",
+      "group": "canvas-pouch",
+      "reviews": [
+        {
+          "id": "cotton-canvas-zipper-pouch-stitch-1-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Nethmi P. (fictional)",
+          "rating": 5,
+          "title": "Cute little organiser",
+          "body": "The Stitch design is lovely. I keep my pens and small stationery together in this instead of searching through my whole bag.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-stitch-1-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Arun K. (fictional)",
+          "rating": 4,
+          "title": "Handy for my office bag",
+          "body": "A nice way to keep the small things separate. The print looks cheerful without making the pouch too busy.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-stitch-1-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Fathima R. (fictional)",
+          "rating": 3,
+          "title": "Check what you want to carry",
+          "body": "Good for my everyday bits, but I wanted space for a few larger items too. I would check the measurements before ordering.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "cotton-canvas-zipper-pouch-stitch-2",
+      "productName": "Cotton Canvas Zipper Pouch Stitch 2",
+      "productUrl": "https://www.dressingbear.com/products/cotton-canvas-zipper-pouch-stitch-2",
+      "group": "canvas-pouch",
+      "reviews": [
+        {
+          "id": "cotton-canvas-zipper-pouch-stitch-2-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Kavindu S. (fictional)",
+          "rating": 5,
+          "title": "My sister liked it",
+          "body": "Picked this Stitch pouch for my sister in Kurunegala. She has already put it in her handbag for her daily essentials.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-stitch-2-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Nirosha T. (fictional)",
+          "rating": 4,
+          "title": "Nice change from a plain pouch",
+          "body": "I wanted something simple but a little fun for my work bag. This design was a good choice for that.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-stitch-2-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Tharushi M. (fictional)",
+          "rating": 4,
+          "title": "Easy to keep things together",
+          "body": "Using it for my small stationery items. I would love to see a few more Stitch designs in the same collection.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "cotton-canvas-zipper-pouch-best-teacher-1",
+      "productName": "Cotton Canvas Zipper Pouch best teacher 1",
+      "productUrl": "https://www.dressingbear.com/products/cotton-canvas-zipper-pouch-best-teacher-1",
+      "group": "canvas-pouch",
+      "reviews": [
+        {
+          "id": "cotton-canvas-zipper-pouch-best-teacher-1-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Ahamed F. (fictional)",
+          "rating": 5,
+          "title": "A thoughtful teacher gift",
+          "body": "Chose this as a small thank-you for my daughter's teacher. The message makes it feel more personal than a plain pouch.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-best-teacher-1-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Priya R. (fictional)",
+          "rating": 4,
+          "title": "Useful gift idea",
+          "body": "Bought one for a teacher in our family. A practical little present, especially if they carry pens and small teaching essentials.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-best-teacher-1-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Isuru K. (fictional)",
+          "rating": 4,
+          "title": "Simple and meaningful",
+          "body": "The teacher theme is what made me choose it. I would add my own gift bag if giving it for a special occasion.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "cotton-canvas-zipper-pouch-christmas-1",
+      "productName": "Cotton Canvas Zipper Pouch christmas 1",
+      "productUrl": "https://www.dressingbear.com/products/cotton-canvas-zipper-pouch-christmas-1",
+      "group": "canvas-pouch",
+      "reviews": [
+        {
+          "id": "cotton-canvas-zipper-pouch-christmas-1-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Malsha S. (fictional)",
+          "rating": 5,
+          "title": "Little Christmas treat",
+          "body": "Picked this for our office gift exchange in Colombo. The festive design makes a small everyday item feel a bit more special.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-christmas-1-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Shenaya P. (fictional)",
+          "rating": 4,
+          "title": "Useful festive gift",
+          "body": "I like that it is something the person can keep using after Christmas too. Added a small card and it was ready to give.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-christmas-1-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Sahan D. (fictional)",
+          "rating": 4,
+          "title": "Nice for the holiday bag",
+          "body": "Using this to organise little things while visiting family during the holidays. The Christmas print is a cheerful extra.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "cotton-canvas-zipper-pouch-christmas-2",
+      "productName": "Cotton Canvas Zipper Pouch christmas 2",
+      "productUrl": "https://www.dressingbear.com/products/cotton-canvas-zipper-pouch-christmas-2",
+      "group": "canvas-pouch",
+      "reviews": [
+        {
+          "id": "cotton-canvas-zipper-pouch-christmas-2-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Nethmi P. (fictional)",
+          "rating": 5,
+          "title": "For my Christmas gift list",
+          "body": "Wanted a few smaller presents for cousins and this design caught my eye. It feels more useful than another decoration.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-christmas-2-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Arun K. (fictional)",
+          "rating": 4,
+          "title": "Cute seasonal pouch",
+          "body": "A nice festive option for small personal items. I prefer this sort of practical gift that does not take up too much space.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-christmas-2-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Fathima R. (fictional)",
+          "rating": 3,
+          "title": "Nice print, wanted another size",
+          "body": "The Christmas theme is lovely, but I was looking for a bigger organiser. Worth checking the size against what you carry.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "cotton-canvas-zipper-pouch-christmas-3",
+      "productName": "Cotton Canvas Zipper Pouch christmas 3",
+      "productUrl": "https://www.dressingbear.com/products/cotton-canvas-zipper-pouch-christmas-3",
+      "group": "canvas-pouch",
+      "reviews": [
+        {
+          "id": "cotton-canvas-zipper-pouch-christmas-3-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Kavindu S. (fictional)",
+          "rating": 5,
+          "title": "Cheerful little present",
+          "body": "Bought this as part of a Christmas hamper for my niece. The pouch makes a nice addition without being an oversized gift.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-christmas-3-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Nirosha T. (fictional)",
+          "rating": 4,
+          "title": "Handy during holiday travel",
+          "body": "Kept my small everyday things together on our family trip. I like having one pouch to move between different bags.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-christmas-3-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Tharushi M. (fictional)",
+          "rating": 4,
+          "title": "A festive touch",
+          "body": "The Christmas design is what I liked most. I would be happy to see more choices for small gift exchanges.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "cotton-canvas-zipper-pouch-christmas-4",
+      "productName": "Cotton Canvas Zipper Pouch christmas 4",
+      "productUrl": "https://www.dressingbear.com/products/cotton-canvas-zipper-pouch-christmas-4",
+      "group": "canvas-pouch",
+      "reviews": [
+        {
+          "id": "cotton-canvas-zipper-pouch-christmas-4-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Ahamed F. (fictional)",
+          "rating": 5,
+          "title": "Secret Santa sorted",
+          "body": "This worked well for our small Secret Santa exchange in Kandy. A useful gift with a festive feel, rather than something just for display.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-christmas-4-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Priya R. (fictional)",
+          "rating": 4,
+          "title": "Simple holiday gift",
+          "body": "Picked it for a friend who likes keeping her bag organised. I added her favourite sweets separately to make a small gift set.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-christmas-4-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Isuru K. (fictional)",
+          "rating": 3,
+          "title": "Good for small essentials",
+          "body": "Nice seasonal design. It suits smaller everyday items better than the larger collection of stationery I had in mind.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "cotton-canvas-zipper-pouch-christmas-5",
+      "productName": "Cotton Canvas Zipper Pouch christmas 5",
+      "productUrl": "https://www.dressingbear.com/products/cotton-canvas-zipper-pouch-christmas-5",
+      "group": "canvas-pouch",
+      "reviews": [
+        {
+          "id": "cotton-canvas-zipper-pouch-christmas-5-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Malsha S. (fictional)",
+          "rating": 5,
+          "title": "Lovely for a small gift",
+          "body": "My cousin enjoys Christmas-themed things, so this was an easy choice. It is something she can use rather than put away afterwards.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-christmas-5-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Shenaya P. (fictional)",
+          "rating": 4,
+          "title": "Keeping my bag tidy",
+          "body": "Using the pouch for all the little things that usually disappear into my handbag. The festive print makes it easy to spot.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-christmas-5-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Sahan D. (fictional)",
+          "rating": 4,
+          "title": "Would buy as a gift again",
+          "body": "A nice idea when you want a modest Christmas present. I would choose some separate wrapping to finish it off.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "cotton-canvas-zipper-pouch-christmas-6",
+      "productName": "Cotton Canvas Zipper Pouch christmas 6",
+      "productUrl": "https://www.dressingbear.com/products/cotton-canvas-zipper-pouch-christmas-6",
+      "group": "canvas-pouch",
+      "reviews": [
+        {
+          "id": "cotton-canvas-zipper-pouch-christmas-6-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Nethmi P. (fictional)",
+          "rating": 5,
+          "title": "For a festive gift set",
+          "body": "Added this to a small present for my friend in Negombo. The Christmas theme fitted nicely with the rest of the gift.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-christmas-6-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Arun K. (fictional)",
+          "rating": 4,
+          "title": "Practical and cheerful",
+          "body": "I enjoy seasonal designs, but still want the item to be useful. This is a nice little organiser for everyday things.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-christmas-6-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Fathima R. (fictional)",
+          "rating": 3,
+          "title": "Wanted more colour choices",
+          "body": "The festive design is cute. I would have liked a few more colour options so I could choose different ones for the family.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "cotton-canvas-zipper-pouch-life-is-good",
+      "productName": "Cotton Canvas Zipper Pouch life is good",
+      "productUrl": "https://www.dressingbear.com/products/cotton-canvas-zipper-pouch-life-is-good",
+      "group": "canvas-pouch",
+      "reviews": [
+        {
+          "id": "cotton-canvas-zipper-pouch-life-is-good-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Kavindu S. (fictional)",
+          "rating": 5,
+          "title": "A nice little reminder",
+          "body": "The Life Is Good message makes me smile when I take it out of my work bag. Useful for keeping my small things together.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-life-is-good-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Nirosha T. (fictional)",
+          "rating": 4,
+          "title": "Simple design I can use daily",
+          "body": "I prefer something with a message rather than a character print. This one suits my everyday bag nicely.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-life-is-good-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Tharushi M. (fictional)",
+          "rating": 4,
+          "title": "Good small gift",
+          "body": "Chose this for a friend starting a new job. The message was a nice touch without making the present too personal.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "cotton-canvas-zipper-pouch-unicorn",
+      "productName": "Cotton Canvas Zipper Pouch unicorn",
+      "productUrl": "https://www.dressingbear.com/products/cotton-canvas-zipper-pouch-unicorn",
+      "group": "canvas-pouch",
+      "reviews": [
+        {
+          "id": "cotton-canvas-zipper-pouch-unicorn-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Ahamed F. (fictional)",
+          "rating": 5,
+          "title": "Unicorn fan approved",
+          "body": "My niece picked the unicorn design herself. She is enjoying having a separate pouch for her favourite little stationery items.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-unicorn-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Priya R. (fictional)",
+          "rating": 4,
+          "title": "A sweet birthday extra",
+          "body": "Added this to a birthday present for my younger cousin. The unicorn theme made it feel like I had chosen something just for her.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-unicorn-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Isuru K. (fictional)",
+          "rating": 3,
+          "title": "Cute, check the measurements",
+          "body": "The design is sweet, but I had pictured a little more space. Best to check the listed measurements before planning what to put inside.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "gsm-220-oversized",
+      "productName": "GSM 220 Oversized",
+      "productUrl": "https://www.dressingbear.com/products/gsm-220-oversized",
+      "group": "tee",
+      "reviews": [
+        {
+          "id": "gsm-220-oversized-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Malsha S. (fictional)",
+          "rating": 5,
+          "title": "A useful plain tee",
+          "body": "I wanted a plain oversized tee for everyday wear rather than another graphic print. Easy to put together with jeans or relaxed trousers.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "gsm-220-oversized-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Shenaya P. (fictional)",
+          "rating": 4,
+          "title": "Comfortable relaxed look",
+          "body": "The oversized style is what I was after. Checking the size chart helped more than choosing the size I normally buy from other shops.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "gsm-220-oversized-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Sahan D. (fictional)",
+          "rating": 3,
+          "title": "Prefer a lighter feel for midday",
+          "body": "I like the relaxed look, but on very hot afternoons in Colombo I tend to choose a lighter tee. More of a personal preference.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "keep-smiling-canvas-cotton-tote-bag",
+      "productName": "Keep Smiling Canvas Cotton Tote Bag",
+      "productUrl": "https://www.dressingbear.com/products/keep-smiling-canvas-cotton-tote-bag",
+      "group": "tote",
+      "reviews": [
+        {
+          "id": "keep-smiling-canvas-cotton-tote-bag-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Nethmi P. (fictional)",
+          "rating": 5,
+          "title": "My daily errand bag",
+          "body": "The Keep Smiling design is cheerful without being too much. I reach for this on quick trips around town instead of taking my larger bag.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "keep-smiling-canvas-cotton-tote-bag-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Arun K. (fictional)",
+          "rating": 4,
+          "title": "Nice for work and after",
+          "body": "I like having a separate tote for a few things on office days. The design is easy to match with casual clothes.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "keep-smiling-canvas-cotton-tote-bag-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Fathima R. (fictional)",
+          "rating": 4,
+          "title": "Happy with the simple design",
+          "body": "The message is what caught my attention. I would check the listed dimensions if you need it to fit a particular laptop or folder.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "pastel-unicorn-canvas-cotton-tote-bag",
+      "productName": "Pastel Unicorn Canvas Cotton Tote Bag",
+      "productUrl": "https://www.dressingbear.com/products/pastel-unicorn-canvas-cotton-tote-bag",
+      "group": "tote",
+      "reviews": [
+        {
+          "id": "pastel-unicorn-canvas-cotton-tote-bag-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Kavindu S. (fictional)",
+          "rating": 5,
+          "title": "Soft-looking unicorn design",
+          "body": "The pastel unicorn theme is lovely. Bought it for my cousin and it suits her casual outfits nicely without looking overly busy.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "pastel-unicorn-canvas-cotton-tote-bag-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Nirosha T. (fictional)",
+          "rating": 4,
+          "title": "For my weekend things",
+          "body": "Using it as an extra bag when going out with family. I like the lighter design and would enjoy seeing more pastel options.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "pastel-unicorn-canvas-cotton-tote-bag-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Tharushi M. (fictional)",
+          "rating": 3,
+          "title": "Check the colour photos",
+          "body": "I like the unicorn theme, though I had imagined a different shade on my phone. Useful to look through all the product photos first.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "pooh-face-canvas-cotton-tote-bag",
+      "productName": "Pooh Face Canvas Cotton Tote Bag",
+      "productUrl": "https://www.dressingbear.com/products/pooh-face-canvas-cotton-tote-bag",
+      "group": "tote",
+      "reviews": [
+        {
+          "id": "pooh-face-canvas-cotton-tote-bag-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Ahamed F. (fictional)",
+          "rating": 5,
+          "title": "For a Pooh fan",
+          "body": "I have liked Pooh since school, so this face design made me smile straight away. It is a fun choice for everyday casual outings.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "pooh-face-canvas-cotton-tote-bag-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Priya R. (fictional)",
+          "rating": 4,
+          "title": "Nice change for uni days",
+          "body": "Wanted a simple character tote for my extra things when going to campus. The Pooh face is cute without taking over the whole outfit.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "pooh-face-canvas-cotton-tote-bag-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Isuru K. (fictional)",
+          "rating": 4,
+          "title": "A gift she actually uses",
+          "body": "My friend in Galle loves Pooh and was happy with this. I would check the measurements if you are planning it for a specific purpose.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "pooh-honey-canvas-cotton-tote-bag",
+      "productName": "Pooh Honey Canvas Cotton Tote Bag",
+      "productUrl": "https://www.dressingbear.com/products/pooh-honey-canvas-cotton-tote-bag",
+      "group": "tote",
+      "reviews": [
+        {
+          "id": "pooh-honey-canvas-cotton-tote-bag-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Malsha S. (fictional)",
+          "rating": 5,
+          "title": "Love the honey theme",
+          "body": "This Pooh design feels familiar and cheerful. I use the tote for little outings when I do not need my usual office bag.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "pooh-honey-canvas-cotton-tote-bag-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Shenaya P. (fictional)",
+          "rating": 4,
+          "title": "A cute casual bag",
+          "body": "Picked the honey design because it is a little different from the usual Pooh face. Easy to pair with a plain tee.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "pooh-honey-canvas-cotton-tote-bag-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Sahan D. (fictional)",
+          "rating": 3,
+          "title": "Would like another size too",
+          "body": "The print theme is nice. I would also be interested in a larger version for the days when I need to carry more things.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "premium-pu-leather-zipper-pouch",
+      "productName": "Premium PU Leather Zipper Pouch",
+      "productUrl": "https://www.dressingbear.com/products/premium-pu-leather-zipper-pouch",
+      "group": "pu-pouch",
+      "reviews": [
+        {
+          "id": "premium-pu-leather-zipper-pouch-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Nethmi P. (fictional)",
+          "rating": 5,
+          "title": "Neat option for work",
+          "body": "I wanted a pouch with a simple look for my office bag. The PU finish suits that better than a bright printed design.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "premium-pu-leather-zipper-pouch-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Arun K. (fictional)",
+          "rating": 4,
+          "title": "Good everyday organiser",
+          "body": "Keeping my small essentials in one place is much easier now. I like the understated look and would welcome more colour choices.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "premium-pu-leather-zipper-pouch-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Fathima R. (fictional)",
+          "rating": 3,
+          "title": "Different from a fabric pouch",
+          "body": "The PU finish is the main reason I chose it. I still prefer a softer fabric pouch for some uses, so it depends on your preference.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "smiley-faces-canvas-cotton-tote-bag",
+      "productName": "Smiley Faces Canvas Cotton Tote Bag",
+      "productUrl": "https://www.dressingbear.com/products/smiley-faces-canvas-cotton-tote-bag",
+      "group": "tote",
+      "reviews": [
+        {
+          "id": "smiley-faces-canvas-cotton-tote-bag-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Kavindu S. (fictional)",
+          "rating": 5,
+          "title": "Brightens up a plain outfit",
+          "body": "The smiley faces are a fun touch with jeans and a plain top. I like a bag that adds a little personality without much effort.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "smiley-faces-canvas-cotton-tote-bag-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Nirosha T. (fictional)",
+          "rating": 4,
+          "title": "Handy extra bag",
+          "body": "I keep reaching for this when heading out for a few errands. A nice alternative to carrying another shopping bag around.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "smiley-faces-canvas-cotton-tote-bag-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Tharushi M. (fictional)",
+          "rating": 4,
+          "title": "Cheerful everyday option",
+          "body": "Wanted a simple tote for casual use in Nugegoda. The smiley design was the one I kept coming back to.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "stitch-canvas-cotton-tote-bag",
+      "productName": "Stitch Canvas Cotton Tote Bag",
+      "productUrl": "https://www.dressingbear.com/products/stitch-canvas-cotton-tote-bag",
+      "group": "tote",
+      "reviews": [
+        {
+          "id": "stitch-canvas-cotton-tote-bag-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Ahamed F. (fictional)",
+          "rating": 5,
+          "title": "My new Stitch favourite",
+          "body": "Hari lassanai! I like the Stitch design with a simple outfit, and it makes a nice change from my usual plain tote.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "stitch-canvas-cotton-tote-bag-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Priya R. (fictional)",
+          "rating": 4,
+          "title": "For my sister's birthday",
+          "body": "She likes anything Stitch, so this was a straightforward choice. It feels more personal than buying her another plain bag.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "stitch-canvas-cotton-tote-bag-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Isuru K. (fictional)",
+          "rating": 3,
+          "title": "Nice design, read the details",
+          "body": "The character print is what attracted me. I would go through the size and material details carefully if you have a particular use in mind.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "butterfly-oversize-tshirt",
+      "productName": "butterfly Oversize Tshirt",
+      "productUrl": "https://www.dressingbear.com/products/butterfly-oversize-tshirt",
+      "group": "tee",
+      "reviews": [
+        {
+          "id": "butterfly-oversize-tshirt-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Malsha S. (fictional)",
+          "rating": 5,
+          "title": "Lovely butterfly theme",
+          "body": "The butterfly design looks nice with a simple pair of jeans. Wanted a casual tee for weekends and this is the sort of look I enjoy.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "butterfly-oversize-tshirt-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Shenaya P. (fictional)",
+          "rating": 4,
+          "title": "Nice relaxed outfit",
+          "body": "I usually go for plain tops, so the butterfly print was a small change for me. I would follow the size chart for the oversized fit.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "butterfly-oversize-tshirt-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Sahan D. (fictional)",
+          "rating": 3,
+          "title": "Think about the length too",
+          "body": "The design is lovely, though I would pay attention to the length as well as the chest measurement. Oversized cuts vary between shops.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "car-oversize-tshirt",
+      "productName": "car Oversize Tshirt",
+      "productUrl": "https://www.dressingbear.com/products/car-oversize-tshirt",
+      "group": "tee",
+      "reviews": [
+        {
+          "id": "car-oversize-tshirt-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Nethmi P. (fictional)",
+          "rating": 5,
+          "title": "Good pick for a car fan",
+          "body": "Chose the car design for my brother in Kandy. He likes the relaxed streetwear look and this fits in with what he normally wears.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "car-oversize-tshirt-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Arun K. (fictional)",
+          "rating": 4,
+          "title": "Easy weekend look",
+          "body": "The car graphic is the reason I picked this one. Looks good with a simple pair of jeans without needing to think too much about the outfit.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "car-oversize-tshirt-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Fathima R. (fictional)",
+          "rating": 4,
+          "title": "Would like more car designs",
+          "body": "I enjoy this kind of graphic tee and would be interested in seeing more car options. The size guide is useful before choosing.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "cotton-canvas-zipper-pouch-best-teacher-2",
+      "productName": "cotton-canvas-zipper-pouch-best-teacher-2",
+      "productUrl": "https://www.dressingbear.com/products/cotton-canvas-zipper-pouch-best-teacher-2",
+      "group": "canvas-pouch",
+      "reviews": [
+        {
+          "id": "cotton-canvas-zipper-pouch-best-teacher-2-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Kavindu S. (fictional)",
+          "rating": 5,
+          "title": "For our class teacher",
+          "body": "We wanted a small gift that our class teacher could actually use. This felt like a nice balance of thoughtful and practical.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-best-teacher-2-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Nirosha T. (fictional)",
+          "rating": 4,
+          "title": "Lovely message",
+          "body": "The teacher design suits the occasion nicely. I paired it with a handwritten note rather than buying another mug.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "cotton-canvas-zipper-pouch-best-teacher-2-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Tharushi M. (fictional)",
+          "rating": 3,
+          "title": "Would like a larger option",
+          "body": "A sweet gift idea, though I was hoping to fit more stationery inside. A larger version would be useful for teachers.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "dog2-oversize-tshirt",
+      "productName": "dog2 Oversize Tshirt",
+      "productUrl": "https://www.dressingbear.com/products/dog2-oversize-tshirt",
+      "group": "tee",
+      "reviews": [
+        {
+          "id": "dog2-oversize-tshirt-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Ahamed F. (fictional)",
+          "rating": 5,
+          "title": "For the dog people",
+          "body": "Our house is full of dog lovers, so this design was an easy choice. It is a nice casual tee for a relaxed weekend outfit.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "dog2-oversize-tshirt-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Priya R. (fictional)",
+          "rating": 4,
+          "title": "Cute without being too busy",
+          "body": "I wanted an animal print that I could wear often. The dog theme goes nicely with the plain bottoms I already have.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "dog2-oversize-tshirt-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Isuru K. (fictional)",
+          "rating": 3,
+          "title": "Check the size you want",
+          "body": "Cute design. I would compare the size chart with a tee you already like, especially if this is your first oversized style.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "love-oversize-tshirt",
+      "productName": "love Oversize Tshirt",
+      "productUrl": "https://www.dressingbear.com/products/love-oversize-tshirt",
+      "group": "tee",
+      "reviews": [
+        {
+          "id": "love-oversize-tshirt-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Malsha S. (fictional)",
+          "rating": 5,
+          "title": "Simple design I keep choosing",
+          "body": "The love theme is sweet without feeling too dressed up. I like it for casual outings with jeans and sandals.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "love-oversize-tshirt-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Shenaya P. (fictional)",
+          "rating": 4,
+          "title": "A thoughtful little gift",
+          "body": "Picked this for my cousin in Matara. I checked her preferred tee measurements first rather than guessing the size from the label.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "love-oversize-tshirt-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Sahan D. (fictional)",
+          "rating": 4,
+          "title": "Easy to style",
+          "body": "I tend to buy simple graphic tees and this design fits that preference. A few more colour options would be lovely.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "paris-oversize-tshirt",
+      "productName": "paris Oversize Tshirt",
+      "productUrl": "https://www.dressingbear.com/products/paris-oversize-tshirt",
+      "group": "tee",
+      "reviews": [
+        {
+          "id": "paris-oversize-tshirt-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Nethmi P. (fictional)",
+          "rating": 5,
+          "title": "Nice casual Paris look",
+          "body": "I liked the Paris theme and wanted something relaxed for weekends. It works well with the simple jeans-and-trainers outfits I usually wear.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "paris-oversize-tshirt-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Arun K. (fictional)",
+          "rating": 4,
+          "title": "An easy outfit choice",
+          "body": "This is the sort of graphic I can wear without adding many accessories. The oversized style is why I chose it over a fitted top.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "paris-oversize-tshirt-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Fathima R. (fictional)",
+          "rating": 3,
+          "title": "Look at all the photos",
+          "body": "The Paris design appealed to me, but I would take time to check the print placement and measurements before choosing your size.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    },
+    {
+      "productId": "simpsons-oversize-tshirt",
+      "productName": "simpsons Oversize Tshirt",
+      "productUrl": "https://www.dressingbear.com/products/simpsons-oversize-tshirt",
+      "group": "tee",
+      "reviews": [
+        {
+          "id": "simpsons-oversize-tshirt-sample-1",
+          "label": "Sample review — fictional example",
+          "authorName": "Kavindu S. (fictional)",
+          "rating": 5,
+          "title": "A bit of cartoon nostalgia",
+          "body": "Grew up watching The Simpsons, so I liked this design straight away. Fun for a casual weekend without needing a whole themed outfit.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "simpsons-oversize-tshirt-sample-2",
+          "label": "Sample review — fictional example",
+          "authorName": "Nirosha T. (fictional)",
+          "rating": 4,
+          "title": "My brother liked the design",
+          "body": "Ordered it as a gift for my brother in Jaffna. He prefers relaxed tees, so I compared the size chart with one he already wears.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        },
+        {
+          "id": "simpsons-oversize-tshirt-sample-3",
+          "label": "Sample review — fictional example",
+          "authorName": "Tharushi M. (fictional)",
+          "rating": 4,
+          "title": "Would enjoy more characters",
+          "body": "The Simpsons theme is what brought me to this one. I would be interested in a few more character designs in the same style.",
+          "synthetic": true,
+          "sampleOnly": true,
+          "approved": false,
+          "verifiedPurchase": false
+        }
+      ]
+    }
+  ]
+}

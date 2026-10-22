@@ -3,6 +3,7 @@ import {
   bookCourier, advanceStatus, markCodCollected, resendConfirmationEmail, cancelOrder,
 } from "@/app/admin/orders/actions";
 import { useActionRunner, Spinner } from "./use-action-runner";
+import { recheckPayment } from "@/app/admin/orders/payment-actions";
 
 type Props = {
   orderId: string; status: string; paymentMethod: string; paymentStatus: string | null;
@@ -25,6 +26,10 @@ export function OrderActions(p: Props) {
 
   return (
     <div className="space-y-2">
+      {unpaidOnline && p.status === "PENDING" && (
+        <button disabled={pending} onClick={() => run("payment", () => recheckPayment(p.orderId))}
+          className="w-full rounded-md border px-3 py-1.5 text-sm">Recheck payment</button>
+      )}
       {p.status === "CONFIRMED" && !p.courierBooked && p.curfoxEnabled && (
         <button disabled={pending} onClick={() => run("dispatch", () => bookCourier(p.orderId))}
           className="flex w-full items-center justify-center gap-1 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">

@@ -26,16 +26,19 @@ export function DesignTile({
 }: {
   href: string; name: string; note: string; slides: Slide[]; sizes?: string;
 }) {
+  const isAccessory = href.startsWith("/categories/accessories/");
   return (
-    <div className="group relative block aspect-square overflow-hidden rounded-[14px] transition-transform duration-(--duration-base) ease-(--ease-out) motion-safe:hover:-translate-y-[3px]">
-      <SlideShow slides={slides} dots="top-right" fadeMs={650} subject={name} sizes={sizes} />
+    <div className={"group relative aspect-square overflow-hidden rounded-[14px] bg-card transition-transform duration-(--duration-base) ease-(--ease-out) motion-safe:hover:-translate-y-[3px] " + (isAccessory ? "flex flex-col" : "block")}>
+      <div className={isAccessory ? "relative min-h-0 flex-1 overflow-hidden" : "absolute inset-0"}>
+        <SlideShow slides={slides} dots="top-right" fadeMs={650} subject={name} sizes={sizes} imageFit={isAccessory ? "contain" : "cover"} />
+      </div>
       <div
-        className="absolute inset-x-0 bottom-0 flex flex-col gap-px px-3 pb-[11px] pt-[26px]"
-        style={{ backgroundImage: CAPTION_GRADIENT }}
+        className={"flex flex-col gap-px px-3 pb-[11px] " + (isAccessory ? "shrink-0 pt-2" : "absolute inset-x-0 bottom-0 pt-[26px]")}
+        style={isAccessory ? undefined : { backgroundImage: CAPTION_GRADIENT }}
       >
-        <span className="text-[15px] font-semibold leading-[1.15] text-white">{name}</span>
+        <span className={"text-[15px] font-semibold leading-[1.15] " + (isAccessory ? "text-foreground" : "text-white")}>{name}</span>
         {note && (
-          <span className="font-mono text-[9px] uppercase tracking-[.14em] text-white/[.72]">
+          <span className={"font-mono text-[9px] uppercase tracking-[.14em] " + (isAccessory ? "text-muted-foreground" : "text-white/[.72]")}>
             {note}
           </span>
         )}

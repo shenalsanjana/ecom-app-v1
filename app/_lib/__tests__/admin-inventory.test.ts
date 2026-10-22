@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { plainFindMany, designFindMany, productGroupBy } = vi.hoisted(() => ({
+const { plainFindMany, designFindMany, productGroupBy, variantFindMany } = vi.hoisted(() => ({
   plainFindMany: vi.fn(),
   designFindMany: vi.fn(),
   productGroupBy: vi.fn(),
+  variantFindMany: vi.fn(),
 }));
 
 vi.mock("@/app/_lib/prisma", () => ({
@@ -11,15 +12,35 @@ vi.mock("@/app/_lib/prisma", () => ({
     plainTshirtStock: { findMany: plainFindMany },
     dtfDesign: { findMany: designFindMany },
     product: { groupBy: productGroupBy },
+    productVariant: { findMany: variantFindMany },
   },
 }));
 
-import { listPlainTshirtStock, listDtfDesigns } from "../admin-inventory";
+import { listPlainTshirtStock, listDtfDesigns, listInventoryStockGroups } from "../admin-inventory";
 
 beforeEach(() => {
   plainFindMany.mockReset();
   designFindMany.mockReset();
   productGroupBy.mockReset();
+  variantFindMany.mockReset();
+});
+
+describe("listInventoryStockGroups", () => {
+  it("joins product identity to existing accessory balances and keeps unlinked blanks visible", async () => {
+    plainFindMany.mockResolvedValueOnce([
+      { id: "tee", color: "Black", colorSlug: "black", size: "M", quantity: 5, version: 1 },
+      { id: "bag", color: "Natural Ivory", colorSlug: "natural-ivory", size: "One size", quantity: 22, version: 2 },
+    ]);
+    variantFindMany.mockResolvedValueOnce([{
+      archived: false,
+      color: "Natural Ivory", colorSlug: "natural-ivory", sizeStocks: [{ size: "One size" }],
+      product: { id: "tote", name: "Canvas tote", archived: false, department: { slug: "accessories", slugHistory: [] } },
+    }]);
+    const result = await listInventoryStockGroups();
+    expect(result.plain.map(row => row.id)).toEqual(["tee"]);
+    expect(result.accessories).toMatchObject([{ id: "bag", quantity: 22, products: [{ id: "tote", name: "Canvas tote" }] }]);
+    expect(result.shared).toEqual([]);
+  });
 });
 
 describe("listPlainTshirtStock", () => {

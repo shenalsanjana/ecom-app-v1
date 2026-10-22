@@ -35,7 +35,7 @@ describe("provider callback routes", () => {
     const res = await GET(new Request(`https://shop.example.com/api/payments/mintpay/return?orderId=ORD-1&amount=2440.00&hash=${encodeURIComponent(hash)}&result=success`));
 
     expect(res.status).toBe(302);
-    expect(finalizePaidPayment).toHaveBeenCalledWith("ORD-1", "MINTPAY");
+    expect(finalizePaidPayment).toHaveBeenCalledWith("ORD-1", "MINTPAY", { amount: 2440, currency: "LKR" });
   });
 
   it("finalizes Mintpay failure when fail HMAC is valid", async () => {

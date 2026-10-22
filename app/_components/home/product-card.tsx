@@ -17,6 +17,7 @@ import { Price } from "@/app/_components/ui/price";
 import { Rating } from "@/app/_components/ui/rating";
 import { SaleBadge } from "@/app/_components/ui/sale-badge";
 import type { ProductView } from "@/app/_lib/products";
+import { ProductOfferNote, useProductPromotion } from "@/app/_components/discounts/product-offer";
 
 export function ProductCard({
   product,
@@ -30,12 +31,14 @@ export function ProductCard({
   const { id, name, rating, reviewCount, category, departmentName, variants, defaultColorSlug, badge } = product;
   const [selectedColor, setSelectedColor] = useState(defaultColorSlug);
   const variant = variants.find((v) => v.colorSlug === selectedColor) ?? variants[0];
+  const isAccessory = product.departmentSlug === "accessories";
   const lowStock = variant.lowStock;
 
   const price = variant.price;
   const originalPrice = variant.originalPrice;
-  const onSale = originalPrice != null && originalPrice > price;
-  const pct = onSale ? discountPct(price, originalPrice) : 0;
+  const promotion = useProductPromotion({ productId: id, price, originalPrice, quantity: 1, categorySlugs: product.collectionSlugs ?? [category] });
+  const onSale = promotion.originalPrice != null && promotion.originalPrice > promotion.price;
+  const pct = promotion.exact && promotion.offer ? promotion.offer.value / 100 : onSale ? discountPct(promotion.price, promotion.originalPrice!) : 0;
   const image = variant.cardImages[0] ?? "";
   const href = `/products/${id}?color=${selectedColor}`;
   const swatchOptions = variants.map((v) => ({
@@ -46,16 +49,20 @@ export function ProductCard({
     <Card className="group overflow-hidden p-0">
       <div className="relative aspect-[4/5] overflow-hidden bg-muted">
         {onSale && <SaleBadge pct={pct} className="absolute left-3 top-3 z-10" />}
+        {!onSale && promotion.offer && <span className="absolute left-3 top-3 z-10 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">{promotion.offer.code ? "Code offer" : "Offer"}</span>}
         <Link href={href} aria-label={name} className="absolute inset-0">
-          <Image
+          {image ? <Image
             key={selectedColor}
             src={image}
-            alt={name}
+            alt={`${name}, ${variant.color}`}
             fill
             unoptimized={isUploadedImage(image)}
             sizes="(min-width:1024px) 33vw, (min-width:640px) 50vw, 100vw"
-            className="object-cover transition-transform duration-(--duration-slow) ease-(--ease-out) group-hover:scale-105 animate-in fade-in duration-(--duration-fast)"
-          />
+            className={
+              "animate-in fade-in duration-(--duration-fast) " +
+              (isAccessory ? "object-contain" : "object-cover transition-transform duration-(--duration-slow) ease-(--ease-out) group-hover:scale-105")
+            }
+          /> : <span className="flex h-full items-center justify-center text-sm text-muted-foreground">Image unavailable</span>}
         </Link>
         <div className="absolute right-2 top-2 z-10">
           <WishlistHeart productId={id} fromPath={fromPath} />
@@ -78,8 +85,9 @@ export function ProductCard({
             Only {lowStock} left
           </p>
         )}
-        <ColorSwatches options={swatchOptions} selected={selectedColor} onSelect={setSelectedColor} />
-        <Price price={price} originalPrice={originalPrice} />
+        <ColorSwatches options={swatchOptions} selected={selectedColor} onSelect={setSelectedColor} showLabels={isAccessory} />
+        <Price price={promotion.price} originalPrice={promotion.originalPrice} />
+        <ProductOfferNote promotion={promotion} />
       </CardContent>
       <CardFooter className="p-4 pt-0">
         <div className="flex w-full flex-col gap-2">
@@ -89,6 +97,9 @@ export function ProductCard({
             color={variant.color}
             name={name}
             price={price}
+            displayPrice={promotion.price}
+            originalPrice={promotion.originalPrice}
+            offerNote={<ProductOfferNote promotion={promotion} />}
             image={image}
             sizes={variant.sizes.join(",")}
             triggerVariant="default"

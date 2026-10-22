@@ -19,6 +19,7 @@ type SlideShowProps = {
    *  (see department-card.tsx / design-tile.tsx), not copied from a shared
    *  default, since the two grids' columns are a different width apart. */
   sizes: string;
+  imageFit?: "cover" | "contain";
 };
 
 /**
@@ -31,12 +32,13 @@ type SlideShowProps = {
  * directly (unlike RotatingSlideShow) without tripping the Rules of Hooks.
  */
 export function SlideLayer({
-  slide, active, fadeMs, sizes,
+  slide, active, fadeMs, sizes, imageFit = "cover",
 }: {
   slide: Slide;
   active: boolean;
   fadeMs: number;
   sizes: string;
+  imageFit?: "cover" | "contain";
 }) {
   return (
     <div
@@ -55,7 +57,7 @@ export function SlideLayer({
           fill
           unoptimized={isUploadedImage(slide.photo)}
           sizes={sizes}
-          className="object-cover object-center"
+          className={imageFit === "contain" ? "object-contain object-center" : "object-cover object-center"}
         />
       )}
       {slide.title && (
@@ -86,12 +88,12 @@ export function SlideLayer({
  * below never renders (and therefore never executes) the hook-owning
  * RotatingSlideShow at all.
  */
-export function SlideShow({ slides, dots, fadeMs, subject, sizes }: SlideShowProps) {
+export function SlideShow({ slides, dots, fadeMs, subject, sizes, imageFit }: SlideShowProps) {
   if (!rotates(slides.length)) {
     const slide = slides[0];
-    return slide ? <SlideLayer slide={slide} active fadeMs={fadeMs} sizes={sizes} /> : null;
+    return slide ? <SlideLayer slide={slide} active fadeMs={fadeMs} sizes={sizes} imageFit={imageFit} /> : null;
   }
-  return <RotatingSlideShow slides={slides} dots={dots} fadeMs={fadeMs} subject={subject} sizes={sizes} />;
+  return <RotatingSlideShow slides={slides} dots={dots} fadeMs={fadeMs} subject={subject} sizes={sizes} imageFit={imageFit} />;
 }
 
 /**
@@ -100,7 +102,7 @@ export function SlideShow({ slides, dots, fadeMs, subject, sizes }: SlideShowPro
  * useSlideTick() is never reached, not merely that its result goes unused.
  * Not meant to be imported by any consumer other than SlideShow itself.
  */
-export function RotatingSlideShow({ slides, dots, fadeMs, subject, sizes }: SlideShowProps) {
+export function RotatingSlideShow({ slides, dots, fadeMs, subject, sizes, imageFit }: SlideShowProps) {
   const [pinned, setPinned] = useState<number | null>(null);
   const tick = useSlideTick();
   const index = slideIndex(tick, slides.length, pinned);
@@ -108,7 +110,7 @@ export function RotatingSlideShow({ slides, dots, fadeMs, subject, sizes }: Slid
   return (
     <>
       {slides.map((slide, i) => (
-        <SlideLayer key={i} slide={slide} active={i === index} fadeMs={fadeMs} sizes={sizes} />
+        <SlideLayer key={i} slide={slide} active={i === index} fadeMs={fadeMs} sizes={sizes} imageFit={imageFit} />
       ))}
 
       {/* Siblings of the tile's <Link>, not descendants (see department-card.tsx

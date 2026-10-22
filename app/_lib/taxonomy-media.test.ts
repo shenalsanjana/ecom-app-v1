@@ -14,6 +14,11 @@ const withPhoto = (designSlug: string, url: string): ProductMediaRow => ({
 });
 
 describe("designMedia", () => {
+  it("uses the same product photo in additional collections, counting each membership once", () => {
+    const media = designMedia([{ ...withPhoto("cat", "/shared.jpg"), additionalCollections: [{ designSlug: "cat" }, { designSlug: "gifts" }, { designSlug: "gifts" }] }]);
+    expect(media.get("cat")).toEqual({ photos: ["/shared.jpg"], count: 1 });
+    expect(media.get("gifts")).toEqual({ photos: ["/shared.jpg"], count: 1 });
+  });
   it("groups photos and counts by design slug", () => {
     const media = designMedia([
       withPhoto("cat", "/a.jpg"), withPhoto("cat", "/b.jpg"), withPhoto("dino", "/c.jpg"),

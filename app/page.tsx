@@ -10,6 +10,7 @@ import { SiteHeader } from "@/app/_components/home/site-header";
 import { SlideClock } from "@/app/_components/ui/slide-clock";
 import { getDepartments } from "@/app/_lib/taxonomy";
 import { getDesignMedia } from "@/app/_lib/taxonomy-media";
+import { PromotionBanner } from "@/app/_components/discounts/promotion-banner";
 
 export const revalidate = 300;
 
@@ -34,6 +35,7 @@ export default async function Home() {
       <SiteHeader />
       <main className="flex-1">
         <Hero />
+        <PromotionBanner />
         <SocialProof />
         <ProductGrid />
         {/* One shared clock for both taxonomy sections' rotating tiles --

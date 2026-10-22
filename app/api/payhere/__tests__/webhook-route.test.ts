@@ -155,7 +155,7 @@ describe("POST /api/payhere/webhook", () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ status: "success" });
-    expect(finalizePaidPayment).toHaveBeenCalledWith("ORD-123", "PAYHERE");
+    expect(finalizePaidPayment).toHaveBeenCalledWith("ORD-123", "PAYHERE", { reference: "320025", amount: 2440, currency: "LKR" });
   });
 
   it("accepts legacy status when status_code is absent", async () => {
@@ -173,7 +173,7 @@ describe("POST /api/payhere/webhook", () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ status: "success" });
-    expect(finalizePaidPayment).toHaveBeenCalledWith("ORD-123", "PAYHERE");
+    expect(finalizePaidPayment).toHaveBeenCalledWith("ORD-123", "PAYHERE", { reference: "320025", amount: 2440, currency: "LKR" });
   });
 
   it("confirms a signed notification without depending on the Merchant API", async () => {
@@ -189,7 +189,7 @@ describe("POST /api/payhere/webhook", () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ status: "success" });
-    expect(finalizePaidPayment).toHaveBeenCalledWith("ORD-123", "PAYHERE");
+    expect(finalizePaidPayment).toHaveBeenCalledWith("ORD-123", "PAYHERE", { reference: "320025", amount: 2440, currency: "LKR" });
   });
 
   it("does not mark the order paid when the verified amount differs from the order total", async () => {

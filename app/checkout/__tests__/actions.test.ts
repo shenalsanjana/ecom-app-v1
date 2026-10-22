@@ -1,4 +1,12 @@
+vi.mock("@/app/_lib/stock-movements", () => ({ setStockMovementContext: vi.fn() }));
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { DiscountRule } from "@/app/_lib/discounts";
+const { discountFindMany, discountClaim } = vi.hoisted(() => ({
+  discountFindMany: vi.fn<() => Promise<DiscountRule[]>>().mockResolvedValue([]),
+  discountClaim: vi.fn().mockResolvedValue({ count: 1 }),
+}));
+vi.mock("@/app/_lib/product-publication", async importOriginal => ({ ...await importOriginal<typeof import("@/app/_lib/product-publication")>(), assertProductsPublished: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 
 const { txOrderCreate, productVariantFindMany, plainStockFindMany, designFindMany } = vi.hoisted(() => ({
   txOrderCreate: vi.fn(async () => ({})),
@@ -10,7 +18,7 @@ const { txOrderCreate, productVariantFindMany, plainStockFindMany, designFindMan
       colorSlug: "white",
       sku: "DB-TEE-WHT-M",
       sizeStocks: [{ size: "S" }, { size: "M" }, { size: "L" }],
-      product: { dtfDesignId: "D1" },
+      price: null, archived: false, product: { dtfDesignId: "D1", name: "T-Shirt", price: 1200, status: "PUBLISHED", archived: false },
     },
   ]),
   plainStockFindMany: vi.fn(async () => [
@@ -38,6 +46,7 @@ vi.mock("@/app/_lib/prisma", () => ({
     dtfDesign: { findMany: designFindMany },
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
       fn({
+        discount: { findMany: discountFindMany, updateMany: discountClaim, fields: { usageLimit: "usageLimit" } },
         plainTshirtStock: {
           updateMany: async () => ({ count: 1 }),
         },
@@ -90,6 +99,9 @@ const baseInput: Omit<ProcessOrderInput, "paymentMethod"> = {
 };
 
 beforeEach(() => {
+  discountFindMany.mockReset().mockResolvedValue([]);
+  discountClaim.mockReset().mockResolvedValue({ count: 1 });
+  vi.mocked(getVerifiedSessionUser).mockResolvedValue(null);
   vi.mocked(bookCourierAndNotify).mockClear();
   vi.mocked(sendOrderConfirmationEmail).mockClear();
   vi.mocked(sendPendingPrepaidNotificationEmail).mockClear();
@@ -100,7 +112,7 @@ beforeEach(() => {
     {
       id: "V1", productId: "P1", color: "White", colorSlug: "white", sku: "DB-TEE-WHT-M",
       sizeStocks: [{ size: "S" }, { size: "M" }, { size: "L" }],
-      product: { dtfDesignId: "D1" },
+      price: null, archived: false, product: { dtfDesignId: "D1", name: "T-Shirt", price: 1200, status: "PUBLISHED", archived: false },
     },
   ]);
   plainStockFindMany.mockReset().mockResolvedValue([
@@ -112,6 +124,23 @@ beforeEach(() => {
 });
 
 describe("processOrder — COD path", () => {
+  it("requires review of a changed catalog price before creating an order", async () => {
+    const result = await processOrder({ ...baseInput, items: [{ ...baseInput.items[0], price: 1 }], paymentMethod: "COD" });
+    expect(result).toMatchObject({ success: false, priceChanges: [{ variantId: "V1", price: 1200 }] });
+    expect(txOrderCreate).not.toHaveBeenCalled();
+  });
+
+  it("rejects an archived catalog variant even if it remains in a cart", async () => {
+    const rows = await productVariantFindMany();
+    productVariantFindMany.mockResolvedValueOnce(rows.map((row) => ({ ...row, archived: true })));
+    expect((await processOrder({ ...baseInput, paymentMethod: "COD" })).success).toBe(false);
+    expect(txOrderCreate).not.toHaveBeenCalled();
+  });
+
+  it("snapshots the database name rather than a submitted product name", async () => {
+    await processOrder({ ...baseInput, items: [{ ...baseInput.items[0], name: "Altered name" }], paymentMethod: "COD" });
+    expect(txOrderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ items: { create: [expect.objectContaining({ name: "T-Shirt", price: 1200 })] } }) }));
+  });
   it("does not book the courier at checkout; still sends customer confirmation; returns success", async () => {
     process.env.ROYAL_EXPRESS_ENABLED = "true";
     const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
@@ -358,7 +387,7 @@ describe("processOrder — variant color snapshots", () => {
       {
         id: "V1", productId: "OTHER-PRODUCT", color: "White", colorSlug: "white", sku: "DB-TEE-WHT-M",
         sizeStocks: [{ size: "M" }],
-        product: { dtfDesignId: "D1" },
+        price: null, archived: false, product: { dtfDesignId: "D1", name: "T-Shirt", price: 1200, status: "PUBLISHED", archived: false },
       },
     ]);
 
@@ -473,6 +502,7 @@ describe("processOrder — free delivery excluded for Koko/Mintpay", () => {
   // exclusion has to hold here regardless of what any client preview showed.
   // baseInput is 2 x 1200 = 2400, below the 5000 threshold, so bump the price
   // to clear it.
+  beforeEach(() => { productVariantFindMany.mockResolvedValue([{ id: "V1", productId: "P1", color: "White", colorSlug: "white", sku: "DB-TEE-WHT-M", price: null, archived: false, sizeStocks: [{ size: "M" }], product: { dtfDesignId: "D1", name: "T-Shirt", price: 4000, status: "PUBLISHED", archived: false } }]); });
   const qualifyingCart = {
     ...baseInput,
     items: [{ ...baseInput.items[0], price: 4000, quantity: 2 }], // 8000 subtotal
@@ -499,5 +529,73 @@ describe("processOrder — free delivery excluded for Koko/Mintpay", () => {
         data: expect.objectContaining({ subtotal: 8000, shippingCost: 0, total: 8000 }),
       }),
     );
+  });
+});
+
+
+describe("size SKU snapshots", () => {
+  it("records the selected size SKU rather than the legacy colour SKU", async () => {
+    const [variant] = await productVariantFindMany();
+    productVariantFindMany.mockResolvedValue([{ ...variant, sizeStocks: variant.sizeStocks.map(cell => ({ ...cell, sku: cell.size === "M" ? "DBV-000002" : "DBV-000001" })) }]);
+    await processOrder({ ...baseInput, paymentMethod: "COD" });
+    expect(txOrderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ items: { create: [expect.objectContaining({ size: "M", sku: "DBV-000002" })] } }) }));
+    expect(productVariantFindMany).toHaveBeenLastCalledWith(expect.objectContaining({ select: expect.objectContaining({ sizeStocks: expect.objectContaining({ where: { archived: false } }) }) }));
+  });
+});
+
+const coupon: DiscountRule = { id: "coupon1", name: "Save ten", code: "SAVE10", type: "PERCENTAGE", scope: "STORE", value: 1000, active: true,
+  startsAt: null, expiresAt: null, usageLimit: 5, usedCount: 0, minimumOrder: 0, maximumDiscount: null, version: 2, products: [], categories: [] };
+describe("checkout promotions", () => {
+  it("persists the authoritative saving, redemption and protected adjustment with the order", async () => {
+    discountFindMany.mockResolvedValue([coupon]);
+    const result = await processOrder({ ...baseInput, paymentMethod: "COD", couponCode: " save10 ", discountExpectation: { id: coupon.id, amount: 24000 } });
+    expect(result.success).toBe(true);
+    expect(discountClaim).toHaveBeenCalledOnce();
+    expect(txOrderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      subtotal: 2400, shippingCost: 350, total: 2510,
+      discountRedemption: { create: { discountId: "coupon1", name: "Save ten", code: "SAVE10", amount: 24000 } },
+      adjustments: { create: expect.objectContaining({ amount: -240, promotion: true }) },
+    }) }));
+    expect(notifyOrderConfirmed).toHaveBeenCalledWith(expect.objectContaining({ total: 2510, adjustments: [expect.objectContaining({ amount: -240 })] }));
+  });
+  it("rejects invalid and expired codes before creating an order", async () => {
+    expect(await processOrder({ ...baseInput, paymentMethod: "COD", couponCode: "BAD" })).toMatchObject({ success: false, error: expect.stringContaining("Invalid coupon") });
+    discountFindMany.mockResolvedValue([{ ...coupon, expiresAt: new Date(0) }]);
+    expect(await processOrder({ ...baseInput, paymentMethod: "COD", couponCode: "SAVE10" })).toMatchObject({ success: false, error: expect.stringContaining("expired") });
+    expect(txOrderCreate).not.toHaveBeenCalled(); expect(discountClaim).not.toHaveBeenCalled();
+  });
+  it("rejects an edited quote rather than silently charging a different amount", async () => {
+    discountFindMany.mockResolvedValue([coupon]);
+    expect(await processOrder({ ...baseInput, paymentMethod: "COD", couponCode: "SAVE10", discountExpectation: { id: coupon.id, amount: 1 } })).toMatchObject({ success: false, error: expect.stringContaining("offer changed") });
+    expect(txOrderCreate).not.toHaveBeenCalled(); expect(discountClaim).not.toHaveBeenCalled();
+  });
+  it("rejects a lost usage claim without creating an order", async () => {
+    discountFindMany.mockResolvedValue([coupon]); discountClaim.mockResolvedValue({ count: 0 });
+    expect(await processOrder({ ...baseInput, paymentMethod: "COD", couponCode: "SAVE10" })).toMatchObject({ success: false, error: expect.stringContaining("usage limit") });
+    expect(txOrderCreate).not.toHaveBeenCalled();
+  });
+  it("applies an automatic offer once and caps it to merchandise", async () => {
+    discountFindMany.mockResolvedValue([{ ...coupon, code: null, type: "FIXED", value: 999999 }]);
+    expect((await processOrder({ ...baseInput, paymentMethod: "PAYHERE" })).success).toBe(true);
+    expect(txOrderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ total: 350, subtotal: 2400, adjustments: { create: expect.objectContaining({ amount: -2400 }) } }) }));
+  });
+});
+
+
+describe("zero-total promotions", () => {
+  it("requires a zero-total order to bypass the online payment gateway", async () => {
+    const [variant] = await productVariantFindMany();
+    productVariantFindMany.mockResolvedValue([{ ...variant, product: { ...variant.product, price: 4000 } }]);
+    discountFindMany.mockResolvedValue([{ ...coupon, code: null, value: 10000 }]);
+    const result = await processOrder({ ...baseInput, items: [{ ...baseInput.items[0], price: 4000 }], paymentMethod: "PAYHERE" });
+    expect(result).toMatchObject({ success: false, error: expect.stringContaining("total is zero") });
+    expect(txOrderCreate).not.toHaveBeenCalled(); expect(discountClaim).not.toHaveBeenCalled();
+  });
+  it("allows a zero-total COD order with no negative balance", async () => {
+    const [variant] = await productVariantFindMany();
+    productVariantFindMany.mockResolvedValue([{ ...variant, product: { ...variant.product, price: 4000 } }]);
+    discountFindMany.mockResolvedValue([{ ...coupon, code: null, value: 10000 }]);
+    expect((await processOrder({ ...baseInput, items: [{ ...baseInput.items[0], price: 4000 }], paymentMethod: "COD" })).success).toBe(true);
+    expect(txOrderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ subtotal: 8000, shippingCost: 0, total: 0 }) }));
   });
 });

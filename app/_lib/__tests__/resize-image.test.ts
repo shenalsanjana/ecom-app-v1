@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeCoverCrop, resizeImageFile } from "../resize-image";
+import { computeCoverCrop, computeContainedDimensions, resizeImageFile } from "../resize-image";
 
 describe("computeCoverCrop", () => {
   it("crops width when the source is wider than the target ratio", () => {
@@ -20,6 +20,20 @@ describe("computeCoverCrop", () => {
   it("returns the full rectangle when source ratio already matches target", () => {
     // 800x1000 is exactly 4:5 -> no crop
     expect(computeCoverCrop(800, 1000, 1200, 1500)).toEqual({ sx: 0, sy: 0, sw: 800, sh: 1000 });
+  });
+});
+
+describe("product image dimensions", () => {
+  it("retains the complete landscape collage within the product bounds", () => {
+    expect(computeContainedDimensions(1448, 1086, 1200, 1500)).toEqual({ w: 1200, h: 900 });
+  });
+
+  it("retains the top and bottom of a tall infographic", () => {
+    expect(computeContainedDimensions(1000, 2000, 1200, 1500)).toEqual({ w: 750, h: 1500 });
+  });
+
+  it("does not upscale smaller product photos", () => {
+    expect(computeContainedDimensions(600, 450, 1200, 1500)).toEqual({ w: 600, h: 450 });
   });
 });
 

@@ -6,7 +6,7 @@ const {
   designCreate, designFindUnique,
   variantDeleteMany, variantCreate, variantFindMany, variantUpdate,
   variantImageCreateMany, variantImageDeleteMany,
-  variantSizeStockCreateMany, variantSizeStockDeleteMany,
+  variantSizeStockCreateMany, variantSizeStockDeleteMany, sizeFindMany, sizeUpdateMany, sizeUpsert,
   historyUpsert, historyDeleteMany, txn,
 } =
   vi.hoisted(() => ({
@@ -15,7 +15,7 @@ const {
     designCreate: vi.fn(), designFindUnique: vi.fn(),
     variantDeleteMany: vi.fn(), variantCreate: vi.fn(), variantFindMany: vi.fn(), variantUpdate: vi.fn(),
     variantImageCreateMany: vi.fn(), variantImageDeleteMany: vi.fn(),
-    variantSizeStockCreateMany: vi.fn(), variantSizeStockDeleteMany: vi.fn(),
+    variantSizeStockCreateMany: vi.fn(), variantSizeStockDeleteMany: vi.fn(), sizeFindMany: vi.fn(), sizeUpdateMany: vi.fn(), sizeUpsert: vi.fn(),
     historyUpsert: vi.fn(), historyDeleteMany: vi.fn(), txn: vi.fn(),
   }));
 
@@ -25,8 +25,9 @@ function buildClient() {
     design: { create: designCreate, findUnique: designFindUnique },
     productVariant: { deleteMany: variantDeleteMany, create: variantCreate, findMany: variantFindMany, update: variantUpdate },
     variantImage: { createMany: variantImageCreateMany, deleteMany: variantImageDeleteMany },
-    variantSizeStock: { createMany: variantSizeStockCreateMany, deleteMany: variantSizeStockDeleteMany },
+    variantSizeStock: { createMany: variantSizeStockCreateMany, deleteMany: variantSizeStockDeleteMany, findMany: sizeFindMany, updateMany: sizeUpdateMany, upsert: sizeUpsert },
     productSlugHistory: { upsert: historyUpsert, deleteMany: historyDeleteMany },
+    productCollection: { deleteMany: vi.fn(), createMany: vi.fn() },
     orderItem: { count: orderItemCount },
   };
 }
@@ -51,6 +52,7 @@ beforeEach(() => {
   variantFindMany.mockReset().mockResolvedValue([]); variantUpdate.mockReset().mockResolvedValue({});
   variantImageCreateMany.mockReset(); variantImageDeleteMany.mockReset();
   variantSizeStockCreateMany.mockReset(); variantSizeStockDeleteMany.mockReset();
+  sizeFindMany.mockReset().mockResolvedValue([]); sizeUpdateMany.mockReset().mockResolvedValue({ count: 0 }); sizeUpsert.mockReset().mockResolvedValue({});
   historyUpsert.mockReset(); historyDeleteMany.mockReset();
   txn.mockReset().mockImplementation(async (fn: (c: unknown) => unknown) => fn(buildClient()));
 });
@@ -89,10 +91,14 @@ const NEW_INPUT = {
 };
 
 describe("createProduct", () => {
-  it("rejects empty name / non-positive price / empty variants", async () => {
+  it("defaults an unfinished product to draft without print, images or variants", async () => {
+    productFindUnique.mockResolvedValue(null);
+    expect(await createProduct({ ...NEW_INPUT, description: "", dtfDesignId: null, variants: [] })).toMatchObject({ success: true });
+    expect(productCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "DRAFT", dtfDesignId: null }) }));
+  });
+  it("rejects empty name / non-positive price", async () => {
     expect((await createProduct({ ...NEW_INPUT, name: " " })).success).toBe(false);
     expect((await createProduct({ ...NEW_INPUT, price: 0 })).success).toBe(false);
-    expect((await createProduct({ ...NEW_INPUT, variants: [] })).success).toBe(false);
   });
   it("rejects a name/slug with no slug-able characters", async () => {
     const res = await createProduct({ ...NEW_INPUT, name: "!!!", slug: "" });
@@ -205,7 +211,7 @@ describe("updateProduct", () => {
     expect(res).toEqual({ success: true, slug: "cat-white" });
   });
 
-  it("reconciles: a variant with no id (or an id absent from the existing set) is created", async () => {
+  it("reconciles: a new variant without an id is created", async () => {
     productFindUnique.mockResolvedValueOnce({ id: "cat-white" });
     productUpdate.mockResolvedValueOnce({});
     variantFindMany.mockResolvedValueOnce([{ id: "variant-existing" }]);
@@ -213,7 +219,7 @@ describe("updateProduct", () => {
 
     const res = await updateProduct("cat-white", {
       ...NEW_INPUT,
-      variants: [{ ...NEW_INPUT.variants[0], id: "unknown-id" }],
+      variants: [{ ...NEW_INPUT.variants[0] }],
     });
 
     expect(variantCreate).toHaveBeenCalledWith({
@@ -244,7 +250,7 @@ describe("updateProduct", () => {
     expect(res).toEqual({ success: true, slug: "cat-white" });
   });
 
-  it("runs inside a transaction with a raised timeout and batches image/size rebuilds into one call each", async () => {
+  it("runs inside a transaction with a raised timeout and batches images and reconciles sizes without deleting their identities", async () => {
     // Regression: the update transaction rebuilt images + size cells with two
     // writes per color, so a multi-color edit exceeded Prisma's default 5s
     // interactive-transaction limit and every save failed with the generic
@@ -267,9 +273,9 @@ describe("updateProduct", () => {
     expect(variantImageDeleteMany).toHaveBeenCalledTimes(1);
     expect(variantImageDeleteMany).toHaveBeenCalledWith({ where: { variantId: { in: ["variant-existing"] } } });
     expect(variantImageCreateMany).toHaveBeenCalledTimes(1);
-    expect(variantSizeStockDeleteMany).toHaveBeenCalledTimes(1);
-    expect(variantSizeStockDeleteMany).toHaveBeenCalledWith({ where: { variantId: { in: ["variant-existing"] } } });
-    expect(variantSizeStockCreateMany).toHaveBeenCalledTimes(1);
+    expect(variantSizeStockDeleteMany).not.toHaveBeenCalled();
+    expect(sizeUpsert).toHaveBeenCalled();
+    expect(variantSizeStockCreateMany).not.toHaveBeenCalled();
     expect(res).toEqual({ success: true, slug: "cat-white" });
   });
 

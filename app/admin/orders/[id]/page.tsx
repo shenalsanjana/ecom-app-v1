@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getOrderDetail, nextStatuses } from "@/app/_lib/admin-orders";
+import { getOrderDetail, nextStatuses, financialEditsLocked, canEdit } from "@/app/_lib/admin-orders";
 import { formatPrice } from "@/app/_lib/format";
 import { paymentStatusLabel } from "@/app/_lib/order-status";
 import { OrderActions } from "@/app/_components/admin/orders/order-actions";
@@ -10,13 +10,14 @@ import { AddressEditor } from "@/app/_components/admin/orders/address-editor";
 import { OrderNotes } from "@/app/_components/admin/orders/order-notes";
 import { PrintLabelLink } from "@/app/_components/admin/orders/print-label-link";
 import { TrackingEditor } from "@/app/_components/admin/orders/tracking-editor";
+import { PaymentReviewControl } from "@/app/_components/admin/orders/payment-review-control";
 
 export default async function AdminOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const order = await getOrderDetail(id);
   if (!order) notFound();
 
-  const canEditOrder = order.status !== "DELIVERED" && order.status !== "CANCELLED";
+  const canEditOrder = canEdit(order) && !financialEditsLocked(order);
   const next = nextStatuses(order.status)[0] ?? null;
   const curfoxEnabled = process.env.ROYAL_EXPRESS_ENABLED === "true";
   const showManualDispatch = order.status === "CONFIRMED" && (!curfoxEnabled || !!order.courierLastError);
@@ -31,16 +32,34 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         <span className="ml-auto"><PrintLabelLink waybill={order.courierWaybillNumber} /></span>
       </div>
 
+      {order.deletedAt && (
+        <p role="status" className="mb-4 rounded-md border p-3 text-sm">
+          This order is in Deleted. Its payment history and stock records are retained.
+          Restore it from the Deleted tab to return it to the normal order lists.
+        </p>
+      )}
+
+      {financialEditsLocked(order) && (
+        <p className="mb-4 text-sm text-muted-foreground">Payment has started. Items, prices and delivery charges are locked to the payment amount.</p>
+      )}
+      {order.paymentReviewRequired && (
+        <div role="alert" className="mb-4 rounded-lg border border-amber-500 bg-amber-50 p-4 text-sm text-amber-950">
+          <strong>Payment requires review.</strong> {order.paymentReviewReason}
+          {(order.status === "CANCELLED" || order.paymentStatus === "PAID") && <PaymentReviewControl orderId={order.id} />}
+        </div>
+      )}
+
       <div className="grid gap-4 md:grid-cols-3">
         <div className="space-y-4 md:col-span-2">
           <div className="rounded-lg border p-4">
+            {order.adjustments.some(a => a.promotion) && <p className="mb-3 text-sm text-muted-foreground">Items are locked to preserve this order’s promotion eligibility. Cancel and place a new order to change items.</p>}
             <OrderItemsEditor
               orderId={order.id}
-              editable={canEditOrder}
+              editable={canEditOrder && !order.adjustments.some(a => a.promotion)}
               items={order.items.map((i) => ({
                 id: i.id, name: i.name, size: i.size, color: i.color, sku: i.sku,
                 price: i.price, quantity: i.quantity,
-                sizes: i.variant ? i.variant.sizeStocks.map((s) => s.size).join(",") : (i.size ?? ""),
+                sizes: [...new Set([...(i.variant?.sizeStocks.map((s) => s.size) ?? []), ...(i.size ? [i.size] : [])])].join(","),
               }))}
             />
             <div className="mt-3 border-t pt-2 text-sm">
@@ -57,7 +76,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
           </div>
           <div className="rounded-lg border p-4">
             <OrderAdjustments orderId={order.id} editable={canEditOrder}
-              adjustments={order.adjustments.map((a) => ({ id: a.id, label: a.label, amount: a.amount }))} />
+              adjustments={order.adjustments.map((a) => ({ id: a.id, label: a.label, amount: a.amount, promotion: a.promotion }))} />
           </div>
           <div className="rounded-lg border p-4"><h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Internal notes</h4>
             <OrderNotes orderId={order.id} notes={order.notesLog} />
@@ -85,7 +104,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
               <span className="text-muted-foreground">{order.user?.email ?? order.guestEmail} · {order.customerPhone}</span></div>
           </div>
           <div className="rounded-lg border p-4"><h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Shipping address</h4>
-            <AddressEditor orderId={order.id} locked={!!order.courierBookedAt}
+            <AddressEditor orderId={order.id} locked={!!order.courierBookedAt || !canEdit(order) || financialEditsLocked(order)}
               address={{ line1: order.shippingLine1, line2: order.shippingLine2, city: order.shippingCity, country: order.shippingCountry }} />
           </div>
           <div className="rounded-lg border p-4"><h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Payment</h4>

@@ -24,6 +24,11 @@ const TARGET_DIMS: Record<ResizeTarget, { w: number; h: number }> = {
   product: { w: 1200, h: 1500 },
 };
 
+export function computeContainedDimensions(srcW: number, srcH: number, maxW: number, maxH: number): { w: number; h: number } {
+  const scale = Math.min(1, maxW / srcW, maxH / srcH);
+  return { w: Math.max(1, Math.round(srcW * scale)), h: Math.max(1, Math.round(srcH * scale)) };
+}
+
 // Vector / animated formats can't be canvas-cropped cleanly — leave them as-is.
 const PASS_THROUGH_TYPES = new Set(["image/svg+xml", "image/gif"]);
 
@@ -44,7 +49,8 @@ function encodeCanvas(canvas: HTMLCanvasElement): Promise<Blob | null> {
   });
 }
 
-// Cover-crop + downscale a raster image to the target box and re-encode to WebP.
+// Product photos retain their full composition and aspect ratio. Only category
+// artwork uses a cover crop. Both are downscaled and re-encoded to WebP.
 // Returns a new File; the original is returned untouched for pass-through types.
 export async function resizeImageFile(file: File, target: ResizeTarget): Promise<File> {
   if (!file.type.startsWith("image/") || PASS_THROUGH_TYPES.has(file.type)) {
@@ -53,17 +59,21 @@ export async function resizeImageFile(file: File, target: ResizeTarget): Promise
 
   const { w: tw, h: th } = TARGET_DIMS[target];
   const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
-  const { sx, sy, sw, sh } = computeCoverCrop(bitmap.width, bitmap.height, tw, th);
+  const product = target === "product";
+  const { w, h } = product ? computeContainedDimensions(bitmap.width, bitmap.height, tw, th) : { w: tw, h: th };
+  const { sx, sy, sw, sh } = product
+    ? { sx: 0, sy: 0, sw: bitmap.width, sh: bitmap.height }
+    : computeCoverCrop(bitmap.width, bitmap.height, tw, th);
 
   const canvas = document.createElement("canvas");
-  canvas.width = tw;
-  canvas.height = th;
+  canvas.width = w;
+  canvas.height = h;
   const ctx = canvas.getContext("2d");
   if (!ctx) {
     bitmap.close();
     return file;
   }
-  ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, tw, th);
+  ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, w, h);
   bitmap.close();
 
   const blob = await encodeCanvas(canvas);
