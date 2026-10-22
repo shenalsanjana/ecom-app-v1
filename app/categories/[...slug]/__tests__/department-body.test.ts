@@ -19,7 +19,7 @@ vi.mock("@/app/_components/analytics/track-category-view", () => ({
   TrackCategoryView: () => null,
 }));
 
-import { DepartmentBody } from "../page";
+import { DepartmentBody } from "../department-body";
 import { DesignTile } from "@/app/_components/home/design-tile";
 import { CatalogueBrowser } from "@/app/_components/catalogue/catalogue-browser";
 

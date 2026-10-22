@@ -12,7 +12,7 @@ import { finalizeFailedPayment, finalizePaidPayment } from "@/app/_lib/payments/
  * PayHere computes: md5(merchant_id + order_id + amount + currency + status_code + upper(md5(merchant_secret)))
  * We recompute using our MERCHANT_SECRET and compare.
  */
-export function verifyPayHereSignature(params: {
+function verifyPayHereSignature(params: {
   merchantId: string;
   orderId: string;
   amount: string;

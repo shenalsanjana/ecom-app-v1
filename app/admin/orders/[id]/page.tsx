@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getOrderDetail, nextStatuses, financialEditsLocked, canEdit } from "@/app/_lib/admin-orders";
 import { formatPrice } from "@/app/_lib/format";
+import { orderReference } from "@/app/_lib/order-reference";
 import { paymentStatusLabel } from "@/app/_lib/order-status";
 import { OrderActions } from "@/app/_components/admin/orders/order-actions";
 import { OrderItemsEditor } from "@/app/_components/admin/orders/order-items-editor";
@@ -26,10 +27,12 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
     <section>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <Link href="/admin/orders" className="text-sm text-muted-foreground">‹ Orders</Link>
-        <h1 className="text-xl font-bold">{order.webNumber ?? order.id}</h1>
+        <h1 className="text-xl font-bold">{orderReference(order)}</h1>
         <span className="rounded-full bg-secondary px-2 py-0.5 text-xs">{order.status}</span>
         <span className="rounded-full bg-secondary px-2 py-0.5 text-xs">{paymentStatusLabel(order.paymentStatus) ?? "—"} · {order.paymentMethod}</span>
-        <span className="ml-auto"><PrintLabelLink waybill={order.courierWaybillNumber} /></span>
+        <span className="ml-auto">{order.salesChannel === "POS"
+          ? <Link href={`/admin/pos/receipts/${order.id}`} className="rounded-md border px-3 py-2 text-sm">View / print receipt</Link>
+          : <PrintLabelLink waybill={order.courierWaybillNumber} />}</span>
       </div>
 
       {order.deletedAt && (
@@ -84,7 +87,8 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-lg border p-4"><h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Status &amp; dispatch</h4>
+          <div className="rounded-lg border p-4"><h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">{order.salesChannel === "POS" ? "Shop sale" : "Status & dispatch"}</h4>
+            {order.salesChannel === "POS" ? <p className="text-sm">Paid and collected in store.</p> : <>
             <OrderActions orderId={order.id} status={order.status} paymentMethod={order.paymentMethod}
               paymentStatus={order.paymentStatus} courierBooked={!!order.courierBookedAt} nextStatus={next}
               curfoxEnabled={curfoxEnabled} />
@@ -98,22 +102,24 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
                 <TrackingEditor orderId={order.id} mode="edit" trackingCode={order.trackingCode} />
               </div>
             )}
+            </>}
           </div>
           <div className="rounded-lg border p-4"><h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Customer</h4>
             <div className="text-sm">{order.user?.name ?? order.guestName}<br />
               <span className="text-muted-foreground">{order.user?.email ?? order.guestEmail} · {order.customerPhone}</span></div>
           </div>
-          <div className="rounded-lg border p-4"><h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Shipping address</h4>
+          {order.salesChannel !== "POS" && <div className="rounded-lg border p-4"><h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Shipping address</h4>
             <AddressEditor orderId={order.id} locked={!!order.courierBookedAt || !canEdit(order) || financialEditsLocked(order)}
               address={{ line1: order.shippingLine1, line2: order.shippingLine2, city: order.shippingCity, country: order.shippingCountry }} />
-          </div>
+          </div>}
           <div className="rounded-lg border p-4"><h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Payment</h4>
             <div className="space-y-1 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span>{order.paymentMethod}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span>{order.paymentMethodDisplay}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span>{paymentStatusLabel(order.paymentStatus) ?? "—"}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Web #</span><span>{order.webNumber ?? "—"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">{order.salesChannel === "POS" ? "Receipt #" : "Web #"}</span><span>{order.posNumber ?? order.webNumber ?? "—"}</span></div>
+              {order.posPaymentReference && <div className="flex justify-between gap-2"><span className="text-muted-foreground">Terminal reference</span><span className="break-all">{order.posPaymentReference}</span></div>}
               {order.rbNumber && <div className="flex justify-between"><span className="text-muted-foreground">RB #</span><span>{order.rbNumber}</span></div>}
-              <div className="flex justify-between"><span className="text-muted-foreground">Waybill</span><span>{order.courierWaybillNumber ?? "— (after dispatch)"}</span></div>
+              {order.salesChannel !== "POS" && <div className="flex justify-between"><span className="text-muted-foreground">Waybill</span><span>{order.courierWaybillNumber ?? "— (after dispatch)"}</span></div>}
             </div>
           </div>
         </div>

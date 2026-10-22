@@ -15,12 +15,13 @@ export default async function AdminOrdersPage({
     tab,
     q: sp.q,
     payment: sp.payment,
+    channel: sp.channel as "ONLINE" | "POS" | undefined,
     sort: sp.sort as "newest" | "oldest" | undefined,
     page,
   });
 
   const counts = Object.fromEntries(
-    await Promise.all(ORDER_TABS.map(async (t) => [t, await prisma.order.count({ where: buildOrderWhere({ tab: t }) })])),
+    await Promise.all(ORDER_TABS.map(async (t) => [t, await prisma.order.count({ where: buildOrderWhere({ tab: t, channel: sp.channel as "ONLINE" | "POS" | undefined }) })])),
   ) as Record<OrderTab, number>;
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));

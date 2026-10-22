@@ -327,6 +327,12 @@ model Order {
   paymentMethod         String
   paymentMethodDisplay  String
   paymentStatus         String?
+  salesChannel          String   @default("ONLINE") @db.VarChar(8)
+  posNumber             String?  @unique
+  cashierId             String?
+  posTendered           Float?
+  posPaymentReference   String?
+  posPayloadHash        String?  @db.VarChar(64)
   version               Int      @default(0)
   paymentStartedAt      DateTime?
   paymentReviewRequired Boolean  @default(false)
@@ -367,6 +373,7 @@ model Order {
   @@index([status, courierBookedAt])
   @@index([paymentStatus, createdAt])
   @@index([deletedAt, createdAt])
+  @@index([salesChannel, createdAt])
 }
 
 // Verified gateway outcomes and reconciliation decisions, including late payments.

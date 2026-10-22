@@ -32,6 +32,11 @@ export function OrdersToolbar({ counts }: { counts: Record<OrderTab, number> }) 
         onKeyDown={(e) => { if (e.key === "Enter") setParam("q", (e.target as HTMLInputElement).value); }}
       />
       <div className="mt-3 flex flex-wrap items-center gap-2">
+        <select value={sp.get("channel") ?? ""} onChange={e => setParam("channel", e.target.value)} className={selectCls} aria-label="Filter by sales channel">
+          <option value="">All sales channels</option>
+          <option value="ONLINE">Online orders</option>
+          <option value="POS">Shop POS sales</option>
+        </select>
         <select
           value={sp.get("payment") ?? ""}
           onChange={(e) => setParam("payment", e.target.value)}
