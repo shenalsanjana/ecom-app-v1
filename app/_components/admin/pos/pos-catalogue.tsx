@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { isUploadedImage } from "@/app/_lib/uploaded-image";
 import { useState } from "react";
 import { Package, Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -52,7 +53,7 @@ export function PosCatalogue({ options, query, locked, onAdd, onClearSearch }: {
               onClick={() => product.options.length === 1 ? onAdd(first) : setSelectedId(product.id)}
               className="flex min-w-0 items-center gap-3 rounded-xl border bg-card p-3 text-left transition hover:border-primary disabled:opacity-50">
               <span className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-secondary">
-                {first.image ? <Image src={first.image} alt="" fill sizes="64px" className="object-cover" /> : <Package className="size-6 text-muted-foreground" aria-hidden="true" />}
+                {first.image ? <Image src={first.image} alt="" fill unoptimized={isUploadedImage(first.image)} sizes="64px" className="object-cover" /> : <Package className="size-6 text-muted-foreground" aria-hidden="true" />}
               </span>
               <span className="min-w-0 flex-1 space-y-1">
                 <span className="block text-sm font-medium">{product.name}</span>
