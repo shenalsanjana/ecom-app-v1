@@ -60,10 +60,43 @@ describe.skipIf(!shared.url)("POS with PostgreSQL", () => {
   beforeEach(async () => {
     await db().plainTshirtStock.update({ where: { id: blank }, data: { quantity: 10 } });
     await db().dtfDesign.update({ where: { id: print }, data: { quantity: 10 } });
+    await db().storeSettings.upsert({ where: { id: "singleton" },
+      create: { id: "singleton", storeName: "POS Test", supportEmail: "pos@example.test", supportPhone: "0771234567", businessAddress: "Test", colomboDeliveryCost: 350, otherDeliveryCost: 450, freeDeliveryThreshold: 5000 },
+      update: { colomboDeliveryCost: 350, otherDeliveryCost: 450, freeDeliveryThreshold: 5000 } });
     product = await makeProduct();
   });
   afterAll(async () => { await db().$disconnect(); });
 
+  it.each([["Colombo", 35000], ["Kandy", 45000]] as const)("creates a COD delivery to %s with authoritative zone pricing and one stock deduction", async (city, expectedCharge) => {
+    const input = sale({ paymentMethod: "COD", tendered: 0, customerName: "Delivery Customer",
+      delivery: { carrier: "ROYAL_EXPRESS", phone: "0771234567", line1: "12 Test Road", line2: "Unit 3", city, expectedCharge } });
+    const result = await savePosSale(input, "cashier-one");
+    expect(await savePosSale(input, "cashier-one")).toEqual(result);
+    expect(await db().order.findUniqueOrThrow({ where: { id: result.orderId } })).toMatchObject({
+      status: "CONFIRMED", paymentStatus: "COD_PENDING", paymentMethod: "COD", shippingCost: expectedCharge / 100,
+      total: 3999.98 + expectedCharge / 100, subtotal: 3999.98, posTendered: null,
+      customerPhone: "0771234567", shippingLine1: "12 Test Road", shippingLine2: "Unit 3", shippingCity: city,
+      deliveryCompany: "Royal Express", courierBookedAt: null, posPaymentReference: null,
+    });
+    expect(await balances()).toEqual({ blank: 8, print: 8 });
+  });
+  it("rejects stale delivery fees without creating an order or reserving stock", async () => {
+    const input = sale({ paymentMethod: "COD", tendered: 0, customerName: "Delivery Customer",
+      delivery: { carrier: "ROYAL_EXPRESS", phone: "0771234567", line1: "12 Test Road", line2: "", city: "Kandy", expectedCharge: 35000 } });
+    await expect(savePosSale(input, "cashier-one")).rejects.toThrow("Delivery charges changed");
+    expect(await balances()).toEqual({ blank: 10, print: 10 });
+    expect(await db().order.count({ where: { idempotencyKey: `pos:${input.operationKey}` } })).toBe(0);
+  });
+  it("records a fully paid bank delivery with its reference and shared free delivery policy", async () => {
+    const input = sale({ paymentMethod: "BANK_TRANSFER", tendered: 599997, paymentReference: "BANK-123", customerName: "Bank Customer",
+      items: [{ sizeStockId: product.variants[0].sizeStocks[0].id, quantity: 3, expectedPrice: 199999 }],
+      delivery: { carrier: "ROYAL_EXPRESS", phone: "0771234567", line1: "12 Test Road", line2: "", city: "Kandy", expectedCharge: 0 } });
+    const result = await savePosSale(input, "cashier-one");
+    expect(await db().order.findUniqueOrThrow({ where: { id: result.orderId } })).toMatchObject({
+      paymentMethod: "BANK_TRANSFER", paymentStatus: "PAID", status: "CONFIRMED", shippingCost: 0,
+      total: 5999.97, posPaymentReference: "BANK-123", paymentStartedAt: null,
+    });
+  });
   it("lists live prices, exact SKUs and the limiting stock pool", async () => {
     await db().dtfDesign.update({ where: { id: print }, data: { quantity: 3 } });
     const products = await getPosProducts(product.variants[0].sizeStocks[0].sku);

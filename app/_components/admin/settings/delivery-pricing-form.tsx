@@ -7,7 +7,7 @@ type Pricing = { colomboDeliveryCost: number; otherDeliveryCost: number; freeDel
 
 const FIELDS: { name: keyof Pricing; label: string }[] = [
   { name: "colomboDeliveryCost", label: "Colombo delivery (Rs.)" },
-  { name: "otherDeliveryCost", label: "Other zone delivery (Rs.)" },
+  { name: "otherDeliveryCost", label: "Outside Colombo delivery (Rs.)" },
   { name: "freeDeliveryThreshold", label: "Free delivery over (Rs.)" },
 ];
 

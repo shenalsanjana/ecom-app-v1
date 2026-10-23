@@ -33,7 +33,7 @@ export function OrderActions(p: Props) {
       {p.status === "CONFIRMED" && !p.courierBooked && p.curfoxEnabled && (
         <button disabled={pending} onClick={() => run("dispatch", () => bookCourier(p.orderId))}
           className="flex w-full items-center justify-center gap-1 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
-          {runningLabel === "dispatch" && <Spinner />} 📦 Book courier (Curfox)
+          {runningLabel === "dispatch" && <Spinner />} 📦 Book Royal Express Delivery
         </button>
       )}
       {p.nextStatus && (

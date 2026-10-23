@@ -78,6 +78,14 @@ beforeEach(() => {
 });
 
 describe("bookCourierAndNotify — happy path", () => {
+  it.each(["COD", "BANK_TRANSFER"] as const)("books a shop %s delivery with its POS reference and correct collection amount", async paymentMethod => {
+    vi.mocked(createCurfoxOrder).mockResolvedValueOnce("ROYAL-POS-123");
+    const order: OrderDetails = { ...ORDER, posNumber: "POS9001", webNumber: null,
+      paymentMethod, paymentStatus: paymentMethod === "COD" ? "COD_PENDING" : "PAID", total: 2850, shipping: 450 };
+    expect(await bookCourierAndNotify({ order })).toBe("ROYAL-POS-123");
+    const payload = vi.mocked(createCurfoxOrder).mock.calls[0][0].order_data[0];
+    expect(payload).toMatchObject({ order_no: "POS9001", customer_phone: "0770000000", cod: paymentMethod === "COD" ? 2850 : 0 });
+  });
   it("sends direct city in the envelope, captures waybill, sends dispatch email without PDF", async () => {
     vi.mocked(createCurfoxOrder).mockResolvedValueOnce("RA03870247");
     vi.mocked(sendDispatchNotificationEmail).mockResolvedValueOnce(undefined);

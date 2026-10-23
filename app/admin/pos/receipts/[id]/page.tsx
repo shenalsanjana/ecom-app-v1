@@ -1,3 +1,4 @@
+import { paymentStatusLabel } from "@/app/_lib/order-status";
 import { POS_PAYMENT_LABELS } from "@/app/_lib/pos";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -14,6 +15,8 @@ export default async function PosReceiptPage({ params }: { params: Promise<{ id:
   const order = await prisma.order.findUnique({ where: { id }, include: { items: true } });
   if (!order || order.salesChannel !== "POS") notFound();
   const store = await getStoreSettings();
+  const delivery = !!order.shippingCity;
+  const codDue = order.paymentMethod === "COD" && order.paymentStatus === "COD_PENDING" && order.status !== "CANCELLED";
 
   return (
     <section>
@@ -27,11 +30,12 @@ export default async function PosReceiptPage({ params }: { params: Promise<{ id:
           <h1 className="text-lg font-bold">{store.storeName}</h1>
           <p className="mt-1 whitespace-pre-line text-xs">{store.businessAddress}</p>
           <p className="text-xs">{store.supportPhone}</p>
-          <h2 className="mt-4 font-bold">SALES RECEIPT</h2>
+          <h2 className="mt-4 font-bold">{order.paymentMethod === "COD" ? "ORDER RECEIPT" : "SALES RECEIPT"}</h2>
           <p>{order.posNumber}</p>
           <p className="mt-1 text-xs">{order.createdAt.toLocaleString("en-GB", { timeZone: "Asia/Colombo" })} SLT</p>
         </div>
         <p className="my-3 text-xs">Customer: {order.guestName}</p>
+        {delivery && <div className="mb-3 text-xs"><p>{order.customerPhone}</p><p>{[order.shippingLine1, order.shippingLine2, order.shippingCity, order.shippingCountry].filter(Boolean).join(", ")}</p><p>Delivery: {order.deliveryCompany ?? "Royal Express"} · {order.status}</p>{order.trackingCode && <p>Tracking: {order.trackingCode}</p>}</div>}
         <ul className="space-y-3 border-y border-dashed border-gray-400 py-3">
           {order.items.map(item => <li key={item.id}>
             <p className="font-semibold">{item.name}</p>
@@ -40,15 +44,18 @@ export default async function PosReceiptPage({ params }: { params: Promise<{ id:
           </li>)}
         </ul>
         <div className="space-y-2 border-b border-dashed border-gray-400 py-3">
+          {delivery && <><div className="flex justify-between"><span>Subtotal</span><span>{formatPrice(order.subtotal)}</span></div><div className="flex justify-between"><span>Delivery charge</span><span>{formatPrice(order.shippingCost)}</span></div></>}
           <div className="flex justify-between text-base font-bold"><span>TOTAL</span><span>{formatPrice(order.total)}</span></div>
           <div className="flex justify-between"><span>Payment</span><span>{POS_PAYMENT_LABELS[order.paymentMethod as keyof typeof POS_PAYMENT_LABELS] ?? order.paymentMethodDisplay}</span></div>
+          <div className="flex justify-between"><span>Payment status</span><span>{paymentStatusLabel(order.paymentStatus) ?? order.paymentStatus}</span></div>
+          {codDue && <p className="font-bold">Amount due on delivery: {formatPrice(order.total)}</p>}
           {order.paymentMethod === "CASH" && <>
             <div className="flex justify-between"><span>Cash received</span><span>{formatPrice(order.posTendered ?? order.total)}</span></div>
             <div className="flex justify-between"><span>Change</span><span>{formatPrice(Math.max(0, Math.round(((order.posTendered ?? order.total) - order.total) * 100) / 100))}</span></div>
           </>}
           {order.posPaymentReference && <p className="break-all text-xs">{order.paymentMethod === "CARD" ? "Terminal reference" : "Payment reference"}: {order.posPaymentReference}</p>}
         </div>
-        <p className="mt-4 text-center text-xs">Paid · Collected in store</p>
+        <p className="mt-4 text-center text-xs">{order.status === "CANCELLED" ? "Order cancelled" : delivery ? (codDue ? "Payment to be collected on delivery" : `Delivery order · ${order.status}`) : "Paid · Collected in store"}</p>
         <p className="mt-2 text-center text-xs">Thank you for shopping with us!</p>
       </article>
     </section>

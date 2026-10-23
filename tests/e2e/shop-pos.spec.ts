@@ -31,6 +31,9 @@ async function scan(page: Page) {
 }
 
 test.beforeAll(async () => {
+  await db.storeSettings.upsert({ where: { id: "singleton" },
+    create: { id: "singleton", storeName: "POS Test", supportEmail: "pos@example.test", supportPhone: "0771234567", businessAddress: "Test", colomboDeliveryCost: 350, otherDeliveryCost: 450, freeDeliveryThreshold: 5000 },
+    update: { colomboDeliveryCost: 350, otherDeliveryCost: 450, freeDeliveryThreshold: 5000 } });
   adminId = (await db.user.create({ data: { name: "POS browser cashier", email, role: "ADMIN", passwordHash: await bcrypt.hash(password, 10) } })).id;
   await db.department.create({ data: { slug: prefix, name: prefix, navLabel: prefix, tileName: prefix, hex: "#fff" } });
   await db.design.create({ data: { slug: prefix, name: prefix, departmentSlug: prefix, hex: "#fff" } });
@@ -147,7 +150,7 @@ test("requires card approval and prevents cash underpayment", async ({ page }) =
   expect(order).toMatchObject({ total: 1999.99, paymentMethod: "CARD", paymentStatus: "PAID", shippingCost: 0 });
 });
 
-for (const [paymentMethod, label] of [["KOKO", "Koko"], ["MINTPAY", "Mintpay"]] as const) {
+for (const [paymentMethod, label] of [["KOKO", "Koko"], ["MINTPAY", "Mintpay"], ["BANK_TRANSFER", "Bank Transfer"]] as const) {
   test(`records approved ${label} payments and prints the provider on receipts`, async ({ page, context }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await login(page);
@@ -171,6 +174,58 @@ for (const [paymentMethod, label] of [["KOKO", "Koko"], ["MINTPAY", "Mintpay"]] 
     await expect(receipt.locator(".pos-receipt")).toContainText(`Payment reference: ${reference}`);
   });
 }
+
+test("creates COD delivery, edits contact/address, dispatches with Royal Express and records collection", async ({ page, context }) => {
+  test.setTimeout(150000);
+  page.on("dialog", dialog => dialog.accept());
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page);
+  await scan(page);
+  await page.getByRole("radio", { name: "Cash on Delivery (COD)", exact: true }).check();
+  await expect(page.getByRole("combobox", { name: "Fulfilment", exact: true })).toHaveValue("ROYAL_EXPRESS");
+  await expect(page.getByRole("button", { name: /Complete sale/ })).toBeDisabled();
+  await page.getByLabel("Customer name (required)", { exact: true }).fill("COD Test Customer");
+  await page.getByLabel("Contact number", { exact: true }).fill("0771234567");
+  await page.getByLabel("Delivery address", { exact: true }).fill("12 Test Road");
+  await page.getByRole("combobox", { name: /^Delivery city/ }).selectOption("Colombo");
+  await expect(page.getByRole("button", { name: /Complete sale/ })).toContainText("2,349.99");
+  await page.getByRole("combobox", { name: /^Delivery city/ }).selectOption("Kandy");
+  await expect(page.getByRole("button", { name: /Complete sale/ })).toContainText("2,449.99");
+  await page.reload();
+  await expect(page.getByLabel("Contact number", { exact: true })).toHaveValue("0771234567");
+  await expect(page.getByLabel("Delivery address", { exact: true })).toHaveValue("12 Test Road");
+  await expect(page.getByRole("combobox", { name: /^Delivery city/ })).toHaveValue("Kandy");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole("button", { name: /Complete sale/ }).click();
+  await expect(page.getByRole("status")).toContainText(/Sale POS\d+ completed/);
+  const order = await db.order.findFirstOrThrow({ where: { cashierId: adminId, paymentMethod: "COD" }, orderBy: { createdAt: "desc" } });
+  expect(order).toMatchObject({ paymentStatus: "COD_PENDING", status: "CONFIRMED", total: 2449.99, shippingCost: 450, deliveryCompany: "Royal Express" });
+  const popup = context.waitForEvent("page");
+  await page.getByRole("link", { name: "View / print receipt" }).click();
+  const receipt = await popup;
+  await expect(receipt.getByRole("heading", { name: "ORDER RECEIPT" })).toBeVisible();
+  await expect(receipt.locator(".pos-receipt")).toContainText("Amount due on delivery");
+  await expect(receipt.locator(".pos-receipt")).not.toContainText("Paid · Collected in store");
+  await receipt.close();
+  await page.getByRole("link", { name: "Manage order & delivery" }).click();
+  await expect(page.getByText("Delivery company: Royal Express", { exact: true })).toBeVisible();
+  const shippingDetails = page.getByRole("heading", { name: "Shipping address", exact: true }).locator("..");
+  await shippingDetails.getByRole("button", { name: "✎ Edit", exact: true }).click();
+  await shippingDetails.getByPlaceholder("line1", { exact: true }).fill("34 Updated Street");
+  await shippingDetails.getByLabel("Contact number", { exact: true }).fill("0777654321");
+  await shippingDetails.getByRole("button", { name: "Save", exact: true }).click();
+  await expect.poll(async () => (await db.order.findUniqueOrThrow({ where: { id: order.id } })).customerPhone).toBe("0777654321");
+  await page.getByLabel("Royal Express tracking number").fill("ROYAL-POS-123");
+  await page.getByRole("button", { name: /Mark dispatched \(Royal Express\)/ }).click();
+  await expect(page.getByLabel("Update tracking number")).toBeVisible();
+  await page.getByLabel("Update tracking number").fill("ROYAL-POS-456");
+  await page.getByRole("button", { name: "Save tracking number", exact: true }).click();
+  await expect.poll(async () => (await db.order.findUniqueOrThrow({ where: { id: order.id } })).trackingCode).toBe("ROYAL-POS-456");
+  await page.getByRole("button", { name: "Mark delivered", exact: true }).click();
+  await expect.poll(async () => (await db.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe("DELIVERED");
+  await page.getByRole("button", { name: "Mark COD collected", exact: true }).click();
+  await expect.poll(async () => (await db.order.findUniqueOrThrow({ where: { id: order.id } })).paymentStatus).toBe("COD_COLLECTED");
+});
 
 test("recovers a committed sale after its response is lost without deducting stock twice", async ({ page }) => {
   await login(page);
