@@ -1,3 +1,4 @@
+import { catalogueByDistrict } from "@/app/_lib/courier/catalogue";
 import { getDeliveryConfig } from "@/app/_lib/store-settings";
 import Link from "next/link";
 import { requireAdmin } from "@/app/_lib/admin-auth";
@@ -17,7 +18,7 @@ export default async function PosPage() {
         </div>
         <Link href="/admin/orders?channel=POS" className="rounded-md border px-3 py-2 text-sm hover:bg-secondary">Shop sales & receipts</Link>
       </div>
-      <PosRegister initialProducts={products} initialDeliveryConfig={deliveryConfig} />
+      <PosRegister initialProducts={products} initialDeliveryConfig={deliveryConfig} cityGroups={catalogueByDistrict()} />
     </section>
   );
 }

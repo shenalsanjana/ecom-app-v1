@@ -175,6 +175,30 @@ for (const [paymentMethod, label] of [["KOKO", "Koko"], ["MINTPAY", "Mintpay"], 
   });
 }
 
+test("offers the complete Royal Express catalogue without duplicates and searches cities or districts", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page);
+  await page.getByRole("radio", { name: "Cash on Delivery (COD)", exact: true }).check();
+  const city = page.getByRole("combobox", { name: "Delivery city", exact: true });
+  await city.click();
+  const options = page.getByRole("listbox").getByRole("option");
+  await expect(options).toHaveCount(2028);
+  const names = await options.allTextContents();
+  expect(new Set(names.map(name => name.trim().toLowerCase())).size).toBe(names.length);
+  await city.fill("Soranathota");
+  await expect(options).toHaveCount(1);
+  await city.press("ArrowDown");
+  await city.press("Enter");
+  await expect(city).toHaveValue("Soranathota");
+  await page.reload();
+  await expect(city).toHaveValue("Soranathota");
+  await city.fill("Badulla");
+  await expect(page.getByRole("option", { name: "Soranathota", exact: true })).toHaveCount(1);
+  await city.press("Escape");
+  await expect(city).toHaveValue("Soranathota");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
 test("creates COD delivery, edits contact/address, dispatches with Royal Express and records collection", async ({ page, context }) => {
   test.setTimeout(150000);
   page.on("dialog", dialog => dialog.accept());
@@ -187,19 +211,21 @@ test("creates COD delivery, edits contact/address, dispatches with Royal Express
   await page.getByLabel("Customer name (required)", { exact: true }).fill("COD Test Customer");
   await page.getByLabel("Contact number", { exact: true }).fill("0771234567");
   await page.getByLabel("Delivery address", { exact: true }).fill("12 Test Road");
-  await page.getByRole("combobox", { name: /^Delivery city/ }).selectOption("Colombo");
+  await page.getByRole("combobox", { name: "Delivery city", exact: true }).fill("Colombo 01");
+  await page.getByRole("option", { name: "Colombo 01", exact: true }).click();
   await expect(page.getByRole("button", { name: /Complete sale/ })).toContainText("2,349.99");
-  await page.getByRole("combobox", { name: /^Delivery city/ }).selectOption("Kandy");
+  await page.getByRole("combobox", { name: "Delivery city", exact: true }).fill("Soranathota");
+  await page.getByRole("option", { name: "Soranathota", exact: true }).click();
   await expect(page.getByRole("button", { name: /Complete sale/ })).toContainText("2,449.99");
   await page.reload();
   await expect(page.getByLabel("Contact number", { exact: true })).toHaveValue("0771234567");
   await expect(page.getByLabel("Delivery address", { exact: true })).toHaveValue("12 Test Road");
-  await expect(page.getByRole("combobox", { name: /^Delivery city/ })).toHaveValue("Kandy");
+  await expect(page.getByRole("combobox", { name: /^Delivery city/ })).toHaveValue("Soranathota");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole("button", { name: /Complete sale/ }).click();
   await expect(page.getByRole("status")).toContainText(/Sale POS\d+ completed/);
   const order = await db.order.findFirstOrThrow({ where: { cashierId: adminId, paymentMethod: "COD" }, orderBy: { createdAt: "desc" } });
-  expect(order).toMatchObject({ paymentStatus: "COD_PENDING", status: "CONFIRMED", total: 2449.99, shippingCost: 450, deliveryCompany: "Royal Express" });
+  expect(order).toMatchObject({ paymentStatus: "COD_PENDING", status: "CONFIRMED", total: 2449.99, shippingCost: 450, shippingCity: "Soranathota", deliveryCompany: "Royal Express" });
   const popup = context.waitForEvent("page");
   await page.getByRole("link", { name: "View / print receipt" }).click();
   const receipt = await popup;
