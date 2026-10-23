@@ -1,3 +1,4 @@
+import { hasPosPriceAdjustments } from "@/app/_lib/pos-adjustments";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getOrderDetail, nextStatuses, financialEditsLocked, canEdit } from "@/app/_lib/admin-orders";
@@ -18,6 +19,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
   const order = await getOrderDetail(id);
   if (!order) notFound();
 
+  const fixedPosPricing = hasPosPriceAdjustments(order);
   const collectionSale = order.salesChannel === "POS" && !order.shippingCity;
   const canEditOrder = canEdit(order) && !financialEditsLocked(order);
   const next = nextStatuses(order.status)[0] ?? null;
@@ -57,9 +59,10 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         <div className="space-y-4 md:col-span-2">
           <div className="rounded-lg border p-4">
             {order.adjustments.some(a => a.promotion) && <p className="mb-3 text-sm text-muted-foreground">Items are locked to preserve this order’s promotion eligibility. Cancel and place a new order to change items.</p>}
+            {fixedPosPricing && <p className="mb-3 text-sm text-muted-foreground">POS costs and discounts are fixed to this sale. Items and pricing cannot be edited here.</p>}
             <OrderItemsEditor
               orderId={order.id}
-              editable={canEditOrder && !order.adjustments.some(a => a.promotion)}
+              editable={canEditOrder && !fixedPosPricing && !order.adjustments.some(a => a.promotion)}
               items={order.items.map((i) => ({
                 id: i.id, name: i.name, size: i.size, color: i.color, sku: i.sku,
                 price: i.price, quantity: i.quantity,
@@ -79,7 +82,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
             </div>
           </div>
           <div className="rounded-lg border p-4">
-            <OrderAdjustments orderId={order.id} editable={canEditOrder}
+            <OrderAdjustments orderId={order.id} editable={canEditOrder && !fixedPosPricing}
               adjustments={order.adjustments.map((a) => ({ id: a.id, label: a.label, amount: a.amount, promotion: a.promotion }))} />
           </div>
           <div className="rounded-lg border p-4"><h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Internal notes</h4>

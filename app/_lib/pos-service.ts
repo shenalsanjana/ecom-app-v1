@@ -1,3 +1,4 @@
+import { calculatePosPricing } from "./pos-adjustments";
 import { calculateDelivery, DEFAULT_DELIVERY_CONFIG } from "./checkout-config";
 import { zoneForCity } from "./delivery-zones";
 import { DELIVERY_COMPANY_NAME } from "./carrier";
@@ -8,7 +9,7 @@ import { acquireItemPools } from "@/app/_lib/inventory-pools";
 import { assertProductsPublished } from "@/app/_lib/product-publication";
 import { setStockMovementContext } from "@/app/_lib/stock-movements";
 import { effectivePrintId, requiresPrint } from "@/app/_lib/stock-policy";
-import { POS_PAYMENT_LABELS, PosError, posChange, posTotal, type PosProduct, type PosSale } from "@/app/_lib/pos";
+import { POS_PAYMENT_LABELS, PosError, posChange, type PosProduct, type PosSale } from "@/app/_lib/pos";
 
 export async function getPosProducts(query = ""): Promise<PosProduct[]> {
   const q = query.trim().slice(0, 120);
@@ -104,7 +105,14 @@ export async function savePosSale(sale: PosSale, cashierId: string) {
             plainTshirtStockId: blank.id, dtfDesignId: effectivePrintId(product), stockMode: product.stockMode,
           };
         });
-        const subtotal = posTotal(lines.map(line => ({ price: toCents(line.price), quantity: line.quantity })));
+        let pricing: ReturnType<typeof calculatePosPricing>;
+        try {
+          pricing = calculatePosPricing(items.map((item, index) => {
+            const line = lines[index];
+            return { sizeStockId: item.sizeStockId, price: toCents(line.price), quantity: line.quantity, adjustments: item.adjustments };
+          }), sale.adjustments);
+        } catch (error) { throw new PosError(error instanceof Error ? error.message : "Check the additional costs and discounts."); }
+        const subtotal = pricing.subtotal;
         let shippingCents = 0;
         if (sale.delivery) {
           const settings = await tx.storeSettings.findUnique({ where: { id: "singleton" } });
@@ -112,7 +120,8 @@ export async function savePosSale(sale: PosSale, cashierId: string) {
           shippingCents = toCents(calculateDelivery(fromCents(subtotal), zoneForCity(sale.delivery.city), pricing, sale.paymentMethod));
           if (shippingCents !== sale.delivery.expectedCharge) throw new PosError("Delivery charges changed. Refresh products to see the updated total, then confirm the order again.");
         }
-        const total = subtotal + shippingCents;
+        const total = pricing.merchandiseTotal + shippingCents;
+        if (total === 0 && sale.paymentMethod !== "CASH") throw new PosError("Use cash with zero received for a fully discounted sale.");
         posChange(total, sale.paymentMethod === "CASH" ? sale.tendered : total);
         if (sale.paymentMethod !== "CASH" && sale.paymentMethod !== "COD" && sale.tendered !== total) {
           throw new PosError("The payment amount must match the sale total.");
@@ -139,6 +148,10 @@ export async function savePosSale(sale: PosSale, cashierId: string) {
           paymentStatus: sale.paymentMethod === "COD" ? "COD_PENDING" : "PAID", status: sale.delivery ? "CONFIRMED" : "DELIVERED", posTendered: sale.paymentMethod === "COD" ? null : fromCents(sale.tendered),
           posPaymentReference: sale.paymentMethod !== "CASH" && sale.paymentMethod !== "COD" ? sale.paymentReference : null,
           items: { create: lines },
+          adjustments: { create: pricing.adjustments.map(entry => {
+            const cell = entry.sizeStockId ? cells.find(cell => cell.id === entry.sizeStockId) : undefined;
+            return { label: cell ? entry.label.replace("POS · Item ·", `POS · Item ${cell.variant.product.name} [${cell.sku}] ·`) : entry.label, amount: fromCents(entry.amount) };
+          }) },
         } });
         return { orderId, posNumber };
       }, { isolationLevel: "Serializable" });
