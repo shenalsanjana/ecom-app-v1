@@ -34,6 +34,16 @@ describe("Curfox catalogue", () => {
     }
   });
 
+
+  it("exposes every supported city once for checkout and Shop POS", () => {
+    const cities = catalogueByDistrict().flatMap(group => group.cities);
+    const keys = cities.map(normalizeCityName);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(new Set(keys)).toEqual(new Set(CURFOX_CATALOGUE.map(city => normalizeCityName(city.name))));
+    expect(cities.filter(city => city === "Soranathota")).toHaveLength(1);
+    for (const city of cities) expect(findCatalogueCity(city)).toBeDefined();
+  });
+
   it("groups cities by district, sorted, with no empty groups", () => {
     const groups = catalogueByDistrict();
     expect(groups.length).toBe(15);

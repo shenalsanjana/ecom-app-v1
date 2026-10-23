@@ -3,8 +3,9 @@
 import { calculatePosPricing, emptyPosAdjustments, parsePosAdjustments, restorePosAdjustments } from "@/app/_lib/pos-adjustments";
 import { PosAdjustmentFields } from "./pos-adjustment-fields";
 import { calculateDelivery, type DeliveryConfig } from "@/app/_lib/checkout-config";
-import { DELIVERY_CITIES, zoneForCity } from "@/app/_lib/delivery-zones";
+import { zoneForCity } from "@/app/_lib/delivery-zones";
 import Link from "next/link";
+import { CityCombobox, type CityGroup } from "@/components/ui/city-combobox";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Search, ShoppingBasket, Plus, Minus, Trash2, ReceiptText } from "lucide-react";
 import { completePosSale, searchPosProducts, getPosDeliveryConfig } from "@/app/admin/pos/actions";
@@ -43,12 +44,14 @@ function readDraft() {
   } catch { return fresh; }
 }
 
-export function PosRegister({ initialProducts, initialDeliveryConfig }: { initialProducts: PosProduct[]; initialDeliveryConfig: DeliveryConfig }) {
+type RegisterProps = { initialProducts: PosProduct[]; initialDeliveryConfig: DeliveryConfig; cityGroups: CityGroup[] };
+
+export function PosRegister({ initialProducts, initialDeliveryConfig, cityGroups }: RegisterProps) {
   const hydrated = useSyncExternalStore(subscribe, () => true, () => false);
-  return hydrated ? <Register initialProducts={initialProducts} initialDeliveryConfig={initialDeliveryConfig} /> : <p className="text-sm text-muted-foreground">Loading register…</p>;
+  return hydrated ? <Register initialProducts={initialProducts} initialDeliveryConfig={initialDeliveryConfig} cityGroups={cityGroups} /> : <p className="text-sm text-muted-foreground">Loading register…</p>;
 }
 
-function Register({ initialProducts, initialDeliveryConfig }: { initialProducts: PosProduct[]; initialDeliveryConfig: DeliveryConfig }) {
+function Register({ initialProducts, initialDeliveryConfig, cityGroups }: RegisterProps) {
   const [draft] = useState(readDraft);
   const [products, setProducts] = useState(initialProducts);
   const [query, setQuery] = useState("");
@@ -249,7 +252,10 @@ function Register({ initialProducts, initialDeliveryConfig }: { initialProducts:
               <label className="block space-y-1 text-sm"><span>Contact number</span><input type="tel" value={phone} onChange={e => setPhone(e.target.value)} disabled={locked} maxLength={30} placeholder="0771234567" className={field} /></label>
               <label className="block space-y-1 text-sm"><span>Delivery address</span><input value={line1} onChange={e => setLine1(e.target.value)} disabled={locked} maxLength={200} placeholder="House / building number and street" className={field} /></label>
               <label className="block space-y-1 text-sm"><span>Address line 2 (optional)</span><input value={line2} onChange={e => setLine2(e.target.value)} disabled={locked} maxLength={200} className={field} /></label>
-              <label className="block space-y-1 text-sm"><span>Delivery city</span><select value={city} onChange={e => setCity(e.target.value)} disabled={locked} className={field}><option value="">Select city</option>{DELIVERY_CITIES.filter(c => c.name !== "Mt. Lavinia").map(c => <option key={c.name} value={c.name}>{c.name}</option>)}</select></label>
+              <div className="space-y-1 text-sm">
+                <label htmlFor="pos-delivery-city">Delivery city</label>
+                <CityCombobox id="pos-delivery-city" value={city} onChange={setCity} groups={cityGroups} disabled={locked} placeholder="Search city or district…" />
+              </div>
               <p className="text-xs text-muted-foreground">Sri Lanka · Rates and free delivery follow store delivery settings.</p>
             </div>}
             <fieldset disabled={locked}>

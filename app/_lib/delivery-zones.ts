@@ -1,6 +1,6 @@
 // app/_lib/delivery-zones.ts
-// Single source of truth for the customer-facing city dropdown at checkout
-// and for the zone classification that drives delivery pricing.
+// City-to-zone classification for delivery pricing. Supported delivery choices
+// in online checkout and Shop POS come from courier/catalogue.ts.
 //
 // Independent of app/_lib/courier/* so that a future courier swap does not
 // have to disturb pricing logic. The initial catalogue is seeded from the
