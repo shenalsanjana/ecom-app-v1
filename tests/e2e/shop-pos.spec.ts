@@ -77,6 +77,27 @@ test("blocks anonymous access to the register and receipts", async ({ page }) =>
   await expect(page).toHaveURL(/\/login\?callbackUrl=/);
 });
 
+test("loads a product photo uploaded after startup directly in POS", async ({ page, context }) => {
+  const imagePath = `/uploads/${prefix}-runtime.png`;
+  const variant = await db.productVariant.findFirstOrThrow({ where: { productId: `${prefix}-bag` } });
+  const image = await db.variantImage.create({ data: { variantId: variant.id, role: "CARD", sortOrder: -1, url: imagePath } });
+  try {
+    // nginx serves runtime uploads directly; the standalone optimizer has no
+    // startup entry for this newly added file. Intercept only the raw URL.
+    await context.route(`**${imagePath}`, route => route.fulfill({ contentType: "image/png", body: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVR4nGOYFmD0H4QZYAwASRQIXTw1Kr0AAAAASUVORK5CYII=", "base64") }));
+    await login(page);
+    const photo = page.getByRole("button", { name: "Add POS Browser Bag", exact: true }).locator("img");
+    await expect(photo).toHaveAttribute("src", imagePath);
+    await expect.poll(() => photo.evaluate(node => {
+      const img = node as HTMLImageElement;
+      return img.complete && img.naturalWidth > 0 && new URL(img.currentSrc).pathname.startsWith("/uploads/");
+    })).toBe(true);
+    await page.reload();
+    await expect.poll(() => photo.evaluate(node => (node as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  } finally { await db.variantImage.delete({ where: { id: image.id } }); }
+});
+
 test("groups products by category and chooses colour and size without duplicate cards", async ({ page }) => {
   await login(page);
   const categories = page.getByRole("navigation", { name: "Product categories" });
