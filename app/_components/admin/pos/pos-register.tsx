@@ -1,5 +1,7 @@
 "use client";
 
+import { calculatePosPricing, emptyPosAdjustments, parsePosAdjustments, restorePosAdjustments } from "@/app/_lib/pos-adjustments";
+import { PosAdjustmentFields } from "./pos-adjustment-fields";
 import { calculateDelivery, type DeliveryConfig } from "@/app/_lib/checkout-config";
 import { DELIVERY_CITIES, zoneForCity } from "@/app/_lib/delivery-zones";
 import Link from "next/link";
@@ -17,6 +19,7 @@ const subscribe = () => () => {};
 
 function readDraft() {
   const fresh = { cart: [] as PosCartLine[], method: "CASH" as PosPaymentMethod, tendered: "", reference: "", customer: "",
+    billAdjustments: emptyPosAdjustments(),
     shipping: false, phone: "", line1: "", line2: "", city: "",
     operationKey: crypto.randomUUID() as string, pendingSale: null as PosSaleInput | null };
   try {
@@ -25,7 +28,7 @@ function readDraft() {
       line && [line.sizeStockId, line.name, line.sku, line.color, line.size].every(value => typeof value === "string") &&
       Number.isSafeInteger(line.price) && line.price > 0 && Number.isInteger(line.quantity) && line.quantity > 0 && line.quantity <= 99)) return fresh;
     const pending = PosSaleSchema.safeParse(stored.pendingSale);
-    return { cart: stored.cart as PosCartLine[], method: PosPaymentMethodSchema.catch("CASH").parse(stored.method),
+    return { cart: (stored.cart as PosCartLine[]).map(line => ({ ...line, adjustments: restorePosAdjustments(line.adjustments) })), billAdjustments: restorePosAdjustments(stored.billAdjustments), method: PosPaymentMethodSchema.catch("CASH").parse(stored.method),
       tendered: typeof stored.tendered === "string" ? stored.tendered : "",
       reference: typeof stored.reference === "string" ? stored.reference : "",
       customer: typeof stored.customer === "string" ? stored.customer : "",
@@ -51,6 +54,7 @@ function Register({ initialProducts, initialDeliveryConfig }: { initialProducts:
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [cart, setCart] = useState(draft.cart);
+  const [billAdjustments, setBillAdjustments] = useState(draft.billAdjustments);
   const [method, setMethod] = useState(draft.method);
   const [tendered, setTendered] = useState(draft.tendered);
   const [reference, setReference] = useState(draft.reference);
@@ -71,26 +75,35 @@ function Register({ initialProducts, initialDeliveryConfig }: { initialProducts:
   const submitting = useRef(false);
   const pendingIntent = useRef(draft.pendingSale);
   const locked = saving || !!pendingSale;
-  const subtotal = posTotal(cart);
+  const preview = (() => {
+    try {
+      const items = cart.map(line => ({ sizeStockId: line.sizeStockId, price: line.price, quantity: line.quantity,
+        adjustments: parsePosAdjustments(line.adjustments ?? emptyPosAdjustments()) }));
+      const adjustments = parsePosAdjustments(billAdjustments);
+      return { items, adjustments, pricing: calculatePosPricing(items, adjustments), error: "" };
+    } catch (error) { return { items: [], adjustments: undefined, pricing: undefined, error: error instanceof Error ? error.message : "Check costs and discounts." }; }
+  })();
+  const subtotal = preview.pricing?.subtotal ?? posTotal(cart);
   const shippingCents = shipping ? Math.round(calculateDelivery(subtotal / 100, zoneForCity(city), deliveryConfig, method) * 100) : 0;
-  const total = subtotal + shippingCents;
+  const total = (preview.pricing?.merchandiseTotal ?? subtotal) + shippingCents;
   const received = tendered.trim() ? Number(tendered) * 100 : NaN;
   const receivedCents = Math.round(received);
   const validCash = Number.isFinite(received) && Math.abs(received - receivedCents) < 0.00001 && receivedCents >= total && receivedCents <= POS_MAX_CENTS;
   const currentSale: PosSaleInput = {
-    operationKey, items: cart.map(line => ({ sizeStockId: line.sizeStockId, quantity: line.quantity, expectedPrice: line.price })),
+    operationKey, items: preview.items.map(line => ({ sizeStockId: line.sizeStockId, quantity: line.quantity, expectedPrice: line.price, ...(line.adjustments ? { adjustments: line.adjustments } : {}) })),
+    ...(preview.adjustments ? { adjustments: preview.adjustments } : {}),
     paymentMethod: method, tendered: method === "CASH" ? receivedCents : method === "COD" ? 0 : total,
     paymentReference: reference, customerName: customer,
     ...(shipping ? { delivery: { carrier: "ROYAL_EXPRESS", phone, line1, line2, city, expectedCharge: shippingCents } } : {}),
   };
-  const canSubmit = PosSaleSchema.safeParse(currentSale).success && cart.length > 0 && total > 0 && total <= POS_MAX_CENTS &&
+  const canSubmit = !preview.error && PosSaleSchema.safeParse(currentSale).success && cart.length > 0 && total >= 0 && (total > 0 || method === "CASH") && total <= POS_MAX_CENTS &&
     (method === "COD" ? shipping : method !== "CASH" ? !!reference.trim() : validCash);
 
   useEffect(() => {
     try {
-      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ cart, method, tendered, reference, customer, shipping, phone, line1, line2, city, operationKey, pendingSale }));
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ cart, billAdjustments, method, tendered, reference, customer, shipping, phone, line1, line2, city, operationKey, pendingSale }));
     } catch { /* The register still works when browser storage is unavailable. */ }
-  }, [cart, method, tendered, reference, customer, shipping, phone, line1, line2, city, operationKey, pendingSale]);
+  }, [cart, billAdjustments, method, tendered, reference, customer, shipping, phone, line1, line2, city, operationKey, pendingSale]);
 
   async function refreshProducts() {
     const version = ++searchVersion.current;
@@ -116,7 +129,7 @@ function Register({ initialProducts, initialDeliveryConfig }: { initialProducts:
       const existing = current.find(line => line.sizeStockId === product.sizeStockId);
       if ((existing?.quantity ?? 0) >= Math.min(product.available, 99)) return current;
       return existing ? current.map(line => line.sizeStockId === product.sizeStockId
-        ? { ...product, quantity: line.quantity + 1 } : line) : [...current, { ...product, quantity: 1 }];
+        ? { ...product, adjustments: line.adjustments, quantity: line.quantity + 1 } : line) : [...current, { ...product, quantity: 1 }];
     });
   }
 
@@ -129,7 +142,7 @@ function Register({ initialProducts, initialDeliveryConfig }: { initialProducts:
     setPendingSale(sale);
     pendingIntent.current = sale;
     // Persist before making the request, so refresh cannot lose an in-flight intent.
-    try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ cart, method, tendered, reference, customer, shipping, phone, line1, line2, city, operationKey, pendingSale: sale })); } catch {}
+    try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ cart, billAdjustments, method, tendered, reference, customer, shipping, phone, line1, line2, city, operationKey, pendingSale: sale })); } catch {}
     try {
       const result = await completePosSale(sale);
       if (!result.success) {
@@ -138,7 +151,7 @@ function Register({ initialProducts, initialDeliveryConfig }: { initialProducts:
         return;
       }
       setLastSale(result);
-      setCart([]); setTendered(""); setReference(""); setCustomer(""); setMethod("CASH"); setShipping(false); setPhone(""); setLine1(""); setLine2(""); setCity("");
+      setCart([]); setBillAdjustments(emptyPosAdjustments()); setTendered(""); setReference(""); setCustomer(""); setMethod("CASH"); setShipping(false); setPhone(""); setLine1(""); setLine2(""); setCity("");
       setOperationKey(crypto.randomUUID()); setPendingSale(null);
       pendingIntent.current = null;
       try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
@@ -187,12 +200,12 @@ function Register({ initialProducts, initialDeliveryConfig }: { initialProducts:
         <div className="rounded-xl border bg-card p-4">
           <div className="mb-4 flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-semibold"><ShoppingBasket className="size-5" />Current sale</h2>
-            <button disabled={locked || !cart.length} onClick={() => { setCart([]); setTendered(""); setError(""); setOperationKey(crypto.randomUUID()); }} className="text-xs text-muted-foreground underline disabled:opacity-50">Clear cart</button>
+            <button disabled={locked || !cart.length} onClick={() => { setCart([]); setBillAdjustments(emptyPosAdjustments()); setTendered(""); setError(""); setOperationKey(crypto.randomUUID()); }} className="text-xs text-muted-foreground underline disabled:opacity-50">Clear cart</button>
           </div>
           {!cart.length ? <p className="py-8 text-center text-sm text-muted-foreground">Choose a product to start a sale.</p> : (
             <ul className="max-h-96 space-y-4 overflow-y-auto">
               {cart.map(line => <li key={line.sizeStockId} className="border-b pb-3 last:border-0">
-                <div className="flex justify-between gap-2"><span className="text-sm font-medium">{line.name}</span><span className="shrink-0 text-sm">{money(line.price * line.quantity)}</span></div>
+                <div className="flex justify-between gap-2"><span className="text-sm font-medium">{line.name}</span><span className="shrink-0 text-sm">{money(preview.pricing?.lineTotals.get(line.sizeStockId) ?? line.price * line.quantity)}</span></div>
                 <p className="mt-1 text-xs text-muted-foreground">{line.color} · {line.size} · {line.sku}</p>
                 <div className="mt-2 flex items-center gap-2">
                   <button disabled={locked || line.quantity <= 1} aria-label={`Decrease ${line.sku}`} className="rounded border p-1 disabled:opacity-40" onClick={() => setCart(current => current.map(item => item.sizeStockId === line.sizeStockId ? { ...item, quantity: item.quantity - 1 } : item))}><Minus className="size-3" /></button>
@@ -201,9 +214,26 @@ function Register({ initialProducts, initialDeliveryConfig }: { initialProducts:
                   <span className="text-xs text-muted-foreground">× {money(line.price)}</span>
                   <button disabled={locked} aria-label={`Remove ${line.sku}`} className="ml-auto p-1 text-muted-foreground disabled:opacity-40" onClick={() => setCart(current => current.filter(item => item.sizeStockId !== line.sizeStockId))}><Trash2 className="size-4" /></button>
                 </div>
+                <details className="mt-2 rounded border p-2">
+                  <summary className="cursor-pointer text-xs text-muted-foreground">Item additional cost & discount</summary>
+                  <p className="my-2 text-xs text-muted-foreground">Applies to this line’s full quantity. Original: {money(line.price * line.quantity)}.</p>
+                  <PosAdjustmentFields label={`${line.name} (${line.sku})`} value={line.adjustments ?? emptyPosAdjustments()} locked={locked}
+                    onChange={adjustments => setCart(current => current.map(item => item.sizeStockId === line.sizeStockId ? { ...item, adjustments } : item))} />
+                </details>
               </li>)}
             </ul>
           )}
+          <details className="mt-4 rounded-lg border p-3">
+            <summary className="cursor-pointer text-sm">Bill additional costs & discounts</summary>
+            <p className="my-2 text-xs text-muted-foreground">Applied after item adjustments. Delivery is excluded.</p>
+            <PosAdjustmentFields label="Entire bill" value={billAdjustments} locked={locked} onChange={setBillAdjustments} />
+          </details>
+          {preview.error && <p role="alert" className="mt-2 text-sm text-destructive">{preview.error}</p>}
+          {!!preview.pricing?.adjustments.length && <div className="mt-3 space-y-1 text-sm">
+            <div className="flex justify-between"><span>Product subtotal</span><span>{money(subtotal)}</span></div>
+            <div className="flex justify-between"><span>Additional costs</span><span>+{money(preview.pricing.adjustments.reduce((sum, entry) => sum + Math.max(0, entry.amount), 0))}</span></div>
+            <div className="flex justify-between"><span>Discounts</span><span>−{money(preview.pricing.adjustments.reduce((sum, entry) => sum - Math.min(0, entry.amount), 0))}</span></div>
+          </div>}
           <div className="mt-4 flex items-center justify-between border-t pt-4 text-lg font-semibold"><span>Total</span><span>{money(total)}</span></div>
           {shipping ? <div className="mt-2 flex justify-between text-sm"><span>Delivery · {zoneForCity(city) === "COLOMBO" ? "Colombo" : "Outside Colombo"}</span><span>{money(shippingCents)}</span></div>
             : <p className="mt-1 text-xs text-muted-foreground">In-store collection · No delivery fee</p>}

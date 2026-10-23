@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { POS_ADJUSTMENT_MAX_CENTS, PosPriceAdjustmentsSchema, type PosAdjustmentDraft } from "./pos-adjustments";
 import { LkPhoneSchema } from "./validation";
 
 export const POS_PAYMENT_LABELS = { CASH: "Cash", CARD: "Card terminal", KOKO: "Koko", MINTPAY: "Mintpay", BANK_TRANSFER: "Bank Transfer", COD: "Cash on Delivery (COD)" } as const;
@@ -6,7 +7,7 @@ export const PosPaymentMethodSchema = z.enum(["CASH", "CARD", "KOKO", "MINTPAY",
 export type PosPaymentMethod = z.infer<typeof PosPaymentMethodSchema>;
 
 // POS amounts cross the client boundary as integer LKR cents.
-export const POS_MAX_CENTS = 1_000_000_000;
+export const POS_MAX_CENTS = POS_ADJUSTMENT_MAX_CENTS;
 const cents = z.number().int().min(0).max(POS_MAX_CENTS);
 export const PosSaleSchema = z.object({
   operationKey: z.uuid(),
@@ -14,7 +15,9 @@ export const PosSaleSchema = z.object({
     sizeStockId: z.string().min(1).max(128),
     quantity: z.number().int().min(1).max(99),
     expectedPrice: cents.positive(),
+    adjustments: PosPriceAdjustmentsSchema.optional(),
   }).strict()).min(1, "Add at least one item.").max(100),
+  adjustments: PosPriceAdjustmentsSchema.optional(),
   paymentMethod: PosPaymentMethodSchema,
   tendered: cents,
   paymentReference: z.string().trim().max(100).default(""),
@@ -47,7 +50,7 @@ export type PosProduct = {
   sizeStockId: string; sku: string; name: string; color: string; size: string;
   price: number; available: number; image: string | null;
 };
-export type PosCartLine = PosProduct & { quantity: number };
+export type PosCartLine = PosProduct & { quantity: number; adjustments?: PosAdjustmentDraft };
 export type PosSaleResult =
   | { success: true; orderId: string; posNumber: string }
   | { success: false; error: string; uncertain?: boolean };
@@ -59,9 +62,10 @@ export function posTotal(items: { price: number; quantity: number }[]): number {
 }
 
 export function posChange(total: number, tendered: number): number {
-  if (!Number.isSafeInteger(total) || total <= 0 || total > POS_MAX_CENTS) {
+  if (!Number.isSafeInteger(total) || total < 0 || total > POS_MAX_CENTS) {
     throw new PosError("The sale total is outside the supported range.");
   }
+  if (total === 0 && tendered !== 0) throw new PosError("A zero-total sale requires zero payment.");
   if (!Number.isSafeInteger(tendered) || tendered < total || tendered > POS_MAX_CENTS) {
     throw new PosError("The amount received must cover the sale total.");
   }

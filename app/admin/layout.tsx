@@ -14,7 +14,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <AdminTopBar userLabel={userLabel} />
       <div className="flex flex-1">
         <AdminSidebar />
-        <main className="flex-1 p-6">{children}</main>
+        <main className="min-w-0 flex-1 p-6">{children}</main>
       </div>
       <Toaster richColors position="top-right" />
     </div>

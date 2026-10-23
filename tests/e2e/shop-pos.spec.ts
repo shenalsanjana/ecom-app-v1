@@ -227,9 +227,60 @@ test("creates COD delivery, edits contact/address, dispatches with Royal Express
   await expect.poll(async () => (await db.order.findUniqueOrThrow({ where: { id: order.id } })).paymentStatus).toBe("COD_COLLECTED");
 });
 
+test("applies item and bill costs/discounts, restores drafts and prints the saved total", async ({ page, context }) => {
+  test.setTimeout(120000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page);
+  await scan(page);
+  await page.getByRole("button", { name: `Increase ${sku}` }).click();
+  const itemLabel = `POS Browser Shirt (${sku})`;
+  await page.getByText("Item additional cost & discount", { exact: true }).click();
+  await page.getByLabel(`Additional cost for ${itemLabel}`, { exact: true }).fill("100");
+  await page.getByLabel(`Discount type for ${itemLabel}`, { exact: true }).selectOption("PERCENT");
+  await page.getByLabel(`Discount for ${itemLabel}`, { exact: true }).fill("10");
+  await page.getByText("Bill additional costs & discounts", { exact: true }).click();
+  await page.getByLabel("Additional cost type for Entire bill", { exact: true }).selectOption("PERCENT");
+  await page.getByLabel("Additional cost for Entire bill", { exact: true }).fill("5");
+  await page.getByLabel("Discount for Entire bill", { exact: true }).fill("100");
+  await expect(page.getByRole("button", { name: /Complete sale/ })).toContainText("3,774.48");
+  await page.getByRole("button", { name: `Increase ${sku}` }).click();
+  await expect(page.getByRole("button", { name: /Complete sale/ })).toContainText("5,664.47");
+  await page.getByRole("button", { name: `Decrease ${sku}` }).click();
+  await expect(page.getByRole("button", { name: /Complete sale/ })).toContainText("3,774.48");
+  await page.reload();
+  await expect(page.getByRole("button", { name: /Complete sale/ })).toContainText("3,774.48");
+  await page.getByText("Item additional cost & discount", { exact: true }).click();
+  await expect(page.getByLabel(`Additional cost for ${itemLabel}`, { exact: true })).toHaveValue("100");
+  await page.getByText("Bill additional costs & discounts", { exact: true }).click();
+  await page.getByLabel("Discount for Entire bill", { exact: true }).fill("999999");
+  await expect(page.getByRole("alert").filter({ hasText: "discount exceeds" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Complete sale/ })).toBeDisabled();
+  await page.getByLabel("Discount for Entire bill", { exact: true }).fill("100");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath("pos-adjustments-mobile.png"), fullPage: true });
+  await page.getByRole("button", { name: "Exact cash", exact: true }).click();
+  await page.getByRole("button", { name: /Complete sale/ }).click();
+  await expect(page.getByRole("status")).toContainText(/Sale POS\d+ completed/);
+  const order = await db.order.findFirstOrThrow({ where: { cashierId: adminId, total: 3774.48 }, include: { adjustments: true } });
+  expect(order.adjustments).toHaveLength(4);
+  const popup = context.waitForEvent("page");
+  await page.getByRole("link", { name: "View / print receipt" }).click();
+  const receipt = await popup;
+  await expect(receipt.locator(".pos-receipt")).toContainText("Entire bill");
+  await expect(receipt.locator(".pos-receipt")).toContainText(sku);
+  await expect(receipt.locator(".pos-receipt")).toContainText("3,774.48");
+  await receipt.close();
+  await page.getByRole("link", { name: "Manage order & delivery" }).click();
+  await expect(page.getByText("POS costs and discounts are fixed to this sale. Items and pricing cannot be edited here.", { exact: true })).toBeVisible();
+  await expect(page.getByText("3,774.48", { exact: false }).first()).toBeVisible();
+});
+
 test("recovers a committed sale after its response is lost without deducting stock twice", async ({ page }) => {
   await login(page);
   await scan(page);
+  await page.getByText("Bill additional costs & discounts", { exact: true }).click();
+  await page.getByLabel("Discount type for Entire bill", { exact: true }).selectOption("PERCENT");
+  await page.getByLabel("Discount for Entire bill", { exact: true }).fill("10");
   await page.getByRole("button", { name: "Exact cash", exact: true }).click();
   const before = await db.order.count({ where: { cashierId: adminId } });
   const stockBefore = (await db.plainTshirtStock.findUniqueOrThrow({ where: { id: stockId } })).quantity;
@@ -244,12 +295,16 @@ test("recovers a committed sale after its response is lost without deducting sto
   await page.getByRole("button", { name: /Complete sale/ }).click();
   await expect(page.getByRole("button", { name: "Retry sale confirmation" })).toBeEnabled();
   await expect(page.getByLabel("Cash received (LKR)")).toBeDisabled();
+  await expect(page.getByLabel("Discount for Entire bill", { exact: true })).toBeDisabled();
   await page.unroute("**/admin/pos");
   await page.reload();
   await expect(page.getByRole("button", { name: "Retry sale confirmation" })).toBeEnabled();
   await page.getByRole("button", { name: "Retry sale confirmation" }).click();
   await expect(page.getByRole("status")).toContainText(/Sale POS\d+ completed/);
   expect(await db.order.count({ where: { cashierId: adminId } })).toBe(before + 1);
+  const recovered = await db.order.findFirstOrThrow({ where: { cashierId: adminId }, orderBy: { createdAt: "desc" }, include: { adjustments: true } });
+  expect(recovered.total).toBe(1799.99);
+  expect(recovered.adjustments).toHaveLength(1);
   expect((await db.plainTshirtStock.findUniqueOrThrow({ where: { id: stockId } })).quantity).toBe(stockBefore - 1);
 });
 

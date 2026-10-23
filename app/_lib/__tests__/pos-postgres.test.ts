@@ -97,6 +97,37 @@ describe.skipIf(!shared.url)("POS with PostgreSQL", () => {
       total: 5999.97, posPaymentReference: "BANK-123", paymentStartedAt: null,
     });
   });
+  it("saves item and bill adjustment snapshots atomically and retries without duplicating them", async () => {
+    const input = sale({ tendered: 400000,
+      items: [{ sizeStockId: product.variants[0].sizeStocks[0].id, quantity: 2, expectedPrice: 199999,
+        adjustments: { charge: { mode: "FIXED", value: 10000 }, discount: { mode: "PERCENT", value: 1000 } } }],
+      adjustments: { charge: { mode: "PERCENT", value: 500 }, discount: { mode: "FIXED", value: 10000 } } });
+    const result = await savePosSale(input, "cashier-one");
+    expect(await savePosSale(input, "cashier-one")).toEqual(result);
+    const order = await db().order.findUniqueOrThrow({ where: { id: result.orderId }, include: { items: true, adjustments: true } });
+    expect(order).toMatchObject({ subtotal: 3999.98, total: 3774.48, posTendered: 4000 });
+    expect(order.items[0]).toMatchObject({ price: 1999.99, quantity: 2 });
+    expect(order.adjustments).toHaveLength(4);
+    expect(order.adjustments.map(entry => entry.amount).sort((a,b) => a-b)).toEqual([-410, -100, 100, 184.5]);
+    expect(order.adjustments.some(entry => entry.label.includes(product.variants[0].sizeStocks[0].sku))).toBe(true);
+    expect(await balances()).toEqual({ blank: 8, print: 8 });
+    await expect(savePosSale({ ...input, adjustments: { discount: { mode: "FIXED", value: 1 } } }, "cashier-one")).rejects.toThrow("different details");
+  });
+  it("excludes delivery from bill percentages and retains the original free-delivery basis", async () => {
+    const input = sale({ paymentMethod: "COD", tendered: 0, customerName: "Discount customer",
+      adjustments: { discount: { mode: "PERCENT", value: 1000 } },
+      delivery: { carrier: "ROYAL_EXPRESS", phone: "0771234567", line1: "12 Test Road", line2: "", city: "Colombo", expectedCharge: 35000 } });
+    const result = await savePosSale(input, "cashier-one");
+    expect(await db().order.findUniqueOrThrow({ where: { id: result.orderId } })).toMatchObject({ subtotal: 3999.98, shippingCost: 350, total: 3949.98, paymentStatus: "COD_PENDING" });
+  });
+  it("rejects over-discounting without stock changes, and supports zero-payment cash sales", async () => {
+    await expect(savePosSale(sale({ adjustments: { discount: { mode: "FIXED", value: 999999 } } }), "cashier-one")).rejects.toThrow("discount exceeds");
+    expect(await balances()).toEqual({ blank: 10, print: 10 });
+    const input = sale({ tendered: 0, adjustments: { discount: { mode: "PERCENT", value: 10000 } } });
+    const result = await savePosSale(input, "cashier-one");
+    expect(await db().order.findUniqueOrThrow({ where: { id: result.orderId } })).toMatchObject({ total: 0, posTendered: 0, paymentStatus: "PAID" });
+    await expect(savePosSale(sale({ paymentMethod: "CARD", tendered: 0, paymentReference: "INVALID-ZERO", adjustments: input.adjustments }), "cashier-one")).rejects.toThrow("zero received");
+  });
   it("lists live prices, exact SKUs and the limiting stock pool", async () => {
     await db().dtfDesign.update({ where: { id: print }, data: { quantity: 3 } });
     const products = await getPosProducts(product.variants[0].sizeStocks[0].sku);

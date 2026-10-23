@@ -1,0 +1,2 @@
+- [x] Implement adjustments, authoritative totals and saved snapshots.
+- [x] Validate and prepare protected app-only release.

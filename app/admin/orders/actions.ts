@@ -1,5 +1,6 @@
 "use server";
 
+import { hasPosPriceAdjustments } from "@/app/_lib/pos-adjustments";
 import { LkPhoneSchema } from "@/app/_lib/validation";
 import { requiresPrint, effectivePrintId, type StockMode } from "@/app/_lib/stock-policy";
 import { setStockMovementContext } from "@/app/_lib/stock-movements";
@@ -227,6 +228,7 @@ export async function editItems(orderId: string, changes: ItemChange[]): Promise
     include: { items: true, adjustments: true },
   });
   if (!order) return { success: false, error: "Order not found" };
+  if (hasPosPriceAdjustments(order)) return { success: false, error: "POS charges and discounts are fixed to the original items. Cancel and create a new sale to change them." };
   if (order.adjustments?.some(a => a.promotion)) return { success: false, error: "Items on a discounted order are locked to preserve offer eligibility. Cancel and place a new order to change items." };
   if (!canEdit(order)) return { success: false, error: "This order can no longer be edited" };
   if (financialEditsLocked(order)) return { success: false, error: "Payment has started. Items and charges are locked to the payment amount." };
@@ -326,6 +328,7 @@ export async function addAdjustment(
 
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true, adjustments: true } });
   if (!order) return { success: false, error: "Order not found" };
+  if (hasPosPriceAdjustments(order)) return { success: false, error: "POS costs and discounts are fixed to this sale. Cancel and create a new sale to change them." };
   if (!canEdit(order)) return { success: false, error: "This order can no longer be edited" };
   if (financialEditsLocked(order)) return { success: false, error: "Payment has started. Items and charges are locked to the payment amount." };
   const courierError = courierBookedError(order);
@@ -357,6 +360,7 @@ export async function removeAdjustment(orderId: string, adjustmentId: string): P
   await requireAdmin();
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true, adjustments: true } });
   if (!order) return { success: false, error: "Order not found" };
+  if (hasPosPriceAdjustments(order)) return { success: false, error: "POS costs and discounts are fixed to this sale. Cancel and create a new sale to change them." };
   if (!canEdit(order)) return { success: false, error: "This order can no longer be edited" };
   if (financialEditsLocked(order)) return { success: false, error: "Payment has started. Items and charges are locked to the payment amount." };
   const courierError = courierBookedError(order);
@@ -500,6 +504,7 @@ export async function addOrderItem(
 
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true, adjustments: true } });
   if (!order) return { success: false, error: "Order not found" };
+  if (hasPosPriceAdjustments(order)) return { success: false, error: "POS charges and discounts are fixed to the original items. Cancel and create a new sale to change them." };
   if (order.adjustments?.some(a => a.promotion)) return { success: false, error: "Items on a discounted order are locked to preserve offer eligibility. Cancel and place a new order to change items." };
   if (!canEdit(order)) return { success: false, error: "This order can no longer be edited" };
   if (financialEditsLocked(order)) return { success: false, error: "Payment has started. Items and charges are locked to the payment amount." };
@@ -574,6 +579,7 @@ export async function swapOrderItem(
 
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true, adjustments: true } });
   if (!order) return { success: false, error: "Order not found" };
+  if (hasPosPriceAdjustments(order)) return { success: false, error: "POS charges and discounts are fixed to the original items. Cancel and create a new sale to change them." };
   if (order.adjustments?.some(a => a.promotion)) return { success: false, error: "Items on a discounted order are locked to preserve offer eligibility. Cancel and place a new order to change items." };
   if (!canEdit(order)) return { success: false, error: "This order can no longer be edited" };
   if (financialEditsLocked(order)) return { success: false, error: "Payment has started. Items and charges are locked to the payment amount." };

@@ -12,7 +12,7 @@ import "./receipt.css";
 export default async function PosReceiptPage({ params }: { params: Promise<{ id: string }> }) {
   await requireAdmin();
   const { id } = await params;
-  const order = await prisma.order.findUnique({ where: { id }, include: { items: true } });
+  const order = await prisma.order.findUnique({ where: { id }, include: { items: true, adjustments: { orderBy: { createdAt: "asc" } } } });
   if (!order || order.salesChannel !== "POS") notFound();
   const store = await getStoreSettings();
   const delivery = !!order.shippingCity;
@@ -44,7 +44,9 @@ export default async function PosReceiptPage({ params }: { params: Promise<{ id:
           </li>)}
         </ul>
         <div className="space-y-2 border-b border-dashed border-gray-400 py-3">
-          {delivery && <><div className="flex justify-between"><span>Subtotal</span><span>{formatPrice(order.subtotal)}</span></div><div className="flex justify-between"><span>Delivery charge</span><span>{formatPrice(order.shippingCost)}</span></div></>}
+          {(delivery || order.adjustments.length > 0) && <div className="flex justify-between"><span>Subtotal</span><span>{formatPrice(order.subtotal)}</span></div>}
+          {order.adjustments.map(entry => <div key={entry.id} className="flex justify-between gap-3 text-xs"><span className="min-w-0 break-words">{entry.label}</span><span className="shrink-0">{entry.amount < 0 ? "−" : "+"}{formatPrice(Math.abs(entry.amount))}</span></div>)}
+          {delivery && <div className="flex justify-between"><span>Delivery charge</span><span>{formatPrice(order.shippingCost)}</span></div>}
           <div className="flex justify-between text-base font-bold"><span>TOTAL</span><span>{formatPrice(order.total)}</span></div>
           <div className="flex justify-between"><span>Payment</span><span>{POS_PAYMENT_LABELS[order.paymentMethod as keyof typeof POS_PAYMENT_LABELS] ?? order.paymentMethodDisplay}</span></div>
           <div className="flex justify-between"><span>Payment status</span><span>{paymentStatusLabel(order.paymentStatus) ?? order.paymentStatus}</span></div>
