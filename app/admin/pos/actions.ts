@@ -1,5 +1,6 @@
 "use server";
 
+import { getDeliveryConfig } from "@/app/_lib/store-settings";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/app/_lib/admin-auth";
 import { invalidateStock } from "@/app/_lib/invalidate-stock";
@@ -34,4 +35,9 @@ export async function completePosSale(input: PosSaleInput): Promise<PosSaleResul
     revalidatePath("/admin/pos");
   } catch { console.error("[pos] Sale saved; cache refresh failed", { orderId: result.orderId }); }
   return { success: true, ...result };
+}
+
+export async function getPosDeliveryConfig() {
+  await requireAdmin();
+  return getDeliveryConfig();
 }

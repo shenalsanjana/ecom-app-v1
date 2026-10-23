@@ -6,6 +6,19 @@ const sale = () => ({ operationKey: randomUUID(), items: [{ sizeStockId: "size-1
   paymentMethod: "CASH", tendered: 400000 });
 
 describe("POS validation and money", () => {
+  it("keeps collection payloads unchanged and requires bank approval", () => {
+    expect(PosSaleSchema.parse(sale())).not.toHaveProperty("delivery");
+    expect(PosSaleSchema.safeParse({ ...sale(), paymentMethod: "BANK_TRANSFER" }).success).toBe(false);
+    expect(PosSaleSchema.parse({ ...sale(), paymentMethod: "BANK_TRANSFER", paymentReference: " TRANSFER-123 " }).paymentReference).toBe("TRANSFER-123");
+  });
+  it("requires complete COD customer details and defers all payment", () => {
+    const cod = { ...sale(), customerName: "Delivery customer", paymentMethod: "COD", tendered: 0,
+      delivery: { carrier: "ROYAL_EXPRESS", phone: "0771234567", line1: "12 Test Road", line2: "", city: "Colombo", expectedCharge: 35000 } };
+    expect(PosSaleSchema.safeParse(cod).success).toBe(true);
+    for (const invalid of [{ ...cod, delivery: undefined }, { ...cod, customerName: "" }, { ...cod, tendered: 1 },
+      { ...cod, delivery: { ...cod.delivery, phone: "123" } }, { ...cod, delivery: { ...cod.delivery, line1: "" } },
+      { ...cod, delivery: { ...cod.delivery, city: "" } }]) expect(PosSaleSchema.safeParse(invalid).success).toBe(false);
+  });
   it("calculates sub-rupee prices and change in integer cents", () => {
     const total = posTotal([{ price: 199999, quantity: 2 }, { price: 25050, quantity: 3 }]);
     expect(total).toBe(475148);

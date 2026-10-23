@@ -1,0 +1,2 @@
+- [x] Implement and cover bank/COD delivery orders.
+- [x] Validate and prepare protected app-only release.

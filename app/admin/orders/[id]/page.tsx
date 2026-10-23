@@ -18,6 +18,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
   const order = await getOrderDetail(id);
   if (!order) notFound();
 
+  const collectionSale = order.salesChannel === "POS" && !order.shippingCity;
   const canEditOrder = canEdit(order) && !financialEditsLocked(order);
   const next = nextStatuses(order.status)[0] ?? null;
   const curfoxEnabled = process.env.ROYAL_EXPRESS_ENABLED === "true";
@@ -87,8 +88,10 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-lg border p-4"><h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">{order.salesChannel === "POS" ? "Shop sale" : "Status & dispatch"}</h4>
-            {order.salesChannel === "POS" ? <p className="text-sm">Paid and collected in store.</p> : <>
+          <div className="rounded-lg border p-4"><h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">{collectionSale ? "Shop sale" : "Status & dispatch"}</h4>
+            {collectionSale ? <p className="text-sm">Paid and collected in store.</p> : <>
+            <p className="mb-3 text-sm">Delivery company: {order.deliveryCompany ?? "Royal Express"}</p>
+            <PrintLabelLink waybill={order.courierWaybillNumber} />
             <OrderActions orderId={order.id} status={order.status} paymentMethod={order.paymentMethod}
               paymentStatus={order.paymentStatus} courierBooked={!!order.courierBookedAt} nextStatus={next}
               curfoxEnabled={curfoxEnabled} />
@@ -108,9 +111,9 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
             <div className="text-sm">{order.user?.name ?? order.guestName}<br />
               <span className="text-muted-foreground">{order.user?.email ?? order.guestEmail} · {order.customerPhone}</span></div>
           </div>
-          {order.salesChannel !== "POS" && <div className="rounded-lg border p-4"><h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Shipping address</h4>
+          {!collectionSale && <div className="rounded-lg border p-4"><h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Shipping address</h4>
             <AddressEditor orderId={order.id} locked={!!order.courierBookedAt || !canEdit(order) || financialEditsLocked(order)}
-              address={{ line1: order.shippingLine1, line2: order.shippingLine2, city: order.shippingCity, country: order.shippingCountry }} />
+              address={{ line1: order.shippingLine1, line2: order.shippingLine2, city: order.shippingCity, country: order.shippingCountry, ...(order.salesChannel === "POS" ? { phone: order.customerPhone } : {}) }} />
           </div>}
           <div className="rounded-lg border p-4"><h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Payment</h4>
             <div className="space-y-1 text-sm">
@@ -119,7 +122,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
               <div className="flex justify-between"><span className="text-muted-foreground">{order.salesChannel === "POS" ? "Receipt #" : "Web #"}</span><span>{order.posNumber ?? order.webNumber ?? "—"}</span></div>
               {order.posPaymentReference && <div className="flex justify-between gap-2"><span className="text-muted-foreground">{order.paymentMethod === "CARD" ? "Terminal reference" : "Payment reference"}</span><span className="break-all">{order.posPaymentReference}</span></div>}
               {order.rbNumber && <div className="flex justify-between"><span className="text-muted-foreground">RB #</span><span>{order.rbNumber}</span></div>}
-              {order.salesChannel !== "POS" && <div className="flex justify-between"><span className="text-muted-foreground">Waybill</span><span>{order.courierWaybillNumber ?? "— (after dispatch)"}</span></div>}
+              {!collectionSale && <div className="flex justify-between"><span className="text-muted-foreground">Waybill</span><span>{order.courierWaybillNumber ?? "— (after dispatch)"}</span></div>}
             </div>
           </div>
         </div>

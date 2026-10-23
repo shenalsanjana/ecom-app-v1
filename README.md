@@ -287,3 +287,7 @@ full setup and deployment procedure.
 POS supports Cash, Card terminal, Koko and Mintpay. For non-cash sales, approve
 the full amount using the terminal/provider first, then record its reference.
 POS records the approved payment; it does not initiate an online payment.
+
+Shop POS also supports Bank Transfer (confirm receipt of the full transfer and record its reference) and Cash on Delivery. Select Royal Express Delivery, enter the recipient name, contact number, complete street address and city. COD requires delivery and remains COD pending until an admin records collection. Other methods retain paid in-store collection by default.
+
+Colombo and Outside Colombo charges are configured in Admin → Settings → Delivery pricing, shared with web checkout including its free-delivery policy. POS checks the current fee again before saving. Delivery orders appear as confirmed under Orders, with the existing Royal Express booking, manual dispatch/tracking fallback, delivery status, address/contact editing before dispatch, cancellation, and COD collection controls. No courier is booked automatically by the register.

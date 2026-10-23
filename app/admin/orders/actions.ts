@@ -1,5 +1,6 @@
 "use server";
 
+import { LkPhoneSchema } from "@/app/_lib/validation";
 import { requiresPrint, effectivePrintId, type StockMode } from "@/app/_lib/stock-policy";
 import { setStockMovementContext } from "@/app/_lib/stock-movements";
 import { saleSkuForSize } from "@/app/_lib/sale-skus";
@@ -157,6 +158,7 @@ export async function cancelOrder(orderId: string): Promise<ActionResult> {
 }
 
 const AddressSchema = z.object({
+  phone: LkPhoneSchema.optional(),
   line1: z.string().trim().min(1),
   line2: z.string().trim().optional().default(""),
   city: z.string().trim().min(1),
@@ -165,7 +167,7 @@ const AddressSchema = z.object({
 
 export async function editAddress(
   orderId: string,
-  address: { line1: string; line2?: string; city: string; country: string },
+  address: { line1: string; line2?: string; city: string; country: string; phone?: string },
 ): Promise<ActionResult> {
   await requireAdmin();
   const parsed = AddressSchema.safeParse(address);
@@ -182,6 +184,7 @@ export async function editAddress(
     await updateOrderFromSnapshot(order, {
       where: { id: orderId },
       data: {
+        ...(parsed.data.phone ? { customerPhone: parsed.data.phone } : {}),
         shippingLine1: parsed.data.line1,
         shippingLine2: parsed.data.line2 || null,
         shippingCity: parsed.data.city,
@@ -667,6 +670,7 @@ function toOrderDetails(order: DbOrderForDetails): OrderDetails {
     paymentMethod: order.paymentMethod as OrderDetails["paymentMethod"],
     paymentMethodDisplay: order.paymentMethodDisplay,
     notes: order.notes ?? undefined,
+    posNumber: order.posNumber,
     webNumber: order.webNumber,
     rbNumber: order.rbNumber,
     paymentStatus: order.paymentStatus,

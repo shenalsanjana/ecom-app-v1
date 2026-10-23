@@ -1,3 +1,6 @@
+import { calculateDelivery, DEFAULT_DELIVERY_CONFIG } from "./checkout-config";
+import { zoneForCity } from "./delivery-zones";
+import { DELIVERY_COMPANY_NAME } from "./carrier";
 import { createHash, randomUUID } from "node:crypto";
 import { prisma } from "@/app/_lib/prisma";
 import { toCents, fromCents } from "@/app/_lib/discounts";
@@ -101,11 +104,21 @@ export async function savePosSale(sale: PosSale, cashierId: string) {
             plainTshirtStockId: blank.id, dtfDesignId: effectivePrintId(product), stockMode: product.stockMode,
           };
         });
-        const total = posTotal(lines.map(line => ({ price: toCents(line.price), quantity: line.quantity })));
+        const subtotal = posTotal(lines.map(line => ({ price: toCents(line.price), quantity: line.quantity })));
+        let shippingCents = 0;
+        if (sale.delivery) {
+          const settings = await tx.storeSettings.findUnique({ where: { id: "singleton" } });
+          const pricing = settings ? { colombo: settings.colomboDeliveryCost, other: settings.otherDeliveryCost, freeThreshold: settings.freeDeliveryThreshold } : DEFAULT_DELIVERY_CONFIG;
+          shippingCents = toCents(calculateDelivery(fromCents(subtotal), zoneForCity(sale.delivery.city), pricing, sale.paymentMethod));
+          if (shippingCents !== sale.delivery.expectedCharge) throw new PosError("Delivery charges changed. Refresh products to see the updated total, then confirm the order again.");
+        }
+        const total = subtotal + shippingCents;
         posChange(total, sale.paymentMethod === "CASH" ? sale.tendered : total);
-        if (sale.paymentMethod !== "CASH" && sale.tendered !== total) {
+        if (sale.paymentMethod !== "CASH" && sale.paymentMethod !== "COD" && sale.tendered !== total) {
           throw new PosError("The payment amount must match the sale total.");
         }
+
+        if (sale.paymentMethod === "COD" && (!sale.delivery || sale.tendered !== 0)) throw new PosError("COD requires delivery details and no upfront payment.");
 
         const orderId = randomUUID();
         await setStockMovementContext(tx, { actorType: "ADMIN", actorId: cashierId,
@@ -118,12 +131,13 @@ export async function savePosSale(sale: PosSale, cashierId: string) {
         const posNumber = `POS${String(sequence[0].next).padStart(4, "0")}`;
         await tx.order.create({ data: {
           id: orderId, salesChannel: "POS", posNumber, cashierId, posPayloadHash: hash, idempotencyKey,
-          guestName: sale.customerName || "Walk-in customer", customerPhone: "",
-          shippingLine1: "In-store collection", shippingCity: "", shippingCountry: "Sri Lanka",
-          subtotal: fromCents(total), shippingCost: 0, total: fromCents(total),
-          paymentMethod: sale.paymentMethod, paymentMethodDisplay: `${POS_PAYMENT_LABELS[sale.paymentMethod]} (in store)`,
-          paymentStatus: "PAID", status: "DELIVERED", posTendered: fromCents(sale.tendered),
-          posPaymentReference: sale.paymentMethod !== "CASH" ? sale.paymentReference : null,
+          guestName: sale.customerName || "Walk-in customer", customerPhone: sale.delivery?.phone ?? "",
+          shippingLine1: sale.delivery?.line1 ?? "In-store collection", shippingLine2: sale.delivery?.line2 || null, shippingCity: sale.delivery?.city ?? "", shippingCountry: "Sri Lanka",
+          deliveryCompany: sale.delivery ? DELIVERY_COMPANY_NAME : null,
+          subtotal: fromCents(subtotal), shippingCost: fromCents(shippingCents), total: fromCents(total),
+          paymentMethod: sale.paymentMethod, paymentMethodDisplay: `${POS_PAYMENT_LABELS[sale.paymentMethod]} (${sale.delivery ? "delivery" : "in store"})`,
+          paymentStatus: sale.paymentMethod === "COD" ? "COD_PENDING" : "PAID", status: sale.delivery ? "CONFIRMED" : "DELIVERED", posTendered: sale.paymentMethod === "COD" ? null : fromCents(sale.tendered),
+          posPaymentReference: sale.paymentMethod !== "CASH" && sale.paymentMethod !== "COD" ? sale.paymentReference : null,
           items: { create: lines },
         } });
         return { orderId, posNumber };

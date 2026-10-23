@@ -1,0 +1,5 @@
+# Shop delivery, bank transfer and COD
+
+Add externally confirmed BANK_TRANSFER and deferred COD to POS. Keep existing paid collection sales unchanged. Delivery is optional for prepaid methods and mandatory for COD; select Royal Express and require customer name, a valid Sri Lankan phone, street address and city. Use the existing admin Colombo/outside-Colombo delivery settings and standard free-delivery policy. Snapshot the quoted delivery fee and reject stale quotes before stock changes.
+
+Persist delivery orders as CONFIRMED with PAID or COD_PENDING, existing POS numbering and existing shared-stock allocation. COD tendered must be zero. Reuse order details for Royal Express booking/manual tracking, dispatch/delivered transitions, cancellation and COD collection. Show truthful status, delivery charges and recipient details on receipts. Keep old pending-sale hashes stable by making new delivery input optional without defaults. No migrations or automatic courier booking. Validate with isolated database and browser tests; compile and release with memory/CPU limits, candidate verification and app-only rollback.
