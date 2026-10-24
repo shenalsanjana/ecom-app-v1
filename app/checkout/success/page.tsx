@@ -1,4 +1,5 @@
 // app/checkout/success/page.tsx
+import { CustomOrderDesign } from "@/app/_components/custom-order-design";
 import { Suspense } from "react";
 import Link from "next/link";
 import { Loader2, ShoppingBag, Truck, CheckCircle, AlertCircle } from "lucide-react";
@@ -129,6 +130,8 @@ async function OrderDetails({ orderId, paymentStatus }: { orderId: string; payme
           <p className="text-sm text-muted-foreground mb-1">Order Reference</p>
           <p className="text-2xl font-bold font-mono">{ref}</p>
         </div>
+
+        {!isCancelled && order.status !== "CANCELLED" && !order.deletedAt && <CustomOrderDesign items={order.items} orderNumber={ref} />}
 
         {/* Payment and delivery info */}
         <div className="bg-card border rounded-xl p-6 mb-8 text-left space-y-4">

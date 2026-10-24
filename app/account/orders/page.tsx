@@ -1,4 +1,6 @@
 // app/account/orders/page.tsx
+import { CustomOrderDesign } from "@/app/_components/custom-order-design";
+import { orderReference } from "@/app/_lib/order-reference";
 import { redirect } from "next/navigation";
 import { auth } from "@/app/_lib/auth";
 import { prisma } from "@/app/_lib/prisma";
@@ -105,6 +107,7 @@ export default async function OrdersPage() {
                       </li>
                     ))}
                   </ul>
+                  {o.status !== "CANCELLED" && !o.deletedAt && <CustomOrderDesign items={o.items} orderNumber={orderReference(o)} />}
                 </CardContent>
               </Card>
             </li>

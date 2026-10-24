@@ -599,3 +599,15 @@ describe("zero-total promotions", () => {
     expect(txOrderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ subtotal: 8000, shippingCost: 0, total: 0 }) }));
   });
 });
+
+
+it("snapshots the server custom-design requirement and returns it for COD confirmation", async () => {
+  const variants = await productVariantFindMany();
+  Object.assign(variants[0].product, { isCustomizedDesign: true });
+  productVariantFindMany.mockResolvedValueOnce(variants);
+  const result = await processOrder({ ...baseInput, paymentMethod: "COD" });
+  expect(result).toMatchObject({ success: true, customizedProducts: [{ productId: "P1", name: "T-Shirt" }] });
+  expect(txOrderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+    items: { create: [expect.objectContaining({ isCustomizedDesign: true })] },
+  }) }));
+});

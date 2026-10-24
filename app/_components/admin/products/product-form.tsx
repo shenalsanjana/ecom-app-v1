@@ -18,6 +18,7 @@ type Initial = {
   additionalCollectionSlugs?: string[];
   status?: "DRAFT" | "PUBLISHED";
   stockMode?: StockMode;
+  isCustomizedDesign?: boolean;
 };
 
 function toNum(s: string): number | null {
@@ -34,7 +35,7 @@ export function ProductForm({
   inventoryParents?: { id: string; name: string; section?: string | null }[]; stockOptions?: InventoryStockChoice[];
 }) {
   const router = useRouter();
-  const [f, setF] = useState<Initial>({ ...initial, stockMode: initial.stockMode ?? "PRINTED_TO_ORDER", status: initial.status ?? (mode === "create" ? "DRAFT" : "PUBLISHED") });
+  const [f, setF] = useState<Initial>({ ...initial, isCustomizedDesign: initial.isCustomizedDesign ?? false, stockMode: initial.stockMode ?? "PRINTED_TO_ORDER", status: initial.status ?? (mode === "create" ? "DRAFT" : "PUBLISHED") });
   const [collections, setCollections] = useState(categories);
   const [slugTouched, setSlugTouched] = useState(false);
   const [slug, setSlug] = useState(initial.id ?? "");
@@ -76,6 +77,7 @@ export function ProductForm({
       description: f.description.trim(),
       dtfDesignId: f.dtfDesignId || null,
       stockMode: f.stockMode,
+      isCustomizedDesign: f.isCustomizedDesign,
       inventoryProductId: f.inventoryProductId || null,
       variants: f.variants.filter(v => v.id || v.color.trim() || v.sizeStocks.length || v.cardImages.some(url => url.trim()) || v.detailImages.some(url => url.trim())).map((v) => ({
         id: v.id,
@@ -156,6 +158,11 @@ export function ProductForm({
             <p className="mt-1 text-xs text-muted-foreground">Used for this product’s breadcrumb and primary department. This choice does not move its physical stock.</p></div>
           <AdditionalCollections categories={collections} departments={departments} primary={f.designSlug}
             value={f.additionalCollectionSlugs ?? []} onChange={slugs => set("additionalCollectionSlugs", slugs)} />
+          <div className="space-y-1 rounded-md border p-3">
+            <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={f.isCustomizedDesign === true}
+              onChange={event => set("isCustomizedDesign", event.target.checked)} />Customized Design Product</label>
+            <p className="text-xs text-muted-foreground">Show the Business WhatsApp design button and remind customers to send PNG design files. Purchases remain available.</p>
+          </div>
           <div><label htmlFor="stock-mode" className="text-xs text-muted-foreground">How is this item fulfilled?</label>
             <select id="stock-mode" value={f.stockMode} onChange={event => set("stockMode", event.target.value as StockMode)} className="w-full rounded border px-2 py-1.5 text-sm">
               <option value="PRINTED_TO_ORDER">Printed to order — shared blank + print</option>

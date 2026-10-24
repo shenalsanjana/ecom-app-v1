@@ -1,5 +1,6 @@
 // app/checkout/checkout-client.tsx
 "use client";
+import { CustomDesignNotice } from "@/app/_components/custom-design-notice";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -53,6 +54,7 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [customizedOrderProducts, setCustomizedOrderProducts] = useState<{ name: string; productId: string | null; designReceivedAt?: string | null }[]>([]);
   const [orderReference, setOrderReference] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("COD");
   // Once an online order exists in the DB, hold its id so a failed redirect
@@ -129,6 +131,9 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
                 ? "Your items will be delivered with Cash on Delivery."
                 : `Your payment via ${paymentOptions.find((p) => p.id === paymentMethod)?.name ?? paymentMethod} is being processed.`}
             </p>
+            <CustomDesignNotice products={customizedOrderProducts.map(product => ({ name: product.name,
+              ...(product.productId ? { url: new URL(`/products/${product.productId}`, window.location.origin).toString() } : {}) }))} orderNumber={orderReference ?? orderId} received={customizedOrderProducts.length > 0 && customizedOrderProducts.every(product => !!product.designReceivedAt)} />
+            {customizedOrderProducts.length > 0 && <Link href={`/checkout/success?order_id=${encodeURIComponent(orderId)}`} className="mb-4 block text-sm underline">View order and design receipt status</Link>}
             <Button onClick={() => router.push("/")} className="w-full">
               Continue Shopping
             </Button>
@@ -257,6 +262,7 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
         // COD: capture purchase data BEFORE clearing the cart, then track.
         const purchaseContentIds = items.map((i) => i.productId);
         const purchaseValue = total;
+        setCustomizedOrderProducts(result.customizedProducts ?? []);
         clearCart();
         setOrderId(result.orderId);
         setOrderReference(result.webNumber ?? result.orderId);
@@ -542,6 +548,8 @@ export function CheckoutClient({ user, paymentOptions, cityGroups }: Props) {
               <div>
                 <div className="rounded-lg border p-6 sticky top-24">
                   <h2 className="font-heading text-lg font-semibold mb-4">Order Summary</h2>
+                  <CustomDesignNotice products={(offers.quote?.customizedProducts ?? []).map(product => ({ name: product.name,
+                    url: new URL(`/products/${product.productId}`, window.location.origin).toString() }))} />
                   {discountAmount > 0 && <p className="mb-3 text-xs text-muted-foreground">Item prices are before order offers. Your saving is deducted below.</p>}
 
                   <div className="space-y-3 text-sm">

@@ -1,3 +1,4 @@
+import { CustomDesignReceipt } from "@/app/_components/admin/orders/custom-design-receipt";
 import { hasPosPriceAdjustments } from "@/app/_lib/pos-adjustments";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -91,6 +92,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         </div>
 
         <div className="space-y-4">
+          <CustomDesignReceipt orderId={order.id} items={order.items} locked={!!order.deletedAt || order.status === "CANCELLED"} />
           <div className="rounded-lg border p-4"><h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">{collectionSale ? "Shop sale" : "Status & dispatch"}</h4>
             {collectionSale ? <p className="text-sm">Paid and collected in store.</p> : <>
             <p className="mb-3 text-sm">Delivery company: {order.deliveryCompany ?? "Royal Express"}</p>

@@ -425,6 +425,7 @@ export async function searchProductsForOrder(query: string): Promise<ProductSear
 }
 
 type ResolvedOrderVariant = {
+  isCustomizedDesign: boolean;
   stockMode: StockMode;
   productId: string;
   productName: string;
@@ -451,13 +452,14 @@ async function resolveVariantForOrder(productId: string, variantId: string): Pro
       archived: true,
       price: true,
       sizeStocks: { where: { archived: false }, select: { size: true, sku: true, plainTshirtStockId: true } },
-      product: { select: { id: true, name: true, price: true, dtfDesignId: true, stockMode: true, archived: true, status: true } },
+      product: { select: { id: true, name: true, price: true, isCustomizedDesign: true, dtfDesignId: true, stockMode: true, archived: true, status: true } },
     },
   });
   if (!variant || variant.archived || variant.productId !== productId || variant.product.archived || variant.product.status !== "PUBLISHED") return null;
   return {
     productId: variant.product.id,
     productName: variant.product.name,
+    isCustomizedDesign: variant.product.isCustomizedDesign === true,
     productPrice: variant.product.price,
     variantId: variant.id,
     color: variant.color,
@@ -546,6 +548,8 @@ export async function addOrderItem(
           color: resolved.color,
           sku: saleSkuForSize(resolved.stockBySize, parsed.data.size, resolved.sku),
           name: resolved.productName,
+          isCustomizedDesign: resolved.isCustomizedDesign,
+          designReceivedAt: null,
           size: parsed.data.size,
           price,
           quantity: parsed.data.quantity,
@@ -620,6 +624,8 @@ export async function swapOrderItem(
           color: resolved.color,
           sku: saleSkuForSize(resolved.stockBySize, parsed.data.size, resolved.sku),
           name: resolved.productName,
+          isCustomizedDesign: resolved.isCustomizedDesign,
+          designReceivedAt: null,
           size: parsed.data.size,
           price,
           quantity: parsed.data.quantity,

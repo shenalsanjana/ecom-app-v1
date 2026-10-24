@@ -126,6 +126,7 @@ export default async function ProductPage({
             <BuyBoxClient
               productId={detail.product.id}
               name={detail.product.name}
+              isCustomizedDesign={detail.product.isCustomizedDesign}
               variants={detail.variants}
               plainStockRows={detail.plainStockRows}
               designStockRows={detail.designStockRows}

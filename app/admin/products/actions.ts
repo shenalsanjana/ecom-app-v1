@@ -105,6 +105,7 @@ const ProductInputSchema = z.object({
   name: z.string().trim().min(1),
   status: z.enum(["DRAFT", "PUBLISHED"]).optional(),
   stockMode: z.enum(["PRINTED_TO_ORDER", "PLAIN"]).optional(),
+  isCustomizedDesign: z.boolean().optional(),
   slug: z.string().trim().optional(),
   designSlug: z.string().trim().min(1),
   additionalCollectionSlugs: z.array(z.string().trim().min(1)).max(100).optional(),
@@ -335,6 +336,7 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
           id: slug, name: d.name, designSlug: d.designSlug, departmentSlug, dtfDesignId: d.dtfDesignId,
           price: d.price, originalPrice: d.originalPrice ?? null,
           description: d.description, archived: false, status: d.status ?? "DRAFT", stockMode: d.stockMode ?? "PRINTED_TO_ORDER",
+          isCustomizedDesign: d.isCustomizedDesign ?? false,
           ...(d.inventoryProductId !== undefined ? { inventoryProductId: d.inventoryProductId } : {}),
         },
       });
@@ -381,6 +383,7 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
             description: d.description,
             ...(d.status !== undefined ? { status: d.status } : {}),
             ...(d.stockMode !== undefined ? { stockMode: d.stockMode } : {}),
+            ...(d.isCustomizedDesign !== undefined ? { isCustomizedDesign: d.isCustomizedDesign } : {}),
             ...(d.inventoryProductId !== undefined ? { inventoryProductId: d.inventoryProductId } : {}),
           },
         });
@@ -413,6 +416,7 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
           description: d.description,
           ...(d.status !== undefined ? { status: d.status } : {}),
             ...(d.stockMode !== undefined ? { stockMode: d.stockMode } : {}),
+            ...(d.isCustomizedDesign !== undefined ? { isCustomizedDesign: d.isCustomizedDesign } : {}),
           ...(d.inventoryProductId !== undefined ? { inventoryProductId: d.inventoryProductId } : {}),
         },
       });

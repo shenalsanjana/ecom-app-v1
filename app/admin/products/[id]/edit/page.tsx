@@ -19,7 +19,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
       stockOptions={plainStock.map(row => { const parent = parents.find(p => p.id === row.inventoryProductId); return { ...row, parentName: parent ? `${parent.category.name} → ${parent.name}` : "Unassigned blank", section: parent?.section }; })}
       initial={{
         id: product.id, name: product.name, designSlug: product.designSlug,
-        status: product.status, stockMode: product.stockMode,
+        status: product.status, stockMode: product.stockMode, isCustomizedDesign: product.isCustomizedDesign,
         additionalCollectionSlugs: product.additionalCollections.map(link => link.designSlug),
         price: String(product.price),
         originalPrice: product.originalPrice != null ? String(product.originalPrice) : "",

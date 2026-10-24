@@ -102,6 +102,7 @@ export async function savePosSale(sale: PosSale, cashierId: string) {
           return {
             productId: product.id, variantId: variant.id, name: product.name, color: variant.color,
             size: cell.size, sku: cell.sku, price: fromCents(price), quantity: item.quantity,
+            isCustomizedDesign: product.isCustomizedDesign === true,
             plainTshirtStockId: blank.id, dtfDesignId: effectivePrintId(product), stockMode: product.stockMode,
           };
         });

@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
   webpack: process.env.OVH_LOW_MEMORY_BUILD === "1" ? (config) => {
     // Avoid loading a large filesystem cache on the memory-limited OVH host.
     config.cache = false;
+    // Bound concurrent module transforms on the small OVH build host.
+    config.parallelism = 2;
     return config;
   } : undefined,
   typescript: {

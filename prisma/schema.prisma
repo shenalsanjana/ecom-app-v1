@@ -111,6 +111,7 @@ model Product {
   departmentSlug String
   archived      Boolean  @default(false)
   status        ProductStatus @default(DRAFT)
+  isCustomizedDesign Boolean @default(false)
   stockMode     StockMode @default(PRINTED_TO_ORDER)
   dtfDesignId   String?
   inventoryProductId String?
@@ -393,6 +394,8 @@ model PaymentEvent {
 }
 
 model OrderItem {
+  isCustomizedDesign Boolean @default(false)
+  designReceivedAt   DateTime?
   stockMode          StockMode @default(PRINTED_TO_ORDER)
   id                 String  @id @default(cuid())
   orderId            String

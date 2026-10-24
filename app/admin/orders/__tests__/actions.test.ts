@@ -979,6 +979,7 @@ describe("addOrderItem", () => {
         orderId: "o1", productId: "p1", variantId: "v1", color: "White", sku: "DB-CAT-WHT",
         name: "Cat Tee", size: "M", price: 2000, quantity: 2,
         plainTshirtStockId: "ps-white-m", dtfDesignId: "d1",
+        isCustomizedDesign: false, designReceivedAt: null,
       },
     });
     // subtotal 1000 (existing) + 2000*2 (new) = 5000, at/above 5000 free-shipping threshold -> 0
@@ -1054,6 +1055,7 @@ describe("swapOrderItem", () => {
         productId: "p2", variantId: "v2", color: "Black", sku: "DB-DOG-BLK",
         name: "Dog Tee", size: "S", price: 1800, quantity: 3,
         plainTshirtStockId: "ps-black-s", dtfDesignId: "d-new",
+        isCustomizedDesign: false, designReceivedAt: null,
       },
     });
     expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({

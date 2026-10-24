@@ -52,12 +52,13 @@ export type DiscountQuote = {
   lines?: DiscountLine[];
   notice?: string | null;
   paymentMethod?: PaymentMethod;
+  customizedProducts?: { productId: string; name: string }[];
 };
 export async function quoteCart(items: QuoteItemInput[], code?: string, paymentMethod?: PaymentMethod): Promise<DiscountQuote> {
   const variants = await prisma.productVariant.findMany({
     where: { id: { in: [...new Set(items.map(i => i.variantId))] }, archived: false, product: { archived: false, status: "PUBLISHED" } },
     select: { id: true, productId: true, price: true, originalPrice: true,
-      product: { select: { price: true, originalPrice: true, designSlug: true, additionalCollections: { select: { designSlug: true } } } } },
+      product: { select: { price: true, originalPrice: true, name: true, isCustomizedDesign: true, designSlug: true, additionalCollections: { select: { designSlug: true } } } } },
   });
   const map = new Map(variants.map(v => [v.id, v]));
   const lines: DiscountLine[] = items.map(item => {
@@ -74,5 +75,7 @@ export async function quoteCart(items: QuoteItemInput[], code?: string, paymentM
     paymentMethod,
     lines,
     prices: variants.map(v => ({ variantId: v.id, price: effectivePrice(v, v.product) })),
+    ...(variants.some(v => v.product.isCustomizedDesign) ? { customizedProducts: [...new Map(variants.filter(v => v.product.isCustomizedDesign)
+      .map(v => [v.productId, { productId: v.productId, name: v.product.name }])).values()] } : {}),
   };
 }
