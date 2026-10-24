@@ -15,6 +15,7 @@ vi.mock("@/app/_lib/prisma", async () => {
   shared.client = new PrismaClient({ datasourceUrl: shared.url ?? "postgresql://unused:unused@127.0.0.1:1/unused_test" });
   return { prisma: shared.client };
 });
+vi.mock("@/app/_lib/admin-auth", () => ({ requireAdmin: vi.fn().mockResolvedValue({ user: { id: "design-admin", email: "admin@example.test", role: "ADMIN" } }) }));
 vi.mock("@/app/_lib/session-user", () => ({ getVerifiedSessionUser: vi.fn().mockResolvedValue(null) }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn(), unstable_cache: (fn: unknown) => fn }));
 vi.mock("@/app/_lib/invalidate-stock", () => ({ invalidateStock: vi.fn() }));
@@ -22,6 +23,8 @@ vi.mock("@/app/_lib/order-notifications", () => ({ notifyOrderConfirmed: vi.fn()
 vi.mock("@/app/_lib/mailer", () => ({ sendPendingPrepaidNotificationEmail: vi.fn(), sendAdminFailureAlertEmail: vi.fn(), logMailerError: vi.fn() }));
 
 import { getPosProducts, savePosSale } from "../pos-service";
+import { setCustomDesignReceived } from "@/app/admin/orders/custom-design-actions";
+import { customDesignSummary } from "../custom-design";
 import { processOrder } from "@/app/checkout/actions";
 
 const db = () => shared.client!;
@@ -157,6 +160,31 @@ describe.skipIf(!shared.url)("POS with PostgreSQL", () => {
     expect(movements).toHaveLength(2);
     expect(movements.every(row => row.actorId === "cashier-one" && row.operationKey === input.operationKey && row.reason === "Shop POS sale")).toBe(true);
   });
+  it.each(["COD", "PAYHERE"] as const)("preserves custom requirements on %s orders and tracks receipt without changing stock or payment", async paymentMethod => {
+    await db().product.update({ where: { id: product.id }, data: { isCustomizedDesign: true } });
+    const result = await processOrder({ items: [{ productId: product.id, variantId: product.variants[0].id, name: "Untrusted name", price: 1999.99, quantity: 1, size: "M" }],
+      shippingAddress: { line1: "Test", city: "Colombo 01", country: "Sri Lanka" }, paymentMethod, contactPhone: "+94770000000",
+      guestInfo: { name: "Custom guest", phone: "+94770000000" }, idempotencyKey: randomUUID() });
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error(result.error);
+    const saved = await db().order.findUniqueOrThrow({ where: { id: result.orderId }, include: { items: true } });
+    expect(saved.items[0]).toMatchObject({ name: product.name, isCustomizedDesign: true, designReceivedAt: null });
+    const stock = await balances();
+    await db().product.update({ where: { id: product.id }, data: { isCustomizedDesign: false } });
+    expect(await setCustomDesignReceived(saved.id, saved.items[0].id, true)).toEqual({ success: true });
+    const received = await db().order.findUniqueOrThrow({ where: { id: saved.id }, include: { items: true, notesLog: true } });
+    expect(received.items[0].isCustomizedDesign).toBe(true);
+    expect(customDesignSummary(received.items).pending).toHaveLength(0);
+    expect(received.items[0].designReceivedAt).toBeInstanceOf(Date);
+    expect(received.notesLog[0].body).toContain("received via WhatsApp");
+    expect(received.total).toBe(saved.total);
+    expect(received.paymentStatus).toBe(saved.paymentStatus);
+    expect(await balances()).toEqual(stock);
+    expect(await setCustomDesignReceived(saved.id, saved.items[0].id, false)).toEqual({ success: true });
+    const reset = await db().orderItem.findUniqueOrThrow({ where: { id: saved.items[0].id } });
+    expect(customDesignSummary([reset]).pending).toHaveLength(1);
+  });
+
   it("plain products consume only physical stock", async () => {
     product = await makeProduct("PLAIN");
     await savePosSale(sale(), "cashier-one");

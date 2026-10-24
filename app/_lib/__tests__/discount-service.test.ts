@@ -66,3 +66,13 @@ describe("authoritative promotion service", () => {
     expect(mock.claim).not.toHaveBeenCalled();
   });
 });
+
+
+it("supplies authoritative custom product names for restored-cart reminders without duplicate variants", async () => {
+  mock.rules.mockResolvedValue([]);
+  const product = { name: "Custom Tote", isCustomizedDesign: true, price: 1790, originalPrice: null, designSlug: "bags", additionalCollections: [] };
+  mock.variants.mockResolvedValue([{ id: "v1", productId: "p", price: null, originalPrice: null, product }, { id: "v2", productId: "p", price: null, originalPrice: null, product }]);
+  const quote = await quoteCart([{ productId: "p", variantId: "v1", quantity: 1 }, { productId: "p", variantId: "v2", quantity: 1 }]);
+  expect(quote.customizedProducts).toEqual([{ productId: "p", name: "Custom Tote" }]);
+  expect(quote.subtotal).toBe(358000);
+});

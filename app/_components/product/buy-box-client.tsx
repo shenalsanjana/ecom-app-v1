@@ -1,5 +1,6 @@
 // app/_components/product/buy-box-client.tsx
 "use client";
+import { CustomDesignNotice } from "@/app/_components/custom-design-notice";
 import type { StockMode } from "@/app/_lib/stock-policy";
 
 import { useEffect, useMemo, useState } from "react";
@@ -49,6 +50,7 @@ type Props = {
   ratingAvg: number;
   ratingCount: number;
   shareUrl: string;
+  isCustomizedDesign?: boolean;
 };
 
 function discountPct(price: number, original: number): number {
@@ -56,7 +58,7 @@ function discountPct(price: number, original: number): number {
 }
 
 export function BuyBoxClient({
-  productId, name, variants, plainStockRows, designStockRows, defaultColorSlug, departmentSlug, collectionSlugs = [], ratingAvg, ratingCount, shareUrl,
+  productId, name, variants, plainStockRows, designStockRows, defaultColorSlug, departmentSlug, collectionSlugs = [], ratingAvg, ratingCount, shareUrl, isCustomizedDesign = false,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -179,6 +181,8 @@ export function BuyBoxClient({
       </div>
       <ProductOfferNote promotion={promotion} />
       <InstallmentNote total={promotion.price} />
+
+      {isCustomizedDesign && <CustomDesignNotice products={[{ name, url: shareUrl }]} />}
 
       {/* Color selector */}
       <div className="space-y-2">

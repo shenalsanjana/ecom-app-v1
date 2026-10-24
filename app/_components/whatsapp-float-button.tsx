@@ -1,10 +1,11 @@
 // app/_components/whatsapp-float-button.tsx
 "use client";
+import { BUSINESS_WHATSAPP_NUMBER } from "@/app/_lib/custom-design";
 
 export function WhatsAppFloatButton() {
   return (
     <a
-      href="https://wa.me/94740545536"
+      href={`https://wa.me/${BUSINESS_WHATSAPP_NUMBER}`}
       target="_blank"
       rel="noopener noreferrer"
       className="whatsapp-fab fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-green-500 text-white shadow-lg transition-[transform,bottom] hover:scale-110 hover:bg-green-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"

@@ -34,7 +34,7 @@ import { assertProductsPublished, PublicationError } from "@/app/_lib/product-pu
 export type PaymentMethod = "COD" | "PAYHERE" | "KOKO" | "MINTPAY";
 
 export type CheckoutResult =
-  | { success: true; orderId: string; webNumber?: string | null; trackingCode?: string; isGuest?: boolean }
+  | { success: true; orderId: string; webNumber?: string | null; trackingCode?: string; isGuest?: boolean; customizedProducts?: { productId: string | null; name: string; designReceivedAt?: string | null }[] }
   | { success: false; error: string; priceChanges?: { variantId: string; price: number }[] };
 
 const PAYMENT_METHOD_DISPLAY: Record<PaymentMethod, string> = {
@@ -190,6 +190,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
   if (idempotencyKey) {
     const existing = await prisma.order.findUnique({
       where: { idempotencyKey },
+      include: { items: true },
     });
     if (existing) {
       if (existing.userId !== userId || (!userId && existing.customerPhone !== contactPhone)) {
@@ -207,6 +208,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
         webNumber: existing.webNumber,
         trackingCode: existing.trackingCode ?? undefined,
         isGuest: !existing.userId,
+        ...((existing.items ?? []).some(item => item.isCustomizedDesign) ? { customizedProducts: existing.items.filter(item => item.isCustomizedDesign).map(item => ({ productId: item.productId, name: item.name, designReceivedAt: item.designReceivedAt?.toISOString() ?? null })) } : {}),
       };
     }
   }
@@ -227,12 +229,12 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
       originalPrice: true,
       archived: true,
       sizeStocks: { where: { archived: false }, select: { size: true, sku: true, plainTshirtStockId: true } },
-      product: { select: { dtfDesignId: true, stockMode: true, name: true, price: true, originalPrice: true, designSlug: true, additionalCollections: { select: { designSlug: true } }, archived: true, status: true } },
+      product: { select: { dtfDesignId: true, stockMode: true, isCustomizedDesign: true, name: true, price: true, originalPrice: true, designSlug: true, additionalCollections: { select: { designSlug: true } }, archived: true, status: true } },
     },
   });
   const variantMap = new Map<
     string,
-    VariantStock & { productId: string; color: string; colorSlug: string; sku: string | null; name: string; price: number }
+    VariantStock & { productId: string; color: string; colorSlug: string; sku: string | null; name: string; price: number; isCustomizedDesign: boolean }
   >(
     dbVariants.filter((v) => !v.archived && !v.product.archived && v.product.status === "PUBLISHED").map((v) => [
       v.id,
@@ -242,6 +244,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
         colorSlug: v.colorSlug,
         sku: v.sku,
         name: v.product.name,
+        isCustomizedDesign: v.product.isCustomizedDesign === true,
         price: effectivePrice(v, v.product),
         dtfDesignId: effectivePrintId(v.product),
         stockMode: v.product.stockMode,
@@ -349,6 +352,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
               color: variantMap.get(item.variantId)?.color ?? null,
               sku: saleSkuForSize(variantMap.get(item.variantId)?.sizes ?? [], item.size, variantMap.get(item.variantId)?.sku),
               name: item.name,
+              isCustomizedDesign: variantMap.get(item.variantId)?.isCustomizedDesign === true,
               size: item.size ?? null,
               price: item.price,
               quantity: item.quantity,
@@ -433,6 +437,8 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
     }
   }
 
-  return { success: true, orderId, webNumber: created.webNumber, trackingCode, isGuest: !userId };
+  return { success: true, orderId, webNumber: created.webNumber, trackingCode, isGuest: !userId,
+    ...([...variantMap.values()].some(variant => variant.isCustomizedDesign) ? { customizedProducts: [...new Map([...variantMap.values()].filter(variant => variant.isCustomizedDesign)
+      .map(variant => [variant.productId, { productId: variant.productId, name: variant.name }])).values()] } : {}) };
 }
 

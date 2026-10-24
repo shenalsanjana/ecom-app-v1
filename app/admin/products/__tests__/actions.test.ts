@@ -368,3 +368,22 @@ describe("deleteProduct", () => {
     expect(res).toEqual({ success: false, error: "Something went wrong. Please try again." });
   });
 });
+
+
+describe("customized design product setting", () => {
+  it("persists the flag when creating a product", async () => {
+    productFindUnique.mockResolvedValueOnce(null);
+    expect(await createProduct({ ...NEW_INPUT, isCustomizedDesign: true })).toMatchObject({ success: true });
+    expect(productCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ isCustomizedDesign: true }) }));
+  });
+  it("can disable the flag when editing a product", async () => {
+    productFindUnique.mockResolvedValueOnce({ id: "cat-white", isCustomizedDesign: true });
+    expect(await updateProduct("cat-white", { ...NEW_INPUT, isCustomizedDesign: false })).toMatchObject({ success: true });
+    expect(productUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ isCustomizedDesign: false }) }));
+  });
+  it("preserves the saved flag for legacy callers that omit it", async () => {
+    productFindUnique.mockResolvedValueOnce({ id: "cat-white", isCustomizedDesign: true });
+    expect(await updateProduct("cat-white", NEW_INPUT)).toMatchObject({ success: true });
+    expect(productUpdate.mock.calls[0][0].data).not.toHaveProperty("isCustomizedDesign");
+  });
+});
