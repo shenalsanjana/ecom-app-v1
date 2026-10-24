@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
-import type { PosSale } from "../pos";
+import { PosSaleSchema, type PosSale } from "../pos";
 
 const shared = vi.hoisted(() => ({ url: process.env.POS_TEST_DATABASE_URL, client: null as PrismaClient | null }));
 vi.mock("@/app/_lib/prisma", async () => {
@@ -78,10 +78,22 @@ describe.skipIf(!shared.url)("POS with PostgreSQL", () => {
     expect(await db().order.findUniqueOrThrow({ where: { id: result.orderId } })).toMatchObject({
       status: "CONFIRMED", paymentStatus: "COD_PENDING", paymentMethod: "COD", shippingCost: expectedCharge / 100,
       total: 3999.98 + expectedCharge / 100, subtotal: 3999.98, posTendered: null,
-      customerPhone: "0771234567", shippingLine1: "12 Test Road", shippingLine2: "Unit 3", shippingCity: city,
+      customerPhone: "0771234567", alternatePhone: null, shippingLine1: "12 Test Road", shippingLine2: "Unit 3", shippingCity: city,
       deliveryCompany: "Royal Express", courierBookedAt: null, posPaymentReference: null,
     });
     expect(await balances()).toEqual({ blank: 8, print: 8 });
+  });
+  it("persists the secondary delivery contact and rejects changed-contact retries without deducting stock twice", async () => {
+    const input = PosSaleSchema.parse(sale({ paymentMethod: "COD", tendered: 0, customerName: "Secondary Contact Customer",
+      delivery: { carrier: "ROYAL_EXPRESS", phone: "0771234567", alternatePhone: "(071) 222-3333", line1: "12 Test Road", line2: "", city: "Colombo", expectedCharge: 35000 } }));
+    const result = await savePosSale(input, "cashier-one");
+    expect(await savePosSale(input, "cashier-one")).toEqual(result);
+    expect(await db().order.findUniqueOrThrow({ where: { id: result.orderId } })).toMatchObject({
+      customerPhone: "0771234567", alternatePhone: "0712223333", total: 4349.98, shippingCost: 350, paymentStatus: "COD_PENDING",
+    });
+    await expect(savePosSale({ ...input, delivery: { ...input.delivery!, alternatePhone: "0722223333" } }, "cashier-one")).rejects.toThrow("different details");
+    expect(await balances()).toEqual({ blank: 8, print: 8 });
+    expect(await db().order.count({ where: { idempotencyKey: `pos:${input.operationKey}` } })).toBe(1);
   });
   it("rejects stale delivery fees without creating an order or reserving stock", async () => {
     const input = sale({ paymentMethod: "COD", tendered: 0, customerName: "Delivery Customer",

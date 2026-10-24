@@ -142,6 +142,7 @@ export async function savePosSale(sale: PosSale, cashierId: string) {
         await tx.order.create({ data: {
           id: orderId, salesChannel: "POS", posNumber, cashierId, posPayloadHash: hash, idempotencyKey,
           guestName: sale.customerName || "Walk-in customer", customerPhone: sale.delivery?.phone ?? "",
+          alternatePhone: sale.delivery?.alternatePhone ?? null,
           shippingLine1: sale.delivery?.line1 ?? "In-store collection", shippingLine2: sale.delivery?.line2 || null, shippingCity: sale.delivery?.city ?? "", shippingCountry: "Sri Lanka",
           deliveryCompany: sale.delivery ? DELIVERY_COMPANY_NAME : null,
           subtotal: fromCents(subtotal), shippingCost: fromCents(shippingCents), total: fromCents(total),

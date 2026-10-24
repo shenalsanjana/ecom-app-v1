@@ -1,0 +1,9 @@
+# POS secondary delivery contact
+
+Shop POS now shows Secondary Contact Number (optional) immediately below the primary contact in Royal Express delivery details, including COD. It uses the same Sri Lankan phone validation as online checkout and saves into the existing Order.alternatePhone column. The existing courier booking already maps that value to customer_secondary_phone; no schema or courier API change is needed.
+
+Session drafts restore the raw input, blank values are omitted from sale requests, and the field clears after a completed sale. Pending-sale locking includes the new input. Missing fields in legacy drafts and requests remain valid, and omitting a blank secondary contact preserves the previous payload hash for safe retries. Existing courier-only handling is retained without adding the number to receipts or customer messages.
+
+Validation passed: 1,291 unit tests, 22 tests against isolated PostgreSQL, scoped TypeScript and ESLint, a resource-bounded production build and two mobile browser flows. Coverage checks optional/invalid/formatted numbers, persistence, changed-contact retry rejection without duplicate stock deductions, draft refresh, clearing, a COD order through contact editing/manual Royal Express dispatch and collection, and a standard cash sale/receipt. External browser requests are blocked and no production orders or messages are sent.
+
+Checks run sequentially under CPU/memory caps with a host memory reserve. The release removes isolated-test caches, regenerates pages with production data, verifies a private canary and deploys only the app with rollback retained. Read-only live validation checks the labelled tel input, draft refresh, collection mode and mobile width. Final evidence records the host boot ID and unchanged database/proxy container IDs and start times. No database migration is required.
