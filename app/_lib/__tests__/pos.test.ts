@@ -19,6 +19,15 @@ describe("POS validation and money", () => {
       { ...cod, delivery: { ...cod.delivery, phone: "123" } }, { ...cod, delivery: { ...cod.delivery, line1: "" } },
       { ...cod, delivery: { ...cod.delivery, city: "" } }]) expect(PosSaleSchema.safeParse(invalid).success).toBe(false);
   });
+  it("keeps the secondary delivery phone optional and normalizes it like online checkout", () => {
+    const input = { ...sale(), customerName: "Delivery customer", paymentMethod: "COD", tendered: 0,
+      delivery: { carrier: "ROYAL_EXPRESS", phone: "0771234567", line1: "12 Test Road", line2: "", city: "Colombo", expectedCharge: 35000 } };
+    expect(PosSaleSchema.parse(input).delivery).not.toHaveProperty("alternatePhone");
+    expect(PosSaleSchema.parse({ ...input, delivery: { ...input.delivery, alternatePhone: " (071) 222-3333 " } }).delivery?.alternatePhone).toBe("0712223333");
+    for (const alternatePhone of ["123", "not a phone", "0000000000"]) {
+      expect(PosSaleSchema.safeParse({ ...input, delivery: { ...input.delivery, alternatePhone } }).success).toBe(false);
+    }
+  });
   it("calculates sub-rupee prices and change in integer cents", () => {
     const total = posTotal([{ price: 199999, quantity: 2 }, { price: 25050, quantity: 3 }]);
     expect(total).toBe(475148);

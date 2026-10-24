@@ -21,7 +21,7 @@ const subscribe = () => () => {};
 function readDraft() {
   const fresh = { cart: [] as PosCartLine[], method: "CASH" as PosPaymentMethod, tendered: "", reference: "", customer: "",
     billAdjustments: emptyPosAdjustments(),
-    shipping: false, phone: "", line1: "", line2: "", city: "",
+    shipping: false, phone: "", alternatePhone: "", line1: "", line2: "", city: "",
     operationKey: crypto.randomUUID() as string, pendingSale: null as PosSaleInput | null };
   try {
     const stored = JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? "null");
@@ -37,6 +37,7 @@ function readDraft() {
         typeof stored.operationKey === "string" && /^[0-9a-f-]{36}$/i.test(stored.operationKey) ? stored.operationKey : fresh.operationKey,
       shipping: stored.shipping === true || stored.method === "COD",
       phone: typeof stored.phone === "string" ? stored.phone : "",
+      alternatePhone: typeof stored.alternatePhone === "string" ? stored.alternatePhone : "",
       line1: typeof stored.line1 === "string" ? stored.line1 : "",
       line2: typeof stored.line2 === "string" ? stored.line2 : "",
       city: typeof stored.city === "string" ? stored.city : "",
@@ -65,6 +66,7 @@ function Register({ initialProducts, initialDeliveryConfig, cityGroups }: Regist
   const [deliveryConfig, setDeliveryConfig] = useState(initialDeliveryConfig);
   const [shipping, setShipping] = useState(draft.shipping);
   const [phone, setPhone] = useState(draft.phone);
+  const [alternatePhone, setAlternatePhone] = useState(draft.alternatePhone);
   const [line1, setLine1] = useState(draft.line1);
   const [line2, setLine2] = useState(draft.line2);
   const [city, setCity] = useState(draft.city);
@@ -97,16 +99,16 @@ function Register({ initialProducts, initialDeliveryConfig, cityGroups }: Regist
     ...(preview.adjustments ? { adjustments: preview.adjustments } : {}),
     paymentMethod: method, tendered: method === "CASH" ? receivedCents : method === "COD" ? 0 : total,
     paymentReference: reference, customerName: customer,
-    ...(shipping ? { delivery: { carrier: "ROYAL_EXPRESS", phone, line1, line2, city, expectedCharge: shippingCents } } : {}),
+    ...(shipping ? { delivery: { carrier: "ROYAL_EXPRESS", phone, ...(alternatePhone.trim() ? { alternatePhone: alternatePhone.trim() } : {}), line1, line2, city, expectedCharge: shippingCents } } : {}),
   };
   const canSubmit = !preview.error && PosSaleSchema.safeParse(currentSale).success && cart.length > 0 && total >= 0 && (total > 0 || method === "CASH") && total <= POS_MAX_CENTS &&
     (method === "COD" ? shipping : method !== "CASH" ? !!reference.trim() : validCash);
 
   useEffect(() => {
     try {
-      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ cart, billAdjustments, method, tendered, reference, customer, shipping, phone, line1, line2, city, operationKey, pendingSale }));
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ cart, billAdjustments, method, tendered, reference, customer, shipping, phone, alternatePhone, line1, line2, city, operationKey, pendingSale }));
     } catch { /* The register still works when browser storage is unavailable. */ }
-  }, [cart, billAdjustments, method, tendered, reference, customer, shipping, phone, line1, line2, city, operationKey, pendingSale]);
+  }, [cart, billAdjustments, method, tendered, reference, customer, shipping, phone, alternatePhone, line1, line2, city, operationKey, pendingSale]);
 
   async function refreshProducts() {
     const version = ++searchVersion.current;
@@ -145,7 +147,7 @@ function Register({ initialProducts, initialDeliveryConfig, cityGroups }: Regist
     setPendingSale(sale);
     pendingIntent.current = sale;
     // Persist before making the request, so refresh cannot lose an in-flight intent.
-    try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ cart, billAdjustments, method, tendered, reference, customer, shipping, phone, line1, line2, city, operationKey, pendingSale: sale })); } catch {}
+    try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ cart, billAdjustments, method, tendered, reference, customer, shipping, phone, alternatePhone, line1, line2, city, operationKey, pendingSale: sale })); } catch {}
     try {
       const result = await completePosSale(sale);
       if (!result.success) {
@@ -154,7 +156,7 @@ function Register({ initialProducts, initialDeliveryConfig, cityGroups }: Regist
         return;
       }
       setLastSale(result);
-      setCart([]); setBillAdjustments(emptyPosAdjustments()); setTendered(""); setReference(""); setCustomer(""); setMethod("CASH"); setShipping(false); setPhone(""); setLine1(""); setLine2(""); setCity("");
+      setCart([]); setBillAdjustments(emptyPosAdjustments()); setTendered(""); setReference(""); setCustomer(""); setMethod("CASH"); setShipping(false); setPhone(""); setAlternatePhone(""); setLine1(""); setLine2(""); setCity("");
       setOperationKey(crypto.randomUUID()); setPendingSale(null);
       pendingIntent.current = null;
       try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
@@ -250,6 +252,7 @@ function Register({ initialProducts, initialDeliveryConfig, cityGroups }: Regist
             {shipping && <div className="space-y-3 rounded-lg border p-3">
               <p className="text-xs text-muted-foreground">Enter the complete delivery address and contact number. <Link href="/admin/settings" className="underline">Configure delivery charges</Link></p>
               <label className="block space-y-1 text-sm"><span>Contact number</span><input type="tel" value={phone} onChange={e => setPhone(e.target.value)} disabled={locked} maxLength={30} placeholder="0771234567" className={field} /></label>
+              <label className="block space-y-1 text-sm"><span>Secondary Contact Number (optional)</span><input type="tel" value={alternatePhone} onChange={e => setAlternatePhone(e.target.value)} disabled={locked} maxLength={30} placeholder="0712345678" className={field} /></label>
               <label className="block space-y-1 text-sm"><span>Delivery address</span><input value={line1} onChange={e => setLine1(e.target.value)} disabled={locked} maxLength={200} placeholder="House / building number and street" className={field} /></label>
               <label className="block space-y-1 text-sm"><span>Address line 2 (optional)</span><input value={line2} onChange={e => setLine2(e.target.value)} disabled={locked} maxLength={200} className={field} /></label>
               <div className="space-y-1 text-sm">

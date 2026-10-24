@@ -25,6 +25,7 @@ export const PosSaleSchema = z.object({
   delivery: z.object({
     carrier: z.literal("ROYAL_EXPRESS"),
     phone: LkPhoneSchema,
+    alternatePhone: LkPhoneSchema.optional(),
     line1: z.string().trim().min(5, "Enter the complete street address.").max(200),
     line2: z.string().trim().max(200),
     city: z.string().trim().min(1, "Select a delivery city.").max(100),
