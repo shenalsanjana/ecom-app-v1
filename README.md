@@ -295,3 +295,14 @@ Colombo and Outside Colombo charges are configured in Admin → Settings → Del
 POS additional costs and discounts support fixed LKR amounts or percentages per item line and on the entire bill. Item amounts apply to the full quantity of that line. Each scope applies the additional cost first, then its discount; the bill uses the product total after item adjustments and excludes delivery. Values support two decimals and round to cents. Delivery/free-delivery eligibility keeps its existing original-product-subtotal policy.
 
 Saved orders and receipts include signed adjustment amounts with item/SKU and rate descriptions. These pricing snapshots cannot be edited independently of their items in Orders; for open orders, cancel and create a new sale to change saved pricing. COD contact/address and dispatch controls remain available. A fully discounted collection sale can be completed with Cash and zero received.
+
+
+### Sales dashboard
+
+Open **Admin → Sales dashboard** (`/admin/sales`) for POS and online sales by payment received date in Sri Lanka time. Today, Monday-based week, month and custom inclusive dates share the same figures and CSV/Excel downloads. The visible dashboard refreshes every 15 seconds; inactive tabs stop polling. Cancelled orders and pending payments do not count as sales. Delivery is separate from merchandise net sales and gross profit.
+
+Set **Cost price per unit** in product create/edit for future order snapshots. Historical costs stay unknown until an admin records actual unit costs under **Sales accounting → Product cost history** on the order. Missing costs leave gross profit unavailable. Older payment dates without gateway evidence are explicitly estimated from the order date; unrecorded old markdowns and refunds are not invented.
+
+After completing a refund with the provider, use **Sales accounting → Record a completed refund** to save the verified reference, refund date, merchandise/delivery amounts and reason. This records accounting only. Inventory returns are handled in Inventory; returned quantities mean resellable units already restocked. Voiding a reporting record retains its audit history. Active refund references are unique per order and repeated requests cannot create duplicate refunds.
+
+Reports reuse shared inventory for low-stock alerts, count each settled order once, and include daily, channel, payment, product, category/collection and size breakdowns. To protect server resources, one report is computed at a time with a short cache, transaction timeouts and a maximum of 366 days, 5,000 paid orders, 2,000 refund records and 20,000 combined lines. Narrow the dates or channel when a range exceeds those bounds.

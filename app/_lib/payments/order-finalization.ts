@@ -73,7 +73,7 @@ async function finalize(orderId: string, method: string, outcome: "PAID" | "FAIL
           await setStockMovementContext(tx, { actorType: "SYSTEM", reason: "Verified payment failure / allocation released", orderId: order.id });
           await claimOrderMutation(tx, order);
           if (status === "success") {
-            await tx.order.update({ where: { id: order.id }, data: { paymentStatus: "PAID", paymentReviewRequired: false, paymentReviewReason: null } });
+            await tx.order.update({ where: { id: order.id }, data: { paymentStatus: "PAID", salesPaidAt: order.salesPaidAt ?? new Date(), salesDateEstimated: false, paymentReviewRequired: false, paymentReviewReason: null } });
           } else if (status === "failed") {
             await tx.order.update({ where: { id: order.id }, data: { paymentStatus: "PAYMENT_FAILED", status: "CANCELLED", paymentReviewRequired: false, paymentReviewReason: null } });
             for (const item of order.items) await restoreItemPools(tx, item);

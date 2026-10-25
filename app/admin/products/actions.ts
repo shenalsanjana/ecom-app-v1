@@ -106,6 +106,7 @@ const ProductInputSchema = z.object({
   status: z.enum(["DRAFT", "PUBLISHED"]).optional(),
   stockMode: z.enum(["PRINTED_TO_ORDER", "PLAIN"]).optional(),
   isCustomizedDesign: z.boolean().optional(),
+  costPriceCents: z.number().int().min(0).max(2_000_000_000).nullable().optional(),
   slug: z.string().trim().optional(),
   designSlug: z.string().trim().min(1),
   additionalCollectionSlugs: z.array(z.string().trim().min(1)).max(100).optional(),
@@ -337,6 +338,7 @@ export async function createProduct(input: ProductInput): Promise<ActionResult> 
           price: d.price, originalPrice: d.originalPrice ?? null,
           description: d.description, archived: false, status: d.status ?? "DRAFT", stockMode: d.stockMode ?? "PRINTED_TO_ORDER",
           isCustomizedDesign: d.isCustomizedDesign ?? false,
+          costPriceCents: d.costPriceCents ?? null,
           ...(d.inventoryProductId !== undefined ? { inventoryProductId: d.inventoryProductId } : {}),
         },
       });
@@ -384,6 +386,7 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
             ...(d.status !== undefined ? { status: d.status } : {}),
             ...(d.stockMode !== undefined ? { stockMode: d.stockMode } : {}),
             ...(d.isCustomizedDesign !== undefined ? { isCustomizedDesign: d.isCustomizedDesign } : {}),
+            ...(d.costPriceCents !== undefined ? { costPriceCents: d.costPriceCents } : {}),
             ...(d.inventoryProductId !== undefined ? { inventoryProductId: d.inventoryProductId } : {}),
           },
         });
@@ -417,6 +420,7 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Ac
           ...(d.status !== undefined ? { status: d.status } : {}),
             ...(d.stockMode !== undefined ? { stockMode: d.stockMode } : {}),
             ...(d.isCustomizedDesign !== undefined ? { isCustomizedDesign: d.isCustomizedDesign } : {}),
+            ...(d.costPriceCents !== undefined ? { costPriceCents: d.costPriceCents } : {}),
           ...(d.inventoryProductId !== undefined ? { inventoryProductId: d.inventoryProductId } : {}),
         },
       });

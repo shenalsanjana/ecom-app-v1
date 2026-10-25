@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 type Props = {
   label: string;
-  value: number;
+  value: number | string;
   variant?: "hero" | "default";
   href?: string;
 };

@@ -9,6 +9,7 @@ import { saleSkuForSize } from "@/app/_lib/sale-skus";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
+import { salesItemSnapshot } from "@/app/_lib/sales/snapshot";
 import { prisma } from "@/app/_lib/prisma";
 import { requireAdmin } from "@/app/_lib/admin-auth";
 import { nextStatuses, applyItemChanges, recomputeTotals, canEdit, canConfirm, financialEditsLocked, courierBookedError, signedAdjustmentAmount, type ItemChange, type AdjustmentKind } from "@/app/_lib/admin-orders";
@@ -74,7 +75,7 @@ export async function markCodCollected(orderId: string): Promise<ActionResult> {
     return { success: false, error: "Not a COD order awaiting collection" };
   }
   try {
-    await updateOrderFromSnapshot(order, { where: { id: orderId }, data: { paymentStatus: "COD_COLLECTED" } });
+    await updateOrderFromSnapshot(order, { where: { id: orderId }, data: { paymentStatus: "COD_COLLECTED", salesPaidAt: new Date(), salesDateEstimated: false } });
   } catch (error) {
     return { success: false, error: error instanceof OrderConflictError ? error.message : "Something went wrong. Please try again." };
   }
@@ -425,6 +426,7 @@ export async function searchProductsForOrder(query: string): Promise<ProductSear
 }
 
 type ResolvedOrderVariant = {
+  sales: ReturnType<typeof salesItemSnapshot>;
   isCustomizedDesign: boolean;
   stockMode: StockMode;
   productId: string;
@@ -451,14 +453,16 @@ async function resolveVariantForOrder(productId: string, variantId: string): Pro
       sku: true,
       archived: true,
       price: true,
+      originalPrice: true,
       sizeStocks: { where: { archived: false }, select: { size: true, sku: true, plainTshirtStockId: true } },
-      product: { select: { id: true, name: true, price: true, isCustomizedDesign: true, dtfDesignId: true, stockMode: true, archived: true, status: true } },
+      product: { select: { id: true, name: true, price: true, originalPrice: true, costPriceCents: true, designSlug: true, design: { select: { name: true } }, isCustomizedDesign: true, dtfDesignId: true, stockMode: true, archived: true, status: true } },
     },
   });
   if (!variant || variant.archived || variant.productId !== productId || variant.product.archived || variant.product.status !== "PUBLISHED") return null;
   return {
     productId: variant.product.id,
     productName: variant.product.name,
+    sales: salesItemSnapshot(variant.product, variant, variant.price ?? variant.product.price),
     isCustomizedDesign: variant.product.isCustomizedDesign === true,
     productPrice: variant.product.price,
     variantId: variant.id,
@@ -549,6 +553,7 @@ export async function addOrderItem(
           sku: saleSkuForSize(resolved.stockBySize, parsed.data.size, resolved.sku),
           name: resolved.productName,
           isCustomizedDesign: resolved.isCustomizedDesign,
+          ...resolved.sales,
           designReceivedAt: null,
           size: parsed.data.size,
           price,
@@ -625,6 +630,7 @@ export async function swapOrderItem(
           sku: saleSkuForSize(resolved.stockBySize, parsed.data.size, resolved.sku),
           name: resolved.productName,
           isCustomizedDesign: resolved.isCustomizedDesign,
+          ...resolved.sales,
           designReceivedAt: null,
           size: parsed.data.size,
           price,
