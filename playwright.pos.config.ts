@@ -11,7 +11,7 @@ process.env.DATABASE_URL = databaseUrl;
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  testMatch: "shop-pos.spec.ts",
+  testMatch: ["shop-pos.spec.ts", "sales-dashboard.spec.ts"],
   fullyParallel: false,
   workers: 1,
   retries: 0,

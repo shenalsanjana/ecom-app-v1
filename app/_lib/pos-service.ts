@@ -1,3 +1,4 @@
+import { salesItemSnapshot } from "./sales/snapshot";
 import { calculatePosPricing } from "./pos-adjustments";
 import { calculateDelivery, DEFAULT_DELIVERY_CONFIG } from "./checkout-config";
 import { zoneForCity } from "./delivery-zones";
@@ -82,7 +83,7 @@ export async function savePosSale(sale: PosSale, cashierId: string) {
         const cells = await tx.variantSizeStock.findMany({
           where: { id: { in: items.map(item => item.sizeStockId) }, archived: false,
             variant: { archived: false, product: { archived: false, status: "PUBLISHED" } } },
-          include: { plainTshirtStock: true, variant: { include: { product: true } } },
+          include: { plainTshirtStock: true, variant: { include: { product: { include: { design: { select: { name: true } } } } } } },
         });
         if (cells.length !== items.length) throw new PosError("An item is no longer available. Refresh products and update the cart.");
         await assertProductsPublished(tx, cells.map(cell => cell.variant.product.id));
@@ -103,6 +104,7 @@ export async function savePosSale(sale: PosSale, cashierId: string) {
             productId: product.id, variantId: variant.id, name: product.name, color: variant.color,
             size: cell.size, sku: cell.sku, price: fromCents(price), quantity: item.quantity,
             isCustomizedDesign: product.isCustomizedDesign === true,
+            ...salesItemSnapshot(product, variant, fromCents(price)),
             plainTshirtStockId: blank.id, dtfDesignId: effectivePrintId(product), stockMode: product.stockMode,
           };
         });
@@ -140,7 +142,7 @@ export async function savePosSale(sale: PosSale, cashierId: string) {
         const sequence = await tx.$queryRaw<{ next: bigint }[]>`SELECT nextval('pos_number_seq') AS next`;
         const posNumber = `POS${String(sequence[0].next).padStart(4, "0")}`;
         await tx.order.create({ data: {
-          id: orderId, salesChannel: "POS", posNumber, cashierId, posPayloadHash: hash, idempotencyKey,
+          id: orderId, salesPaidAt: sale.paymentMethod === "COD" ? null : new Date(), salesChannel: "POS", posNumber, cashierId, posPayloadHash: hash, idempotencyKey,
           guestName: sale.customerName || "Walk-in customer", customerPhone: sale.delivery?.phone ?? "",
           alternatePhone: sale.delivery?.alternatePhone ?? null,
           shippingLine1: sale.delivery?.line1 ?? "In-store collection", shippingLine2: sale.delivery?.line2 || null, shippingCity: sale.delivery?.city ?? "", shippingCountry: "Sri Lanka",
@@ -152,7 +154,7 @@ export async function savePosSale(sale: PosSale, cashierId: string) {
           items: { create: lines },
           adjustments: { create: pricing.adjustments.map(entry => {
             const cell = entry.sizeStockId ? cells.find(cell => cell.id === entry.sizeStockId) : undefined;
-            return { label: cell ? entry.label.replace("POS · Item ·", `POS · Item ${cell.variant.product.name} [${cell.sku}] ·`) : entry.label, amount: fromCents(entry.amount) };
+            return { label: cell ? entry.label.replace("POS · Item ·", `POS · Item ${cell.variant.product.name} [${cell.sku}] ·`) : entry.label, amount: fromCents(entry.amount), salesItemSku: cell?.sku ?? null };
           }) },
         } });
         return { orderId, posNumber };

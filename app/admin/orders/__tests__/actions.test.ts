@@ -135,7 +135,7 @@ describe("markCodCollected", () => {
     orderFindUnique.mockResolvedValueOnce({ id: "o1", paymentMethod: "COD", paymentStatus: "COD_PENDING" });
     orderUpdate.mockResolvedValueOnce({});
     const res = await markCodCollected("o1");
-    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { paymentStatus: "COD_COLLECTED" } });
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: "o1" }, data: { paymentStatus: "COD_COLLECTED", salesPaidAt: expect.any(Date), salesDateEstimated: false } });
     expect(res).toEqual({ success: true });
   });
 });
@@ -978,6 +978,7 @@ describe("addOrderItem", () => {
       data: { stockMode: "PRINTED_TO_ORDER",
         orderId: "o1", productId: "p1", variantId: "v1", color: "White", sku: "DB-CAT-WHT",
         name: "Cat Tee", size: "M", price: 2000, quantity: 2,
+        unitCostCents: null, salesListPriceCents: 200000, salesProductKey: "p1", salesCategoryKey: "uncategorized", salesCategoryName: "Uncategorized",
         plainTshirtStockId: "ps-white-m", dtfDesignId: "d1",
         isCustomizedDesign: false, designReceivedAt: null,
       },
@@ -1054,6 +1055,7 @@ describe("swapOrderItem", () => {
       data: { stockMode: "PRINTED_TO_ORDER",
         productId: "p2", variantId: "v2", color: "Black", sku: "DB-DOG-BLK",
         name: "Dog Tee", size: "S", price: 1800, quantity: 3,
+        unitCostCents: null, salesListPriceCents: 180000, salesProductKey: "p2", salesCategoryKey: "uncategorized", salesCategoryName: "Uncategorized",
         plainTshirtStockId: "ps-black-s", dtfDesignId: "d-new",
         isCustomizedDesign: false, designReceivedAt: null,
       },

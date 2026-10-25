@@ -25,6 +25,8 @@ vi.mock("@/app/_lib/mailer", () => ({ sendPendingPrepaidNotificationEmail: vi.fn
 import { getPosProducts, savePosSale } from "../pos-service";
 import { setCustomDesignReceived } from "@/app/admin/orders/custom-design-actions";
 import { customDesignSummary } from "../custom-design";
+import { markCodCollected } from "@/app/admin/orders/actions";
+import { finalizePaidPayment } from "@/app/_lib/payments/order-finalization";
 import { processOrder } from "@/app/checkout/actions";
 
 const db = () => shared.client!;
@@ -70,6 +72,35 @@ describe.skipIf(!shared.url)("POS with PostgreSQL", () => {
   });
   afterAll(async () => { await db().$disconnect(); });
 
+  it("snapshots costs and original prices in POS and online orders and timestamps collected COD", async () => {
+    await db().product.update({ where: { id: product.id }, data: { costPriceCents: 40000, originalPrice: 2200 } });
+    const shop = await savePosSale(sale(), "cashier-one");
+    const paid = await db().order.findUniqueOrThrow({ where: { id: shop.orderId }, include: { items: true } });
+    expect(paid.salesPaidAt).toBeInstanceOf(Date); expect(paid.salesDateEstimated).toBe(false);
+    expect(paid.items[0]).toMatchObject({ unitCostCents: 40000, salesListPriceCents: 220000, salesCategoryKey: collection, salesProductKey: product.id });
+    await db().product.update({ where: { id: product.id }, data: { costPriceCents: 60000 } });
+    const online = await processOrder({ items: [{ productId: product.id, variantId: product.variants[0].id, name: product.name, price: 1999.99, quantity: 1, size: "M" }],
+      shippingAddress: { line1: "12 Test Road", city: "Colombo", country: "Sri Lanka" }, paymentMethod: "COD", contactPhone: "0771234567", guestInfo: { name: "Cost Customer", phone: "0771234567" }, idempotencyKey: randomUUID() });
+    expect(online.success).toBe(true); if (!online.success) return;
+    const pending = await db().order.findUniqueOrThrow({ where: { id: online.orderId }, include: { items: true } });
+    expect(pending.salesPaidAt).toBeNull(); expect(pending.items[0].unitCostCents).toBe(60000);
+    expect((await markCodCollected(online.orderId)).success).toBe(true);
+    expect((await db().order.findUniqueOrThrow({ where: { id: online.orderId } })).salesPaidAt).toBeInstanceOf(Date);
+    expect((await db().orderItem.findUniqueOrThrow({ where: { id: paid.items[0].id } })).unitCostCents).toBe(40000);
+  });
+  it("records the first verified payment date once despite repeated gateway callbacks", async () => {
+    const result = await processOrder({ items: [{ productId: product.id, variantId: product.variants[0].id, name: product.name, price: 1999.99, quantity: 1, size: "M" }],
+      shippingAddress: { line1: "12 Test Road", city: "Colombo", country: "Sri Lanka" }, paymentMethod: "PAYHERE", contactPhone: "0771234567", guestInfo: { name: "Paid Date", phone: "0771234567" }, idempotencyKey: randomUUID() });
+    expect(result.success).toBe(true); if (!result.success) return;
+    const original = await db().order.findUniqueOrThrow({ where: { id: result.orderId } }); const before = await balances();
+    const evidence = { reference: randomUUID(), amount: original.total, currency: "LKR" };
+    expect((await finalizePaidPayment(result.orderId, "PAYHERE", evidence)).status).toBe("success");
+    const settled = await db().order.findUniqueOrThrow({ where: { id: result.orderId } });
+    expect(settled.salesPaidAt).toBeInstanceOf(Date);
+    expect((await finalizePaidPayment(result.orderId, "PAYHERE", evidence)).status).toBe("already_processed");
+    expect((await db().order.findUniqueOrThrow({ where: { id: result.orderId } })).salesPaidAt).toEqual(settled.salesPaidAt);
+    expect(await db().paymentEvent.count({ where: { orderId: result.orderId } })).toBe(1); expect(await balances()).toEqual(before);
+  });
   it.each([["Colombo", 35000], ["Kandy", 45000]] as const)("creates a COD delivery to %s with authoritative zone pricing and one stock deduction", async (city, expectedCharge) => {
     const input = sale({ paymentMethod: "COD", tendered: 0, customerName: "Delivery Customer",
       delivery: { carrier: "ROYAL_EXPRESS", phone: "0771234567", line1: "12 Test Road", line2: "Unit 3", city, expectedCharge } });

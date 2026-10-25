@@ -18,6 +18,7 @@ import {
   type OrderDetails,
 } from "@/app/_lib/mailer";
 import { notifyOrderConfirmed } from "@/app/_lib/order-notifications";
+import { salesItemSnapshot } from "@/app/_lib/sales/snapshot";
 import { prisma } from "@/app/_lib/prisma";
 import { getVerifiedSessionUser } from "@/app/_lib/session-user";
 import { calculateDelivery } from "@/app/_lib/checkout-config";
@@ -229,12 +230,12 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
       originalPrice: true,
       archived: true,
       sizeStocks: { where: { archived: false }, select: { size: true, sku: true, plainTshirtStockId: true } },
-      product: { select: { dtfDesignId: true, stockMode: true, isCustomizedDesign: true, name: true, price: true, originalPrice: true, designSlug: true, additionalCollections: { select: { designSlug: true } }, archived: true, status: true } },
+      product: { select: { dtfDesignId: true, stockMode: true, isCustomizedDesign: true, costPriceCents: true, design: { select: { name: true } }, name: true, price: true, originalPrice: true, designSlug: true, additionalCollections: { select: { designSlug: true } }, archived: true, status: true } },
     },
   });
   const variantMap = new Map<
     string,
-    VariantStock & { productId: string; color: string; colorSlug: string; sku: string | null; name: string; price: number; isCustomizedDesign: boolean }
+    VariantStock & { productId: string; color: string; colorSlug: string; sku: string | null; name: string; price: number; isCustomizedDesign: boolean; sales: ReturnType<typeof salesItemSnapshot> }
   >(
     dbVariants.filter((v) => !v.archived && !v.product.archived && v.product.status === "PUBLISHED").map((v) => [
       v.id,
@@ -245,6 +246,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
         sku: v.sku,
         name: v.product.name,
         isCustomizedDesign: v.product.isCustomizedDesign === true,
+        sales: salesItemSnapshot({ ...v.product, id: v.productId }, v, effectivePrice(v, v.product)),
         price: effectivePrice(v, v.product),
         dtfDesignId: effectivePrintId(v.product),
         stockMode: v.product.stockMode,
@@ -353,6 +355,7 @@ export async function processOrder(input: ProcessOrderInput): Promise<CheckoutRe
               sku: saleSkuForSize(variantMap.get(item.variantId)?.sizes ?? [], item.size, variantMap.get(item.variantId)?.sku),
               name: item.name,
               isCustomizedDesign: variantMap.get(item.variantId)?.isCustomizedDesign === true,
+              ...variantMap.get(item.variantId)?.sales,
               size: item.size ?? null,
               price: item.price,
               quantity: item.quantity,

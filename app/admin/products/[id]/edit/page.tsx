@@ -22,6 +22,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         status: product.status, stockMode: product.stockMode, isCustomizedDesign: product.isCustomizedDesign,
         additionalCollectionSlugs: product.additionalCollections.map(link => link.designSlug),
         price: String(product.price),
+        costPrice: product.costPriceCents == null ? "" : (product.costPriceCents / 100).toFixed(2),
         originalPrice: product.originalPrice != null ? String(product.originalPrice) : "",
         description: product.description, archived: product.archived,
         dtfDesignId: product.dtfDesignId ?? "",

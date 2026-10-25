@@ -102,6 +102,7 @@ enum StockMode {
 }
 
 model Product {
+  costPriceCents Int? // internal unit cost; null means unknown, never zero by assumption
   id            String   @id
   name          String
   price         Float
@@ -308,6 +309,10 @@ model WishlistItem {
 }
 
 model Order {
+  salesPaidAt DateTime?
+  salesDateEstimated Boolean @default(false)
+  hasSalesRefunds Boolean @default(false)
+  salesRefunds SalesRefund[]
   id                    String   @id
   userId                String?
   guestName             String?
@@ -375,6 +380,8 @@ model Order {
   @@index([paymentStatus, createdAt])
   @@index([deletedAt, createdAt])
   @@index([salesChannel, createdAt])
+  @@index([salesPaidAt])
+  @@index([salesChannel, salesPaidAt])
 }
 
 // Verified gateway outcomes and reconciliation decisions, including late payments.
@@ -394,6 +401,11 @@ model PaymentEvent {
 }
 
 model OrderItem {
+  unitCostCents Int?
+  salesListPriceCents Int?
+  salesProductKey String?
+  salesCategoryKey String?
+  salesCategoryName String?
   isCustomizedDesign Boolean @default(false)
   designReceivedAt   DateTime?
   stockMode          StockMode @default(PRINTED_TO_ORDER)
@@ -439,6 +451,7 @@ model OrderNote {
 }
 
 model OrderAdjustment {
+  salesItemSku String?
   promotion Boolean @default(false)
   id        String   @id @default(cuid())
   orderId   String
@@ -594,4 +607,45 @@ model DiscountRedemption {
   discount Discount? @relation(fields: [discountId], references: [id], onDelete: SetNull)
   order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
   @@index([discountId, createdAt])
+}
+
+// Recorded, verified refunds only; this ledger never initiates payment or stock changes.
+model SalesRefund {
+  id String @id @default(cuid())
+  orderId String
+  operationKey String @unique @db.VarChar(36)
+  payloadHash String @db.VarChar(64)
+  reference String @db.VarChar(120)
+  merchandiseCents Int
+  shippingCents Int
+  occurredAt DateTime
+  reason String @db.VarChar(500)
+  createdByEmail String
+  createdAt DateTime @default(now())
+  voidedAt DateTime?
+  voidReason String? @db.VarChar(500)
+  voidedByEmail String?
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  items SalesRefundItem[]
+  @@index([orderId, reference])
+  @@index([occurredAt])
+  @@index([orderId, voidedAt])
+}
+
+model SalesRefundItem {
+  id String @id @default(cuid())
+  refundId String
+  orderItemId String
+  amountCents Int
+  returnedQuantity Int @default(0)
+  unitCostCents Int?
+  productKey String
+  productName String
+  categoryKey String
+  categoryName String
+  size String
+  refund SalesRefund @relation(fields: [refundId], references: [id], onDelete: Cascade)
+  @@index([refundId])
+  @@index([orderItemId])
+  @@unique([refundId, orderItemId])
 }

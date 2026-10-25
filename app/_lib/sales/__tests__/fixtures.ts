@@ -1,0 +1,6 @@
+import type { SalesOrder, SalesRefundRow } from "../calculations";
+const now = new Date("2026-10-24T08:00:00Z");
+export function order(extra: Partial<SalesOrder> = {}): SalesOrder { return { id: "o1", webNumber: "WEB1", posNumber: null, salesChannel: "ONLINE", paymentMethod: "PAYHERE", paymentStatus: "PAID", status: "DELIVERED", total: 2250, shippingCost: 350, createdAt: new Date("2026-10-20T08:00:00Z"), salesPaidAt: now, salesDateEstimated: false,
+  items: [{ id: "i1", productId: "p1", name: "Tote", sku: "SKU1", size: "One size", price: 1000, quantity: 2, unitCostCents: 40000, salesListPriceCents: 120000, salesProductKey: "p1", salesCategoryKey: "bags", salesCategoryName: "Bags" }], adjustments: [{ amount: -100, salesItemSku: null }], ...extra }; }
+export function refund(extra: Partial<SalesRefundRow> = {}): SalesRefundRow { return { id: "r1", orderId: "o1", merchandiseCents: 50000, shippingCents: 10000, occurredAt: now, voidedAt: null, order: { status: "DELIVERED", paymentStatus: "PAID", salesChannel: "ONLINE", paymentMethod: "PAYHERE" },
+  items: [{ orderItemId: "i1", amountCents: 50000, returnedQuantity: 1, unitCostCents: 40000, productKey: "p1", productName: "Tote", categoryKey: "bags", categoryName: "Bags", size: "One size" }], ...extra }; }

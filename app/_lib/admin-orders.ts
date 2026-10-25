@@ -186,8 +186,8 @@ export function canConfirm(order: { paymentMethod: string; paymentStatus: string
   return !order.paymentReviewRequired && (order.paymentMethod === "COD" || order.paymentStatus === "PAID");
 }
 
-export function financialEditsLocked(order: { paymentMethod: string; paymentStatus: string | null; paymentStartedAt?: Date | null }): boolean {
-  return order.paymentMethod !== "COD" && (!!order.paymentStartedAt || order.paymentStatus === "PAID");
+export function financialEditsLocked(order: { paymentMethod: string; paymentStatus: string | null; paymentStartedAt?: Date | null; hasSalesRefunds?: boolean }): boolean {
+  return order.hasSalesRefunds === true || order.paymentMethod !== "COD" && (!!order.paymentStartedAt || order.paymentStatus === "PAID");
 }
 
 export const PAGE_SIZE = 25;

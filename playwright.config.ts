@@ -10,7 +10,7 @@ for (const f of [".env", ".env.local"]) {
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  testIgnore: "shop-pos.spec.ts", // isolated database suite: playwright.pos.config.ts
+  testIgnore: ["shop-pos.spec.ts", "sales-dashboard.spec.ts"], // isolated database suite: playwright.pos.config.ts
   fullyParallel: false,
   retries: 0,
   workers: 1,

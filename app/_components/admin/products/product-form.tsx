@@ -1,4 +1,5 @@
 "use client";
+import { moneyInput } from "@/app/_lib/sales/input";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createProduct, updateProduct, archiveProduct, unarchiveProduct, unpublishProduct } from "@/app/admin/products/actions";
@@ -19,6 +20,7 @@ type Initial = {
   status?: "DRAFT" | "PUBLISHED";
   stockMode?: StockMode;
   isCustomizedDesign?: boolean;
+  costPrice?: string;
 };
 
 function toNum(s: string): number | null {
@@ -35,7 +37,7 @@ export function ProductForm({
   inventoryParents?: { id: string; name: string; section?: string | null }[]; stockOptions?: InventoryStockChoice[];
 }) {
   const router = useRouter();
-  const [f, setF] = useState<Initial>({ ...initial, isCustomizedDesign: initial.isCustomizedDesign ?? false, stockMode: initial.stockMode ?? "PRINTED_TO_ORDER", status: initial.status ?? (mode === "create" ? "DRAFT" : "PUBLISHED") });
+  const [f, setF] = useState<Initial>({ ...initial, costPrice: initial.costPrice ?? "", isCustomizedDesign: initial.isCustomizedDesign ?? false, stockMode: initial.stockMode ?? "PRINTED_TO_ORDER", status: initial.status ?? (mode === "create" ? "DRAFT" : "PUBLISHED") });
   const [collections, setCollections] = useState(categories);
   const [slugTouched, setSlugTouched] = useState(false);
   const [slug, setSlug] = useState(initial.id ?? "");
@@ -54,6 +56,7 @@ export function ProductForm({
     if (!f.name.trim()) return "Enter a product name.";
     if (!f.designSlug) return "Choose a store collection.";
     if (!Number.isFinite(Number(f.price)) || Number(f.price) <= 0) return "Enter a positive selling price.";
+    try { moneyInput(f.costPrice ?? "", true); } catch { return "Enter a non-negative cost price with at most two decimal places, or leave it blank."; }
     if (publishing && !f.description.trim()) return "Enter a product description.";
     if (publishing && f.stockMode !== "PLAIN" && !f.dtfDesignId) return "Choose the DTF print used by this product.";
     return null;
@@ -78,6 +81,7 @@ export function ProductForm({
       dtfDesignId: f.dtfDesignId || null,
       stockMode: f.stockMode,
       isCustomizedDesign: f.isCustomizedDesign,
+      costPriceCents: moneyInput(f.costPrice ?? "", true),
       inventoryProductId: f.inventoryProductId || null,
       variants: f.variants.filter(v => v.id || v.color.trim() || v.sizeStocks.length || v.cardImages.some(url => url.trim()) || v.detailImages.some(url => url.trim())).map((v) => ({
         id: v.id,
@@ -178,6 +182,7 @@ export function ProductForm({
 
         <div className="rounded-lg border p-4 grid grid-cols-2 gap-3">
           <div><label htmlFor="product-price" className="text-xs text-muted-foreground">Selling price (LKR)</label><input id="product-price" inputMode="decimal" value={f.price} onChange={(e) => set("price", e.target.value)} className="w-full rounded border px-2 py-1.5 text-sm" /></div>
+          <div><label htmlFor="product-cost" className="text-xs text-muted-foreground">Cost price per unit (LKR, optional)</label><input id="product-cost" inputMode="decimal" value={f.costPrice ?? ""} onChange={event => set("costPrice", event.target.value)} placeholder="Unknown" className="w-full rounded border px-2 py-1.5 text-sm" /><p className="mt-1 text-xs text-muted-foreground">Internal product cost for gross profit. Applies to new order items; historical costs can be recorded on each order.</p></div>
           <div><label htmlFor="product-original-price" className="text-xs text-muted-foreground">Original price (optional)</label><input id="product-original-price" inputMode="decimal" value={f.originalPrice} onChange={(e) => set("originalPrice", e.target.value)} className="w-full rounded border px-2 py-1.5 text-sm" /></div>
         </div>
 
