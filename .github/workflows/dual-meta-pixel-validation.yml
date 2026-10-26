@@ -1,0 +1,61 @@
+name: Dual Meta Pixel validation
+
+on:
+  push:
+    branches: [ci/dual-meta-pixel-20261026]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dual-meta-pixel-validation
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Full-project types and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install, generate, type check, and test within resource limits
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_limited() {
+            local step_name="$1"
+            shift
+            sudo systemd-run --quiet --wait --pipe --collect \
+              --unit="pixel-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${step_name}" \
+              --uid="$(id -u)" --gid="$(id -g)" \
+              --property=MemoryMax=4G --property=MemorySwapMax=0 \
+              --property=CPUQuota=100% --property=TasksMax=256 \
+              --property=LimitCORE=0 --property=RuntimeMaxSec=600s \
+              --working-directory="$GITHUB_WORKSPACE" \
+              /usr/bin/env "PATH=$PATH" "HOME=$HOME" CI=true \
+                NODE_OPTIONS=--max-old-space-size=3072 "$@"
+          }
+          run_limited install "$(command -v npm)" ci --no-audit --no-fund
+          run_limited prisma "$(command -v node)" node_modules/prisma/build/index.js generate
+          type_status=0
+          run_limited types "$(command -v node)" node_modules/typescript/bin/tsc --noEmit --incremental false 2>&1 | tee typecheck.log || type_status=$?
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          for line in Path('typecheck.log').read_text().splitlines():
+              match = re.match(r'(.+?)\((\d+),(\d+)\): error (.+)', line)
+              if match:
+                  path, row, col, message = match.groups()
+                  message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                  print(f'::error file={path},line={row},col={col}::{message}')
+          PY
+          test "$type_status" -eq 0
+          run_limited tests "$(command -v node)" node_modules/vitest/vitest.mjs run --no-cache --maxWorkers=1 --no-file-parallelism

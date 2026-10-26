@@ -7,6 +7,10 @@ import { prisma } from "../../app/_lib/prisma";
 
 // A unique guest email so the one order this suite places can be cleaned up.
 const COD_GUEST_EMAIL = "e2e-meta-purchase@example.com";
+const pixelIds = [...new Set([
+  process.env.NEXT_PUBLIC_META_PIXEL_ID,
+  process.env.NEXT_PUBLIC_META_PIXEL_ID_SECONDARY,
+].map((id) => id?.trim()).filter((id): id is string => !!id && /^\d+$/.test(id)))];
 
 // Resolve a real in-stock, non-archived product id from the seeded catalog
 // (the demo "p1" id does not exist in every environment). Stock now lives in
@@ -54,7 +58,7 @@ async function pixelCalls(page: Page): Promise<unknown[][]> {
 }
 
 function eventNames(calls: unknown[][]): string[] {
-  return calls.filter((c) => c[0] === "track").map((c) => String(c[1]));
+  return calls.filter((c) => c[0] === "trackSingle").map((c) => String(c[2]));
 }
 
 async function selectSizeIfPresent(page: Page) {
@@ -65,6 +69,7 @@ async function selectSizeIfPresent(page: Page) {
 }
 
 test("does not load the Pixel base script when NEXT_PUBLIC_META_PIXEL_ID is unset", async ({ page }) => {
+  test.skip(pixelIds.length > 0, "This assertion requires a build with both Pixel variables empty.");
   // No stub here — assert the REAL no-op behavior. With the env var unset (as in
   // this test environment) MetaPixelScript renders null: no base script tag and
   // no fbevents.js request, so the site behaves exactly as before.
@@ -78,6 +83,7 @@ test("does not load the Pixel base script when NEXT_PUBLIC_META_PIXEL_ID is unse
 });
 
 test("fires ViewContent on a product page", async ({ page }) => {
+  test.skip(pixelIds.length === 0, "This assertion requires a configured Pixel in the test build.");
   await stubPixel(page);
   await page.goto(`/products/${productId}`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10_000 });
@@ -85,6 +91,7 @@ test("fires ViewContent on a product page", async ({ page }) => {
 });
 
 test("fires AddToCart when adding from the product page", async ({ page }) => {
+  test.skip(pixelIds.length === 0, "This assertion requires a configured Pixel in the test build.");
   await stubPixel(page);
   await page.goto(`/products/${productId}`);
   await selectSizeIfPresent(page);
@@ -93,6 +100,7 @@ test("fires AddToCart when adding from the product page", async ({ page }) => {
 });
 
 test("fires InitiateCheckout on the checkout page with items in the cart", async ({ page }) => {
+  test.skip(pixelIds.length === 0, "This assertion requires a configured Pixel in the test build.");
   await stubPixel(page);
   await page.goto(`/products/${productId}`);
   await selectSizeIfPresent(page);
@@ -101,7 +109,8 @@ test("fires InitiateCheckout on the checkout page with items in the cart", async
   await expect.poll(async () => eventNames(await pixelCalls(page))).toContain("InitiateCheckout");
 });
 
-test("fires Purchase exactly once on COD order placement", async ({ page }) => {
+test("fires Purchase exactly once per Pixel on COD order placement", async ({ page }) => {
+  test.skip(pixelIds.length === 0, "This assertion requires a configured Pixel in the test build.");
   await stubPixel(page);
   await page.goto(`/products/${productId}`);
   await selectSizeIfPresent(page);
@@ -123,6 +132,12 @@ test("fires Purchase exactly once on COD order placement", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "Order Confirmed!" })).toBeVisible({ timeout: 30_000 });
 
-  const purchases = eventNames(await pixelCalls(page)).filter((n) => n === "Purchase");
-  expect(purchases).toHaveLength(1);
+  await expect.poll(async () =>
+    (await pixelCalls(page)).filter((call) => call[0] === "trackSingle" && call[2] === "Purchase").length,
+  ).toBe(pixelIds.length);
+  const purchases = (await pixelCalls(page)).filter((call) => call[0] === "trackSingle" && call[2] === "Purchase");
+  expect(purchases.map((call) => call[1])).toEqual(pixelIds);
+  const eventIds = purchases.map((call) => (call[4] as { eventID: string }).eventID);
+  expect(eventIds.every((id) => typeof id === "string" && id.length > 0)).toBe(true);
+  expect(new Set(eventIds).size).toBe(1);
 });

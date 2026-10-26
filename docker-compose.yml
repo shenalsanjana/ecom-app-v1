@@ -51,7 +51,7 @@ services:
       extra_hosts:
         - "postgres:127.0.0.1"
       # NEXT_PUBLIC_* vars are inlined at build time, not read at runtime —
-      # `env_file` below only affects the running container, so these three
+      # `env_file` below only affects the running container, so these values
       # must additionally be passed as build args (public values, safe as
       # plain args). Compose resolves ${...} here from .env because
       # scripts/deploy.sh `source`s .env into the real shell environment
@@ -59,6 +59,7 @@ services:
       # deploy that the build log shows no empty-value fallback.
       args:
         NEXT_PUBLIC_META_PIXEL_ID: ${NEXT_PUBLIC_META_PIXEL_ID}
+        NEXT_PUBLIC_META_PIXEL_ID_SECONDARY: ${NEXT_PUBLIC_META_PIXEL_ID_SECONDARY:-}
         NEXT_PUBLIC_KOKO_ENABLED: ${NEXT_PUBLIC_KOKO_ENABLED}
         NEXT_PUBLIC_DEBUG_CART: ${NEXT_PUBLIC_DEBUG_CART}
     restart: unless-stopped

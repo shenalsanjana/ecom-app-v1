@@ -2,8 +2,8 @@
 // Client-only wrapper around the Meta Pixel global (window.fbq). The single
 // source of truth for whether tracking is active. Every call is a no-op unless
 // the base script has loaded window.fbq — which only happens when
-// NEXT_PUBLIC_META_PIXEL_ID is set (see MetaPixelScript). No component reads the
-// env var or touches window.fbq directly.
+// at least one Pixel ID is configured (see MetaPixelScript). No component
+// reads the env vars or touches window.fbq directly.
 
 export type MetaEvent =
   | "PageView"
@@ -23,12 +23,25 @@ declare global {
 }
 
 export function pixelId(): string | undefined {
-  const id = process.env.NEXT_PUBLIC_META_PIXEL_ID;
-  return id && id.length > 0 ? id : undefined;
+  return configuredPixelId(process.env.NEXT_PUBLIC_META_PIXEL_ID);
+}
+
+function configuredPixelId(value: string | undefined): string | undefined {
+  const id = value?.trim();
+  return id && /^\d+$/.test(id) ? id : undefined;
+}
+
+export function pixelIds(): string[] {
+  // Keep direct NEXT_PUBLIC_* reads so Next.js inlines both at build time.
+  const ids = [
+    pixelId(),
+    configuredPixelId(process.env.NEXT_PUBLIC_META_PIXEL_ID_SECONDARY),
+  ].filter((id): id is string => id !== undefined);
+  return [...new Set(ids)];
 }
 
 export function isPixelConfigured(): boolean {
-  return Boolean(pixelId());
+  return pixelIds().length > 0;
 }
 
 function fbq(): Fbq | undefined {
@@ -43,21 +56,25 @@ export function track(
 ): void {
   const f = fbq();
   if (!f) return;
-  try {
-    if (options) f("track", event, payload ?? {}, options);
-    else f("track", event, payload ?? {});
-  } catch {
-    // Pixel must never break the page.
+  for (const id of pixelIds()) {
+    try {
+      if (options) f("trackSingle", id, event, payload ?? {}, options);
+      else f("trackSingle", id, event, payload ?? {});
+    } catch {
+      // A Pixel failure must never break the page or suppress the other Pixel.
+    }
   }
 }
 
 function trackCustom(name: string, payload?: Record<string, unknown>): void {
   const f = fbq();
   if (!f) return;
-  try {
-    f("trackCustom", name, payload ?? {});
-  } catch {
-    // Pixel must never break the page.
+  for (const id of pixelIds()) {
+    try {
+      f("trackSingleCustom", id, name, payload ?? {});
+    } catch {
+      // A Pixel failure must never break the page or suppress the other Pixel.
+    }
   }
 }
 
@@ -108,7 +125,7 @@ export async function trackPurchaseOnce(
   // to infer it from the Network tab, which can't distinguish "blocked" from
   // "loaded but neutered by an extension."
   console.log("[pixel-debug] trackPurchaseOnce: window.fbq is", typeof f === "function" ? "a function (ok)" : f);
-  if (!f || typeof window === "undefined") return;
+  if (!f || !isPixelConfigured() || typeof window === "undefined") return;
 
   // Dedupe: browser Pixel does not auto-dedupe repeated browser fires, and the
   // success page is revisitable (refresh / back-nav / a different browser

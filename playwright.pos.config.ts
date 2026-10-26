@@ -31,6 +31,7 @@ export default defineConfig({
       APP_URL: "http://localhost:3101",
       ROYAL_EXPRESS_ENABLED: "false",
       NEXT_PUBLIC_META_PIXEL_ID: "",
+      NEXT_PUBLIC_META_PIXEL_ID_SECONDARY: "",
     },
   },
 });

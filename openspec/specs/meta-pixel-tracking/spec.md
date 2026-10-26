@@ -11,11 +11,11 @@ the Cash-on-Delivery and online-payment checkout paths.
 
 ### Requirement: Meta Pixel is optional and no-op when unconfigured
 
-The system SHALL load the Meta Pixel only when `NEXT_PUBLIC_META_PIXEL_ID` is set to a non-empty value. When it is unset or empty, no Pixel script SHALL load, `window.fbq` SHALL NOT be defined by the application, and every tracking call SHALL be a silent no-op so the site behaves exactly as before the change.
+The system SHALL accept a primary `NEXT_PUBLIC_META_PIXEL_ID` and an optional `NEXT_PUBLIC_META_PIXEL_ID_SECONDARY`. IDs SHALL be trimmed, numeric, and unique. The system SHALL load one shared Meta runtime when at least one valid ID is configured. When neither variable contains a valid ID, no Pixel script SHALL load, `window.fbq` SHALL NOT be defined by the application, and every tracking call SHALL be a silent no-op.
 
 #### Scenario: Pixel disabled when env var unset
 
-- **WHEN** the app renders with `NEXT_PUBLIC_META_PIXEL_ID` unset or empty
+- **WHEN** both Pixel variables are unset or empty
 - **THEN** no `fbevents.js` request is made, no `meta-pixel-base` script tag is present, and tracking calls do not throw
 
 #### Scenario: Pixel enabled when env var set
@@ -23,9 +23,29 @@ The system SHALL load the Meta Pixel only when `NEXT_PUBLIC_META_PIXEL_ID` is se
 - **WHEN** the app renders with `NEXT_PUBLIC_META_PIXEL_ID` set to a Pixel id
 - **THEN** the base Pixel script loads, `fbq('init', <id>)` runs, and an initial `PageView` fires
 
+### Requirement: Both Pixels share one loader and receive one copy of each event
+
+The system SHALL initialize every unique configured Pixel ID once per document and send `PageView`, `ViewContent`, `AddToCart`, `InitiateCheckout`, `Purchase`, and custom `ViewCategory` to each ID using targeted dispatch. A repeated bootstrap or React effect replay SHALL NOT cause duplicate initialization or an extra initial `PageView`. Both IDs SHALL be passed to the Docker production build as environment-backed build arguments.
+
+#### Scenario: Two distinct Pixels are configured
+
+- **WHEN** both variables contain distinct valid IDs
+- **THEN** one shared `fbevents.js` runtime loads, each ID initializes once, and each event is sent once to each ID with identical payload parameters
+
+#### Scenario: Both variables contain the same ID
+
+- **WHEN** both variables contain the same ID, including surrounding whitespace
+- **THEN** the ID initializes once and each event is sent once
+
+#### Scenario: Purchase is shared across Pixels
+
+- **WHEN** the existing order-level Purchase claim succeeds
+- **THEN** both Pixels receive `Purchase` with the same order `eventID`, `value`, `currency: "LKR"`, and `content_ids`, using one claim for the order
+- **AND** previously claimed orders remain claimed and are never reset for the second Pixel
+
 ### Requirement: PageView fires on initial load and client navigations
 
-The system SHALL fire `PageView` on initial page load and on subsequent App Router client navigations (route changes), without double-counting the initial load.
+The system SHALL fire one `PageView` per configured Pixel on initial page load and on subsequent App Router pathname changes, without double-counting the initial load or repeated effects for the same pathname.
 
 #### Scenario: PageView on client navigation
 

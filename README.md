@@ -64,8 +64,9 @@ named `pos_test` on `127.0.0.1:55432`. They refuse other database locations. Set
 then run `npm run test:pos:db`. Build the app against that same isolated database
 and run `npm run test:pos:e2e` for the register/receipt browser tests on port 3101.
 Use `AUTH_SECRET=isolated-local-pos-browser-test-secret`,
-`AUTH_URL=http://localhost:3101`, `APP_URL=http://localhost:3101` and an empty
-`NEXT_PUBLIC_META_PIXEL_ID` for that test build. Install Playwright Chromium
+`AUTH_URL=http://localhost:3101`, `APP_URL=http://localhost:3101` and empty values for
+both `NEXT_PUBLIC_META_PIXEL_ID` and `NEXT_PUBLIC_META_PIXEL_ID_SECONDARY`
+for that test build. Install Playwright Chromium
 before running browser tests. Test builds and fixture data are disposable;
 production deployment builds the application again with the shop's settings.
 
@@ -87,8 +88,9 @@ AUTH_SECRET="your-secret-key"
 AUTH_URL="http://localhost:3000"
 APP_URL="http://localhost:3000"
 
-# Meta / Facebook (optional — when unset, Pixel + tracking are fully disabled)
+# Meta / Facebook (optional — leave both empty to disable tracking)
 NEXT_PUBLIC_META_PIXEL_ID=""
+NEXT_PUBLIC_META_PIXEL_ID_SECONDARY=""
 
 # SMTP Configuration (for order emails)
 SMTP_HOST="smtp.gmail.com"
@@ -221,10 +223,15 @@ The seed creates 12 realistic oversize t-shirt products with:
 
 ## Social Commerce / Meta Integration
 
-- **Meta Pixel** is optional. Set `NEXT_PUBLIC_META_PIXEL_ID` to your Pixel ID to
-  enable browser tracking of `PageView`, `ViewContent`, `AddToCart`,
-  `InitiateCheckout`, and `Purchase`. When the variable is unset or empty, no
-  Pixel script loads and the site behaves exactly as before.
+- **Meta Pixel** is optional. Set `NEXT_PUBLIC_META_PIXEL_ID` to the primary ID
+  and optionally `NEXT_PUBLIC_META_PIXEL_ID_SECONDARY` to a second ID. One shared
+  script initializes each unique numeric ID once. `PageView`, `ViewContent`,
+  `AddToCart`, `InitiateCheckout`, `Purchase`, and the custom `ViewCategory` event
+  are sent once to each configured Pixel using targeted dispatch. Purchase keeps
+  one shared server claim per order and the same `eventID` for both Pixels;
+  existing tracking records are preserved. Leave both IDs empty to disable
+  tracking. Both variables are included in Docker build arguments: changing
+  either requires rebuilding and deploying the frontend, with deployment approval.
 - **Catalog feed** for Meta Commerce Manager / Facebook Shop is served at
   `/feed/meta-catalog.csv`. Point a scheduled feed at
   `<APP_URL>/feed/meta-catalog.csv`. It excludes archived products and uses LKR
