@@ -59,3 +59,85 @@ jobs:
           PY
           test "$type_status" -eq 0
           run_limited tests "$(command -v node)" node_modules/vitest/vitest.mjs run --no-cache --maxWorkers=1 --no-file-parallelism
+
+  package:
+    name: Package verified release off-server
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Verify application snapshot and package without compilation
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          for required in VPS_HOST VPS_USER VPS_SSH_KEY VPS_SSH_KNOWN_HOSTS; do
+            if [ -z "${!required}" ]; then
+              echo "::error::Missing production CI secret: ${required}"
+              exit 1
+            fi
+          done
+          git diff --exit-code bd624300dea5bce856f9ffe6e98fc1e424048f2b HEAD -- app lib components prisma package.json package-lock.json next.config.ts
+          release_dir="$RUNNER_TEMP/dual-meta-release"
+          mkdir -m 700 "$release_dir"
+          release_key="$release_dir/ssh-key"
+          printf '%s\n' "$VPS_SSH_KEY" > "$release_key"
+          printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > "$release_dir/known-hosts"
+          chmod 600 "$release_key" "$release_dir/known-hosts"
+          trap 'rm -f "$release_key"' EXIT
+          release_ssh=(ssh -T -i "$release_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$release_dir/known-hosts" -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 "$VPS_USER@$VPS_HOST")
+          release_remote="/home/ubuntu/devops/ecom-app-v1/tmp/dual-meta-pixel-deployment-20261026/offserver-transfer.py"
+          release_limited="systemd-run --user --quiet --pipe --wait --collect --property=MemoryMax=256M --property=MemorySwapMax=0 --property=CPUQuota=25% --property=Nice=19 --property=IOWeight=10 --property=TasksMax=48 --property=LimitCORE=0 --property=RuntimeMaxSec=600s /usr/bin/python3 $release_remote"
+          "${release_ssh[@]}" "$release_limited export-base" > "$release_dir/base.tar.gz"
+          printf '%s  %s\n' '647403f24f4d9e92b9bbd15d5074282fba2e369228677383819a13bb0b843b13' "$release_dir/base.tar.gz" | sha256sum --check
+          "${release_ssh[@]}" "$release_limited export-build" > "$release_dir/build.tar"
+          mkdir "$release_dir/context"
+          tar -xf "$release_dir/build.tar" -C "$release_dir/context"
+          python3 - "$release_dir/context" <<'PY'
+          import hashlib, json, sys
+          from pathlib import Path
+          root = Path(sys.argv[1])
+          manifest = json.loads((root / 'build-files.json').read_text())
+          assert manifest['applicationCommit'] == 'bd624300dea5bce856f9ffe6e98fc1e424048f2b'
+          for name, digest in manifest['files'].items():
+              assert hashlib.sha256((root / name).read_bytes()).hexdigest() == digest, name
+          print('Verified all transferred production build files.')
+          PY
+          # These limits apply only to the disposable GitHub runner's daemons.
+          sudo systemctl set-property --runtime docker.service MemoryMax=4G MemorySwapMax=0 CPUQuota=100%
+          sudo systemctl set-property --runtime containerd.service MemoryMax=4G MemorySwapMax=0 CPUQuota=100%
+          package_limited() {
+            local step_name="$1"
+            shift
+            sudo systemd-run --quiet --wait --pipe --collect \
+              --unit="pixel-package-${GITHUB_RUN_ID}-${step_name}" \
+              --uid="$(id -u)" --gid="$(id -g)" \
+              --property=MemoryMax=4G --property=MemorySwapMax=0 \
+              --property=CPUQuota=100% --property=TasksMax=256 \
+              --property=LimitCORE=0 --property=RuntimeMaxSec=600s \
+              --working-directory="$release_dir" \
+              /usr/bin/env "PATH=$PATH" "$@"
+          }
+          package_limited load /bin/bash -o pipefail -c 'gzip -dc base.tar.gz | docker image load'
+          cat > "$release_dir/context/Dockerfile" <<'DOCKERFILE'
+          FROM dressingbear-app:rollback-dual-meta-pixel-20261026-f270fa2
+          COPY --chown=node:node app/ /app/
+          LABEL org.opencontainers.image.revision="bd624300dea5bce856f9ffe6e98fc1e424048f2b"
+          LABEL com.dressingbear.release="dual-meta-pixel"
+          DOCKERFILE
+          package_limited package docker build --tag dressingbear-app:dual-meta-bd624300 "$release_dir/context"
+          package_limited save /bin/bash -o pipefail -c 'docker image save dressingbear-app:dual-meta-bd624300 | gzip -1 > candidate-image.tar.gz'
+          release_digest="$(sha256sum "$release_dir/candidate-image.tar.gz" | cut -d ' ' -f 1)"
+          release_bytes="$(stat --format=%s "$release_dir/candidate-image.tar.gz")"
+          "${release_ssh[@]}" "$release_limited receive-image --sha256 $release_digest --bytes $release_bytes" < "$release_dir/candidate-image.tar.gz"
+          echo "Candidate image transferred and checksum verified. Production traffic has not been switched."
