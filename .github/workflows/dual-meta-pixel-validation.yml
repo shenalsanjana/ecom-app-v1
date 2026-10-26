@@ -12,8 +12,36 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  connection_preflight:
+    name: Verify production connection settings
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 2
+    steps:
+      - name: Check connection setting availability without exposing values
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER || vars.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS || vars.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for required in VPS_HOST VPS_USER VPS_SSH_KEY VPS_SSH_KNOWN_HOSTS; do
+            setting="${!required}"
+            if [ -z "${setting//[[:space:]]/}" ]; then
+              echo "::error::Unavailable production connection setting: ${required}"
+              missing=1
+            else
+              echo "${required}: available"
+            fi
+          done
+          exit "$missing"
+
   validate:
     name: Full-project types and unit tests
+    needs: connection_preflight
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -75,10 +103,10 @@ jobs:
       - name: Verify application snapshot and package without compilation
         shell: bash
         env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER || vars.VPS_USER }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS || vars.VPS_SSH_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
           for required in VPS_HOST VPS_USER VPS_SSH_KEY VPS_SSH_KNOWN_HOSTS; do
